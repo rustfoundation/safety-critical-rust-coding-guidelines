@@ -31,6 +31,10 @@ A record with checksums of the contents is available at `build/html/guidelines-i
 
 ## Contributing to the coding guidelines
 
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Chapter layout mirrors Ferrocene Language Specification
+
 We have the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute you may find a section from the FLS of interest and then write a guideline in the corresponding chapter of these coding guidelines.
 
 ### Guideline template
@@ -60,10 +64,6 @@ The [Rust Foundation][rust-foundation] has adopted a Code of Conduct that we
 expect project participants to adhere to. Please read [the full
 text][code-of-conduct] so that you can understand what actions will and will not
 be tolerated.
-
-## Contributing to This Repository
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licenses
 
