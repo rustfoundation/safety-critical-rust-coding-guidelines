@@ -1,7 +1,6 @@
 name: Build Safety-Critical Rust Coding Guidelines
 
 on:
-  # Add on:
   push:
     tags:
       - "*.*.*"
