@@ -57,11 +57,11 @@ jobs:
             exit 1
           fi
 
-      - name: Archive build logs
+      - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build-logs
+          name: build-artifacts
           path: build
           retention-days: 7
           compression-level: 6  # Default compression level for a good balance of speed and size
