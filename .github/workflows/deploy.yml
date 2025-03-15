@@ -22,6 +22,11 @@ jobs:
           name: build-artifacts
           path: build
 
+      - name: Check artifacts
+        run: |
+          ls build
+          ls build/html
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
