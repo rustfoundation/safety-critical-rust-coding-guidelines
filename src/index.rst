@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Safety-Critical Rust Coding Guidelines documentation
-====================================================
+Safety-Critical Rust Coding Guidelines
+======================================
 
 .. toctree::
    :maxdepth: 2
