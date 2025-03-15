@@ -1,0 +1,19 @@
+
+/* Styling for FLS ID links */
+.fls-id {
+    font-family: monospace;
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    text-decoration: none;
+    border-bottom: 1px dotted #666;
+}
+a.fls-id:hover {
+    background-color: rgba(0, 120, 215, 0.1);
+    color: #0078d7;
+    border-bottom-color: #0078d7;
+}
+.unknown-fls {
+    border-bottom: 1px dashed #cc0000;
+    color: #cc0000;
+}

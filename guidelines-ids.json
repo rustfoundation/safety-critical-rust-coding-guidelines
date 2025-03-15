@@ -1,0 +1,31 @@
+{
+  "documents": [
+    {
+      "title": "Types and Traits",
+      "link": "coding-guidelines/types-and-traits.html",
+      "guidelines": [
+        {
+          "id": "gui_xztNdXA2oFNB",
+          "title": "Avoid Implicit Integer Wrapping",
+          "link": "coding-guidelines/types-and-traits.html#gui_xztNdXA2oFNB",
+          "checksum": "d1503ef4e78fe49863d41e2b58d2a4713ffc0f618e8d82c312bce5612f5b17c7",
+          "rationale": {
+            "id": "rat_kYiIiW8R2qD1",
+            "link": "coding-guidelines/types-and-traits.html#rat_kYiIiW8R2qD1",
+            "checksum": "3960e55edcfcde4198a51980b8f9c6dcb320cdb8fcbad5b41046952b2cacb5f3"
+          },
+          "bad_example": {
+            "id": "bad_ex_PO5TyFsRTlWv",
+            "link": "coding-guidelines/types-and-traits.html#bad_ex_PO5TyFsRTlWv",
+            "checksum": "754478084cdad07bb27ecc503e769d3cf8360247ff1320541e85d093684acf7e"
+          },
+          "good_example": {
+            "id": "good_ex_WTe7GoPu5Ez0",
+            "link": "coding-guidelines/types-and-traits.html#good_ex_WTe7GoPu5Ez0",
+            "checksum": "3f3a8f05fa6c8e17339ca9a4027c3dee678c6d4a14a1b7fe4c0e937bc82e99b3"
+          }
+        }
+      ]
+    }
+  ]
+}
