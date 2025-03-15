@@ -1,4 +1,4 @@
-name: CI
+name: Deploy
 
 on:
   push:
@@ -7,13 +7,13 @@ on:
 
 jobs:
   deploy:
-    # Call the main build workflow
-    uses: ./.github/workflows/build-guidelines.yml
-    # If your main workflow is in a different file, adjust the path accordingly
 
     name: Deploy
     runs-on: ubuntu-latest
     steps:
+      # Call the main build workflow
+      - uses: ./.github/workflows/build-guidelines.yml
+      # If your main workflow is in a different file, adjust the path accordingly
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

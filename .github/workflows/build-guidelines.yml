@@ -1,4 +1,4 @@
-name: Build Safety-Critical Rust Coding Guidelines
+name: Build 
 
 on:
   push:
