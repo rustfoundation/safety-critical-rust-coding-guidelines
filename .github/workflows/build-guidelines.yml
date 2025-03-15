@@ -1,13 +1,16 @@
 name: Build Safety-Critical Rust Coding Guidelines
 
 on:
+  # Add on:
   push:
-    paths:
-      - 'subcommittee/coding-guidelines/initiatives/safety-critical-rust-coding-guidelines/**'
+    tags:
+      - "*.*.*"
+    branches:
+      - "main"
   pull_request:
-    paths:
-      - 'subcommittee/coding-guidelines/initiatives/safety-critical-rust-coding-guidelines/**'
-  # Add workflow_call trigger to make this workflow reusable
+    branches:
+      - "main"
+  # workflow_call trigger to make this workflow reusable
   workflow_call:
     # You can add inputs here if needed in the future
     # inputs:
@@ -30,7 +33,6 @@ jobs:
           uv --version
 
       - name: Build documentation
-        working-directory: subcommittee/coding-guidelines/initiatives/safety-critical-rust-coding-guidelines
         run: |
           mkdir -p build
           ./make.py 2>&1 | tee build/build.log
@@ -61,6 +63,6 @@ jobs:
         if: always()
         with:
           name: build-logs
-          path: subcommittee/coding-guidelines/initiatives/safety-critical-rust-coding-guidelines/build
+          path: build
           retention-days: 7
           compression-level: 6  # Default compression level for a good balance of speed and size
