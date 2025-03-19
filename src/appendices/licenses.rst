@@ -87,7 +87,7 @@ limitations under the License.
 
 
 Ferrocene Specification MIT License
---------------------------
+-----------------------------------
 
 **Copyright (c) The Ferrocene Developers**
 
