@@ -34,7 +34,12 @@ class CodingGuidelinesDomain(Domain):
 
 def setup(app):
     
+
+    # Retrieve the passed value
+
+    ignore_fls_checks = False
     app.add_domain(CodingGuidelinesDomain)
+    app.add_config_value("offline", False, "env") # register offline option
     app.add_config_value(
         name="spec_std_docs_url",
         default="https://doc.rust-lang.org/stable/std",

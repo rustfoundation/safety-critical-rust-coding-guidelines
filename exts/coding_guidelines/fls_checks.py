@@ -20,28 +20,27 @@ def check_fls(app, env):
     """Main checking function for FLS validation"""
     # First make sure all guidelines have correctly formatted FLS IDs
     check_fls_exists_and_valid_format(app, env)
+    offline_mode = env.config.offline
     
     # Gather all FLS paragraph IDs from the specification and get the raw JSON
-    fls_ids, raw_json_data = gather_fls_paragraph_ids(fls_paragraph_ids_url)
-    
+    fls_ids, raw_json_data = gather_fls_paragraph_ids(app, fls_paragraph_ids_url)
     # Error out if we couldn't get the raw JSON data
     if not raw_json_data:
         error_message = f"Failed to retrieve or parse the FLS specification from {fls_paragraph_ids_url}"
         logger.error(error_message)
-        raise FLSValidationError(error_message)
-    
-    # Check for differences against lock file
-    has_differences, differences = check_fls_lock_consistency(app, env, raw_json_data)
-    if has_differences:
-        error_message = "The FLS specification has changed since the lock file was created:\n"
-        for diff in differences:
-            error_message += f"  - {diff}\n"
-        error_message += "\nPlease manually inspect FLS spec items whose checksums have changed as corresponding guidelines may need to account for these changes."
-        error_message += "\nOnce resolved, you may run the following to update the local spec lock file:"
-        error_message += "\n\t./make.py --update-spec-lock-file"
-        logger.error(error_message)
-        raise FLSValidationError(error_message)
-    
+        raise FLSValidationError(error_message) 
+    if not offline_mode: # in offline mode, ignore checking against the lock file
+        # Check for differences against lock file
+        has_differences, differences = check_fls_lock_consistency(app, env, raw_json_data)
+        if has_differences:
+            error_message = "The FLS specification has changed since the lock file was created:\n"
+            for diff in differences:
+                error_message += f"  - {diff}\n"
+            error_message += "\nPlease manually inspect FLS spec items whose checksums have changed as corresponding guidelines may need to account for these changes."
+            error_message += "\nOnce resolved, you may run the following to update the local spec lock file:"
+            error_message += "\n\t./make.py --update-spec-lock-file"
+            logger.error(error_message)
+            raise FLSValidationError(error_message)
     # Check if all referenced FLS IDs exist
     check_fls_ids_correct(app, env, fls_ids)
     
@@ -154,7 +153,7 @@ def check_fls_ids_correct(app, env, fls_ids):
     logger.info("All FLS references in guidelines are valid")
 
 
-def gather_fls_paragraph_ids(json_url):
+def gather_fls_paragraph_ids(app, json_url):
     """
     Gather all Ferrocene Language Specification paragraph IDs from the paragraph-ids.json file,
     including both container section IDs and individual paragraph IDs.
@@ -166,6 +165,8 @@ def gather_fls_paragraph_ids(json_url):
         Dictionary mapping paragraph IDs to metadata AND the complete raw JSON data
     """
     logger.info("Gathering FLS paragraph IDs from %s", json_url)
+    offline = app.config.offline
+    lock_path = app.confdir / 'fls.lock'
     
     # Dictionary to store all FLS IDs and their metadata
     all_fls_ids = {}
@@ -173,18 +174,27 @@ def gather_fls_paragraph_ids(json_url):
     
     try:
         # Load the JSON file
-        response = requests.get(json_url)
-        response.raise_for_status()  # Raise exception for HTTP errors
-        
-        # Parse the JSON data
-        try:
-            raw_json_data = response.json()
-            data = raw_json_data  # Keep reference to the original data
-            logger.debug("Successfully parsed JSON data")
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            logger.debug(f"Response content preview: {response.text[:500]}...")
-            raise
+        if not offline:
+            response = requests.get(json_url)
+            response.raise_for_status()  # Raise exception for HTTP errors
+                # Parse the JSON data
+            try:
+                raw_json_data = response.json()
+                data = raw_json_data  # Keep reference to the original data
+                logger.debug("Successfully parsed JSON data")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON: {e}")
+                logger.debug(f"Response content preview: {response.text[:500]}...")
+                raise
+
+        else : # if online mode is on read from the lock file
+            if not lock_path.exists(): 
+                logger.warning(f"No FLS lock file found at {lock_path}") # TODO: returns an error
+                return False, []
+            with open(lock_path, 'r', encoding='utf-8') as f:
+                raw_json_data=f.read()
+                data = json.loads(raw_json_data)
+
         
         # Check if we have the expected document structure
         if 'documents' not in data:

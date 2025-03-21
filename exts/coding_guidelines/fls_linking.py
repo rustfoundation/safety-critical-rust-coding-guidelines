@@ -26,7 +26,7 @@ def load_fls_ids(app):
     """Load FLS IDs and their URLs."""
     try:
         from . import fls_checks
-        fls_ids, _ = fls_checks.gather_fls_paragraph_ids(app.config.fls_paragraph_ids_url)
+        fls_ids, _ = fls_checks.gather_fls_paragraph_ids(app, app.config.fls_paragraph_ids_url )
         return {fls_id: data['url'] for fls_id, data in fls_ids.items()}
     except Exception as e:
         logger.error(f"Failed to load FLS IDs: {e}")

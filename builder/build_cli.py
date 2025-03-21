@@ -20,10 +20,14 @@ EXTRA_WATCH_DIRS = ["exts", "themes"]
 SPEC_CHECKSUM_URL = "https://spec.ferrocene.dev/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
 
-def build_docs(root, builder, clear, serve, debug, spec_lock_consistency_check):
+def build_docs(root, builder, clear, serve, debug, offline, spec_lock_consistency_check):
     dest = root / "build"
 
     args = ["-b", builder, "-d", dest / "doctrees"]
+
+    if offline:  
+        args.append("-D")
+        args.append("offline=1")
     if debug:
         # Disable parallel builds and show exceptions in debug mode.
         #
@@ -129,6 +133,12 @@ def main(root):
         action="store_true",
     )
     group.add_argument(
+        "-o",
+        "--offline",
+        help="build on offline mode",
+        action="store_true",
+    )
+    group.add_argument(
         "--check-links", help="Check whether all links are valid", action="store_true"
     )
     group.add_argument(
@@ -145,6 +155,6 @@ def main(root):
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     rendered = build_docs(
-        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, not args.ignore_spec_lock_diff
+        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff
     )
 
