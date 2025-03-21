@@ -155,16 +155,16 @@ def check_fls_ids_correct(app, env, fls_ids):
 
 def gather_fls_paragraph_ids(app, json_url):
     """
-    Gather all Ferrocene Language Specification paragraph IDs from the paragraph-ids.json file,
-    including both container section IDs and individual paragraph IDs.
+    Gather all Ferrocene Language Specification paragraph IDs from the paragraph-ids.json file 
+    or from the lock file in offline mode, including both container section IDs and individual paragraph IDs.
     
     Args:
+        app: The Sphinx application
         json_url: The URL or path to the paragraph-ids.json file
         
     Returns:
         Dictionary mapping paragraph IDs to metadata AND the complete raw JSON data
     """
-    logger.info("Gathering FLS paragraph IDs from %s", json_url)
     offline = app.config.offline
     lock_path = app.confdir / 'fls.lock'
     
@@ -175,6 +175,7 @@ def gather_fls_paragraph_ids(app, json_url):
     try:
         # Load the JSON file
         if not offline:
+            logger.info("Gathering FLS paragraph IDs from %s", json_url)
             response = requests.get(json_url)
             response.raise_for_status()  # Raise exception for HTTP errors
                 # Parse the JSON data
@@ -188,9 +189,11 @@ def gather_fls_paragraph_ids(app, json_url):
                 raise
 
         else : # if online mode is on read from the lock file
+
             if not lock_path.exists(): 
                 logger.warning(f"No FLS lock file found at {lock_path}") # TODO: returns an error
                 return False, []
+            logger.info("Gathering FLS paragraph IDs from lock file: %s", lock_path)
             with open(lock_path, 'r', encoding='utf-8') as f:
                 raw_json_data=f.read()
                 data = json.loads(raw_json_data)
