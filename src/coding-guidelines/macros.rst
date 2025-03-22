@@ -6,15 +6,13 @@
 Macros
 ======
 
-.. guideline:: Shall not use Declarative Macros
-   :id: gui_h0uG1C9ZjryA
-   :category: mandatory
+.. guideline:: Avoid specialized, fixed patterns within declarative macros
+   :id: gui_FSpI084vbwmJ
    :status: draft
-   :release: todo
-   :fls: fls_xa7lp0zg1ol2
-   :decidability: decidable
-   :scope: system
+   :fls: fls_w44hav7mw3ao
    :tags: reduce-human-error
+   :category: macros
+   :recommendation: encouraged
 
    Description of the guideline goes here.
 
@@ -302,3 +300,144 @@ Macros
             // Compliant implementation
         }
 
+.. guideline:: Avoid specialized, fixed patterns within declarative macros
+   :id: gui_FSpI084vbwmJ
+   :status: draft
+   :fls: fls_w44hav7mw3ao
+   :tags: reduce-human-error
+   :category: macros
+   :recommendation: encouraged
+
+   Description of the guideline goes here.
+
+   .. rationale::
+
+      :id: rat_zqr9uEqP6nzW
+      :status: draft
+
+      It is common to use declarative macros to implement traits which would
+      otherwise involve repetitive code.
+
+      In a declarative macro the ordering of the patterns will be the order that
+      they are matched against which can lead to unexpected behavior in the case
+      where we have unique behavior intended for a particular expression.
+
+      If needing to specialize logic within the macro based on a particular
+      expression's value, it may be better to not use a declarative macro.
+
+      Limitation: Note that following this rule means that we are unable to support
+      variadic declarative macros with one or more arguments.
+
+   .. bad_example::
+      :id: bad_ex_5vK0CCmePkef
+      :status: draft
+
+      We have two macro match rules at the same level of nesting. Since the
+      matching is done macro rule by macro rule and this process is stopped as soon
+      as a macro matcher is matched we will not reach the specialized case for EmergencyValve.
+
+      .. code-block:: rust
+
+         #[derive(Debug)]
+         enum SafetyLevel {
+             Green,
+             Yellow,
+             Red
+         }
+
+         trait SafetyCheck {
+             fn verify(&self) -> SafetyLevel;
+         }
+
+         // Different device types that need safety checks
+         struct PressureSensor {/* ... */}
+         struct TemperatureSensor {/* ... */}
+         struct EmergencyValve {
+             open: bool,
+         }
+
+         // This macro has a pattern ordering issue
+         macro_rules! impl_safety_trait {
+             // Generic pattern matches any type - including EmergencyValve
+             ($t:ty) => {
+                 impl SafetyCheck for $t {
+                     fn verify(&self) -> SafetyLevel {
+                         SafetyLevel::Green
+                     }
+                 }
+             };
+
+             // Special pattern for EmergencyValve - but never gets matched
+             (EmergencyValve) => {
+                 impl SafetyCheck for EmergencyValve {
+                     fn verify(&self) -> SafetyLevel {
+                         // Emergency valve must be open for safety
+                         if !self.open {
+                             SafetyLevel::Red
+                         } else {
+                             SafetyLevel::Green
+                         }
+                     }
+                 }
+             };
+         }
+         impl_safety_trait!(EmergencyValve);
+         impl_safety_trait!(PressureSensor);
+         impl_safety_trait!(TemperatureSensor);
+
+   .. good_example::
+      :id: good_ex_ILBlY8DKB6Vs
+      :status: draft
+
+      For the specialized implementation we implement the trait directly.
+
+      If we wish to use a declarative macro for a certain generic implementation
+      we are able to do this. Note there is a single macro rule at the level of
+      nesting within the declarative macro.
+
+      .. code-block:: rust
+
+         #[derive(Debug)]
+         enum SafetyLevel {
+             Green,
+             Yellow,
+             Red
+         }
+
+         trait SafetyCheck {
+             fn verify(&self) -> SafetyLevel;
+         }
+
+         // Different device types that need safety checks
+         struct PressureSensor {/* ... */}
+         struct TemperatureSensor {/* ... */}
+         struct EmergencyValve {
+             open: bool,
+         }
+
+         // Direct implementation for EmergencyValve
+         impl SafetyCheck for EmergencyValve {
+             fn verify(&self) -> SafetyLevel {
+                 // Emergency valve must be open for safety
+                 if !self.open {
+                     SafetyLevel::Red
+                 } else {
+                     SafetyLevel::Green
+                 }
+             }
+         }
+
+         // Use generic implementation for those without
+         // special behavior
+         macro_rules! impl_safety_traits_generic {
+             // Generic pattern for other types
+             ($t:ty) => {
+                 impl SafetyCheck for $t {
+                     fn verify(&self) -> SafetyLevel {
+                         SafetyLevel::Green
+                     }
+                 }
+             };
+         }
+         impl_safety_traits_generic!(PressureSensor);
+         impl_safety_traits_generic!(TemperatureSensor);
