@@ -315,8 +315,9 @@ Macros
       :id: rat_zqr9uEqP6nzW
       :status: draft
 
-      It is common to use declarative macros to implement traits which would
-      otherwise involve repetitive code.
+      It's common to use macros to avoid writing repetitive code, such as trait
+       implementations. It's possible to use derive macros or declarative macros
+       to do so.
 
       In a declarative macro the ordering of the patterns will be the order that
       they are matched against which can lead to unexpected behavior in the case
@@ -324,9 +325,6 @@ Macros
 
       If needing to specialize logic within the macro based on a particular
       expression's value, it may be better to not use a declarative macro.
-
-      Limitation: Note that following this rule means that we are unable to support
-      variadic declarative macros with one or more arguments.
 
    .. bad_example::
       :id: bad_ex_5vK0CCmePkef
