@@ -20,16 +20,17 @@ def generate_guideline_template():
     # Generate IDs for all sections
     guideline_id = generate_id("gui")
     rationale_id = generate_id("rat")
-    bad_example_id = generate_id("bad_ex")
-    good_example_id = generate_id("good_ex")
+    non_compliant_example_id = generate_id("non_compl_ex")
+    compliant_example_id = generate_id("compl_ex")
     
     template = f""".. guideline:: Title Here
    :id: {guideline_id}
+   :category:
    :status: draft
-   :fls: 
-   :tags: 
-   :category: 
-   :recommendation: 
+   :fls:
+   :decidability:
+   :scope:
+   :tags:
 
    Description of the guideline goes here.
 
@@ -39,8 +40,8 @@ def generate_guideline_template():
 
       Explanation of why this guideline is important.
 
-   .. bad_example:: 
-      :id: {bad_example_id}
+   .. non_compliant_example::
+      :id: {non_compliant_example_id}
       :status: draft
 
       Explanation of code example.
@@ -48,11 +49,11 @@ def generate_guideline_template():
       .. code-block:: rust
    
         fn example_function() {{
-            // Bad implementation
+            // Non-compliant implementation
         }}
 
-   .. good_example:: 
-      :id: {good_example_id}
+   .. compliant_example::
+      :id: {compliant_example_id}
       :status: draft
 
       Explanation of code example.
@@ -60,7 +61,7 @@ def generate_guideline_template():
       .. code-block:: rust
    
         fn example_function() {{
-            // Bad implementation
+            // Compliant implementation
         }}
 """
     return template
