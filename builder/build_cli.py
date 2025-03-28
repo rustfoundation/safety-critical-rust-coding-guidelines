@@ -12,6 +12,7 @@ import argparse
 import subprocess
 import sys
 import requests
+import json
 
 # Automatically watch the following extra directories when --serve is used.
 EXTRA_WATCH_DIRS = ["exts", "themes"]
@@ -73,6 +74,16 @@ def update_spec_lockfile(spec_checksum_location, lockfile_location):
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     file.write(chunk)
+
+        with open(lockfile_location, 'r') as file:
+            data = json.load(file)
+
+        print("-- read in --")
+
+        with open(lockfile_location, 'w') as outfile:
+            json.dump(data, outfile, indent=4, sort_keys=True)
+
+        print("-- wrote back out --")
 
         return True
 
