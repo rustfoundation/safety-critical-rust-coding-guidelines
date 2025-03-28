@@ -70,8 +70,8 @@ def write_guidelines_ids(app):
                 "link": f"{doc_uri}#{need['id']}",
                 "checksum": checksum,
                 "rationale": None,
-                "bad_example": None,
-                "good_example": None
+                "non_compliant_example": None,
+                "compliant_example": None
             }
             
             # Look for associated elements using parent_needs_back
@@ -101,18 +101,18 @@ def write_guidelines_ids(app):
                     # Add to the appropriate field based on type
                     if related_type == 'rationale':
                         guideline_data["rationale"] = related_data
-                    elif related_type == 'bad_example':
-                        guideline_data["bad_example"] = related_data
-                    elif related_type == 'good_example':
-                        guideline_data["good_example"] = related_data
+                    elif related_type == 'non_compliant_example':
+                        guideline_data["non_compliant_example"] = related_data
+                    elif related_type == 'compliant_example':
+                        guideline_data["compliant_example"] = related_data
             
             # Check for missing elements
             if guideline_data["rationale"] is None:
                 missing_elements.append("rationale")
-            if guideline_data["bad_example"] is None:
-                missing_elements.append("bad_example")
-            if guideline_data["good_example"] is None:
-                missing_elements.append("good_example")
+            if guideline_data["non_compliant_example"] is None:
+                missing_elements.append("non_compliant_example")
+            if guideline_data["compliant_example"] is None:
+                missing_elements.append("compliant_example")
             
             # Track incomplete guidelines
             if missing_elements:

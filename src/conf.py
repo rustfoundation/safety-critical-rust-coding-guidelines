@@ -48,16 +48,16 @@ needs_types = [
         "style": "node"
     },
     {
-        "directive": "good_example",
-        "title": "Good Example",
-        "prefix": "good_ex_",
+        "directive": "compliant_example",
+        "title": "Compliant Example",
+        "prefix": "compl_ex_",
         "color": "#729FCF", 
         "style": "node"
     },
     {
-        "directive": "bad_example",
-        "title": "Bad Example",
-        "prefix": "bad_ex_",
+        "directive": "non_compliant_example",
+        "title": "Non-Compliant Example",
+        "prefix": "non_compl_ex_",
         "color": "#729FCF", 
         "style": "node"
     }
@@ -69,8 +69,8 @@ needs_layouts = {
         "content": [
             "content",
             "rationale",
-            "good_example",
-            "bad_example"
+            "non_compliant_example",
+            "compliant_example"
         ]
     }
 }
@@ -79,12 +79,12 @@ needs_layouts = {
 needs_render_contexts = {
     "guideline": {
         "content": ["content"],
-        "extra_content": ["rationale", "bad_example", "good_example"]
+        "extra_content": ["rationale", "non_compliant_example", "non_compliant_example"]
     }
 }
 
 # Make sure these sections are included in the JSON
-needs_extra_sections = ["rationale", "good_example", "bad_example"]
+needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example"]
 
 needs_statuses = [
     dict(name="draft", description="This guideline is in draft stage", color="#999999"),
@@ -101,13 +101,26 @@ needs_tags = [
     dict(name="numerics", description="Numerics-related guideline"),
 ]
 
-needs_recommendations = [
-    dict(name="encouraged", description="This guideline is encouraged", color="#999999"),
+needs_categories = [
+    dict(name="mandatory", description="This guideline is mandatory", color="#999999"),
     dict(name="required", description="This guideline is required", color="#FFCC00"),
+    dict(name="advisory", description="This guideline is advisory, should be followed when able", color="#FFCC00"),
+    dict(name="disapplied", description="This guideline is advisory, should be followed when able", color="#FFCC00"),
+]
+
+needs_decidabilities = [
+    dict(name="decidable", description="This guideline can be automatically checked with tooling", color="#999999"),
+    dict(name="undecidable", description="This guideline cannot be automatically checked with tooling", color="#999999"),
+]
+
+needs_scopes = [
+    dict(name="module", description="This guideline can be checked at the module level", color="#999999"),
+    dict(name="crate", description="This guideline can be checked at the crate level", color="#FFCC00"),
+    dict(name="system", description="This guideline must be checked alongside the entire source", color="#FFCC00"),
 ]
 
 # Enable needs export
-needs_extra_options = ["category", "recommendation", "fls"]
+needs_extra_options = ["category", "recommendation", "fls", "decidability", "scope"]
 
 # -- Options for HTML output -------------------------------------------------
 

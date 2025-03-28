@@ -58,7 +58,7 @@ def check_fls(app, env):
 
 def read_fls_ignore_list(app):
     """Read the list of FLS IDs to ignore from a file"""
-    ignore_file_path = app.confdir / 'fls_ignore_list.txt'
+    ignore_file_path = app.confdir / 'spec_ignore_list.txt'
     ignore_list = []
     
     if ignore_file_path.exists():
@@ -276,7 +276,7 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
         - List of difference descriptions with affected guidelines (for error reporting)
     """
     logger.info("Checking FLS lock file consistency")
-    lock_path = app.confdir / 'fls.lock'
+    lock_path = app.confdir / 'spec.lock'
     
     # Get the needs data to find affected guidelines
     data = SphinxNeedsData(env)

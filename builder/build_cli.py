@@ -11,11 +11,13 @@ from pathlib import Path
 import argparse
 import subprocess
 import sys
-
+import requests
 
 # Automatically watch the following extra directories when --serve is used.
 EXTRA_WATCH_DIRS = ["exts", "themes"]
 
+SPEC_CHECKSUM_URL = "https://spec.ferrocene.dev/paragraph-ids.json"
+SPEC_LOCKFILE = "spec.lock"
 
 def build_docs(root, builder, clear, serve, debug):
     dest = root / "build"
@@ -60,6 +62,24 @@ def build_docs(root, builder, clear, serve, debug):
 
     return dest / builder
 
+def update_spec_lockfile(spec_checksum_location, lockfile_location):
+
+    try:
+        response = requests.get(spec_checksum_location, stream=True)
+
+        response.raise_for_status()
+
+        with open(lockfile_location, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    file.write(chunk)
+
+        return True
+
+    except Exception as e:
+        print(f"Error downloading file: {e}")
+        return False
+
 def main(root):
     root = Path(root)
 
@@ -68,6 +88,11 @@ def main(root):
         "-c", "--clear", help="disable incremental builds", action="store_true"
     )
     group = parser.add_mutually_exclusive_group()
+    parser.add_argument(
+        "--update-spec-lock-file",
+        help="update fls.lock file",
+        action="store_true"
+    )
     group.add_argument(
         "-s",
         "--serve",
@@ -86,6 +111,9 @@ def main(root):
         action="store_true",
     )
     args = parser.parse_args()
+
+    if args.update_spec_lock_file:
+        update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     rendered = build_docs(
         root, "xml" if args.xml else "html", args.clear, args.serve, args.debug

@@ -8,17 +8,18 @@ Types and Traits
 
 .. guideline:: Avoid Implicit Integer Wrapping
    :id: gui_xztNdXA2oFNB
+   :category: required
    :status: draft
    :fls: fls_cokwseo3nnr
+   :decidability: decidable
+   :scope: module
    :tags: numerics
-   :category: types
-   :recommendation: required
 
    Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds. 
    Instead, explicitly handle potential overflows using the standard library's checked, 
    saturating, or wrapping operations.
 
-   .. rationale:: 
+   .. rationale::
       :id: rat_kYiIiW8R2qD1
       :status: draft
 
@@ -30,8 +31,8 @@ Types and Traits
       configurations. Explicit handling of potential overflow conditions improves code clarity,
       maintainability, and reduces the risk of numerical errors in production.
 
-   .. bad_example:: 
-      :id: bad_ex_PO5TyFsRTlWv
+   .. non_compliant_example::
+      :id: non_compl_ex_PO5TyFsRTlWv
       :status: draft
    
        .. code-block:: rust
@@ -41,8 +42,8 @@ Types and Traits
              current + velocity
          }
 
-   .. good_example:: 
-      :id: good_ex_WTe7GoPu5Ez0
+   .. compliant_example::
+      :id: compl_ex_WTe7GoPu5Ez0
       :status: draft
    
        .. code-block:: rust
