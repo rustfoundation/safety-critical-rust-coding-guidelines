@@ -331,9 +331,9 @@ Macros
       :id: non_compl_ex_5vK0CCmePkef
       :status: draft
 
-      We have two macro match rules at the same level of nesting. Since the
-      matching is done macro rule by macro rule and this process is stopped as soon
-      as a macro matcher is matched we will not reach the specialized case for EmergencyValve.
+      We have two macro match rules at the same level of nesting. Since macro
+      matching is done sequentially through the matchers and stops at the first 
+      match, the specialized case for EmergencyValve is unreachable.
 
       .. code-block:: rust
 
