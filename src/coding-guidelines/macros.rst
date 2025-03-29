@@ -8,11 +8,12 @@ Macros
 
 .. guideline:: Avoid specialized, fixed patterns within declarative macros
    :id: gui_FSpI084vbwmJ
+   :category: required
    :status: draft
    :fls: fls_w44hav7mw3ao
+   :decidability: decidable
+   :scope: module
    :tags: reduce-human-error
-   :category: macros
-   :recommendation: encouraged
 
    Description of the guideline goes here.
 
@@ -326,8 +327,8 @@ Macros
       If needing to specialize logic within the macro based on a particular
       expression's value, it may be better to not use a declarative macro.
 
-   .. bad_example::
-      :id: bad_ex_5vK0CCmePkef
+   .. non_compliant_example::
+      :id: non_compl_ex_5vK0CCmePkef
       :status: draft
 
       We have two macro match rules at the same level of nesting. Since the
@@ -383,8 +384,8 @@ Macros
          impl_safety_trait!(PressureSensor);
          impl_safety_trait!(TemperatureSensor);
 
-   .. good_example::
-      :id: good_ex_ILBlY8DKB6Vs
+   .. compliant_example::
+      :id: compl_ex_ILBlY8DKB6Vs
       :status: draft
 
       For the specialized implementation we implement the trait directly.
