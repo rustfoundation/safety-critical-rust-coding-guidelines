@@ -166,7 +166,7 @@ def gather_fls_paragraph_ids(app, json_url):
         Dictionary mapping paragraph IDs to metadata AND the complete raw JSON data
     """
     offline = app.config.offline
-    lock_path = app.confdir / 'fls.lock'
+    lock_path = app.confdir / 'spec.lock'
     
     # Dictionary to store all FLS IDs and their metadata
     all_fls_ids = {}
@@ -183,6 +183,7 @@ def gather_fls_paragraph_ids(app, json_url):
                 raw_json_data = response.json()
                 data = raw_json_data  # Keep reference to the original data
                 logger.debug("Successfully parsed JSON data")
+                print("raw json",raw_json_data)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse JSON: {e}")
                 logger.debug(f"Response content preview: {response.text[:500]}...")
