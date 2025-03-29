@@ -320,8 +320,8 @@ Macros
       :status: draft
 
       It's common to use macros to avoid writing repetitive code, such as trait
-       implementations. It's possible to use derive macros or declarative macros
-       to do so.
+      implementations. It's possible to use derive macros or declarative macros
+      to do so.
 
       In a declarative macro the ordering of the patterns will be the order that
       they are matched against which can lead to unexpected behavior in the case
