@@ -36,6 +36,11 @@ def setup(app):
     
     app.add_domain(CodingGuidelinesDomain)
     app.add_config_value(
+        name = "offline", 
+        default=False, 
+        rebuild= "env"
+    ) # register the offline option
+    app.add_config_value(
         name="spec_std_docs_url",
         default="https://doc.rust-lang.org/stable/std",
         rebuild="env",  # Rebuild the environment when this changes
