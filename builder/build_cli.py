@@ -115,7 +115,6 @@ def main(root):
         "-c", "--clear", help="disable incremental builds", action="store_true"
     )
     parser.add_argument(
-        "-o",
         "--offline",
         help="build in offline mode",
         action="store_true",
