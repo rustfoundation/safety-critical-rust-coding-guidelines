@@ -183,7 +183,6 @@ def gather_fls_paragraph_ids(app, json_url):
                 raw_json_data = response.json()
                 data = raw_json_data  # Keep reference to the original data
                 logger.debug("Successfully parsed JSON data")
-                print("raw json",raw_json_data)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse JSON: {e}")
                 logger.debug(f"Response content preview: {response.text[:500]}...")
