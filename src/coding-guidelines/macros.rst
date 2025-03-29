@@ -15,7 +15,10 @@ Macros
    :scope: module
    :tags: reduce-human-error
 
-   Description of the guideline goes here.
+    Matchers within macro rules are evaluated sequentially and short-circuit on
+    the first match. If a specialized fixed matcher follows a broader matcher,
+    it may be unreachable. This can lead to subtle and surprising bugs. It is
+    encouraged to avoid the use of specialized, fixed matchers.
 
    .. rationale::
       :id: rat_U3AEUPyaUhcb
