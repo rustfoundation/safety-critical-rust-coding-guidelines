@@ -16,8 +16,8 @@ Types and Traits
    :scope: module
    :tags: numerics
 
-   Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds. 
-   Instead, explicitly handle potential overflows using the standard library's checked, 
+   Code must not rely on Rust's implicit integer wrapping behavior that may occur in release
+   builds. Instead, explicitly handle potential overflows using the standard library's checked, 
    saturating, or wrapping operations.
 
    .. rationale::
@@ -25,8 +25,12 @@ Types and Traits
       :status: draft
 
       In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
-      However, in release builds (with optimizations enabled), integer operations silently wrap
-      around on overflow, creating potential for silent failures and security vulnerabilities.
+      However, in release builds (with optimizations enabled), unless the flag overflow-checks is
+      turned on, integer operations silently wrap around on overflow, creating potential for silent
+      failures and security vulnerabilities. Note that overflow-checks only brings the default panic
+      behavior from debug into release builds, avoiding potential silent wrap arounds. Nonetheless,
+      abrupt program termination is usually not suitable and, therefore, turning this flag on must
+      not be used as a substitute of explicit handling.
       
       Safety-critical software requires consistent and predictable behavior across all build
       configurations. Explicit handling of potential overflow conditions improves code clarity,
