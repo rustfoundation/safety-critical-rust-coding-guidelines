@@ -328,7 +328,7 @@ Macros
       where we have unique behavior intended for a particular expression.
 
       If needing to specialize logic within the macro based on a particular
-      expression's value, it may be better to not use a declarative macro.
+      expression's value, it is better to not use a declarative macro.
 
    .. non_compliant_example::
       :id: non_compl_ex_5vK0CCmePkef
@@ -337,6 +337,11 @@ Macros
       We have two macro match rules at the same level of nesting. Since macro
       matching is done sequentially through the matchers and stops at the first 
       match, the specialized case for EmergencyValve is unreachable.
+
+      The example would also be non-compliant if the ordering of the matchers
+      were reversed as this introduces the possibility of future human-error
+      when refactoring the macro to place the specialized matcher after the
+      generic matcher.
 
       .. code-block:: rust
 
