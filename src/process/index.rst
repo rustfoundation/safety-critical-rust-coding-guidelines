@@ -3,6 +3,11 @@
 
 .. default-domain:: coding-guidelines
 
-How to Read
-===========
+Process
+=======
 
+.. toctree::
+   :maxdepth: 1
+
+   style-guideline
+   guideline-lifecycle

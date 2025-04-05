@@ -3,6 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-How to Read
-===========
+Deprecated Types and Traits
+===========================
 

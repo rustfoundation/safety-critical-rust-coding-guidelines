@@ -10,6 +10,7 @@ Types and Traits
    :id: gui_xztNdXA2oFNB
    :category: required
    :status: draft
+   :release: 1.85.0;1.85.1
    :fls: fls_cokwseo3nnr
    :decidability: decidable
    :scope: module

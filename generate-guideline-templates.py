@@ -27,6 +27,7 @@ def generate_guideline_template():
    :id: {guideline_id}
    :category:
    :status: draft
+   :release:
    :fls:
    :decidability:
    :scope:

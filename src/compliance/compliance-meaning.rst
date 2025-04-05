@@ -3,6 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-How to Read
-===========
-
+Compliance Meaning
+==================

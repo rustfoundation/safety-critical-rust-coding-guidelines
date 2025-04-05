@@ -21,6 +21,7 @@ release = '0.1'
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
+    'sphinx.ext.autosectionlabel',
     'sphinx_needs',
     'coding_guidelines',
 ]
@@ -88,7 +89,6 @@ needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example
 
 needs_statuses = [
     dict(name="draft", description="This guideline is in draft stage", color="#999999"),
-    dict(name="proposed", description="This guideline is proposed for review", color="#FFCC00"),
     dict(name="approved", description="This guideline has been approved", color="#00FF00"),
     dict(name="deprecated", description="This guideline is deprecated", color="#FF0000"),
 ]
@@ -119,8 +119,13 @@ needs_scopes = [
     dict(name="system", description="This guideline must be checked alongside the entire source", color="#FFCC00"),
 ]
 
+needs_releases = [
+    dict(name="1.85.0", description="This guideline can be checked at the module level", color="#999999"),
+    dict(name="1.85.1", description="This guideline can be checked at the module level", color="#999999"),
+]
+
 # Enable needs export
-needs_extra_options = ["category", "recommendation", "fls", "decidability", "scope"]
+needs_extra_options = ["category", "recommendation", "fls", "decidability", "scope", "release"]
 
 # -- Options for HTML output -------------------------------------------------
 

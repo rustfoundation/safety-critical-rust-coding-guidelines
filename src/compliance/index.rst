@@ -3,6 +3,11 @@
 
 .. default-domain:: coding-guidelines
 
-How to Read
-===========
+Compliance
+==========
 
+.. toctree::
+   :maxdepth: 1
+
+   compliance-meaning
+   deviation-process
