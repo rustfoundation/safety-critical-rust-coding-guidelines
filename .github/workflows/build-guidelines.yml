@@ -1,5 +1,4 @@
 name: Build 
-
 on:
   push:
     tags:
@@ -17,25 +16,21 @@ on:
     #     required: false
     #     type: string
     #     default: 'default value'
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           export PATH="/root/.cargo/bin:$PATH"
           uv --version
-
       - name: Build documentation
         run: |
           mkdir -p build
           ./make.py 2>&1 | tee build/build.log
-
           # Check for a wide range of error indicators in the log
           if grep -q -E "Traceback" build/build.log; then
             echo "::error::Build errors detected in log"
@@ -46,17 +41,31 @@ jobs:
             # Check for the Sphinx temp error file reference and extract it if present
             TEMP_ERROR_FILE=$(grep -o '/tmp/sphinx-err-[^ ]*\.log' build/build.log | head -1)
             if [ ! -z "$TEMP_ERROR_FILE" ] && [ -f "$TEMP_ERROR_FILE" ]; then
-              echo "==== SPHINX DETAILED TRACEBACK START ===="
-              cat "$TEMP_ERROR_FILE"
-              echo "==== SPHINX DETAILED TRACEBACK END ===="
-              
               # Save this traceback for artifacts
+              echo "=== TRACEBACK ==="
+              echo "Saving traceback to build/sphinx_traceback.log"
               cp "$TEMP_ERROR_FILE" build/sphinx_traceback.log
             fi
             
-            exit 1
-          fi
+            # Check for FLS differences file reference and extract it if present
+            FLS_DIFF_FILE=$(grep -o '/tmp/fls_diff_[^ ]*\.txt' build/build.log | head -1)
+            if [ ! -z "$FLS_DIFF_FILE" ] && [ -f "$FLS_DIFF_FILE" ]; then
+              # Save this differences file for artifacts
+              echo "=== SPEC LOCK FILE DIFFERENCES ==="
+              echo "Saving spec lock file differences to to build/spec_lock_file_differences.log"
+              cp "$FLS_DIFF_FILE" build/spec_lock_file_differences.txt
+            fi
 
+            exit 1
+          else
+            # Even if there's no error, still check for FLS differences file
+            FLS_DIFF_FILE=$(grep -o '/tmp/fls_diff_[^ ]*\.txt' build/build.log | head -1)
+            if [ ! -z "$FLS_DIFF_FILE" ] && [ -f "$FLS_DIFF_FILE" ]; then
+              echo "=== SPEC LOCK FILE DIFFERENCES, NO BUILD ERROR ==="
+              echo "Saving spec lock file differences to to build/spec_lock_file_differences.log"
+              cp "$FLS_DIFF_FILE" build/spec_lock_file_differences.txt
+            fi
+          fi
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         if: always()

@@ -37,6 +37,8 @@ def check_fls(app, env):
         for diff in differences:
             error_message += f"  - {diff}\n"
         error_message += "\nPlease manually inspect FLS spec items whose checksums have changed as corresponding guidelines may need to account for these changes."
+        error_message += "\nOnce resolved, you may run the following to update the local spec lock file:"
+        error_message += "\n\t./make.py --update-spec-lock-file"
         logger.error(error_message)
         raise FLSValidationError(error_message)
     
@@ -264,24 +266,29 @@ def gather_fls_paragraph_ids(json_url):
 def check_fls_lock_consistency(app, env, fls_raw_data):
     """
     Compare live FLS JSON data with the lock file to detect changes
-    
+
     Args:
         app: The Sphinx application
         env: The Sphinx environment
         fls_raw_data: Raw JSON data from the live specification
-        
+
     Returns:
         Tuple containing:
         - Boolean indicating whether differences were found
         - List of difference descriptions with affected guidelines (for error reporting)
     """
+    import json
+    import tempfile
+    import os
+    from pathlib import Path
+
     logger.info("Checking FLS lock file consistency")
     lock_path = app.confdir / 'spec.lock'
-    
+
     # Get the needs data to find affected guidelines
     data = SphinxNeedsData(env)
     needs = data.get_needs_view()
-    
+
     # Map of FLS IDs to guidelines that reference them
     fls_to_guidelines = {}
     for need_id, need in needs.items():
@@ -294,25 +301,26 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
                     'id': need_id,
                     'title': need.get('title', 'Untitled')
                 })
-    
-    # Differences to report
-    differences = []
-    has_differences = False
-    
+
     # If no lock file exists, skip checking
     if not lock_path.exists():
         logger.warning(f"No FLS lock file found at {lock_path}, skipping consistency check")
         return False, []
-    
+
+    # Initialize result variables
+    affected_guidelines = {}
+    has_differences = False
+    detailed_differences = []  # This will go to the temp file
+
     try:
         # Load lock file
         with open(lock_path, 'r', encoding='utf-8') as f:
             locked_data = json.load(f)
-        
+
         # Create maps of paragraph IDs to checksums for both live and locked data
         live_checksums = {}
         locked_checksums = {}
-        
+
         # Extract from live data
         for document in fls_raw_data.get('documents', []):
             for section in document.get('sections', []):
@@ -320,13 +328,13 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
                     para_id = paragraph.get('id', '')
                     para_checksum = paragraph.get('checksum', '')
                     para_number = paragraph.get('number', '')
-                    
+
                     if para_id and para_id.startswith('fls_'):
                         live_checksums[para_id] = {
                             'checksum': para_checksum,
                             'section_id': para_number
                         }
-        
+
         # Extract from locked data
         for document in locked_data.get('documents', []):
             for section in document.get('sections', []):
@@ -334,89 +342,135 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
                     para_id = paragraph.get('id', '')
                     para_checksum = paragraph.get('checksum', '')
                     para_number = paragraph.get('number', '')
-                    
+
                     if para_id and para_id.startswith('fls_'):
                         locked_checksums[para_id] = {
                             'checksum': para_checksum,
                             'section_id': para_number
                         }
-        
+
         logger.info(f"Found {len(live_checksums)} paragraphs in live data")
         logger.info(f"Found {len(locked_checksums)} paragraphs in lock file")
-        
-        # Format affected guidelines information
+
+        # Helper function to track affected guidelines
+        def track_affected_guidelines(fls_id, change_type):
+            for guideline in fls_to_guidelines.get(fls_id, []):
+                guideline_id = guideline['id']
+                if guideline_id not in affected_guidelines:
+                    affected_guidelines[guideline_id] = {
+                        'title': guideline['title'],
+                        'changes': []
+                    }
+                section_id = live_checksums.get(fls_id, {}).get('section_id') or locked_checksums.get(fls_id, {}).get('section_id')
+                affected_guidelines[guideline_id]['changes'].append({
+                    'fls_id': fls_id,
+                    'change_type': change_type,
+                    'section_id': section_id
+                })
+
+        # Format affected guidelines information (for detailed log)
         def format_affected_guidelines(fls_id):
             affected = fls_to_guidelines.get(fls_id, [])
             if not affected:
                 return "    No guidelines affected"
-            
+
             result = []
             for guideline in affected:
                 result.append(f"    - {guideline['id']}: {guideline['title']}")
             return "\n".join(result)
-        
+
         # Look for new IDs
         new_ids = set(live_checksums.keys()) - set(locked_checksums.keys())
         if new_ids:
             for fls_id in sorted(new_ids):
                 diff_msg = f"New FLS ID added: {fls_id} ({live_checksums[fls_id]['section_id']})"
                 affected_msg = format_affected_guidelines(fls_id)
-                differences.append(f"{diff_msg}\n  Affected guidelines:\n{affected_msg}")
+                detailed_differences.append(f"{diff_msg}\n  Affected guidelines:\n{affected_msg}")
+                track_affected_guidelines(fls_id, "added")
             has_differences = True
-        
+
         # Look for removed IDs
         removed_ids = set(locked_checksums.keys()) - set(live_checksums.keys())
         if removed_ids:
             for fls_id in sorted(removed_ids):
                 diff_msg = f"FLS ID removed: {fls_id} ({locked_checksums[fls_id]['section_id']})"
                 affected_msg = format_affected_guidelines(fls_id)
-                differences.append(f"{diff_msg}\n  Affected guidelines:\n{affected_msg}")
+                detailed_differences.append(f"{diff_msg}\n  Affected guidelines:\n{affected_msg}")
+                track_affected_guidelines(fls_id, "removed")
             has_differences = True
-        
+
         # Check for checksum changes on existing IDs
         common_ids = set(live_checksums.keys()) & set(locked_checksums.keys())
         for fls_id in sorted(common_ids):
             live_checksum = live_checksums[fls_id]['checksum']
             locked_checksum = locked_checksums[fls_id]['checksum']
-            
+
             changes = []
-            
+            change_type = None
+
             if live_checksum != locked_checksum:
                 changes.append(
                     f"Content changed for FLS ID {fls_id} ({live_checksums[fls_id]['section_id']}): " +
                     f"checksum was {locked_checksum[:8]}... now {live_checksum[:8]}..."
                 )
-            
+                change_type = "content_changed"
+
             # Also check if section IDs have changed
             live_section = live_checksums[fls_id]['section_id']
             locked_section = locked_checksums[fls_id]['section_id']
-            
+
             if live_section != locked_section:
                 changes.append(
                     f"Section changed for FLS ID {fls_id}: {locked_section} -> {live_section}"
                 )
-            
+                if change_type is None:
+                    change_type = "section_changed"
+
             if changes:
                 affected_msg = format_affected_guidelines(fls_id)
-                differences.append(f"{changes[0]}\n  Affected guidelines:\n{affected_msg}")
-                
+                detailed_differences.append(f"{changes[0]}\n  Affected guidelines:\n{affected_msg}")
+
                 # Add any additional changes separately
                 for i in range(1, len(changes)):
-                    differences.append(changes[i])
-                
+                    detailed_differences.append(changes[i])
+
+                if change_type:
+                    track_affected_guidelines(fls_id, change_type)
+
                 has_differences = True
-        
+
+        # Add detailed guideline-focused summary for the log file
+        if affected_guidelines:
+            detailed_differences.append("\n\nDETAILED AFFECTED GUIDELINES:")
+            for guideline_id, info in sorted(affected_guidelines.items()):
+                # For each guideline, list the changed FLS IDs with their section IDs
+                changed_fls = [f"{c['fls_id']} ({c['section_id']})" for c in info['changes']]
+                detailed_differences.append(f"{guideline_id}: {info['title']}")
+                detailed_differences.append(f"  Changed FLS paragraphs: {', '.join(changed_fls)}")
+
+        temp_file = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, prefix='fls_diff_', suffix='.txt') as temp_file:
+                temp_file.write("\n".join(detailed_differences))
+                temp_path = temp_file.name
+            logger.warning(f"Detailed FLS differences written to: {temp_path}")
+        except Exception as e:
+            logger.error(f"Failed to write detailed differences to temp file: {e}")
+
+        # Create concise summary for return
+        summary = []
         if has_differences:
-            logger.warning(f"Found {len(differences)} differences between live FLS data and lock file")
-        else:
-            logger.info("No differences found between live FLS data and lock file")
-        
-        return has_differences, differences
-        
+            summary.append(f"Found differences between live FLS data and lock file affecting {len(affected_guidelines)} guidelines")
+            for guideline_id, info in sorted(affected_guidelines.items()):
+                # Get unique FLS IDs
+                fls_ids = sorted(set(c['fls_id'] for c in info['changes']))
+                summary.append(f"{guideline_id}: {', '.join(fls_ids)}")
+
+        return has_differences, summary
+
     except (json.JSONDecodeError, IOError) as e:
         logger.error(f"Error reading or parsing lock file {lock_path}: {e}")
         return False, [f"Failed to read lock file: {e}"]
-
 
 def insert_fls_coverage(app, env, fls_ids):
     """
