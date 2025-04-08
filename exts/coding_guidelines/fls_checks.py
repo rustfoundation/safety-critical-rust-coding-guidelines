@@ -452,14 +452,15 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
                 detailed_differences.append(f"{guideline_id}: {info['title']}")
                 detailed_differences.append(f"  Changed FLS paragraphs: {', '.join(changed_fls)}")
 
-        temp_file = None
-        try:
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, prefix='fls_diff_', suffix='.txt') as temp_file:
-                temp_file.write("\n".join(detailed_differences))
-                temp_path = temp_file.name
-            logger.warning(f"Detailed FLS differences written to: {temp_path}")
-        except Exception as e:
-            logger.error(f"Failed to write detailed differences to temp file: {e}")
+        if has_differences:
+            temp_file = None
+            try:
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, prefix='fls_diff_', suffix='.txt') as temp_file:
+                    temp_file.write("\n".join(detailed_differences))
+                    temp_path = temp_file.name
+                logger.warning(f"Detailed FLS differences written to: {temp_path}")
+            except Exception as e:
+                logger.error(f"Failed to write detailed differences to temp file: {e}")
 
         # Create concise summary for return
         summary = []
