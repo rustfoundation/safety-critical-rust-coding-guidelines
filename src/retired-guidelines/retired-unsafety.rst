@@ -3,5 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Attributes
-=====================
+Retired Unsafety
+================

@@ -3,5 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Concurrency
-======================
+Retired Ownership and Destruction
+=================================

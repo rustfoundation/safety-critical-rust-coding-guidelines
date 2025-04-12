@@ -3,5 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Ownership and Destruction
-====================================
+Retired FFI
+===========
+

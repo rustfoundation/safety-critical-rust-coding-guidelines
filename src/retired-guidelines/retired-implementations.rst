@@ -3,5 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Associated Items
-===========================
+Retired Implementations
+=======================

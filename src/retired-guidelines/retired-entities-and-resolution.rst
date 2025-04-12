@@ -3,6 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated FFI
-==============
-
+Retired Entities and Resolution
+===============================

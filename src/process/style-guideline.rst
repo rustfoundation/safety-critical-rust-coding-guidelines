@@ -167,16 +167,16 @@ or ``required``, or as ``advisory``.
 
 **MUST** be one of these values:
 
-* ``draft``
+* ``provisional``
 * ``approved``
-* ``deprecated``
+* ``retired``
 
 Guidelines have a lifecycle. When they are first proposed and **MUST** be marked as ``draft`` 
 to allow adoption and feedback to accrue. The Coding Guidelines Subcommittee **MUST**
 periodically review ``draft`` guidelines and either promote them to ``approved``
-or demote them to ``deprecated``.
+or demote them to ``retired``.
 
-From time to time an ``approved`` guideline **MAY** be moved to ``deprecated``. There
+From time to time an ``approved`` guideline **MAY** be moved to ``retired``. There
 could be a number of reasons, such as: a guideline which was a poor fit or wrong,
 or in order to make a single guideline more granular and replace it with
 more than one guideline.
@@ -191,7 +191,7 @@ No formal deviation is required as outlined in :ref:`Compliance`, but alternativ
 **MUST** be made for documenting non-compliances.
 
 *Note*: ``draft`` guideline usage and feedback will help to either promote them to ``approved`` or demote
-them to ``deprecated``.
+them to ``retired``.
 
 ``approved``
 ^^^^^^^^^^^^
@@ -199,10 +199,10 @@ them to ``deprecated``.
 These guidelines **MUST** be enforced. Any deviations **MUST** follow the rule for their
 appropriate ``category``.
 
-``deprecated``
+``retired``
 ^^^^^^^^^^^^^^
 
-These guidelines are not in force and **MUST** not be applied.
+These guidelines **MAY** not be applied.
 
 ``release``
 ------------------------

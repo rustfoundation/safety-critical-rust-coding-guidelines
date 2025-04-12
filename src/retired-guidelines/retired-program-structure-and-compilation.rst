@@ -3,5 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Implementations
-==========================
+Retired Program Structure and Compilation
+=========================================

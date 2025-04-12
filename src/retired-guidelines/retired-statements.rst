@@ -3,6 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Functions
-====================
-
+Retired Statements
+==================

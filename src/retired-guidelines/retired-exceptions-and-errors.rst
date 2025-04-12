@@ -3,5 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Inline Assembly
-==========================
+Retired Exceptions and Errors
+=============================

@@ -16,7 +16,7 @@ Safety-Critical Rust Coding Guidelines
    compliance/index
    process/index
    appendices/index
-   deprecated-guidelines/index
+   retired-guidelines/index
 
 Indices and tables
 ==================

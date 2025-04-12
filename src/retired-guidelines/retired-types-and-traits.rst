@@ -3,5 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Values
-=================
+Retired Types and Traits
+========================
+

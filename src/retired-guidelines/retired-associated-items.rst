@@ -3,5 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Entities and Resolution
-==================================
+Retired Associated Items
+========================

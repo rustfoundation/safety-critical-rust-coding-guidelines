@@ -3,6 +3,5 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Generics
-===================
-
+Retired Macros
+==============

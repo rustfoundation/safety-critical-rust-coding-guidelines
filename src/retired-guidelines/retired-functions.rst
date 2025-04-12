@@ -3,5 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-Deprecated Program Structure and Compilation
-============================================
+Retired Functions
+=================
+
