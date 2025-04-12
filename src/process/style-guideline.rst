@@ -290,7 +290,7 @@ source text **MUST** be classified as ``system``.
 ``tags``
 --------
 
-The ``tags`` are largely descriptive, not proscriptive means of finding commonality between
+The ``tags`` are largely descriptive, not prescriptive means of finding commonality between
 similar guidelines.
 
 Each guideline **MUST** have at least one item listed in ``tags``.
