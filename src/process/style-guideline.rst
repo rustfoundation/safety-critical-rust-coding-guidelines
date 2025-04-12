@@ -146,6 +146,9 @@ alternative arrangements **MUST** be made for documenting non-compliances.
 An organization or project **MAY** choose to recategorize any ``advisory`` guideline as ``mandatory``
 or ``required``, or as ``disapplied``.
 
+If contributing a guideline, you **MAY** choose to submit it as ``advisory``
+and ask for support in assigning the guideline the correct category.
+
 *TODO(pete.levasseur): Add more tips on when this is a good choice for a guideline.*
 
 ``disapplied``
