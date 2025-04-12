@@ -154,14 +154,17 @@ and ask for support in assigning the guideline the correct category.
 ``disapplied``
 ^^^^^^^^^^^^^^
 
-These are guidelines for which compliance **SHOULD NOT** be required. No enforcement is expected, and any
-non-compliance **MAY** be disregarded.
+These are guidelines for which no enforcement is expected and any non-compliance **MAY** be disregarded.
 
-*Note*: Where a guideline does not apply to the chosen release of the Rust compiler, it **MUST** be treated
+Where a guideline does not apply to the chosen release of the Rust compiler, it **MUST** be treated
 as ``disapplied`` for the purposes of coding guideline :ref:`Compliance`.
 
 An organization or project **MAY** choose to recategorize any ``disapplied`` guideline as ``mandatory``
 or ``required``, or as ``advisory``.
+
+*Note*: Rather than changing the categorization of a guideline to ``disapplied`` when we wish to
+make it not applicable, we **MUST** instead leave the categorization as-is and instead change
+the ``status`` to ``retired``.
 
 *TODO(pete.levasseur): Add more tips on when this is a good choice for a guideline.*
 
@@ -205,7 +208,12 @@ appropriate ``category``.
 ``retired``
 ^^^^^^^^^^^^^^
 
-These guidelines **MAY** not be applied.
+These are guidelines for which no enforcement is expected and any non-compliance **MAY** be disregarded.
+
+*Note*: The ``retired`` ``status`` supercedes any ``category`` assigned a guideline, effectively
+conferring upon the guideline the ``category`` of ``disapplied`` with no ability to recategorize it
+to ``mandatory``, ``required``, or ``advisory``. The ``category`` assigned the guideline at the time
+it is retired is kept.
 
 ``release``
 ------------------------
