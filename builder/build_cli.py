@@ -20,7 +20,7 @@ EXTRA_WATCH_DIRS = ["exts", "themes"]
 SPEC_CHECKSUM_URL = "https://spec.ferrocene.dev/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
 
-def build_docs(root, builder, clear, serve, debug):
+def build_docs(root, builder, clear, serve, debug, spec_lock_consistency_check):
     dest = root / "build"
 
     args = ["-b", builder, "-d", dest / "doctrees"]
@@ -36,6 +36,18 @@ def build_docs(root, builder, clear, serve, debug):
         args += ["-j", "auto"]
     if clear:
         args.append("-E")
+
+    # Initialize an empty list for configuration options (without --define)
+    conf_opt_values = []
+    # Add configuration options as needed
+    if not spec_lock_consistency_check:
+        conf_opt_values.append("enable_spec_lock_consistency=0")
+    # Only add the --define argument if there are options to define
+    if conf_opt_values:
+        args.append("--define")
+        for opt in conf_opt_values:
+            args.append(opt)
+
     if serve:
         for extra_watch_dir in EXTRA_WATCH_DIRS:
             extra_watch_dir = root / extra_watch_dir
@@ -100,6 +112,12 @@ def main(root):
     )
     group = parser.add_mutually_exclusive_group()
     parser.add_argument(
+        "--ignore-spec-lock-diff",
+        help="ignore fls.lock file differences with live release -- for WIP branches only",
+        default=False,
+        action="store_true"
+    )
+    parser.add_argument(
         "--update-spec-lock-file",
         help="update fls.lock file",
         action="store_true"
@@ -127,6 +145,6 @@ def main(root):
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     rendered = build_docs(
-        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug
+        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, not args.ignore_spec_lock_diff
     )
 

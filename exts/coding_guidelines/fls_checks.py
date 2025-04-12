@@ -277,6 +277,10 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
         - Boolean indicating whether differences were found
         - List of difference descriptions with affected guidelines (for error reporting)
     """
+    if not app.config.enable_spec_lock_consistency:
+        logger.warn("Spec lock file consistency check disabled")
+        return (False, [])
+
     import json
     import tempfile
     import os

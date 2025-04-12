@@ -44,6 +44,9 @@ def setup(app):
     app.add_config_value(name='fls_paragraph_ids_url', 
                          default='https://spec.ferrocene.dev/paragraph-ids.json', 
                          rebuild='env')
+    app.add_config_value(name='enable_spec_lock_consistency',
+                         default=True,
+                         rebuild='env')
 
     app.connect('env-check-consistency', fls_checks.check_fls)
     app.connect('build-finished', write_guidelines_ids.build_finished)

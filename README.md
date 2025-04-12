@@ -29,6 +29,52 @@ A machine-parseable artifact will be available at `build/html/needs.json`. (ToDo
 
 A record with checksums of the contents is available at `build/html/guidelines-ids.json`. Users of the coding guidelines can reference this file to determine if there have been changes to coding guidelines contents they should be aware of.
 
+## Build breaking due to out-dated spec lock file
+
+It's a fairly common occurence for the build to break due to an out of date spec lock file, located at:
+
+```
+src/spec.lock
+```
+
+The `spec.lock` is checked against the current live version of the specification, which means that your local development may go out of date while you are developing a feature.
+
+### Continuing work while on a feature branch
+
+If you run into this while developing a feature, you may ignore this error by running the build with:
+
+```shell
+   ./make.py --ignore-spec-lock-diff
+```
+
+### If you need to audit the difference
+
+When the build breaks due to the difference a file is created here:
+
+```
+/tmp/fls_diff_<random>.txt
+```
+
+which can be used to aid in auditing the differences.
+
+Follow the below steps to ensure that the guidelines remain a representation of the FLS:
+
+1. Check if there are any guidelines currently affected, if no, go to 6.
+2. For each affected guideline, audit the previous text and current text of the appropriate paragraph-id in the FLS
+3. If the prior and new text of that paragraph in the FLS does not effect the guideline, proceed back to 2. to the next affected guideline
+4. If the prior and new text of that paragraph do differ in the FLS, then a rationalization step is required
+   1. In the rationalization step, either yourself or another coding guidelines member must modify the guideline to comply with the new text
+5. If you any affected coding guidelines remain proceed back to 2. to the next affected guideline
+6. You are done
+
+Once you have completed the above steps, you will now update the local copy of the `spec.lock` file with the live version:
+
+```shell
+   ./make.py --update-spec-lock-file
+```
+
+Open a new PR with only the changes necessary to rationalize the guidelines with the new FLS text.
+
 ## Contributing to the coding guidelines
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
