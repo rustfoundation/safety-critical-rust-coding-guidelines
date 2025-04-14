@@ -122,13 +122,13 @@ def main(root):
     group = parser.add_mutually_exclusive_group()
     parser.add_argument(
         "--ignore-spec-lock-diff",
-        help="ignore fls.lock file differences with live release -- for WIP branches only",
+        help="ignore spec.lock file differences with live release -- for WIP branches only",
         default=False,
         action="store_true"
     )
     parser.add_argument(
         "--update-spec-lock-file",
-        help="update fls.lock file",
+        help="update spec.lock file",
         action="store_true"
     )
     group.add_argument(

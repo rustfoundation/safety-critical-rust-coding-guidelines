@@ -23,7 +23,7 @@ Coverage of the coding guidlines over the FLS is calculated.
 Each coding guideline has its ``:fls:`` option turned into a hyperlink to the corresponding element
 within the FLS to be able to navigate there directly.
 
-Further an ``fls.lock`` file located at ``root/src/fls.lock`` is validated against the currently
+Further an ``spec.lock`` file located at ``root/src/spec.lock`` is validated against the currently
 deployed version of the Ferrocene Language Spec and the build is failed if there is discrepency.
 
 Links to the Rust standard library
