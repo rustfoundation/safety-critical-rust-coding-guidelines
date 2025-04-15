@@ -20,5 +20,5 @@ build:
       - "true"
     build:
       html:
-        - python make.py
+        - uv run python make.py
 
