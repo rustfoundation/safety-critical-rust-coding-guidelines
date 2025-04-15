@@ -15,7 +15,7 @@ build:
        - asdf install uv latest
        - asdf global uv latest
        - uv venv $READTHEDOCS_VIRTUALENV_PATH
-       - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH uv sync
+       - uv sync
     install:
       - "true"
     build:
