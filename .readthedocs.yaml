@@ -17,7 +17,7 @@ build:
        - uv venv $READTHEDOCS_VIRTUALENV_PATH
        - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH uv sync
     install:
-      - true
+      - "true"
     build:
       html:
         - python make.py
