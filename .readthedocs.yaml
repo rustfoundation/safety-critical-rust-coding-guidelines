@@ -18,5 +18,6 @@ build:
     install:
       - UV_PROJECT_ENVIRONMENT=$READTHEDOCS_VIRTUALENV_PATH uv sync --all-extras --group docs --link-mode=copy 
     build:
-      - python make.py
+      html:
+        - python make.py
 
