@@ -21,4 +21,6 @@ build:
     build:
       html:
         - uv run python make.py
+        - mkdir -p $READTHEDOCS_OUTPUT/html/
+        - cp -r build/html/* $READTHEDOCS_OUTPUT/html/
 
