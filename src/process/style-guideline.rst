@@ -92,6 +92,10 @@ We will examine each part:
       :scope: module
       :tags: numerics
 
+      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
+      Instead, explicitly handle potential overflows using the standard library's checked,
+      saturating, or wrapping operations.
+
 ``guideline`` Title
 -------------------
 
