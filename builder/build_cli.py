@@ -21,6 +21,8 @@ SPEC_CHECKSUM_URL = "https://spec.ferrocene.dev/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
 
 def build_docs(root, builder, clear, serve, debug, spec_lock_consistency_check):
+    if builder == "pdf":
+        builder = "latex"
     dest = root / "build"
 
     args = ["-b", builder, "-d", dest / "doctrees"]
@@ -67,6 +69,12 @@ def build_docs(root, builder, clear, serve, debug, spec_lock_consistency_check):
             ],
             check=True,
         )
+        if builder == "latex":
+            subprocess.run(
+                ["make", "-C", str(dest / "latex"), "all-pdf"],
+                check=True
+            )
+            print(f"PDF generated at: {dest/'latex'}")
     except KeyboardInterrupt:
         exit(1)
     except subprocess.CalledProcessError:
@@ -132,7 +140,12 @@ def main(root):
         "--check-links", help="Check whether all links are valid", action="store_true"
     )
     group.add_argument(
-        "--xml", help="Generate Sphinx XML rather than HTML", action="store_true"
+        "--output",
+        help="select output format: html, xml, or pdf",
+        choices=["html", "xml", "pdf"],  
+        default="html",
+        metavar="FORMAT", 
+        required=False,   
     )
     group.add_argument(
         "--debug",
@@ -145,6 +158,6 @@ def main(root):
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     rendered = build_docs(
-        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, not args.ignore_spec_lock_diff
+        root, args.output, args.clear, args.serve, args.debug, not args.ignore_spec_lock_diff
     )
 

@@ -14,6 +14,7 @@ project = 'Safety-Critical Rust Coding Guidelines'
 copyright = '2025, Contributors to Coding Guidelines Subcommittee'
 author = 'Contributors to Coding Guidelines Subcommittee'
 release = '0.1'
+language = 'en'
 
 # -- General configuration ---------------------------------------------------
 
@@ -132,3 +133,24 @@ needs_extra_options = ["category", "recommendation", "fls", "decidability", "sco
 # Configure the theme
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
+
+# -- Options for LaTex output -------------------------------------------------
+latex_engine = 'xelatex'  # or 'pdflatex', 'lualatex'
+#latex_documents = [
+#    ('index', 'YourProject.tex', 'Your Project Title', 'Your Name', 'manual'),
+#]
+
+latex_toplevel_sectioning = 'section'
+latex_show_urls = 'footnote'  # or 'inline', 'no'
+latex_elements = {
+    'classoptions': ',openany,oneside',
+    'preamble': r'''
+    \usepackage[most]{tcolorbox}
+    \usepackage{xcolor}
+    \let\cleardoublepage\clearpage
+''',
+    'fontpkg': r'''
+\setmainfont{DejaVu Serif}
+''',
+    'figure_align': 'H',
+}

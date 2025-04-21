@@ -6,10 +6,9 @@ from . import write_guidelines_ids
 from . import std_role
 from . import fls_linking
 
-from sphinx_needs.api import add_dynamic_function
 from sphinx.errors import SphinxError
 from sphinx.domains import Domain
-
+from docutils import nodes
 import logging
 
 # Get the Sphinx logger
@@ -33,8 +32,9 @@ class CodingGuidelinesDomain(Domain):
         pass  # No domain data to merge
 
 def setup(app):
-    
+
     app.add_domain(CodingGuidelinesDomain)
+    app.connect('env-check-consistency', fls_checks.check_fls)
     app.add_config_value(
         name="spec_std_docs_url",
         default="https://doc.rust-lang.org/stable/std",
@@ -48,7 +48,6 @@ def setup(app):
                          default=True,
                          rebuild='env')
 
-    app.connect('env-check-consistency', fls_checks.check_fls)
     app.connect('build-finished', write_guidelines_ids.build_finished)
     app.connect('build-finished', fls_linking.build_finished)
 
