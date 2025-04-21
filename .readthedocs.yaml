@@ -1,0 +1,26 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Set the OS, Python version, and other tools you might need
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+  jobs:
+    create_environment:
+      # uv config from https://docs.readthedocs.com/platform/stable/build-customization.html#install-dependencies-with-uv
+       - asdf plugin add uv
+       - asdf install uv latest
+       - asdf global uv latest
+       - uv venv $READTHEDOCS_VIRTUALENV_PATH
+    install:
+       - uv sync
+    build:
+      html:
+        - uv run python make.py
+        - mkdir -p $READTHEDOCS_OUTPUT/html/
+        - cp -r build/html/* $READTHEDOCS_OUTPUT/html/
+
