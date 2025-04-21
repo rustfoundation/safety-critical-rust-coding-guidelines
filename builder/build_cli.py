@@ -13,6 +13,7 @@ import subprocess
 import sys
 import requests
 import json
+import time
 
 # Automatically watch the following extra directories when --serve is used.
 EXTRA_WATCH_DIRS = ["exts", "themes"]
@@ -20,7 +21,31 @@ EXTRA_WATCH_DIRS = ["exts", "themes"]
 SPEC_CHECKSUM_URL = "https://spec.ferrocene.dev/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
 
-def build_docs(root, builder, clear, serve, debug, offline, spec_lock_consistency_check):
+def build_docs(
+    root: Path,
+    builder: str,
+    clear: bool,
+    serve: bool,
+    debug: bool,
+    offline: bool,
+    spec_lock_consistency_check: bool
+) -> Path:
+    """
+    Builds the Sphinx documentation with the specified options.
+
+    Args:
+        root: The root directory of the documentation.
+        builder: The builder to use (e.g., 'html', 'xml').
+        clear: Whether to disable incremental builds.
+        serve: Whether to start a local server with live reload.
+        debug: Whether to enable debug mode.
+        offline: Whether to build in offline mode.
+        spec_lock_consistency_check: Whether to check spec lock consistency.
+
+    Returns:
+        Path: The path to the generated documentation.
+    """
+
     dest = root / "build"
 
     args = ["-b", builder, "-d", dest / "doctrees"]
@@ -61,6 +86,9 @@ def build_docs(root, builder, clear, serve, debug, offline, spec_lock_consistenc
         args += ["-W", "--keep-going"]
 
     try:
+
+        # Tracking build time
+        timer_start = time.perf_counter()
         subprocess.run(
             [
                 "sphinx-autobuild" if serve else "sphinx-build",
@@ -76,6 +104,8 @@ def build_docs(root, builder, clear, serve, debug, offline, spec_lock_consistenc
         print("\nhint: if you see an exception, pass --debug to see the full traceback")
         exit(1)
 
+    timer_end = time.perf_counter()
+    print(f"\nBuild finished in {timer_end - timer_start:.2f} seconds.")
     return dest / builder
 
 def update_spec_lockfile(spec_checksum_location, lockfile_location):
