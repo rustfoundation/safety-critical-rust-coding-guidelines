@@ -8,7 +8,7 @@ Types and Traits
 
 .. guideline:: Avoid Implicit Integer Wrapping
    :id: gui_xztNdXA2oFNB
-   :category: required
+   :category: advisory
    :status: draft
    :release: 1.85.0;1.85.1
    :fls: fls_cokwseo3nnr
