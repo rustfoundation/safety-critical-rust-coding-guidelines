@@ -5,6 +5,8 @@ on:
       - "*.*.*"
     branches:
       - "main"
+  # this fires for the temporary branch the merge queue creates
+  merge_group:
   pull_request:
     branches:
       - "main"
