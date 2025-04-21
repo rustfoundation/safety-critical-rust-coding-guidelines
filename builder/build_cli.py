@@ -25,9 +25,6 @@ def build_docs(root, builder, clear, serve, debug, offline, spec_lock_consistenc
 
     args = ["-b", builder, "-d", dest / "doctrees"]
 
-    if offline:  
-        args.append("-D")
-        args.append("offline=1")
     if debug:
         # Disable parallel builds and show exceptions in debug mode.
         #
@@ -46,6 +43,8 @@ def build_docs(root, builder, clear, serve, debug, offline, spec_lock_consistenc
     # Add configuration options as needed
     if not spec_lock_consistency_check:
         conf_opt_values.append("enable_spec_lock_consistency=0")
+    if offline:  
+        conf_opt_values.append("offline=1")
     # Only add the --define argument if there are options to define
     if conf_opt_values:
         args.append("--define")
