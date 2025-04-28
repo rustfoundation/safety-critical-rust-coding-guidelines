@@ -326,7 +326,10 @@ Macros
 
       In a declarative macro the ordering of the patterns will be the order that
       they are matched against which can lead to unexpected behavior in the case
-      where we have unique behavior intended for a particular expression.
+      where we have unique behavior intended for a particular expression. The concern
+      in particular is that while the ordering may be done correctly when the
+      macro match rules are written, it's possible in a refactor for them to
+      unintentionally be moved around in order.
 
       If needing to specialize logic within the macro based on a particular
       expression's value, it is better to not use a declarative macro with multiple rules.
