@@ -329,7 +329,7 @@ Macros
       where we have unique behavior intended for a particular expression.
 
       If needing to specialize logic within the macro based on a particular
-      expression's value, it is better to not use a declarative macro.
+      expression's value, it is better to not use a declarative macro with multiple rules.
 
    .. non_compliant_example::
       :id: non_compl_ex_5vK0CCmePkef
