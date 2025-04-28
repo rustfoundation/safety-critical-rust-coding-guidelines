@@ -20,7 +20,7 @@ build:
        - uv sync
     build:
       html:
-        - uv run python make.py
+        - uv run python make.py --debug
         - mkdir -p $READTHEDOCS_OUTPUT/html/
         - cp -r build/html/* $READTHEDOCS_OUTPUT/html/
 
