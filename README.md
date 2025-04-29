@@ -22,7 +22,6 @@ On Windows systems:
 uv run make.py
 ``` 
 
-
 By default, Sphinx uses incremental rebuilds to generate the content that
 changed since the last invocation. If you notice a problem with incremental
 rebuilds, you can pass the `-c` flag to clear the existing artifacts before
