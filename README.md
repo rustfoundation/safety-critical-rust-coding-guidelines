@@ -19,7 +19,7 @@ On Linux-like systems:
 On Windows systems:
 
 ```shell
-uv run make.py
+   uv run make.py
 ``` 
 
 By default, Sphinx uses incremental rebuilds to generate the content that
