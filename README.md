@@ -40,7 +40,7 @@ A record with checksums of the contents is available at `build/html/guidelines-i
 
 ## Running builds offline
 
-If you're working without internet access or want to avoid reaching out to remote resources (e.g., fetching updated specs), you can pass the --offline flag:
+If you're working without internet access or want to avoid reaching out to remote resources, you can pass the `--offline` flag:
 
 ```shell
    ./make.py --offline
@@ -48,7 +48,7 @@ If you're working without internet access or want to avoid reaching out to remot
 
 This prevents the build system from attempting to fetch remote resources, such as updates to the specification. Use this flag when you need reproducible or air-gapped builds.
 
-It is recommended to use --offline if you are running make.py frequently during development. The builder fetches data from [the Ferrocene Language Specification website](https://spec.ferrocene.dev/paragraph-ids.json), which may rate-limit repeated requests—leading to delays or failed builds. Using --offline can significantly improve build speed and avoid unnecessary network issues during iterative work.
+It is recommended to use `--offline` if you are running `make.py` frequently during development. The builder fetches data from [the Ferrocene Language Specification website](https://spec.ferrocene.dev/paragraph-ids.json), which may rate-limit repeated requests—leading to delays or failed builds. Using `--offline` can significantly improve build speed and avoid unnecessary network issues during iterative work.
 
 
 ## Build breaking due to out-dated spec lock file
