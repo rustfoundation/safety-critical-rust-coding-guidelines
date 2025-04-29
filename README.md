@@ -37,9 +37,23 @@ A machine-parseable artifact will be available at `build/html/needs.json`. (ToDo
 
 A record with checksums of the contents is available at `build/html/guidelines-ids.json`. Users of the coding guidelines can reference this file to determine if there have been changes to coding guidelines contents they should be aware of.
 
+
+## Running builds offline
+
+If you're working without internet access or want to avoid reaching out to remote resources (e.g., fetching updated specs), you can pass the --offline flag:
+
+```shell
+   ./make.py --offline
+```
+
+This prevents the build system from attempting to fetch remote resources, such as updates to the specification. Use this flag when you need reproducible or air-gapped builds.
+
+It is recommended to use --offline if you are running make.py frequently during development. The builder fetches data from [the Ferrocene Language Specification website](https://spec.ferrocene.dev/paragraph-ids.json), which may rate-limit repeated requests—leading to delays or failed builds. Using --offline can significantly improve build speed and avoid unnecessary network issues during iterative work.
+
+
 ## Build breaking due to out-dated spec lock file
 
-It's a fairly common occurence for the build to break due to an out of date spec lock file, located at:
+It's a fairly common occurrence for the build to break due to an out of date spec lock file, located at:
 
 ```
 src/spec.lock
