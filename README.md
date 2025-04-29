@@ -10,9 +10,18 @@ The Safety-Critical Rust Coding Guidelines use `Sphinx` and `Sphinx-Needs` to bu
 
 You can build the rendered version by running:
 
+On Linux-like systems:
+
 ```shell
    ./make.py
 ```
+
+On Windows systems:
+
+```shell
+uv run make.py
+``` 
+
 
 By default, Sphinx uses incremental rebuilds to generate the content that
 changed since the last invocation. If you notice a problem with incremental
