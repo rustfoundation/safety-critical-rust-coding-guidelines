@@ -14,7 +14,7 @@ Macros
    :fls: fls_wn1i6hzg2ff7
    :decidability: decidable
    :scope: crate
-   :tags: macros, proc-macros
+   :tags: readability
 
    Macros should be expressed using declarative syntax
    in preference to procedural syntax.
