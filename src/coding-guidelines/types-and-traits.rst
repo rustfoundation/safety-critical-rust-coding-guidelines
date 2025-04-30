@@ -25,12 +25,17 @@ Types and Traits
       :status: draft
 
       In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
-      However, in release builds (with optimizations enabled), unless the flag overflow-checks is
+      However, in release builds (with optimizations enabled), unless the flag `overflow-checks`_ is
       turned on, integer operations silently wrap around on overflow, creating potential for silent
       failures and security vulnerabilities. Note that overflow-checks only brings the default panic
       behavior from debug into release builds, avoiding potential silent wrap arounds. Nonetheless,
       abrupt program termination is usually not suitable and, therefore, turning this flag on must
-      not be used as a substitute of explicit handling.
+      not be used as a substitute of explicit handling. Furthermore, the behavior in release mode is
+      under consideration by the The Rust Language Design Team and in the future overflow checking
+      may be turned on by default in release builds (it is a `frequently requested change`_).
+
+      .. _overflow-checks: https://github.com/rust-lang/rust/blob/master/src/doc/rustc/src/codegen-options/index.md#overflow-checks
+      .. _frequently requested change: https://lang-team.rust-lang.org/frequently-requested-changes.html#numeric-overflow-checking-should-be-on-by-default-even-in-release-mode
       
       Safety-critical software requires consistent and predictable behavior across all build
       configurations. Explicit handling of potential overflow conditions improves code clarity,
