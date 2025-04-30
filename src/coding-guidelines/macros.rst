@@ -48,47 +48,47 @@ Macros
             // Compliant implementation
         }
 
-.. guideline:: Shall not use Procedural Macros
-   :id: gui_m6BKTDzO2rdL
-   :category: mandatory
+.. guideline:: Procedural macros should not be used
+   :id: gui_66FSqzD55VRZ
+   :category: advisory
    :status: draft
-   :release: todo
+   :release: 1.85.0;1.85.1
    :fls: fls_wn1i6hzg2ff7
    :decidability: decidable
-   :scope: system
-   :tags: reduce-human-error
+   :scope: crate
+   :tags: readability, reduce-human-error
 
-   Description of the guideline goes here.
+   Macros should be expressed using declarative syntax
+   in preference to procedural syntax.
 
    .. rationale::
-      :id: rat_kAcNBmDhJ5W8
+      :id: rat_AmCavSymv3Ev
       :status: draft
 
-      Explanation of why this guideline is important.
+      Procedural macros are not restricted to pure transcription and can contain arbitrary Rust code.
+      This means they can be harder to understand, and cannot be as easily proved to work as intended.
+      Procedural macros can have arbitrary side effects, which can exhaust compiler resources or
+      expose a vulnerability for users of adopted code.
 
    .. non_compliant_example::
-      :id: non_compl_ex_xhIwlJPZYbVb
+      :id: non_compl_ex_pJhVZW6a1HP9
       :status: draft
 
-      Explanation of code example.
+      (example of a simple expansion using a proc-macro)
 
       .. code-block:: rust
 
-        fn example_function() {
-            // Non-compliant implementation
-        }
+        // TODO
 
    .. compliant_example::
-      :id: compl_ex_JxmIfJ7plkEf
+      :id: compl_ex_4VFyucETB7C3
       :status: draft
 
-      Explanation of code example.
+      (example of the same simple expansion using a declarative macro)
 
       .. code-block:: rust
 
-        fn example_function() {
-            // Compliant implementation
-        }
+        // TODO
 
 .. guideline:: Shall not invoke macros
    :id: gui_a1mHfjgKk4Xr
