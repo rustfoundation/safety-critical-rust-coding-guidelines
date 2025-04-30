@@ -233,7 +233,7 @@ Macros
       :id: rat_X8uCF5yx7Mpo
       :status: draft
 
-      Attribute macros are able to rewrite items entirely or other unexpected ways which may cause confusion and introduce errors.
+      Attribute macros are able to rewrite items entirely or in other unexpected ways which may cause confusion and introduce errors.
 
    .. non_compliant_example::
       :id: non_compl_ex_eW374waRPbeL
