@@ -215,3 +215,48 @@ Macros
         fn example_function() {
             // Compliant implementation
         }
+
+.. guideline:: Attribute macros shall not be used
+   :id: gui_13XWp3mb0g2P
+   :category: required
+   :status: draft
+   :release: todo
+   :fls: fls_4vjbkm4ceymk
+   :decidability: decidable
+   :scope: system
+   :tags: reduce-human-error
+
+   Attribute macros shall neither be declared nor invoked.
+   Prefer less powerful macros that only extend source code.
+
+   .. rationale:: 
+      :id: rat_X8uCF5yx7Mpo
+      :status: draft
+
+      Attribute macros are able to rewrite items entirely or other unexpected ways which may cause confusion and introduce errors.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_eW374waRPbeL
+      :status: draft
+
+      Explanation of code example.
+   
+      .. code-block:: rust
+   
+        #[tokio::main]  // non-compliant
+        async fn main() {
+
+        }
+
+   .. compliant_example::
+      :id: compl_ex_Mg8ePOgbGJeW
+      :status: draft
+
+      Explanation of code example.
+   
+      .. code-block:: rust
+   
+        fn example_function() {
+            // Compliant implementation
+        }
+
