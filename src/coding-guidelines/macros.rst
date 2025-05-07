@@ -6,20 +6,17 @@
 Macros
 ======
 
-.. guideline:: Avoid specialized, fixed patterns within declarative macros
-   :id: gui_FSpI084vbwmJ
-   :category: required
+.. guideline:: Shall not use Declarative Macros
+   :id: gui_h0uG1C9ZjryA
+   :category: mandatory
    :status: draft
-   :release: 1.85.0;1.85.1
-   :fls: fls_w44hav7mw3ao
+   :release: todo
+   :fls: fls_xa7lp0zg1ol2
    :decidability: decidable
-   :scope: module
+   :scope: system
    :tags: reduce-human-error
 
-    Matchers within macro rules are evaluated sequentially and short-circuit on
-    the first match. If a specialized fixed matcher follows a broader matcher,
-    it may be unreachable. This can lead to subtle and surprising bugs. It is
-    encouraged to avoid the use of specialized, fixed matchers.
+   Description of the guideline goes here.
 
    .. rationale::
       :id: rat_U3AEUPyaUhcb
@@ -31,7 +28,7 @@ Macros
       :id: non_compl_ex_Gb4zimei8cNI
       :status: draft
 
-      Explanation of code example.
+      (example of a simple expansion using a proc-macro)
 
       .. code-block:: rust
 
@@ -43,7 +40,7 @@ Macros
       :id: compl_ex_Pw7YCh4Iv47Z
       :status: draft
 
-      Explanation of code example
+      (example of the same simple expansion using a declarative macro)
 
       .. code-block:: rust
 
@@ -307,16 +304,17 @@ Macros
 
 .. guideline:: Avoid specialized, fixed patterns within declarative macros
    :id: gui_FSpI084vbwmJ
-   :status: draft
-   :fls: fls_w44hav7mw3ao
-   :tags: reduce-human-error
    :category: macros
-   :recommendation: encouraged
+   :status: draft
+   :release: todo
+   :fls: fls_w44hav7mw3ao
+   :decidability: decidable
+   :scope: system
+   :tags: reduce-human-error
 
    Description of the guideline goes here.
 
    .. rationale::
-
       :id: rat_zqr9uEqP6nzW
       :status: draft
 
