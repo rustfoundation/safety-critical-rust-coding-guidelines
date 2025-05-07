@@ -1,0 +1,547 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Style Guideline &mdash; Safety-Critical Rust Coding Guidelines 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/modern.css?v=803738c0" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/sphinx-data-viewer/jsonview.bundle.js?v=18cd53c5"></script>
+      <script src="../_static/sphinx-data-viewer/jsonview_loader.js?v=f7ff7e7d"></script>
+      <script src="../_static/sphinx-needs/libs/html/datatables.min.js?v=8a4aee21"></script>
+      <script src="../_static/sphinx-needs/libs/html/datatables_loader.js?v=a2cae175"></script>
+      <script src="../_static/sphinx-needs/libs/html/sphinx_needs_collapse.js?v=dca66431"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Guideline Lifecycle" href="guideline-lifecycle.html" />
+    <link rel="prev" title="Process" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Safety-Critical Rust Coding Guidelines
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../coding-guidelines/index.html">Coding Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compliance/index.html">Compliance</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Process</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Style Guideline</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#specifying-requirements-levels">Specifying requirements levels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-of-a-coding-guideline">Example of a coding guideline</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#guideline"><code class="docutils literal notranslate"><span class="pre">guideline</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#rationale"><code class="docutils literal notranslate"><span class="pre">rationale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#non-compliant-example"><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#compliant-example"><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="guideline-lifecycle.html">Guideline Lifecycle</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../appendices/index.html">Appendices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../retired-guidelines/index.html">Retired Guidelines</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Safety-Critical Rust Coding Guidelines</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Process</a></li>
+      <li class="breadcrumb-item active">Style Guideline</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/process/style-guideline.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="style-guideline">
+<h1>Style Guideline<a class="headerlink" href="#style-guideline" title="Link to this heading"></a></h1>
+<section id="specifying-requirements-levels">
+<h2>Specifying requirements levels<a class="headerlink" href="#specifying-requirements-levels" title="Link to this heading"></a></h2>
+<p>We follow <a class="reference external" href="https://datatracker.ietf.org/doc/html/rfc2119">IETF RFC 2119</a>
+for specifying requirements levels.</p>
+</section>
+<section id="example-of-a-coding-guideline">
+<h2>Example of a coding guideline<a class="headerlink" href="#example-of-a-coding-guideline" title="Link to this heading"></a></h2>
+<p>Below is an example of a coding guideline.</p>
+<p>We will examine each part:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">guideline</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rationale</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code></p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">guideline</span><span class="p">::</span> <span class="n">Avoid</span> <span class="n">Implicit</span> <span class="n">Integer</span> <span class="n">Wrapping</span>
+   <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">gui_xztNdXA2oFNB</span>
+   <span class="p">:</span><span class="n">category</span><span class="p">:</span> <span class="n">required</span>
+   <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+   <span class="p">:</span><span class="n">release</span><span class="p">:</span> <span class="mf">1.85.0</span><span class="p">;</span><span class="mf">1.85.1</span>
+   <span class="p">:</span><span class="n">fls</span><span class="p">:</span> <span class="n">fls_cokwseo3nnr</span>
+   <span class="p">:</span><span class="n">decidability</span><span class="p">:</span> <span class="n">decidable</span>
+   <span class="p">:</span><span class="n">scope</span><span class="p">:</span> <span class="n">module</span>
+   <span class="p">:</span><span class="n">tags</span><span class="p">:</span> <span class="n">numerics</span>
+
+   <span class="n">Code</span> <span class="n">must</span> <span class="ow">not</span> <span class="n">rely</span> <span class="n">on</span> <span class="n">Rust</span><span class="s1">&#39;s implicit integer wrapping behavior that occurs in release builds.</span>
+   <span class="n">Instead</span><span class="p">,</span> <span class="n">explicitly</span> <span class="n">handle</span> <span class="n">potential</span> <span class="n">overflows</span> <span class="n">using</span> <span class="n">the</span> <span class="n">standard</span> <span class="n">library</span><span class="s1">&#39;s checked,</span>
+   <span class="n">saturating</span><span class="p">,</span> <span class="ow">or</span> <span class="n">wrapping</span> <span class="n">operations</span><span class="o">.</span>
+
+   <span class="o">..</span> <span class="n">rationale</span><span class="p">::</span>
+      <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">rat_kYiIiW8R2qD1</span>
+      <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+
+      <span class="n">In</span> <span class="n">debug</span> <span class="n">builds</span><span class="p">,</span> <span class="n">Rust</span> <span class="n">performs</span> <span class="n">runtime</span> <span class="n">checks</span> <span class="k">for</span> <span class="n">integer</span> <span class="n">overflow</span> <span class="ow">and</span> <span class="n">will</span> <span class="n">panic</span> <span class="k">if</span> <span class="n">detected</span><span class="o">.</span>
+      <span class="n">However</span><span class="p">,</span> <span class="ow">in</span> <span class="n">release</span> <span class="n">builds</span> <span class="p">(</span><span class="k">with</span> <span class="n">optimizations</span> <span class="n">enabled</span><span class="p">),</span> <span class="n">integer</span> <span class="n">operations</span> <span class="n">silently</span> <span class="n">wrap</span>
+      <span class="n">around</span> <span class="n">on</span> <span class="n">overflow</span><span class="p">,</span> <span class="n">creating</span> <span class="n">potential</span> <span class="k">for</span> <span class="n">silent</span> <span class="n">failures</span> <span class="ow">and</span> <span class="n">security</span> <span class="n">vulnerabilities</span><span class="o">.</span>
+
+      <span class="n">Safety</span><span class="o">-</span><span class="n">critical</span> <span class="n">software</span> <span class="n">requires</span> <span class="n">consistent</span> <span class="ow">and</span> <span class="n">predictable</span> <span class="n">behavior</span> <span class="n">across</span> <span class="nb">all</span> <span class="n">build</span>
+      <span class="n">configurations</span><span class="o">.</span> <span class="n">Explicit</span> <span class="n">handling</span> <span class="n">of</span> <span class="n">potential</span> <span class="n">overflow</span> <span class="n">conditions</span> <span class="n">improves</span> <span class="n">code</span> <span class="n">clarity</span><span class="p">,</span>
+      <span class="n">maintainability</span><span class="p">,</span> <span class="ow">and</span> <span class="n">reduces</span> <span class="n">the</span> <span class="n">risk</span> <span class="n">of</span> <span class="n">numerical</span> <span class="n">errors</span> <span class="ow">in</span> <span class="n">production</span><span class="o">.</span>
+
+   <span class="o">..</span> <span class="n">non_compliant_example</span><span class="p">::</span>
+      <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">non_compl_ex_PO5TyFsRTlWv</span>
+      <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+
+       <span class="o">..</span> <span class="n">code</span><span class="o">-</span><span class="n">block</span><span class="p">::</span> <span class="n">rust</span>
+
+         <span class="n">fn</span> <span class="n">calculate_next_position</span><span class="p">(</span><span class="n">current</span><span class="p">:</span> <span class="n">u32</span><span class="p">,</span> <span class="n">velocity</span><span class="p">:</span> <span class="n">u32</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">u32</span> <span class="p">{</span>
+             <span class="o">//</span> <span class="n">Potential</span> <span class="k">for</span> <span class="n">silent</span> <span class="n">overflow</span> <span class="ow">in</span> <span class="n">release</span> <span class="n">builds</span>
+             <span class="n">current</span> <span class="o">+</span> <span class="n">velocity</span>
+         <span class="p">}</span>
+
+   <span class="o">..</span> <span class="n">compliant_example</span><span class="p">::</span>
+      <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">compl_ex_WTe7GoPu5Ez0</span>
+      <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+
+       <span class="o">..</span> <span class="n">code</span><span class="o">-</span><span class="n">block</span><span class="p">::</span> <span class="n">rust</span>
+
+         <span class="n">fn</span> <span class="n">calculate_next_position</span><span class="p">(</span><span class="n">current</span><span class="p">:</span> <span class="n">u32</span><span class="p">,</span> <span class="n">velocity</span><span class="p">:</span> <span class="n">u32</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">u32</span> <span class="p">{</span>
+             <span class="o">//</span> <span class="n">Explicitly</span> <span class="n">handle</span> <span class="n">potential</span> <span class="n">overflow</span> <span class="k">with</span> <span class="n">checked</span> <span class="n">addition</span>
+             <span class="n">current</span><span class="o">.</span><span class="n">checked_add</span><span class="p">(</span><span class="n">velocity</span><span class="p">)</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;Position calculation overflowed&quot;</span><span class="p">)</span>
+         <span class="p">}</span>
+</pre></div>
+</div>
+<section id="guideline">
+<h3><code class="docutils literal notranslate"><span class="pre">guideline</span></code><a class="headerlink" href="#guideline" title="Link to this heading"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">guideline</span><span class="p">::</span> <span class="n">Avoid</span> <span class="n">Implicit</span> <span class="n">Integer</span> <span class="n">Wrapping</span>
+   <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">gui_xztNdXA2oFNB</span>
+   <span class="p">:</span><span class="n">category</span><span class="p">:</span> <span class="n">required</span>
+   <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+   <span class="p">:</span><span class="n">release</span><span class="p">:</span> <span class="mf">1.85.0</span><span class="p">;</span><span class="mf">1.85.1</span>
+   <span class="p">:</span><span class="n">fls</span><span class="p">:</span> <span class="n">fls_cokwseo3nnr</span>
+   <span class="p">:</span><span class="n">decidability</span><span class="p">:</span> <span class="n">decidable</span>
+   <span class="p">:</span><span class="n">scope</span><span class="p">:</span> <span class="n">module</span>
+   <span class="p">:</span><span class="n">tags</span><span class="p">:</span> <span class="n">numerics</span>
+
+   <span class="n">Code</span> <span class="n">must</span> <span class="ow">not</span> <span class="n">rely</span> <span class="n">on</span> <span class="n">Rust</span><span class="s1">&#39;s implicit integer wrapping behavior that occurs in release builds.</span>
+   <span class="n">Instead</span><span class="p">,</span> <span class="n">explicitly</span> <span class="n">handle</span> <span class="n">potential</span> <span class="n">overflows</span> <span class="n">using</span> <span class="n">the</span> <span class="n">standard</span> <span class="n">library</span><span class="s1">&#39;s checked,</span>
+   <span class="n">saturating</span><span class="p">,</span> <span class="ow">or</span> <span class="n">wrapping</span> <span class="n">operations</span><span class="o">.</span>
+</pre></div>
+</div>
+<section id="guideline-title">
+<h4><code class="docutils literal notranslate"><span class="pre">guideline</span></code> Title<a class="headerlink" href="#guideline-title" title="Link to this heading"></a></h4>
+<p>The Title <strong>MUST</strong> provide a description of the guideline.</p>
+</section>
+<section id="guideline-id">
+<h4><code class="docutils literal notranslate"><span class="pre">guideline</span></code> <code class="docutils literal notranslate"><span class="pre">id</span></code><a class="headerlink" href="#guideline-id" title="Link to this heading"></a></h4>
+<p>A unique identifier for each guideline. Guideline identifiers <strong>MUST</strong> begin with <code class="docutils literal notranslate"><span class="pre">gui_</span></code>.</p>
+<p>These identifiers are considered <strong>stable</strong> across releases and <strong>MUST NOT</strong> be removed.
+See <code class="docutils literal notranslate"><span class="pre">status</span></code> below for more.</p>
+<p><strong>MUST</strong> be generated using the <code class="docutils literal notranslate"><span class="pre">generate-guideline-templates.py</span></code> script to ensure
+compliance.</p>
+</section>
+<section id="category">
+<h4><code class="docutils literal notranslate"><span class="pre">category</span></code><a class="headerlink" href="#category" title="Link to this heading"></a></h4>
+<p><strong>MUST</strong> be one of these values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">mandatory</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">required</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">advisory</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">disapplied</span></code></p></li>
+</ul>
+<section id="mandatory">
+<h5><code class="docutils literal notranslate"><span class="pre">mandatory</span></code><a class="headerlink" href="#mandatory" title="Link to this heading"></a></h5>
+<p>Code claimed to be in compliance with this document <strong>MUST</strong> follow every guideline marked as <code class="docutils literal notranslate"><span class="pre">mandatory</span></code>.</p>
+<p><em>TODO(pete.levasseur): Add more tips on when this is a good choice for a guideline.</em></p>
+</section>
+<section id="required">
+<h5><code class="docutils literal notranslate"><span class="pre">required</span></code><a class="headerlink" href="#required" title="Link to this heading"></a></h5>
+<p>Code claimed to be in compliance with this document <strong>MUST</strong> follow every guideline marked as <code class="docutils literal notranslate"><span class="pre">required</span></code>,
+with a formal deviation required as outlined in <a class="reference internal" href="../compliance/index.html#compliance"><span class="std std-ref">Compliance</span></a>, where this is not the case.</p>
+<p>An organization or project <strong>MAY</strong> choose to recategorize any <code class="docutils literal notranslate"><span class="pre">required</span></code> guideline to <code class="docutils literal notranslate"><span class="pre">mandatory</span></code>.</p>
+<p><em>TODO(pete.levasseur): Add more tips on when this is a good choice for a guideline.</em></p>
+</section>
+<section id="advisory">
+<h5><code class="docutils literal notranslate"><span class="pre">advisory</span></code><a class="headerlink" href="#advisory" title="Link to this heading"></a></h5>
+<p>These are recommendations and <strong>SHOULD</strong> be applied. However, the category of <code class="docutils literal notranslate"><span class="pre">advisory</span></code> does not mean
+that these items can be ignored, but rather that they <strong>SHOULD</strong> be followed as far as reasonably practical.
+Formal deviation is not necessary for advisory guidelines but, if the formal deviation process is not followed,
+alternative arrangements <strong>MUST</strong> be made for documenting non-compliances.</p>
+<p>An organization or project <strong>MAY</strong> choose to recategorize any <code class="docutils literal notranslate"><span class="pre">advisory</span></code> guideline as <code class="docutils literal notranslate"><span class="pre">mandatory</span></code>
+or <code class="docutils literal notranslate"><span class="pre">required</span></code>, or as <code class="docutils literal notranslate"><span class="pre">disapplied</span></code>.</p>
+<p>If contributing a guideline, you <strong>MAY</strong> choose to submit it as <code class="docutils literal notranslate"><span class="pre">advisory</span></code>
+and ask for support in assigning the guideline the correct category.</p>
+<p><em>TODO(pete.levasseur): Add more tips on when this is a good choice for a guideline.</em></p>
+</section>
+<section id="disapplied">
+<h5><code class="docutils literal notranslate"><span class="pre">disapplied</span></code><a class="headerlink" href="#disapplied" title="Link to this heading"></a></h5>
+<p>These are guidelines for which no enforcement is expected and any non-compliance <strong>MAY</strong> be disregarded.</p>
+<p>Where a guideline does not apply to the chosen release of the Rust compiler, it <strong>MUST</strong> be treated
+as <code class="docutils literal notranslate"><span class="pre">disapplied</span></code> for the purposes of coding guideline <a class="reference internal" href="../compliance/index.html#compliance"><span class="std std-ref">Compliance</span></a>.</p>
+<p>An organization or project <strong>MAY</strong> choose to recategorize any <code class="docutils literal notranslate"><span class="pre">disapplied</span></code> guideline as <code class="docutils literal notranslate"><span class="pre">mandatory</span></code>
+or <code class="docutils literal notranslate"><span class="pre">required</span></code>, or as <code class="docutils literal notranslate"><span class="pre">advisory</span></code>.</p>
+<p><em>Note</em>: Rather than changing the categorization of a guideline to <code class="docutils literal notranslate"><span class="pre">disapplied</span></code> when we wish to
+make it not applicable, we <strong>MUST</strong> instead leave the categorization as-is and instead change
+the <code class="docutils literal notranslate"><span class="pre">status</span></code> to <code class="docutils literal notranslate"><span class="pre">retired</span></code>.</p>
+<p><em>TODO(pete.levasseur): Add more tips on when this is a good choice for a guideline.</em></p>
+</section>
+</section>
+<section id="guideline-status">
+<h4><code class="docutils literal notranslate"><span class="pre">guideline</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code><a class="headerlink" href="#guideline-status" title="Link to this heading"></a></h4>
+<p><strong>MUST</strong> be one of these values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">provisional</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">approved</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">retired</span></code></p></li>
+</ul>
+<p>Guidelines have a lifecycle. When they are first proposed and <strong>MUST</strong> be marked as <code class="docutils literal notranslate"><span class="pre">draft</span></code>
+to allow adoption and feedback to accrue. The Coding Guidelines Subcommittee <strong>MUST</strong>
+periodically review <code class="docutils literal notranslate"><span class="pre">draft</span></code> guidelines and either promote them to <code class="docutils literal notranslate"><span class="pre">approved</span></code>
+or demote them to <code class="docutils literal notranslate"><span class="pre">retired</span></code>.</p>
+<p>From time to time an <code class="docutils literal notranslate"><span class="pre">approved</span></code> guideline <strong>MAY</strong> be moved to <code class="docutils literal notranslate"><span class="pre">retired</span></code>. There
+could be a number of reasons, such as: a guideline which was a poor fit or wrong,
+or in order to make a single guideline more granular and replace it with
+more than one guideline.</p>
+<p>For more, see <a class="reference internal" href="guideline-lifecycle.html#guideline-lifecycle"><span class="std std-ref">Guideline Lifecycle</span></a>.</p>
+<section id="draft">
+<h5><code class="docutils literal notranslate"><span class="pre">draft</span></code><a class="headerlink" href="#draft" title="Link to this heading"></a></h5>
+<p>These guidelines are not yet considered in force, but are mature enough they <strong>MAY</strong> be enforced.
+No formal deviation is required as outlined in <a class="reference internal" href="../compliance/index.html#compliance"><span class="std std-ref">Compliance</span></a>, but alternative arrangements
+<strong>MUST</strong> be made for documenting non-compliances.</p>
+<p><em>Note</em>: <code class="docutils literal notranslate"><span class="pre">draft</span></code> guideline usage and feedback will help to either promote them to <code class="docutils literal notranslate"><span class="pre">approved</span></code> or demote
+them to <code class="docutils literal notranslate"><span class="pre">retired</span></code>.</p>
+</section>
+<section id="approved">
+<h5><code class="docutils literal notranslate"><span class="pre">approved</span></code><a class="headerlink" href="#approved" title="Link to this heading"></a></h5>
+<p>These guidelines <strong>MUST</strong> be enforced. Any deviations <strong>MUST</strong> follow the rule for their
+appropriate <code class="docutils literal notranslate"><span class="pre">category</span></code>.</p>
+</section>
+<section id="retired">
+<h5><code class="docutils literal notranslate"><span class="pre">retired</span></code><a class="headerlink" href="#retired" title="Link to this heading"></a></h5>
+<p>These are guidelines for which no enforcement is expected and any non-compliance <strong>MAY</strong> be disregarded.</p>
+<p><em>Note</em>: The <code class="docutils literal notranslate"><span class="pre">retired</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code> supercedes any <code class="docutils literal notranslate"><span class="pre">category</span></code> assigned a guideline, effectively
+conferring upon the guideline the <code class="docutils literal notranslate"><span class="pre">category</span></code> of <code class="docutils literal notranslate"><span class="pre">disapplied</span></code> with no ability to recategorize it
+to <code class="docutils literal notranslate"><span class="pre">mandatory</span></code>, <code class="docutils literal notranslate"><span class="pre">required</span></code>, or <code class="docutils literal notranslate"><span class="pre">advisory</span></code>. The <code class="docutils literal notranslate"><span class="pre">category</span></code> assigned the guideline at the time
+it is retired is kept.</p>
+</section>
+</section>
+<section id="release">
+<h4><code class="docutils literal notranslate"><span class="pre">release</span></code><a class="headerlink" href="#release" title="Link to this heading"></a></h4>
+<p>Each guideline <strong>MUST</strong> note the Rust compiler releases to which the guideline is applicable.</p>
+<p>A guideline likely <strong>MAY</strong> apply to more than one release.</p>
+<p>If a guideline applies to more than one release, the list <strong>MUST</strong> be semicolon separated.</p>
+</section>
+<section id="fls">
+<h4><code class="docutils literal notranslate"><span class="pre">fls</span></code><a class="headerlink" href="#fls" title="Link to this heading"></a></h4>
+<p>Each guideline <strong>MUST</strong> have linkage to an appropriate <code class="docutils literal notranslate"><span class="pre">paragraph-id</span></code> from the
+Ferrocene Language Specification (FLS). That linkage to the FLS is the means by which
+the guidelines cover exactly the specification, no more and no less.</p>
+<p>A single FLS <code class="docutils literal notranslate"><span class="pre">paragraph-id</span></code> <strong>MAY</strong> have more than one guideline which applies to it.</p>
+</section>
+<section id="decidability">
+<h4><code class="docutils literal notranslate"><span class="pre">decidability</span></code><a class="headerlink" href="#decidability" title="Link to this heading"></a></h4>
+<p><strong>MUST</strong> be one of these values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">decidable</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">undecidable</span></code></p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">decidability</span></code> describes the theoretical ability of a static analyzer to answer the
+question: “Does this code comply with this rule?”</p>
+<p>A guideline <strong>MUST</strong> be classified as  <code class="docutils literal notranslate"><span class="pre">decidable</span></code> if it is possible for such a static
+analyzer to answer the question with “yes” or “no” in <em>every case</em> and <strong>MUST</strong> be classified
+as <code class="docutils literal notranslate"><span class="pre">undecidable</span></code> otherwise.</p>
+</section>
+<section id="scope">
+<h4><code class="docutils literal notranslate"><span class="pre">scope</span></code><a class="headerlink" href="#scope" title="Link to this heading"></a></h4>
+<p><strong>MUST</strong> be one of these values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">crate</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">system</span></code></p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">scope</span></code> describes at which level of program scope the guideline can be confirmed followed
+for each instance of code for which a guideline applies.</p>
+<p>For example, if there for each instance of <code class="docutils literal notranslate"><span class="pre">unsafe</span></code> code usage there may be guidelines which
+must then be checked at the module level. This must be done since if a single usage of <code class="docutils literal notranslate"><span class="pre">unsafe</span></code>
+is used in a module, the entire module must be checked for certain invariants.</p>
+<p>When writing guidelines we <strong>MUST</strong> attempt to lower the <code class="docutils literal notranslate"><span class="pre">scope</span></code> as small as possible and as
+allowed by the semantics to improve tractability of their application.</p>
+<section id="module">
+<h5><code class="docutils literal notranslate"><span class="pre">module</span></code><a class="headerlink" href="#module" title="Link to this heading"></a></h5>
+<p>A guideline which is able to be checked at the module level without reference
+to other modules or crates <strong>MUST</strong> be classified as <code class="docutils literal notranslate"><span class="pre">module</span></code>.</p>
+</section>
+<section id="crate">
+<h5><code class="docutils literal notranslate"><span class="pre">crate</span></code><a class="headerlink" href="#crate" title="Link to this heading"></a></h5>
+<p>A guideline which cannot be checked at the module level, but which does not require the
+entire source text <strong>MUST</strong> be classified as <code class="docutils literal notranslate"><span class="pre">crate</span></code>.</p>
+</section>
+<section id="system">
+<h5><code class="docutils literal notranslate"><span class="pre">system</span></code><a class="headerlink" href="#system" title="Link to this heading"></a></h5>
+<p>A guideline which cannot be checked at the module or crate level and requires the entire
+source text <strong>MUST</strong> be classified as <code class="docutils literal notranslate"><span class="pre">system</span></code>.</p>
+</section>
+</section>
+<section id="tags">
+<h4><code class="docutils literal notranslate"><span class="pre">tags</span></code><a class="headerlink" href="#tags" title="Link to this heading"></a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">tags</span></code> are largely descriptive, not prescriptive means of finding commonality between
+similar guidelines.</p>
+<p>Each guideline <strong>MUST</strong> have at least one item listed in <code class="docutils literal notranslate"><span class="pre">tags</span></code>.</p>
+</section>
+<section id="guideline-content">
+<h4>Guideline Content<a class="headerlink" href="#guideline-content" title="Link to this heading"></a></h4>
+<p>Each <code class="docutils literal notranslate"><span class="pre">guideline</span></code> <strong>MUST</strong> have content which follows the options to give an overview of
+what it covers.</p>
+<p>Content <strong>SHOULD</strong> aim to be as short and self-contained as possible, while still explaining
+the scope of the guideline.</p>
+<p>Content <strong>SHOULD NOT</strong> cover the rationale for the guideline, which is done in the <code class="docutils literal notranslate"><span class="pre">rationale</span></code> section.</p>
+<section id="amplification">
+<h5>Amplification<a class="headerlink" href="#amplification" title="Link to this heading"></a></h5>
+<p>Guideline Content <strong>MAY</strong> contain a section titled <em>Amplification</em> followed by text that provides a more
+precise description of the guideline title. An amplification is normative; if it conflicts with the
+<code class="docutils literal notranslate"><span class="pre">guideline</span></code> Title, the amplification <strong>MUST</strong> take precedence. This mechanism is convenient as it allows
+a complicated concept to be conveyed using a short Title.</p>
+</section>
+<section id="exception">
+<h5>Exception<a class="headerlink" href="#exception" title="Link to this heading"></a></h5>
+<p>Guideline Content <strong>MAY</strong> contain a section titled <em>Exception</em> followed by text that that describes
+situations in which the guideline does not apply. The use of exceptions permits the description of
+some guidelines to be simplified. It is important to note that an exception is a situation in which
+a guideline does not apply. Code that complies with a guideline by virtue of an exception does not
+require a deviation.</p>
+</section>
+</section>
+</section>
+<section id="rationale">
+<h3><code class="docutils literal notranslate"><span class="pre">rationale</span></code><a class="headerlink" href="#rationale" title="Link to this heading"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">rationale</span><span class="p">::</span>
+   <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">rat_kYiIiW8R2qD1</span>
+   <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+
+   <span class="n">In</span> <span class="n">debug</span> <span class="n">builds</span><span class="p">,</span> <span class="n">Rust</span> <span class="n">performs</span> <span class="n">runtime</span> <span class="n">checks</span> <span class="k">for</span> <span class="n">integer</span> <span class="n">overflow</span> <span class="ow">and</span> <span class="n">will</span> <span class="n">panic</span> <span class="k">if</span> <span class="n">detected</span><span class="o">.</span>
+   <span class="n">However</span><span class="p">,</span> <span class="ow">in</span> <span class="n">release</span> <span class="n">builds</span> <span class="p">(</span><span class="k">with</span> <span class="n">optimizations</span> <span class="n">enabled</span><span class="p">),</span> <span class="n">integer</span> <span class="n">operations</span> <span class="n">silently</span> <span class="n">wrap</span>
+   <span class="n">around</span> <span class="n">on</span> <span class="n">overflow</span><span class="p">,</span> <span class="n">creating</span> <span class="n">potential</span> <span class="k">for</span> <span class="n">silent</span> <span class="n">failures</span> <span class="ow">and</span> <span class="n">security</span> <span class="n">vulnerabilities</span><span class="o">.</span>
+
+   <span class="n">Safety</span><span class="o">-</span><span class="n">critical</span> <span class="n">software</span> <span class="n">requires</span> <span class="n">consistent</span> <span class="ow">and</span> <span class="n">predictable</span> <span class="n">behavior</span> <span class="n">across</span> <span class="nb">all</span> <span class="n">build</span>
+   <span class="n">configurations</span><span class="o">.</span> <span class="n">Explicit</span> <span class="n">handling</span> <span class="n">of</span> <span class="n">potential</span> <span class="n">overflow</span> <span class="n">conditions</span> <span class="n">improves</span> <span class="n">code</span> <span class="n">clarity</span><span class="p">,</span>
+   <span class="n">maintainability</span><span class="p">,</span> <span class="ow">and</span> <span class="n">reduces</span> <span class="n">the</span> <span class="n">risk</span> <span class="n">of</span> <span class="n">numerical</span> <span class="n">errors</span> <span class="ow">in</span> <span class="n">production</span><span class="o">.</span>
+</pre></div>
+</div>
+<section id="rationale-id">
+<h4><code class="docutils literal notranslate"><span class="pre">rationale</span></code> <code class="docutils literal notranslate"><span class="pre">id</span></code><a class="headerlink" href="#rationale-id" title="Link to this heading"></a></h4>
+<p>A unique identifier for each rationale. Rationale identifiers <strong>MUST</strong> begin with <code class="docutils literal notranslate"><span class="pre">rat_</span></code>.</p>
+<p>These identifiers are considered <strong>stable</strong> across releases and <strong>MUST NOT</strong> be removed.
+See <code class="docutils literal notranslate"><span class="pre">status</span></code> below for more.</p>
+<p><strong>MUST</strong> be generated using the <code class="docutils literal notranslate"><span class="pre">generate-guideline-templates.py</span></code> script to ensure
+compliance.</p>
+</section>
+<section id="rationale-status">
+<h4><code class="docutils literal notranslate"><span class="pre">rationale</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code><a class="headerlink" href="#rationale-status" title="Link to this heading"></a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">status</span></code> option of a <code class="docutils literal notranslate"><span class="pre">rationale</span></code> <strong>MUST</strong> match the <code class="docutils literal notranslate"><span class="pre">status</span></code> of its parent <code class="docutils literal notranslate"><span class="pre">guideline</span></code>.</p>
+</section>
+<section id="rationale-content">
+<h4>Rationale Content<a class="headerlink" href="#rationale-content" title="Link to this heading"></a></h4>
+<p>TODO(pete.levasseur)</p>
+</section>
+</section>
+<section id="non-compliant-example">
+<h3><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code><a class="headerlink" href="#non-compliant-example" title="Link to this heading"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">non_compliant_example</span><span class="p">::</span>
+   <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">non_compl_ex_PO5TyFsRTlWv</span>
+   <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+
+    <span class="o">..</span> <span class="n">code</span><span class="o">-</span><span class="n">block</span><span class="p">::</span> <span class="n">rust</span>
+
+      <span class="n">fn</span> <span class="n">calculate_next_position</span><span class="p">(</span><span class="n">current</span><span class="p">:</span> <span class="n">u32</span><span class="p">,</span> <span class="n">velocity</span><span class="p">:</span> <span class="n">u32</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">u32</span> <span class="p">{</span>
+          <span class="o">//</span> <span class="n">Potential</span> <span class="k">for</span> <span class="n">silent</span> <span class="n">overflow</span> <span class="ow">in</span> <span class="n">release</span> <span class="n">builds</span>
+          <span class="n">current</span> <span class="o">+</span> <span class="n">velocity</span>
+      <span class="p">}</span>
+</pre></div>
+</div>
+<section id="non-compliant-example-id">
+<h4><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <code class="docutils literal notranslate"><span class="pre">id</span></code><a class="headerlink" href="#non-compliant-example-id" title="Link to this heading"></a></h4>
+<p>A unique identifier for each <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code>. <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> identifiers
+<strong>MUST</strong> begin with <code class="docutils literal notranslate"><span class="pre">non_compl_ex_</span></code>.</p>
+<p>These identifiers are considered <strong>stable</strong> across releases and <strong>MUST NOT</strong> be removed.
+See <code class="docutils literal notranslate"><span class="pre">status</span></code> below for more.</p>
+<p><strong>MUST</strong> be generated using the <code class="docutils literal notranslate"><span class="pre">generate-guideline-templates.py</span></code> script to ensure
+compliance.</p>
+</section>
+<section id="non-compliant-example-status">
+<h4><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code><a class="headerlink" href="#non-compliant-example-status" title="Link to this heading"></a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">status</span></code> option of a <code class="docutils literal notranslate"><span class="pre">non_compl_ex</span></code> <strong>MUST</strong> match the <code class="docutils literal notranslate"><span class="pre">status</span></code> of its parent <code class="docutils literal notranslate"><span class="pre">guideline</span></code>.</p>
+</section>
+<section id="non-compliant-example-content">
+<h4><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> Content<a class="headerlink" href="#non-compliant-example-content" title="Link to this heading"></a></h4>
+<p>The Content section of a <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <strong>MUST</strong> contain both a Code Explanation and Code Example.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> is neither normative, nor exhaustive. <code class="docutils literal notranslate"><span class="pre">guideline</span></code> Content <strong>MUST</strong> take precedence.</p>
+<section id="non-compliant-example-code-explanation">
+<h5><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> Code Explanation<a class="headerlink" href="#non-compliant-example-code-explanation" title="Link to this heading"></a></h5>
+<p>The Code Explanation of a <cite>non_compliant_example</cite> <strong>MUST</strong> explain in prose the reason the guideline
+when not applied results in code which is undesirable.</p>
+<p>The Code Explanation of a <cite>non_compliant_example</cite> <strong>MAY</strong> be a simple explanation no longer than
+a sentence.</p>
+<p>The Code Explanation of a <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <strong>SHOULD</strong> be no longer than necessary to explain
+the Code Example that follows.</p>
+</section>
+<section id="non-compliant-example-code-example">
+<h5><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> Code Example<a class="headerlink" href="#non-compliant-example-code-example" title="Link to this heading"></a></h5>
+<p>A <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> Code Example <strong>MUST</strong> have a single <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">code-block::</span> <span class="pre">rust</span></code>
+in which the example code is placed.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> Code Example <strong>SHOULD</strong> be made as short and simple to understand
+as possible.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> Code Example <strong>SHOULD</strong> include clarifying comments if complex and/or
+long.</p>
+<p>The Code Example of a <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <strong>MUST NOT</strong> contain a guideline violation other
+than the current guideline.</p>
+</section>
+</section>
+</section>
+<section id="compliant-example">
+<h3><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code><a class="headerlink" href="#compliant-example" title="Link to this heading"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">compliant_example</span><span class="p">::</span>
+   <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">compl_ex_WTe7GoPu5Ez0</span>
+   <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
+
+    <span class="o">..</span> <span class="n">code</span><span class="o">-</span><span class="n">block</span><span class="p">::</span> <span class="n">rust</span>
+
+      <span class="n">fn</span> <span class="n">calculate_next_position</span><span class="p">(</span><span class="n">current</span><span class="p">:</span> <span class="n">u32</span><span class="p">,</span> <span class="n">velocity</span><span class="p">:</span> <span class="n">u32</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">u32</span> <span class="p">{</span>
+          <span class="o">//</span> <span class="n">Explicitly</span> <span class="n">handle</span> <span class="n">potential</span> <span class="n">overflow</span> <span class="k">with</span> <span class="n">checked</span> <span class="n">addition</span>
+          <span class="n">current</span><span class="o">.</span><span class="n">checked_add</span><span class="p">(</span><span class="n">velocity</span><span class="p">)</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;Position calculation overflowed&quot;</span><span class="p">)</span>
+      <span class="p">}</span>
+</pre></div>
+</div>
+<section id="compliant-example-id">
+<h4><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> <code class="docutils literal notranslate"><span class="pre">id</span></code><a class="headerlink" href="#compliant-example-id" title="Link to this heading"></a></h4>
+<p>A unique identifier for each <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code>. <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> identifiers
+<strong>MUST</strong> begin with <code class="docutils literal notranslate"><span class="pre">compl_ex_</span></code>.</p>
+<p>These identifiers are considered <strong>stable</strong> across releases and <strong>MUST NOT</strong> be removed.
+See <code class="docutils literal notranslate"><span class="pre">status</span></code> below for more.</p>
+<p><strong>MUST</strong> be generated using the <code class="docutils literal notranslate"><span class="pre">generate-guideline-templates.py</span></code> script to ensure
+compliance.</p>
+</section>
+<section id="compliant-example-status">
+<h4><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code><a class="headerlink" href="#compliant-example-status" title="Link to this heading"></a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">status</span></code> option of a <code class="docutils literal notranslate"><span class="pre">compl_ex</span></code> <strong>MUST</strong> match the <code class="docutils literal notranslate"><span class="pre">status</span></code> of its parent <code class="docutils literal notranslate"><span class="pre">guideline</span></code>.</p>
+</section>
+<section id="compliant-example-content">
+<h4><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Content<a class="headerlink" href="#compliant-example-content" title="Link to this heading"></a></h4>
+<p>The Content section of a <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> <strong>MUST</strong> contain both a Code Explanation and Code Example.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> is neither normative, nor exhaustive. <code class="docutils literal notranslate"><span class="pre">guideline</span></code> Content <strong>MUST</strong> take precedence.</p>
+<section id="compliant-example-code-explanation">
+<h5><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Code Explanation<a class="headerlink" href="#compliant-example-code-explanation" title="Link to this heading"></a></h5>
+<p>The Code Explanation of a <cite>compliant_example</cite> <strong>MAY</strong> be a simple explanation no longer than
+a sentence.</p>
+<p>The Code Explanation of a <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> <strong>SHOULD</strong> be no longer than necessary to explain
+the Code Example that follows.</p>
+</section>
+<section id="compliant-example-code-example">
+<h5><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Code Example<a class="headerlink" href="#compliant-example-code-example" title="Link to this heading"></a></h5>
+<p>A <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Code Example <strong>MUST</strong> have a single <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">code-block::</span> <span class="pre">rust</span></code>
+in which the example code is placed.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Code Example <strong>SHOULD</strong> be made as short and simple to understand
+as possible.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Code Example <strong>SHOULD</strong> include clarifying comments if complex and/or
+long.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Code Example <strong>MUST</strong> comply with every guideline.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">compliant_example</span></code> Code Example <strong>SHOULD</strong> try to illustrate the guideline by
+getting close to violating it, but staying within compliance.</p>
+</section>
+</section>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Process" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="guideline-lifecycle.html" class="btn btn-neutral float-right" title="Guideline Lifecycle" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Contributors to Coding Guidelines Subcommittee.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

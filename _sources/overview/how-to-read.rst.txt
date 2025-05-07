@@ -3,7 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-How to read
+How to Read
 ===========
-
 

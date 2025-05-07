@@ -13,7 +13,10 @@ Safety-Critical Rust Coding Guidelines
    README
    overview/index
    coding-guidelines/index
+   compliance/index
+   process/index
    appendices/index
+   retired-guidelines/index
 
 Indices and tables
 ==================

@@ -12,11 +12,11 @@
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/modern.css?v=803738c0" />
 
   
@@ -83,7 +83,10 @@
 <li class="toctree-l2"><a class="reference internal" href="inline-assembly.html">Inline Assembly</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="../compliance/index.html">Compliance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../process/index.html">Process</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../appendices/index.html">Appendices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../retired-guidelines/index.html">Retired Guidelines</a></li>
 </ul>
 
         </div>
@@ -113,7 +116,7 @@
              
   <section id="types-and-traits">
 <h1>Types and Traits<a class="headerlink" href="#types-and-traits" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-35362849">
+<div class="need_container docutils container" id="SNCB-4ce4f15d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_xztNdXA2oFNB">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -124,19 +127,21 @@
 <tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
 <div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">numerics</span></span></span></div>
-<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">types</span></span></div>
-<div class="line"><span class="needs_recommendation"><span class="needs_label">recommendation: </span><span class="needs_data">required</span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">required</span></span></div>
 <div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://spec.ferrocene.dev/types-and-traits.html#fls_cokwseo3nnr" class="fls-id">fls_cokwseo3nnr</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.85.0;1.85.1</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_kYiIiW8R2qD1" title="gui_xztNdXA2oFNB">rat_kYiIiW8R2qD1</a>, <a class="reference internal" href="#bad_ex_PO5TyFsRTlWv" title="gui_xztNdXA2oFNB">bad_ex_PO5TyFsRTlWv</a>, <a class="reference internal" href="#good_ex_WTe7GoPu5Ez0" title="gui_xztNdXA2oFNB">good_ex_WTe7GoPu5Ez0</a></span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_kYiIiW8R2qD1" title="gui_xztNdXA2oFNB">rat_kYiIiW8R2qD1</a>, <a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWv" title="gui_xztNdXA2oFNB">non_compl_ex_PO5TyFsRTlWv</a>, <a class="reference internal" href="#compl_ex_WTe7GoPu5Ez0" title="gui_xztNdXA2oFNB">compl_ex_WTe7GoPu5Ez0</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s implicit integer wrapping behavior that occurs in release builds.
-Instead, explicitly handle potential overflows using the standard library’s checked,
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s implicit integer wrapping behavior that may occur in release
+builds. Instead, explicitly handle potential overflows using the standard library’s checked,
 saturating, or wrapping operations.</p>
-<div class="need_container docutils container" id="SNCB-e2932282">
+<div class="need_container docutils container" id="SNCB-f00a41f6">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_kYiIiW8R2qD1">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -153,8 +158,14 @@ saturating, or wrapping operations.</p>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
-However, in release builds (with optimizations enabled), integer operations silently wrap
-around on overflow, creating potential for silent failures and security vulnerabilities.</p>
+However, in release builds (with optimizations enabled), unless the flag <a class="reference external" href="https://github.com/rust-lang/rust/blob/master/src/doc/rustc/src/codegen-options/index.md#overflow-checks">overflow-checks</a> is
+turned on, integer operations silently wrap around on overflow, creating potential for silent
+failures and security vulnerabilities. Note that overflow-checks only brings the default panic
+behavior from debug into release builds, avoiding potential silent wrap arounds. Nonetheless,
+abrupt program termination is usually not suitable and, therefore, turning this flag on must
+not be used as a substitute of explicit handling. Furthermore, the behavior in release mode is
+under consideration by the The Rust Language Design Team and in the future overflow checking
+may be turned on by default in release builds (it is a <a class="reference external" href="https://lang-team.rust-lang.org/frequently-requested-changes.html#numeric-overflow-checking-should-be-on-by-default-even-in-release-mode">frequently requested change</a>).</p>
 <p>Safety-critical software requires consistent and predictable behavior across all build
 configurations. Explicit handling of potential overflow conditions improves code clarity,
 maintainability, and reduces the risk of numerical errors in production.</p>
@@ -163,18 +174,18 @@ maintainability, and reduces the risk of numerical errors in production.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-ec73541d">
-<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bad_example docutils align-default" id="bad_ex_PO5TyFsRTlWv">
+<div class="need_container docutils container" id="SNCB-1fd1707f">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWv">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
-<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bad Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bad_ex_PO5TyFsRTlWv" title="bad_ex_PO5TyFsRTlWv">bad_ex_PO5TyFsRTlWv</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWv" title="non_compl_ex_PO5TyFsRTlWv">non_compl_ex_PO5TyFsRTlWv</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
 </div>
 </td>
 </tr>
 <tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNB" title="bad_ex_PO5TyFsRTlWv">gui_xztNdXA2oFNB</a></span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNB" title="non_compl_ex_PO5TyFsRTlWv">gui_xztNdXA2oFNB</a></span></span></div>
 </span></div>
 </div>
 </td>
@@ -192,18 +203,18 @@ maintainability, and reduces the risk of numerical errors in production.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-8132cf3e">
-<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_good_example docutils align-default" id="good_ex_WTe7GoPu5Ez0">
+<div class="need_container docutils container" id="SNCB-84fd065f">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_WTe7GoPu5Ez0">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
-<div class="line"><span><span class="needs_type_name"><span class="needs_data">Good Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#good_ex_WTe7GoPu5Ez0" title="good_ex_WTe7GoPu5Ez0">good_ex_WTe7GoPu5Ez0</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_WTe7GoPu5Ez0" title="compl_ex_WTe7GoPu5Ez0">compl_ex_WTe7GoPu5Ez0</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
 </div>
 </td>
 </tr>
 <tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNB" title="good_ex_WTe7GoPu5Ez0">gui_xztNdXA2oFNB</a></span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNB" title="compl_ex_WTe7GoPu5Ez0">gui_xztNdXA2oFNB</a></span></span></div>
 </span></div>
 </div>
 </td>
