@@ -322,15 +322,19 @@ Macros
       implementations. It's possible to use procedural macros or declarative macros
       to do so.
 
-      In a declarative macro the ordering of the patterns will be the order that
-      they are matched against which can lead to unexpected behavior in the case
-      where we have unique behavior intended for a particular expression. The concern
-      in particular is that while the ordering may be done correctly when the
-      macro match rules are written, it's possible in a refactor for them to
+      The choice of which `transcriber`_
+      is being used in a declarative macro depends on their declaration order within the macro.
+      This can lead to unexpected behavior changes in invocations of declarative macros if a new
+      transciber is inserted before another due to invocations suddenly matching a different transcriber.
+
+      The concern in particular is that while the declaration ordering may be done correctly
+      when the macro match rules are written, it's possible in a refactor for them to
       unintentionally be moved around in order.
 
       If needing to specialize logic within the macro based on a particular
       expression's value, it is better to not use a declarative macro with multiple rules.
+
+      .. _transcriber: https://doc.rust-lang.org/reference/macros-by-example.html
 
    .. non_compliant_example::
       :id: non_compl_ex_5vK0CCmePkef
