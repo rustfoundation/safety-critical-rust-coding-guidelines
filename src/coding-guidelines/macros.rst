@@ -40,7 +40,7 @@ Macros
       :id: compl_ex_Pw7YCh4Iv47Z
       :status: draft
 
-      (example of the same simple expansion using a declarative macro)
+      Explanation of code example
 
       .. code-block:: rust
 
