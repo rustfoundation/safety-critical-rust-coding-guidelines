@@ -28,7 +28,7 @@ Macros
       :id: non_compl_ex_Gb4zimei8cNI
       :status: draft
 
-      (example of a simple expansion using a proc-macro)
+      Explanation of code example.
 
       .. code-block:: rust
 
