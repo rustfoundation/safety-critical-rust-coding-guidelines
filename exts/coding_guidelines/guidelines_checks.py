@@ -1,16 +1,10 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
-bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} {postfix}"
 from sphinx.errors import SphinxError
 from sphinx_needs.data import SphinxNeedsData
-import logging
-from tqdm import tqdm
+from .common import logger, get_tqdm, bar_format 
 
-logger = logging.getLogger('sphinx')
-
-import os
-os.environ["DISABLE_TQDM"] = "1"
 
 class IntegrityCheckError(SphinxError):
     category = "Integrity Check Error"
@@ -27,7 +21,7 @@ def validate_required_fields(app, env):
 
     # prefiltring: this is mainly done for tqdm progress
     guidelines = {k: v for k, v in needs.items() if v.get('type') == 'guideline'}
-    pbar = tqdm(guidelines.items(), desc="Checking for required fields", bar_format=bar_format, unit="need")
+    pbar = get_tqdm(iterable=guidelines.items(), desc="Checking for required fields", bar_format=bar_format, unit="need")
 
     for key, value in pbar:
         if value.get('type') == 'guideline':
@@ -47,4 +41,3 @@ def validate_required_fields(app, env):
                 logger.error(error_message)
                 app.builder.statuscode = 1 # mark the build as failed (0 means success)
                 raise IntegrityCheckError(error_message) 
-            logger.info("No missing required field")

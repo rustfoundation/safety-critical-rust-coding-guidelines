@@ -1,24 +1,15 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
-bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} {postfix}"
-from tqdm import tqdm
+
+from .common import logger, get_tqdm, bar_format, logging
 import time 
 import requests
-import logging
 import re
 import json
-from pathlib import Path
 from sphinx.errors import SphinxError
 from sphinx_needs.data import SphinxNeedsData
 
-
-disable_tqdm = False 
-def get_tqdm(**kwargs):
-    kwargs['disable'] = disable_tqdm
-    return tqdm(**kwargs)
-# Get the Sphinx logger
-logger = logging.getLogger('sphinx')
 fls_paragraph_ids_url = "https://rust-lang.github.io/fls/paragraph-ids.json"
 
 class FLSValidationError(SphinxError):

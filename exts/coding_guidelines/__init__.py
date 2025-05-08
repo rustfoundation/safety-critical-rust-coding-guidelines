@@ -1,21 +1,14 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
-from tqdm import tqdm
-import time, os
+  
 from . import fls_checks
 from . import write_guidelines_ids
 from . import std_role
 from . import fls_linking
 from . import guidelines_checks 
-from sphinx_needs.api import add_dynamic_function
-from sphinx.errors import SphinxError
-from sphinx.domains import Domain
-import logging
 
-bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} {postfix}"
-# Get the Sphinx logger
-logger = logging.getLogger('sphinx')
-logger.setLevel(logging.WARNING)
+from .common import logger, get_tqdm, bar_format, logging 
+from sphinx.domains import Domain
 
 class CodingGuidelinesDomain(Domain):
     name = "coding-guidelines"
@@ -36,7 +29,7 @@ class CodingGuidelinesDomain(Domain):
 
 def on_build_finished(app, exception):
     print("\nFinalizing build:")
-    for _ in tqdm(range(1), desc="Finalizing",bar_format=bar_format):
+    for _ in get_tqdm(iterable=range(1), desc="Finalizing",bar_format=bar_format):
         pass
 
     outdir = app.outdir
@@ -78,6 +71,7 @@ def setup(app):
     )
     if app.config.verbose:
         logger.setLevel(logging.INFO)
+        common.disable_tqdm = True  
     
     app.connect('env-check-consistency', guidelines_checks.validate_required_fields)
     app.connect('env-check-consistency', fls_checks.check_fls)
