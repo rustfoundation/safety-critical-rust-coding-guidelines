@@ -3,14 +3,12 @@ Module to generate checksums for guidelines and write paragraph-ids.json file.
 """
 import hashlib
 import json
-import logging
 import os
 from collections import defaultdict
 import sphinx
 from sphinx_needs.data import SphinxNeedsData
+from .common import logger
 
-# Get the Sphinx logger
-logger = logging.getLogger('sphinx')
 
 def calculate_checksum(content, options):
     """Calculate a SHA-256 checksum of content and options"""
