@@ -1,23 +1,21 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
-
+from tqdm import tqdm
+import time, os
 from . import fls_checks
 from . import write_guidelines_ids
 from . import std_role
 from . import fls_linking
 from . import guidelines_checks 
-from . import spinner 
-
 from sphinx_needs.api import add_dynamic_function
 from sphinx.errors import SphinxError
 from sphinx.domains import Domain
-
 import logging
 
+bar_format = "{l_bar}{bar}| {n_fmt}/{total_fmt} {postfix}"
 # Get the Sphinx logger
 logger = logging.getLogger('sphinx')
 logger.setLevel(logging.WARNING)
-spinner = spinner.Spinner(" Building docs...", enabled=True)
 
 class CodingGuidelinesDomain(Domain):
     name = "coding-guidelines"
@@ -37,17 +35,19 @@ class CodingGuidelinesDomain(Domain):
 
 
 def on_build_finished(app, exception):
+    print("\nFinalizing build:")
+    for _ in tqdm(range(1), desc="Finalizing",bar_format=bar_format):
+        pass
+
     outdir = app.outdir
     if exception is not None:
-        spinner.stop(" - Build failed")
+        print(" - Build failed")
     else:
         if not app.config.verbose:
-            spinner.stop(f" + Build complete -> {outdir}")
+            print(f" + Build complete -> {outdir}")
 
 def setup(app):
     
-    spinner.start()
-
     app.add_domain(CodingGuidelinesDomain)
     app.add_config_value(
         name = "offline", 
@@ -70,7 +70,6 @@ def setup(app):
     app.add_config_value(name='enable_spec_lock_consistency',
                          default=True,
                          rebuild='env')
-
     app.add_config_value(
         name='required_guideline_fields',
         default=['release', 'fls', 'decidability', 'scope'],
@@ -80,18 +79,17 @@ def setup(app):
     if app.config.verbose:
         logger.setLevel(logging.INFO)
     
-
     app.connect('env-check-consistency', guidelines_checks.validate_required_fields)
-
     app.connect('env-check-consistency', fls_checks.check_fls)
-
     app.connect('build-finished', write_guidelines_ids.build_finished)
-
     app.connect('build-finished', fls_linking.build_finished)
-
-    app.connect("build-finished", on_build_finished)
-
-
+    app.connect('build-finished', on_build_finished)
+    
+    return {
+        'version': '0.1',
+        'parallel_read_safe': True,
+    }
+    
     return {
         'version': '0.1',
         'parallel_read_safe': True,
