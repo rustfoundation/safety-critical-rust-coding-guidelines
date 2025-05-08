@@ -83,8 +83,3 @@ def setup(app):
         'version': '0.1',
         'parallel_read_safe': True,
     }
-    
-    return {
-        'version': '0.1',
-        'parallel_read_safe': True,
-    }
