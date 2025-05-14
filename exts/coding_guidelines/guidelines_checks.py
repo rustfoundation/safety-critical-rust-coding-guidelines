@@ -19,7 +19,7 @@ def validate_required_fields(app, env):
 
     required_fields = app.config.required_guideline_fields  # Access the configured values
 
-    # prefiltring: this is mainly done for tqdm progress
+    # prefiltering: this is mainly done for tqdm progress
     guidelines = {k: v for k, v in needs.items() if v.get('type') == 'guideline'}
     pbar = get_tqdm(iterable=guidelines.items(), desc="Checking for required fields", bar_format=bar_format, unit="need")
 

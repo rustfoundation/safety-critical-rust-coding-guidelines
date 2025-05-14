@@ -127,7 +127,7 @@ def check_fls_ids_correct(app, env, fls_ids):
     # Track any errors found
     invalid_ids = []
     
-    # prefiltring: this is mainly done for tqdm progress
+    # prefiltering: this is mainly done for tqdm progress
     guidelines = {k: v for k, v in needs.items() if v.get('type') == 'guideline'}
     
     pbar = get_tqdm(iterable=guidelines.items(), desc="Validating FLS IDs",bar_format=bar_format, unit="need")
@@ -317,7 +317,7 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
     # Map of FLS IDs to guidelines that reference them
     fls_to_guidelines = {}
 
-    # prefiltring: this is mainly done for tqdm progress
+    # prefiltering: this is mainly done for tqdm progress
     guidelines = {k: v for k, v in needs.items() if v.get('type') == 'guideline'}
     pbar = get_tqdm(iterable=guidelines.items(), desc="Checking fls lock consistency", bar_format=bar_format, unit="need")
 
