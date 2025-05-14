@@ -156,7 +156,7 @@ def check_fls_ids_correct(app, env, fls_ids):
             logger.error(error_message)
             raise FLSValidationError(error_message)
         
-        logger.info("All FLS references in guidelines are valid")
+    logger.info("All FLS references in guidelines are valid")
 
     pbar.close()  # Ensure cleanup
 
