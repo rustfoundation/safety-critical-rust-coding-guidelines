@@ -427,9 +427,9 @@ Macros
             // Compliant implementation
         }
 
-.. guideline:: Names in a macro definition shall use a global path
+.. guideline:: Names in a macro definition shall use a fully qualified path
    :id: gui_SJMrWDYZ0dN4
-   :category: advisory
+   :category: required
    :status: draft
    :release: 1.85.0;1.85.1
    :fls: fls_7kb6ltajgiou
@@ -437,15 +437,15 @@ Macros
    :scope: module
    :tags: reduce-human-error
 
-   Each name inside of the definition of a macro shall use a global path, which absolutely refers to an
-   entity.
+   Each name inside of the definition of a macro shall either use a global path or path prefixed with $crate.
 
    .. rationale::
       :id: rat_VRNXaxmW1l2s
       :status: draft
 
       Using a path that refers to an entity relatively inside of a macro subjects it to path resolution
-      results which may change depending on where the macro is used. This could lead to developer confusion
+      results which may change depending on where the macro is used. The intended path to refer to an entity
+      can be shadowed when using a macro leading to unexpected behaviors. This could lead to developer confusion
       about why a macro behaves differently in diffenent locations, or confusion about where entity in a macro
       will resolve to.
 
