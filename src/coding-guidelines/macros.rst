@@ -426,3 +426,67 @@ Macros
         fn example_function() {
             // Compliant implementation
         }
+
+.. guideline:: Names in a macro definition shall use a global path
+   :id: gui_SJMrWDYZ0dN4
+   :category: advisory
+   :status: draft
+   :release: 1.85.0;1.85.1
+   :fls: fls_7kb6ltajgiou
+   :decidability: decidable
+   :scope: module
+   :tags: reduce-human-error
+
+   Each name inside of the definition of a macro shall use a global path, which absolutely refers to an
+   entity.
+
+   .. rationale::
+      :id: rat_VRNXaxmW1l2s
+      :status: draft
+
+      Using a path that refers to an entity relatively inside of a macro subjects it to path resolution
+      results which may change depending on where the macro is used. This could lead to developer confusion
+      about why a macro behaves differently in diffenent locations, or confusion about where entity in a macro
+      will resolve to.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_m2XR1ihTbCQS
+      :status: draft
+
+      The following is a macro which shows referring to a vector entity using a non-global path.
+
+      .. code-block:: rust
+
+        #[macro_export]
+        macro_rules! vec {
+            ( $( $x:expr ),* ) => {
+                {
+                    let mut temp_vec = Vec::new(); // non-global path
+                    $(
+                        temp_vec.push($x);
+                    )*
+                    temp_vec
+                }
+            };
+        }
+
+   .. compliant_example::
+      :id: compl_ex_xyaShvxL9JAM
+      :status: draft
+
+      The following is a macro refers to Vec using a global path.
+
+      .. code-block:: rust
+
+        #[macro_export]
+        macro_rules! vec {
+            ( $( $x:expr ),* ) => {
+                {
+                    let mut temp_vec = ::std::vec::Vec::new(); // global path
+                    $(
+                        temp_vec.push($x);
+                    )*
+                    temp_vec
+                }
+            };
+        }
