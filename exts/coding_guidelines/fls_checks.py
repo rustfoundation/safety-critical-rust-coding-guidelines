@@ -136,7 +136,6 @@ def check_fls_ids_correct(app, env, fls_ids):
     for need_id, need in pbar:
         if need.get('type') == 'guideline':
             pbar.set_postfix(fls_id=need_id)
-            time.sleep(0.1)
             fls_value = need.get("fls")
             
             # Skip needs we already validated format for
@@ -324,7 +323,6 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
     for need_id, need in pbar:
         if need.get('type') == 'guideline':
             pbar.set_postfix(fls_id=need_id)
-            time.sleep(0.1) # this is temporary for testing
             fls_value = need.get("fls")
             if fls_value:
                 if fls_value not in fls_to_guidelines:

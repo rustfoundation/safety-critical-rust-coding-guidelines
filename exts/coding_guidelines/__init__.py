@@ -36,7 +36,7 @@ def on_build_finished(app, exception):
     if exception is not None:
         print(" - Build failed")
     else:
-        if not app.config.verbose:
+        if not app.config.debug:
             print(f" + Build complete -> {outdir}")
 
 def setup(app):
@@ -53,7 +53,7 @@ def setup(app):
         rebuild="env",  # Rebuild the environment when this changes
         types=[str],
     )
-    app.add_config_value(name='verbose', 
+    app.add_config_value(name='debug', 
                          default=False, 
                          rebuild='env'
     )
@@ -69,7 +69,7 @@ def setup(app):
         rebuild='env',
         types=[list],
     )
-    if app.config.verbose:
+    if app.config.debug:
         logger.setLevel(logging.INFO)
         common.disable_tqdm = True  
     

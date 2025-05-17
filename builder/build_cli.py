@@ -29,7 +29,6 @@ def build_docs(
     debug: bool,
     offline: bool,
     spec_lock_consistency_check: bool,
-    verbose: bool
 ) -> Path:
     """
     Builds the Sphinx documentation with the specified options.
@@ -71,8 +70,8 @@ def build_docs(
         conf_opt_values.append("enable_spec_lock_consistency=0")
     if offline:  
         conf_opt_values.append("offline=1")
-    if verbose:  
-        conf_opt_values.append("verbose=1")
+    if debug:  
+        conf_opt_values.append("debug=1")
 
     # Only add the --define argument if there are options to define
     if conf_opt_values:
@@ -193,6 +192,6 @@ def main(root):
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     rendered = build_docs(
-        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff, args.verbose
+        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff, 
     )
 
