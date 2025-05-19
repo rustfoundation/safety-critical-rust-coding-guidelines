@@ -453,7 +453,10 @@ Macros
       :id: non_compl_ex_m2XR1ihTbCQS
       :status: draft
 
-      The following is a macro which shows referring to a vector entity using a non-global path.
+      The following is a macro which shows referring to a vector entity using a non-global path. Depending on
+      where the macro is used a different `Vec` could be used than is intended. If scope where this is used
+      defines a struct `Vec` which is not preset at the macro defintion, the macro user might be intending to
+      use that in the macro.
 
       .. code-block:: rust
 
@@ -474,7 +477,9 @@ Macros
       :id: compl_ex_xyaShvxL9JAM
       :status: draft
 
-      The following is a macro refers to Vec using a global path.
+      The following is a macro refers to Vec using a global path. Even if there is a different struct called
+      `Vec` defined in the scope of the macro usage, this macro will unambigiously use the `Vec` from the
+      Standard Library.
 
       .. code-block:: rust
 
