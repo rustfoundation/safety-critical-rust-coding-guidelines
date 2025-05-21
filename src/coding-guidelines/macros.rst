@@ -90,6 +90,89 @@ Macros
 
         // TODO
 
+.. guideline:: A macro should not be used in place of a function
+   :id: gui_2jjWUoF1teOY
+   :category: mandatory
+   :status: draft
+   :release: todo
+   :fls: fls_xa7lp0zg1ol2
+   :decidability: decidable
+   :scope: system
+   :tags: reduce-human-error
+
+   Functions should always be preferred over macros, except when macros provide essential functionality that functions cannot, such as variadic interfaces, compile-time code generation, or syntax extensions via custom derive and attribute macros.
+    
+   |
+
+   .. rationale:: 
+      :id: rat_M9bp23ctkzQ7
+      :status: draft
+
+      Macros are powerful but they come at the cost of readability, complexity, and maintainability. They obfuscate control flow and type signatures.
+
+      **Debugging Complexity** 
+
+      - Errors point to expanded code rather than source locations, making it difficult to trace compile-time errors back to the original macro invocation.
+
+      **Optimization**
+      
+      - Macros may inhibit compiler optimizations that work better with functions.
+      - Macros act like ``#[inline(always)]`` functions, which can lead to code bloat.
+      - They don't benefit from the compiler's inlining heuristics, missing out on selective inlining where the compiler decides when inlining is beneficial.
+
+      **Functions provide**
+
+      - Clear type signatures.
+      - Predictable behavior.
+      - Proper stack traces.
+      - Consistent optimization opportunities.
+
+
+   .. non_compliant_example::
+      :id: non_compl_ex_TZgk2vG42t2r
+      :status: draft
+
+      Using a macro where a simple function would suffice, leads to hidden mutation:
+   
+      .. code-block:: rust
+
+        macro_rules! increment_and_double {
+            ($x:expr) => {
+                {
+                    $x += 1; // mutation is implicit
+                    $x * 2
+                }
+            };
+        }
+        let mut num = 5;
+        let result = increment_and_double!(num);
+        println!("Result: {}, Num: {}", result, num);
+        // Result: 12, Num: 6
+
+      In this example, calling the macro both increments and returns the value in one go—without any clear indication in its “signature” that it mutates its argument. As a result, num is changed behind the scenes, which can surprise readers and make debugging more difficult.
+
+
+   .. compliant_example::
+      :id: compl_ex_iPTgzrvO7qr3
+      :status: draft
+
+      The same functionality, implemented as a function with explicit borrowing:
+
+      .. code-block:: rust
+
+        fn increment_and_double(x: &mut i32) -> i32 {
+            *x += 1; // mutation is explicit 
+            *x * 2
+        }
+        let mut num = 5;
+        let result = increment_and_double(&mut num);
+        println!("Result: {}, Num: {}", result, num);
+        // Result: 12, Num: 6
+
+      The function version makes the mutation and borrowing explicit in its signature, improving readability, safety, and debuggability.
+
+      
+
 .. guideline:: Shall not use Function-like Macros
    :id: gui_WJlWqgIxmE8P
    :category: mandatory
@@ -301,4 +384,114 @@ Macros
         fn example_function() {
             // Compliant implementation
         }
+   
+.. guideline:: Do not hide unsafe blocks within macro expansions
+   :id: gui_FRLaMIMb4t3S                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+   :category: required                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+   :status: draft                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+   :release: todo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+   :fls: fls_4vjbkm4ceymk
+   :decidability: todo
+   :scope: todo
+   :tags: reduce-human-error
 
+   Description of the guideline goes here.
+
+   .. rationale:: 
+      :id: rat_WJubG7KuUDLW
+      :status: draft
+
+      Explanation of why this guideline is important.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_AyFnP0lJLHxi
+      :status: draft
+
+      Explanation of code example.
+
+      .. code-block:: rust
+
+        fn example_function() {
+            // Non-compliant implementation
+        }
+
+   .. compliant_example::
+      :id: compl_ex_pO5gP1aj2v4F
+      :status: draft
+
+      Explanation of code example.
+
+      .. code-block:: rust
+
+        fn example_function() {
+            // Compliant implementation
+        }
+
+.. guideline:: Names in a macro definition shall use a fully qualified path
+   :id: gui_SJMrWDYZ0dN4
+   :category: required
+   :status: draft
+   :release: 1.85.0;1.85.1
+   :fls: fls_7kb6ltajgiou
+   :decidability: decidable
+   :scope: module
+   :tags: reduce-human-error
+
+   Each name inside of the definition of a macro shall either use a global path or path prefixed with $crate.
+
+   .. rationale::
+      :id: rat_VRNXaxmW1l2s
+      :status: draft
+
+      Using a path that refers to an entity relatively inside of a macro subjects it to path resolution
+      results which may change depending on where the macro is used. The intended path to refer to an entity
+      can be shadowed when using a macro leading to unexpected behaviors. This could lead to developer confusion
+      about why a macro behaves differently in diffenent locations, or confusion about where entity in a macro
+      will resolve to.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_m2XR1ihTbCQS
+      :status: draft
+
+      The following is a macro which shows referring to a vector entity using a non-global path. Depending on
+      where the macro is used a different `Vec` could be used than is intended. If scope where this is used
+      defines a struct `Vec` which is not preset at the macro defintion, the macro user might be intending to
+      use that in the macro.
+
+      .. code-block:: rust
+
+        #[macro_export]
+        macro_rules! vec {
+            ( $( $x:expr ),* ) => {
+                {
+                    let mut temp_vec = Vec::new(); // non-global path
+                    $(
+                        temp_vec.push($x);
+                    )*
+                    temp_vec
+                }
+            };
+        }
+
+   .. compliant_example::
+      :id: compl_ex_xyaShvxL9JAM
+      :status: draft
+
+      The following is a macro refers to Vec using a global path. Even if there is a different struct called
+      `Vec` defined in the scope of the macro usage, this macro will unambigiously use the `Vec` from the
+      Standard Library.
+
+      .. code-block:: rust
+
+        #[macro_export]
+        macro_rules! vec {
+            ( $( $x:expr ),* ) => {
+                {
+                    let mut temp_vec = ::std::vec::Vec::new(); // global path
+                    $(
+                        temp_vec.push($x);
+                    )*
+                    temp_vec
+                }
+            };
+        }

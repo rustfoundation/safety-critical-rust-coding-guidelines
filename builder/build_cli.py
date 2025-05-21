@@ -18,7 +18,7 @@ import time
 # Automatically watch the following extra directories when --serve is used.
 EXTRA_WATCH_DIRS = ["exts", "themes"]
 
-SPEC_CHECKSUM_URL = "https://spec.ferrocene.dev/paragraph-ids.json"
+SPEC_CHECKSUM_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
 
 def build_docs(

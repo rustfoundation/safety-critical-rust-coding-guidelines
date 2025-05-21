@@ -11,7 +11,7 @@ from sphinx_needs.data import SphinxNeedsData
 
 # Get the Sphinx logger
 logger = logging.getLogger('sphinx')
-fls_paragraph_ids_url = "https://spec.ferrocene.dev/paragraph-ids.json"
+fls_paragraph_ids_url = "https://rust-lang.github.io/fls/paragraph-ids.json"
 
 class FLSValidationError(SphinxError):
     category = "FLS Validation Error"
@@ -206,7 +206,7 @@ def gather_fls_paragraph_ids(app, json_url):
             return {}, None
         
         # Base URL for constructing direct links
-        base_url = "https://spec.ferrocene.dev/"
+        base_url = "https://rust-lang.github.io/"
         
         # Process each document in the JSON structure
         for document in data['documents']:

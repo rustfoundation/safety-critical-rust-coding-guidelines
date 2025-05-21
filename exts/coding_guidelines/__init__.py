@@ -47,7 +47,7 @@ def setup(app):
         types=[str],
     )
     app.add_config_value(name='fls_paragraph_ids_url', 
-                         default='https://spec.ferrocene.dev/paragraph-ids.json', 
+                         default='https://rust-lang.github.io/fls/paragraph-ids.json', 
                          rebuild='env')
     app.add_config_value(name='enable_spec_lock_consistency',
                          default=True,
