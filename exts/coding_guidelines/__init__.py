@@ -1,20 +1,14 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
-
+  
 from . import fls_checks
 from . import write_guidelines_ids
 from . import std_role
 from . import fls_linking
 from . import guidelines_checks 
 
-from sphinx_needs.api import add_dynamic_function
-from sphinx.errors import SphinxError
+from .common import logger, get_tqdm, bar_format, logging 
 from sphinx.domains import Domain
-
-import logging
-
-# Get the Sphinx logger
-logger = logging.getLogger('sphinx')
 
 class CodingGuidelinesDomain(Domain):
     name = "coding-guidelines"
@@ -32,6 +26,19 @@ class CodingGuidelinesDomain(Domain):
     def merge_domaindata(self, docnames, other):
         pass  # No domain data to merge
 
+
+def on_build_finished(app, exception):
+    print("\nFinalizing build:")
+    for _ in get_tqdm(iterable=range(1), desc="Finalizing",bar_format=bar_format):
+        pass
+
+    outdir = app.outdir
+    if exception is not None:
+        print(" - Build failed")
+    else:
+        if not app.config.debug:
+            print(f" + Build complete -> {outdir}")
+
 def setup(app):
     
     app.add_domain(CodingGuidelinesDomain)
@@ -46,6 +53,10 @@ def setup(app):
         rebuild="env",  # Rebuild the environment when this changes
         types=[str],
     )
+    app.add_config_value(name='debug', 
+                         default=False, 
+                         rebuild='env'
+    )
     app.add_config_value(name='fls_paragraph_ids_url', 
                          default='https://rust-lang.github.io/fls/paragraph-ids.json', 
                          rebuild='env')
@@ -58,15 +69,16 @@ def setup(app):
         rebuild='env',
         types=[list],
     )
-
+    if app.config.debug:
+        logger.setLevel(logging.INFO)
+        common.disable_tqdm = True  
+    
     app.connect('env-check-consistency', guidelines_checks.validate_required_fields)
-
     app.connect('env-check-consistency', fls_checks.check_fls)
-
     app.connect('build-finished', write_guidelines_ids.build_finished)
-
     app.connect('build-finished', fls_linking.build_finished)
-
+    app.connect('build-finished', on_build_finished)
+    
     return {
         'version': '0.1',
         'parallel_read_safe': True,

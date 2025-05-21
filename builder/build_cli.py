@@ -28,7 +28,7 @@ def build_docs(
     serve: bool,
     debug: bool,
     offline: bool,
-    spec_lock_consistency_check: bool
+    spec_lock_consistency_check: bool,
 ) -> Path:
     """
     Builds the Sphinx documentation with the specified options.
@@ -70,10 +70,13 @@ def build_docs(
         conf_opt_values.append("enable_spec_lock_consistency=0")
     if offline:  
         conf_opt_values.append("offline=1")
+    if debug:  
+        conf_opt_values.append("debug=1")
+
     # Only add the --define argument if there are options to define
     if conf_opt_values:
-        args.append("--define")
         for opt in conf_opt_values:
+            args.append("--define") # each option needs its own --define
             args.append(opt)
 
     if serve:
@@ -173,6 +176,12 @@ def main(root):
         "--xml", help="Generate Sphinx XML rather than HTML", action="store_true"
     )
     group.add_argument(
+        "-v",
+        "--verbose",
+        help="Debug mode for the extensions, showing exceptions",
+        action="store_true",
+    )
+    group.add_argument(
         "--debug",
         help="Debug mode for the extensions, showing exceptions",
         action="store_true",
@@ -183,6 +192,6 @@ def main(root):
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     rendered = build_docs(
-        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff
+        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff, 
     )
 

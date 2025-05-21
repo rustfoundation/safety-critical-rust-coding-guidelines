@@ -1,16 +1,15 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
+
+from .common import logger, get_tqdm, bar_format, logging
+import time 
 import requests
-import logging
 import re
 import json
-from pathlib import Path
 from sphinx.errors import SphinxError
 from sphinx_needs.data import SphinxNeedsData
 
-# Get the Sphinx logger
-logger = logging.getLogger('sphinx')
 fls_paragraph_ids_url = "https://rust-lang.github.io/fls/paragraph-ids.json"
 
 class FLSValidationError(SphinxError):
@@ -88,9 +87,9 @@ def check_fls_exists_and_valid_format(app, env):
     # Regular expression for FLS ID validation
     # Format: fls_<12 alphanumeric chars including upper and lowercase>
     fls_pattern = re.compile(r'^fls_[a-zA-Z0-9]{9,12}$')
+
     for need_id, need in needs.items():
         logger.debug(f"ID: {need_id}, Need: {need}")
-
         if need.get('type') == 'guideline':
             fls_value = need.get("fls")
             
@@ -128,9 +127,15 @@ def check_fls_ids_correct(app, env, fls_ids):
     # Track any errors found
     invalid_ids = []
     
+    # prefiltering: this is mainly done for tqdm progress
+    guidelines = {k: v for k, v in needs.items() if v.get('type') == 'guideline'}
+    
+    pbar = get_tqdm(iterable=guidelines.items(), desc="Validating FLS IDs",bar_format=bar_format, unit="need")
+
     # Check each guideline's FLS reference
-    for need_id, need in needs.items():
+    for need_id, need in pbar:
         if need.get('type') == 'guideline':
+            pbar.set_postfix(fls_id=need_id)
             fls_value = need.get("fls")
             
             # Skip needs we already validated format for
@@ -141,16 +146,18 @@ def check_fls_ids_correct(app, env, fls_ids):
             if fls_value not in fls_ids:
                 invalid_ids.append((need_id, fls_value))
                 logger.warning(f"Need {need_id} references non-existent FLS ID: '{fls_value}'")
-    
-    # Raise error if any invalid IDs were found
-    if invalid_ids:
-        error_message = "The following needs reference non-existent FLS IDs:\n"
-        for need_id, fls_id in invalid_ids:
-            error_message += f"  - Need {need_id} references '{fls_id}'\n"
-        logger.error(error_message)
-        raise FLSValidationError(error_message)
-    
+        
+        # Raise error if any invalid IDs were found
+        if invalid_ids:
+            error_message = "The following needs reference non-existent FLS IDs:\n"
+            for need_id, fls_id in invalid_ids:
+                error_message += f"  - Need {need_id} references '{fls_id}'\n"
+            logger.error(error_message)
+            raise FLSValidationError(error_message)
+        
     logger.info("All FLS references in guidelines are valid")
+
+    pbar.close()  # Ensure cleanup
 
 
 def gather_fls_paragraph_ids(app, json_url):
@@ -308,8 +315,14 @@ def check_fls_lock_consistency(app, env, fls_raw_data):
 
     # Map of FLS IDs to guidelines that reference them
     fls_to_guidelines = {}
-    for need_id, need in needs.items():
+
+    # prefiltering: this is mainly done for tqdm progress
+    guidelines = {k: v for k, v in needs.items() if v.get('type') == 'guideline'}
+    pbar = get_tqdm(iterable=guidelines.items(), desc="Checking fls lock consistency", bar_format=bar_format, unit="need")
+
+    for need_id, need in pbar:
         if need.get('type') == 'guideline':
+            pbar.set_postfix(fls_id=need_id)
             fls_value = need.get("fls")
             if fls_value:
                 if fls_value not in fls_to_guidelines:

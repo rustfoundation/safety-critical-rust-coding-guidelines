@@ -1,10 +1,8 @@
 import re
 import os
-import logging
 import sphinx
+from .common import logger
 
-# Get the Sphinx logger
-logger = logging.getLogger('sphinx')
 
 def build_finished(app, exception):
     """Hook to run at the end of the build process."""
