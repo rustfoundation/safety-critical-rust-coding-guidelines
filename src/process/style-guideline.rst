@@ -92,10 +92,6 @@ We will examine each part:
       :scope: module
       :tags: numerics
 
-      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
-      Instead, explicitly handle potential overflows using the standard library's checked,
-      saturating, or wrapping operations.
-
 ``guideline`` Title
 -------------------
 
@@ -308,15 +304,27 @@ what it covers.
 Content **SHOULD** aim to be as short and self-contained as possible, while still explaining
 the scope of the guideline.
 
-Content **SHOULD NOT** cover the rationale for the guideline, which is done in the ``rationale`` section.
+Guideline content consists of an Amplification and any Exceptions, which are normative,
+supported by a Rationale and examples, which are not normative.
 
 Amplification
 ^^^^^^^^^^^^^
 
-Guideline Content **MAY** contain a section titled *Amplification* followed by text that provides a more
-precise description of the guideline title. An amplification is normative; if it conflicts with the
-``guideline`` Title, the amplification **MUST** take precedence. This mechanism is convenient as it allows
-a complicated concept to be conveyed using a short Title.
+The *Amplification* is the block of text that **MAY** appear immediately below the guideline
+attribute block, before any other subheadings.
+If it is provided, the Amplification is normative; if it conflicts with the ``guideline`` Title,
+the Amplification **MUST** take precedence. This mechanism is convenient as it allows a complicated
+concept to be conveyed using a short Title and refined by the text below.
+
+Content in the Amplification **SHOULD NOT** cover the rationale for the guideline or any
+non-normative explanations, which **SHOULD** be provided in the ``rationale`` and examples sections
+where helpful.
+
+::
+
+      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
+      Instead, explicitly handle potential overflows using the standard library's checked,
+      saturating, or wrapping operations.
 
 Exception
 ^^^^^^^^^
@@ -327,8 +335,16 @@ some guidelines to be simplified. It is important to note that an exception is a
 a guideline does not apply. Code that complies with a guideline by virtue of an exception does not
 require a deviation.
 
+If it is provided, the Exception is normative; if it conflicts with the ``guideline`` Title or the
+Amplification, the Exception takes precedence over both. Depending on the individual guideline, it
+may be clearer to have an Amplification or Title with an explicit Exception overriding parts of
+their description, or it may be clearer to express excepted cases as integrated sentences in the
+Amplification. This decision is editorial.
+
 ``rationale``
 =============
+
+Each Guideline **MUST** provide a *Rationale* for its inclusion and enforcement.
 
 ::
 
@@ -363,7 +379,13 @@ The ``status`` option of a ``rationale`` **MUST** match the ``status`` of its pa
 Rationale Content
 -----------------
 
-TODO(pete.levasseur)
+The content of the rationale **SHOULD** provide the relevant context for why this guideline is useful.
+The Rationale **SHOULD** make reference to any undefined behaviours or known errors associated
+with the subject of the guideline.
+The Rationale **MAY** make reference to other guidelines or to external documents cited in the
+References.
+
+The Rationale **SHOULD** be supported by code examples wherever concise examples are possible.
 
 ``non_compliant_example``
 =========================
