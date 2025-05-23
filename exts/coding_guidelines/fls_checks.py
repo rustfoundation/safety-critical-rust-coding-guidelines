@@ -213,7 +213,7 @@ def gather_fls_paragraph_ids(app, json_url):
             return {}, None
         
         # Base URL for constructing direct links
-        base_url = "https://rust-lang.github.io/"
+        base_url = "https://rust-lang.github.io/fls/"
         
         # Process each document in the JSON structure
         for document in data['documents']:
