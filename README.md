@@ -10,6 +10,8 @@ _Note_: Early, subject to changes.
 
 The Safety-Critical Rust Coding Guidelines use `Sphinx` and `Sphinx-Needs` to build a rendered version of the coding guidelines, and `uv` to install and manage Python dependencies (including Sphinx itself). To simplify building the rendered version, we created a script called `make.py` that takes care of invoking Sphinx with the right flags.
 
+If you still need to install `uv` you can follow the [steps outlined](https://docs.astral.sh/uv/getting-started/installation/) on Astral's website.
+
 You can build the rendered version by running:
 
 On Linux-like systems:
