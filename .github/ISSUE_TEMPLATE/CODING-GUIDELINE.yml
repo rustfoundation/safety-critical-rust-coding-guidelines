@@ -43,7 +43,7 @@ body:
       description: The title of a guideline. Should be punchy and short. Write an Amplification to expand!
       placeholder: We shall not allow `foo` when `bar`
     validations:
-      required: false
+      required: true
   - type: dropdown
     id: category
     attributes:
@@ -55,14 +55,17 @@ body:
         - Required
         - Advisory
         - Disapplied
+    validations:
+      required: true
   - type: dropdown
     id: status
     attributes:
       label: Status
       description: The Status when first submitted must always be Draft. Status can be updated over time to Approved and/or Retired.
-      multiple: true
       options:
         - Draft
+    validations:
+      required: true
   - type: input
     id: release-begin
     attributes:
@@ -92,10 +95,11 @@ body:
     attributes:
       label: Decidability
       description: Decidable - This guideline can be automatically checked with tooling. Undecidable - This guideline can not be automatically checked with tooling.
-      multiple: true
       options:
         - Decidable
         - Undecidable
+    validations:
+      required: true
   - type: dropdown
     id: scope
     attributes:
@@ -106,6 +110,8 @@ body:
         - Module
         - Crate
         - System
+    validations:
+      required: true
   - type: textarea
     id: tags
     attributes:
@@ -123,7 +129,7 @@ body:
     validations:
       required: false
   - type: textarea
-    id: exception
+    id: exceptions
     attributes:
       label: Exception(s)
       description: An Exception is a chance to specify conditions under which this Guideline does not apply. Zero or more may be supplied.
