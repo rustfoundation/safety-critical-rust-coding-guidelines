@@ -1,7 +1,7 @@
 name: Coding Guideline
 description: File a coding guideline of interest
 title: "[Coding Guideline]: "
-labels: ["coding-guideline"]
+labels: ["coding guideline"]
 assignees:
   - PLeVasseur
 body:
