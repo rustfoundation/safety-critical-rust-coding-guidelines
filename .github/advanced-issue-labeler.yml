@@ -1,0 +1,75 @@
+policy:
+  - section:
+      - id: [chapter]
+        block-list: ['None', 'Other']
+        label:
+          - name: 'chapter: associated-items'
+            keys: ['Associated Items']
+          - name: 'chapter: attributes'
+            keys: ['Attributes']
+          - name: 'chapter: concurrency'
+            keys: ['Concurrency']
+          - name: 'chapter: entities-and-resolution'
+            keys: ['Entities and Resolution']
+          - name: 'chapter: exceptions-and-errors'
+            keys: ['Exceptions and Errors']
+          - name: 'chapter: expressions'
+            keys: ['Expressions']
+          - name: 'chapter: ffi'
+            keys: ['FFI']
+          - name: 'chapter: functions'
+            keys: ['Functions']
+          - name: 'chapter: generics'
+            keys: ['Generics']
+          - name: 'chapter: implementations'
+            keys: ['Implementations']
+          - name: 'chapter: inline-assembly'
+            keys: ['Inline Assembly']
+          - name: 'chapter: macros'
+            keys: ['Macros']
+          - name: 'chapter: ownership-and-destruction'
+            keys: ['Ownership and Destruction']
+          - name: 'chapter: patterns'
+            keys: ['Patterns']
+          - name: 'chapter: program-structure-and-compilation'
+            keys: ['Program Structure and Compilation']
+          - name: 'chapter: statements'
+            keys: ['Statements']
+          - name: 'chapter: types-and-traits'
+            keys: ['Types and Traits']
+          - name: 'chapter: unsafety'
+            keys: ['Unsafety']
+          - name: 'chapter: values'
+            keys: ['Values']
+      - id: [category]
+        block-list: ['None', 'Other']
+        label:
+          - name: 'category: mandatory'
+            keys: ['Mandatory']
+          - name: 'category: required'
+            keys: ['Required']
+          - name: 'category: advisory'
+            keys: ['Advisory']
+          - name: 'category: disapplied'
+            keys: ['Disapplied']
+      - id: [status]
+        block-list: ['None', 'Other', 'Approved', 'Retired']
+        label:
+          - name: 'status: draft'
+            keys: ['Draft']
+      - id: [decidability]
+        block-list: ['None', 'Other']
+        label:
+          - name: 'decidability: decidable'
+            keys: ['Decidable']
+          - name: 'decidability: undecidable'
+            keys: ['Undecidable']
+      - id: [scope]
+        block-list: ['None', 'Other']
+        label:
+          - name: 'scope: module'
+            keys: ['Module']
+          - name: 'scope: crate'
+            keys: ['Crate']
+          - name: 'scope: system'
+            keys: ['System']
