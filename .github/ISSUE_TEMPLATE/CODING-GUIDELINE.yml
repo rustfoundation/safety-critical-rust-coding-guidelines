@@ -1,0 +1,172 @@
+name: Coding Guideline
+description: File a coding guideline of interest
+title: "[Coding Guideline]: "
+labels: ["coding-guideline"]
+assignees:
+  - PLeVasseur
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filling out a coding guideline!
+  - type: dropdown
+    id: chapter
+    attributes:
+      label: Chapter
+      description: Which chapter does this fall under?
+      options:
+        - Associated Items
+        - Attributes
+        - Concurrency
+        - Entities and Resolution
+        - Exceptions and Errors
+        - Expressions
+        - FFI
+        - Functions
+        - Generics
+        - Implementations
+        - Inline Assembly
+        - Macros
+        - Ownership and Destruction
+        - Patterns
+        - Program Structure and Compilation
+        - Statements
+        - Types and Traits
+        - Unsafety
+        - Values
+    validations:
+      required: true
+  - type: input
+    id: title
+    attributes:
+      label: Guideline Title
+      description: The title of a guideline. Should be punchy and short. Write an Amplification to expand!
+      placeholder: We shall not allow `foo` when `bar`
+    validations:
+      required: false
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Mandatory - required, no deviation possible. Required - required, deviation possible for each instance. Advisory - suggested, deviation possible to remove requirement for project-wide. Disapplied - need not be applied, very optional. Suggest using Mandatory very sparingly, if in doubt submit as Disapplied.
+      multiple: true
+      options:
+        - Mandatory
+        - Required
+        - Advisory
+        - Disapplied
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      description: The Status when first submitted must always be Draft. Status can be updated over time to Approved and/or Retired.
+      multiple: true
+      options:
+        - Draft
+  - type: input
+    id: release-begin
+    attributes:
+      label: Release Begin
+      description: First Rust compiler release this guideline is applicable to. If unsure enter "unclear".
+      placeholder: 1.3.0
+    validations:
+      required: true
+  - type: input
+    id: release-end
+    attributes:
+      label: Release End
+      description: Last Rust compiler release this guideline is applicable to. If unsure enter "unclear". If still valid enter "latest".
+      placeholder: 1.79.0
+    validations:
+      required: true
+  - type: input
+    id: fls-id
+    attributes:
+      label: FLS Paragraph ID
+      description: The Paragraph ID from the FLS corresponding to what this Guideline covers. Easiest way to obtain this is to navigate to the [FLS](https://rust-lang.github.io/fls), right click a section ID (e.g. `4.2:2`), inspect, and then find it in the pane which opens in your browser.
+      placeholder: fls_69zyas59o8ff
+    validations:
+      required: true
+  - type: dropdown
+    id: decidability
+    attributes:
+      label: Decidability
+      description: Decidable - This guideline can be automatically checked with tooling. Undecidable - This guideline can not be automatically checked with tooling.
+      multiple: true
+      options:
+        - Decidable
+        - Undecidable
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Module - This guideline can be checked at the module level. Crate - This guideline can be checked at the crate level. System - This guideline must be checked alongside the entire source. If unsure, choose "System" as it's the most strict and will likely be revisited.
+      multiple: true
+      options:
+        - Module
+        - Crate
+        - System
+  - type: textarea
+    id: tags
+    attributes:
+      label: Tags
+      description: Tags describing the issue this Coding Guideline is attempting to prevent. Submit as comma-separated value list. Submit at least one tag.
+      placeholder: numerics, reduce-human-error
+    validations:
+      required: true
+  - type: textarea
+    id: amplification
+    attributes:
+      label: Amplification
+      description: An Amplification is a chance to expand or clarify the Guideline's Title. Optional as needed. Normative. Rationale should not be entered here, but below in Rationale.
+      placeholder: In particular, it's important to not `foo` when `bar` under typical conditions of `baz`
+    validations:
+      required: false
+  - type: textarea
+    id: exception
+    attributes:
+      label: Exception(s)
+      description: An Exception is a chance to specify conditions under which this Guideline does not apply. Zero or more may be supplied.
+      placeholder: When you are `hoge`-ing, this Guideline does not apply.
+    validations:
+      required: false
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: Here we explain the why of this Coding Guideline. Should be as long or as short as needed. Non-normative.
+      placeholder: As documented in the below reference, we see that under conditions `baz` if we `foo` when `bar`-ing we encounter suprising behavior `biz`. ...
+    validations:
+      required: true
+  - type: textarea
+    id: non-compliant-example-prose
+    attributes:
+      label: Non-Compliant Example - Prose
+      description: Here we write a textual description of why the Non-Compliant Example - Code exhibits unintended or consequential behavior. Non-normative.
+      placeholder: As seen below in the `non_compliant_example()` function, when `baz` and `bar` are both active and we `foo`, later during refactoring it's possible to get `biz` instead of `boz` behavior. ...
+    validations:
+      required: true
+  - type: textarea
+    id: non-compliant-example-code
+    attributes:
+      label: Non-Compliant Example - Code
+      description: Here we write a code example showcasing the unintended or consequential behavior. Non-normative.
+      placeholder: fn non_compliant_example() { /* ... */ }
+    validations:
+      required: true
+  - type: textarea
+    id: compliant-example-prose
+    attributes:
+      label: Compliant Example - Prose
+      description: Here we write a textual description of why the Compliant Example - Code avoids unintended or consequential behavior by following the Coding Guideline.
+      placeholder: As seen below in the `compliant_example()` function, when `baz` and `bar` are both active and we avoid doing `foo`, later during refactoring we've prevented an error by construction. ...
+    validations:
+      required: true
+  - type: textarea
+    id: compliant-example-code
+    attributes:
+      label: Compliant Example - Code
+      description: Here we write a code example showcasing we avoid unintended or consequential behavior by following the Coding Guideline.
+      placeholder: fn compliant_example() { /* ... */ }
+    validations:
+      required: true
