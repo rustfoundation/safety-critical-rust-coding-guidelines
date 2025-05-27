@@ -380,7 +380,7 @@ Rationale Content
 -----------------
 
 The content of the rationale **SHOULD** provide the relevant context for why this guideline is useful.
-The Rationale **SHOULD** make reference to any undefined behaviours or known errors associated
+The Rationale **SHOULD** make reference to any undefined behaviors or known errors associated
 with the subject of the guideline.
 The Rationale **MAY** make reference to other guidelines or to external documents cited in the
 References.
