@@ -457,6 +457,9 @@ than the current guideline.
 ``compliant_example``
 =====================
 
+A compliant example **MAY** be omitted when the guideline forbids an action entirely, i.e. there
+is no compliant way to achieve the goal of the non-compliant code.
+
 ::
 
       .. compliant_example::
