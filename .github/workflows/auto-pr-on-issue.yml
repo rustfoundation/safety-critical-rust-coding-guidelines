@@ -1,0 +1,47 @@
+name: Auto Guideline PR
+
+on:
+  issues:
+    types:
+      - labeled
+
+jobs:
+  auto-pr:
+    if: "github.event.label.name == 'status: approved'"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+
+      # - name: Save issue JSON payload to file
+      #   run: echo '${{ toJson(github.event.issue) }}' > issue.json
+      #   pass it directly -- mayne fallback to this if an issue happened due to 
+      #   pipe-ing or encoding 
+
+      - name: Run Python script to generate guideline file
+        run: |
+          echo '${{ toJson(github.event.issue) }}' | python3 scripts/auto-pr-helper.py
+
+      - name: Commit generated guideline files
+        run: |
+          git add src/coding-guidelines/
+          git commit -m "Add guideline for issue #${{ github.event.issue.number }}" 
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Add guideline for issue #${{ github.event.issue.number }}"
+          branch: guideline-${{ github.event.issue.number }}
+          title: "[auto-pr] #${{ github.event.issue.number }}: ${{ github.event.issue.title }}"
+          body: |
+            This PR was automatically generated from issue #${{ github.event.issue.number }}.
+            Closes #${{ github.event.issue.number }}.
