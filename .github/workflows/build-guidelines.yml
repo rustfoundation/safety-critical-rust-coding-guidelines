@@ -76,3 +76,10 @@ jobs:
           path: build
           retention-days: 7
           compression-level: 6  # Default compression level for a good balance of speed and size
+  lint_rst:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Check for typos
+        run: pipx run sphinx-lint src
