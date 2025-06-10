@@ -39,8 +39,8 @@ We will examine each part:
       :scope: module
       :tags: numerics
 
-      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds. 
-      Instead, explicitly handle potential overflows using the standard library's checked, 
+      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
+      Instead, explicitly handle potential overflows using the standard library's checked,
       saturating, or wrapping operations.
 
       .. rationale::
@@ -50,7 +50,7 @@ We will examine each part:
          In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
          However, in release builds (with optimizations enabled), integer operations silently wrap
          around on overflow, creating potential for silent failures and security vulnerabilities.
-         
+
          Safety-critical software requires consistent and predictable behavior across all build
          configurations. Explicit handling of potential overflow conditions improves code clarity,
          maintainability, and reduces the risk of numerical errors in production.
@@ -58,9 +58,9 @@ We will examine each part:
       .. non_compliant_example::
          :id: non_compl_ex_PO5TyFsRTlWv
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Potential for silent overflow in release builds
                 current + velocity
@@ -69,9 +69,9 @@ We will examine each part:
       .. compliant_example::
          :id: compl_ex_WTe7GoPu5Ez0
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Explicitly handle potential overflow with checked addition
                 current.checked_add(velocity).expect("Position calculation overflowed")
@@ -142,7 +142,7 @@ An organization or project **MAY** choose to recategorize any ``required`` guide
 ``advisory``
 ^^^^^^^^^^^^
 
-These are recommendations and **SHOULD** be applied. However, the category of ``advisory`` does not mean 
+These are recommendations and **SHOULD** be applied. However, the category of ``advisory`` does not mean
 that these items can be ignored, but rather that they **SHOULD** be followed as far as reasonably practical.
 Formal deviation is not necessary for advisory guidelines but, if the formal deviation process is not followed,
 alternative arrangements **MUST** be made for documenting non-compliances.
@@ -181,7 +181,7 @@ the ``status`` to ``retired``.
 * ``approved``
 * ``retired``
 
-Guidelines have a lifecycle. When they are first proposed and **MUST** be marked as ``draft`` 
+Guidelines have a lifecycle. When they are first proposed and **MUST** be marked as ``draft``
 to allow adoption and feedback to accrue. The Coding Guidelines Subcommittee **MUST**
 periodically review ``draft`` guidelines and either promote them to ``approved``
 or demote them to ``retired``.
@@ -196,8 +196,8 @@ For more, see :ref:`Guideline Lifecycle`.
 ``draft``
 ^^^^^^^^^
 
-These guidelines are not yet considered in force, but are mature enough they **MAY** be enforced. 
-No formal deviation is required as outlined in :ref:`Compliance`, but alternative arrangements 
+These guidelines are not yet considered in force, but are mature enough they **MAY** be enforced.
+No formal deviation is required as outlined in :ref:`Compliance`, but alternative arrangements
 **MUST** be made for documenting non-compliances.
 
 *Note*: ``draft`` guideline usage and feedback will help to either promote them to ``approved`` or demote
@@ -339,7 +339,7 @@ require a deviation.
          In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
          However, in release builds (with optimizations enabled), integer operations silently wrap
          around on overflow, creating potential for silent failures and security vulnerabilities.
-         
+
          Safety-critical software requires consistent and predictable behavior across all build
          configurations. Explicit handling of potential overflow conditions improves code clarity,
          maintainability, and reduces the risk of numerical errors in production.
@@ -373,9 +373,9 @@ TODO(pete.levasseur)
       .. non_compliant_example::
          :id: non_compl_ex_PO5TyFsRTlWv
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Potential for silent overflow in release builds
                 current + velocity
@@ -384,7 +384,7 @@ TODO(pete.levasseur)
 ``non_compliant_example`` ``id``
 --------------------------------
 
-A unique identifier for each ``non_compliant_example``. ``non_compliant_example`` identifiers 
+A unique identifier for each ``non_compliant_example``. ``non_compliant_example`` identifiers
 **MUST** begin with ``non_compl_ex_``.
 
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.
@@ -440,9 +440,9 @@ than the current guideline.
       .. compliant_example::
          :id: compl_ex_WTe7GoPu5Ez0
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Explicitly handle potential overflow with checked addition
                 current.checked_add(velocity).expect("Position calculation overflowed")
@@ -451,7 +451,7 @@ than the current guideline.
 ``compliant_example`` ``id``
 ----------------------------
 
-A unique identifier for each ``compliant_example``. ``compliant_example`` identifiers 
+A unique identifier for each ``compliant_example``. ``compliant_example`` identifiers
 **MUST** begin with ``compl_ex_``.
 
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.
