@@ -1,0 +1,6 @@
+[default]
+extend-ignore-identifiers-re = [
+  # Ignore things that look like gui_xztNdXA2oFNB
+  "gui_.*",
+]
+
