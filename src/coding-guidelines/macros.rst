@@ -456,7 +456,7 @@ Macros
 
       The following is a macro which shows referring to a vector entity using a non-global path. Depending on
       where the macro is used a different `Vec` could be used than is intended. If scope where this is used
-      defines a struct `Vec` which is not preset at the macro defintion, the macro user might be intending to
+      defines a struct `Vec` which is not preset at the macro definition, the macro user might be intending to
       use that in the macro.
 
       .. code-block:: rust

@@ -214,7 +214,7 @@ appropriate ``category``.
 
 These are guidelines for which no enforcement is expected and any non-compliance **MAY** be disregarded.
 
-*Note*: The ``retired`` ``status`` supercedes any ``category`` assigned a guideline, effectively
+*Note*: The ``retired`` ``status`` supersedes any ``category`` assigned a guideline, effectively
 conferring upon the guideline the ``category`` of ``disapplied`` with no ability to recategorize it
 to ``mandatory``, ``required``, or ``advisory``. The ``category`` assigned the guideline at the time
 it is retired is kept.
