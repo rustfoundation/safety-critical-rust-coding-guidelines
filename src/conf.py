@@ -38,28 +38,28 @@ needs_types = [
         "directive": "guideline",
         "title": "Guideline",
         "prefix": "gui_",
-        "color": "#BFD8D2", 
+        "color": "#BFD8D2",
         "style": "node"
     },
     {
         "directive": "rationale",
         "title": "Rationale",
         "prefix": "rat_",
-        "color": "#DF744A", 
+        "color": "#DF744A",
         "style": "node"
     },
     {
         "directive": "compliant_example",
         "title": "Compliant Example",
         "prefix": "compl_ex_",
-        "color": "#729FCF", 
+        "color": "#729FCF",
         "style": "node"
     },
     {
         "directive": "non_compliant_example",
         "title": "Non-Compliant Example",
         "prefix": "non_compl_ex_",
-        "color": "#729FCF", 
+        "color": "#729FCF",
         "style": "node"
     }
 ]

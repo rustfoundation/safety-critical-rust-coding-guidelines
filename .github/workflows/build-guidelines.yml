@@ -76,6 +76,7 @@ jobs:
           path: build
           retention-days: 7
           compression-level: 6  # Default compression level for a good balance of speed and size
+
   check_typos:
     runs-on: ubuntu-latest
     steps:
