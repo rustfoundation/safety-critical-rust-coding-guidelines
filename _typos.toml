@@ -2,5 +2,8 @@
 extend-ignore-identifiers-re = [
   # Ignore things that look like gui_xztNdXA2oFNB
   "gui_.*",
+  "rat_.*",
+  "compl_ex_.*",
+  "non_compl_ex_.*",
 ]
 
