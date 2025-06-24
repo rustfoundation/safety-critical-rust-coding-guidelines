@@ -117,7 +117,3 @@ Expressions
       :status: draft
 
       There is no compliant way to perform integer division by zero
-
-      .. code-block:: rust
-
-         let x = 5 % 5;
