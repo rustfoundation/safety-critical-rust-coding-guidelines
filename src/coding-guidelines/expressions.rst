@@ -81,3 +81,91 @@ Expressions
          }
 
          fn with_base(_: &Base) { ... }
+
+.. guideline:: Do not use builtin arithmetic expressions
+   :id: gui_7y0GAMmtMhch
+   :category: required
+   :status: draft
+   :release: latest
+   :fls: fls_Q9dhNiICGIfr
+   :decidability: decidable
+   :scope: module
+   :tags: numerics
+
+   This guideline applies when an ArithmeticExpression is used with operands whose types evaluates integer or
+   floating-point types.
+
+   .. rationale::
+      :id: rat_vLFlPWSCHRje
+      :status: draft
+
+      The built-in semantics for these expressions can result in panics, or silent wraparound when overflow,
+      underflow, or division by zero occurs. It is better to explicitly declare what should happen during
+      these events with checked arithmetic functions.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_0XeioBrgfh5z
+      :status: draft
+
+      When the division is performed, the right operand is evaluated to zero and the program panics.
+
+      .. code-block:: rust
+
+         let x = 0;
+         let x = 5 / x;
+
+   .. compliant_example::
+      :id: compl_ex_k1CD6xoZxhXb
+      :status: draft
+
+      If an overflow occurs, it is explicit that the addition should wrap.
+
+      .. code-block:: rust
+
+         let y = 135u8
+         let x = 200u8.wrapping_add(y);
+
+.. guideline:: Do not use unchecked arithmetic expressions
+   :id: gui_mNEvznFjC3kG
+   :category: advisory
+   :status: draft
+   :release: latest
+   :fls: fls_Q9dhNiICGIfr
+   :decidability: decidable
+   :scope: module
+   :tags: numerics
+
+   This guideline applies to ArithmeticExpressions as well as any call to the integer or floating point type
+   methods that begin with `unchecked_`.
+
+   .. rationale::
+      :id: rat_7tF18FIwSYws
+      :status: draft
+
+      The built-in semantics for these expressions can result in panics, or silent wraparound when overflow,
+      underflow, or division by zero occurs. It is better to explicitly declare what should happen during
+      these events with checked arithmetic functions.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_JeRRIgVjq8IE
+      :status: draft
+
+      When the multiplication is performed, the evaluation could encounter wrapping or a panic that is not
+      handled explicitly.
+
+      .. code-block:: rust
+
+         let x = 13u8.unchecked_mul(y);
+
+   .. compliant_example::
+      :id: compl_ex_HIBS9PeBa41c
+      :status: draft
+
+      When the addition is performed, the overflow will be detected and the author will need to explicitly
+      deal with the Option value returned.
+
+      .. code-block:: rust
+
+         let y = 135u8
+         let x = 200u8.checked_add(y);
+
