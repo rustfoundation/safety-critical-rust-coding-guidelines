@@ -116,4 +116,9 @@ Expressions
       :id: compl_ex_Ri9pP5Ch3kbb
       :status: draft
 
-      There is no compliant way to perform integer division by zero
+      There is no compliant way to perform integer division by zero. A checked division will prevent any
+      division by zero from happening. The programmer can then handle the returned Option.
+
+      .. code-block:: rust
+
+         let x = 5u8.checked_div(0);
