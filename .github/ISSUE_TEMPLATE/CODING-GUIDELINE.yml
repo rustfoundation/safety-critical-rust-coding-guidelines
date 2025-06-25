@@ -117,7 +117,7 @@ body:
     attributes:
       label: Tags
       description: Tags describing the issue this Coding Guideline is attempting to prevent. Submit as comma-separated value list. Submit at least one tag.
-      placeholder: numerics, reduce-human-error
+      placeholder: At least one of numerics, reduce-human-error, undefined-behavior, maintainability, portability, surprising-behavior, performance, complexity or other custom tags.
     validations:
       required: true
   - type: textarea
