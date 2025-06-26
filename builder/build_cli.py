@@ -29,6 +29,7 @@ def build_docs(
     debug: bool,
     offline: bool,
     spec_lock_consistency_check: bool,
+    test_rust_blocks: bool,
 ) -> Path:
     """
     Builds the Sphinx documentation with the specified options.
@@ -72,6 +73,8 @@ def build_docs(
         conf_opt_values.append("offline=1")
     if debug:  
         conf_opt_values.append("debug=1")
+    if test_rust_blocks:  
+        conf_opt_values.append("test_rust_blocks=1")
 
     # Only add the --define argument if there are options to define
     if conf_opt_values:
@@ -151,6 +154,14 @@ def main(root):
         help="build in offline mode",
         action="store_true",
     )
+
+    parser.add_argument(
+        "--test-rust-blocks",
+        help="Test extracted rust code blocks using rustc",
+        default=False,
+        action="store_true"
+    )
+
     group = parser.add_mutually_exclusive_group()
     parser.add_argument(
         "--ignore-spec-lock-diff",
@@ -192,6 +203,6 @@ def main(root):
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     rendered = build_docs(
-        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff, 
+        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff, args.test_rust_blocks
     )
 

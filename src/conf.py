@@ -24,6 +24,7 @@ extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx_needs',
     'coding_guidelines',
+    'rust-code-runner',
 ]
 
 # Basic needs configuration
