@@ -107,22 +107,32 @@ Expressions
       :status: draft
 
       When the division is performed, the right operand is evaluated to zero and the program panics.
+      When the addition is performed, either silent overflow happens or a panic depending on the build
+      configuration.
 
       .. code-block:: rust
 
          let x = 0;
          let x = 5 / x;
+         let y = 135u8
+         let y = 200u8 + y;
 
    .. compliant_example::
       :id: compl_ex_k1CD6xoZxhXb
       :status: draft
 
-      If an overflow occurs, it is explicit that the addition should wrap.
+      The developer must explictly indicate the intended behavior when a division by zero or arithmetic
+      overflow occurs when using checked arithmetic methods.
 
       .. code-block:: rust
 
+         let x = 0;
+         let result = match 5u32.checked_div(x) {
+            None => 0
+            Some(r) => r
+         }
          let y = 135u8
-         let x = 200u8.wrapping_add(y);
+         let y = 200u8.wrapping_add(y);
 
 .. guideline:: Do not use unchecked integer arithmetic methods
    :id: gui_mNEvznFjC3kG
@@ -159,11 +169,10 @@ Expressions
       :id: compl_ex_HIBS9PeBa41c
       :status: draft
 
-      When the addition is performed, the overflow will be detected and the author will need to explicitly
-      deal with the Option value returned.
+      If arithmetic overflow would have occurred during the multiplication operation this method will ensure
+      that the returned value is the bounding of the type. The intention is clear in that case.
 
       .. code-block:: rust
 
-         let y = 135u8
-         let x = 200u8.checked_add(y);
+         let x = 13u8.saturating_mul(y);
 
