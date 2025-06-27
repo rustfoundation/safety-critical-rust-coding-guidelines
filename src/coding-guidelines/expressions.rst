@@ -154,6 +154,9 @@ Expressions
       by zero occurs. It is recommended to explicitly declare what should happen during these events with
       checked arithmetic functions.
 
+      In a particularily performace sensitive critical section of the code it may be necessary to use the
+      unchecked methods in tandem with assurances that the arguments will never meet the panic conditions.
+
    .. non_compliant_example::
       :id: non_compl_ex_JeRRIgVjq8IE
       :status: draft
