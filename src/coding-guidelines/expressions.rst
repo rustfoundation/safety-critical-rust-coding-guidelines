@@ -121,7 +121,7 @@ Expressions
       :id: compl_ex_k1CD6xoZxhXb
       :status: draft
 
-      The developer must explictly indicate the intended behavior when a division by zero or arithmetic
+      The developer must explicitly indicate the intended behavior when a division by zero or arithmetic
       overflow occurs when using checked arithmetic methods.
 
       .. code-block:: rust
@@ -154,7 +154,7 @@ Expressions
       by zero occurs. It is recommended to explicitly declare what should happen during these events with
       checked arithmetic functions.
 
-      In a particularily performace sensitive critical section of the code it may be necessary to use the
+      In a particularly performance sensitive critical section of the code it may be necessary to use the
       unchecked methods in tandem with assurances that the arguments will never meet the panic conditions.
 
    .. non_compliant_example::
