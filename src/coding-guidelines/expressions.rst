@@ -82,7 +82,7 @@ Expressions
 
          fn with_base(_: &Base) { ... }
 
-.. guideline:: Do not use builtin arithmetic expressions
+.. guideline:: Do not use builtin integer arithmetic expressions
    :id: gui_7y0GAMmtMhch
    :category: required
    :status: draft
@@ -92,16 +92,15 @@ Expressions
    :scope: module
    :tags: numerics
 
-   This guideline applies when an ArithmeticExpression is used with operands whose types evaluates integer or
-   floating-point types.
+   This guideline applies when an `ArithmeticExpression` is used with operands of integer type.
 
    .. rationale::
       :id: rat_vLFlPWSCHRje
       :status: draft
 
-      The built-in semantics for these expressions can result in panics, or silent wraparound when overflow,
-      underflow, or division by zero occurs. It is better to explicitly declare what should happen during
-      these events with checked arithmetic functions.
+      The built-in semantics for these expressions can result in panics, or silent wraparound upon overflow or
+      division by zero occurs. It is recommended to explicitly declare what should happen during these events
+      with checked arithmetic functions.
 
    .. non_compliant_example::
       :id: non_compl_ex_0XeioBrgfh5z
@@ -125,7 +124,7 @@ Expressions
          let y = 135u8
          let x = 200u8.wrapping_add(y);
 
-.. guideline:: Do not use unchecked arithmetic expressions
+.. guideline:: Do not use unchecked integer arithmetic methods
    :id: gui_mNEvznFjC3kG
    :category: advisory
    :status: draft
@@ -135,16 +134,15 @@ Expressions
    :scope: module
    :tags: numerics
 
-   This guideline applies to ArithmeticExpressions as well as any call to the integer or floating point type
-   methods that begin with `unchecked_`.
+   This guideline applies to any call to the integer type methods that begin with `unchecked_`.
 
    .. rationale::
       :id: rat_7tF18FIwSYws
       :status: draft
 
-      The built-in semantics for these expressions can result in panics, or silent wraparound when overflow,
-      underflow, or division by zero occurs. It is better to explicitly declare what should happen during
-      these events with checked arithmetic functions.
+      The semantics for these expressions can result in panics, or silent wraparound upon overflow or division
+      by zero occurs. It is recommended to explicitly declare what should happen during these events with
+      checked arithmetic functions.
 
    .. non_compliant_example::
       :id: non_compl_ex_JeRRIgVjq8IE
