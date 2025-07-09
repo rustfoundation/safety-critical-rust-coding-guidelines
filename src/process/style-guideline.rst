@@ -306,6 +306,8 @@ the scope of the guideline.
 
 Guideline content consists of an Amplification and any Exceptions, which are normative,
 supported by a Rationale and examples, which are not normative.
+The justification extended explanation for the guideline **SHOULD** appear in the non-normative
+Rationale rather than in the normative content.
 
 Amplification
 ^^^^^^^^^^^^^
@@ -430,10 +432,10 @@ The ``non_compliant_example`` is neither normative, nor exhaustive. ``guideline`
 ``non_compliant_example`` Code Explanation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Code Explanation of a `non_compliant_example` **MUST** explain in prose the reason the guideline
+The Code Explanation of a ``non_compliant_example`` **MUST** explain in prose the reason the guideline
 when not applied results in code which is undesirable.
 
-The Code Explanation of a `non_compliant_example` **MAY** be a simple explanation no longer than
+The Code Explanation of a ``non_compliant_example`` **MAY** be a simple explanation no longer than
 a sentence.
 
 The Code Explanation of a ``non_compliant_example`` **SHOULD** be no longer than necessary to explain
@@ -457,8 +459,11 @@ than the current guideline.
 ``compliant_example``
 =====================
 
-A compliant example **MAY** be omitted when the guideline forbids an action entirely, i.e. there
-is no compliant way to achieve the goal of the non-compliant code.
+A compliant example **SHOULD** be omitted when the guideline forbids an action entirely, i.e. there
+is no compliant way to achieve the goal of the non-compliant code, rather than giving an irrelevant
+example (or encouraging strange workarounds).
+When there is a clear and idiomatic compliant way to achieve the goal, a compliant example **SHOULD**
+be provided after the corresponding non-compliant example.
 
 ::
 
