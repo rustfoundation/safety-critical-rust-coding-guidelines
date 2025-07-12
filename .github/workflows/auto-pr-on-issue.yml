@@ -7,7 +7,7 @@ on:
 
 jobs:
   auto-pr:
-    if: "github.event.label.name == 'status: approved'"
+    if: "github.event.label.name == 'sign-off: create pr from issue'"
     runs-on: ubuntu-latest
     permissions:
       contents: write
