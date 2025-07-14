@@ -144,7 +144,9 @@ Expressions
    :scope: module
    :tags: numerics
 
-   This guideline applies to any call to the integer type methods that begin with `unchecked_`.
+   This guideline applies to any call to the integer type methods that begin with ``unchecked_``, such as ``core::primitive::u8::unchecked_add``_.
+   
+ .. _core::primitive::u8::unchecked_add: https://doc.rust-lang.org/std/primitive.u8.html#method.unchecked_add
 
    .. rationale::
       :id: rat_7tF18FIwSYws
