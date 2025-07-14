@@ -109,6 +109,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 We have the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute you may find a section from the FLS of interest and then write a guideline in the corresponding chapter of these coding guidelines.
 
+### Submit coding guideline issue
+
+For a new coding guideline you'd like to contribute, start with opening a [coding guideline issue](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/new?template=CODING-GUIDELINE.yml).
+
+Once an issue has been well-developed enough it's then time to write up the guideline.
+
 ### Guideline template
 
 We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
