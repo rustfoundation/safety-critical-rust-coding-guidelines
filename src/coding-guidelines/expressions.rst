@@ -117,7 +117,7 @@ Expressions
       :status: draft
 
       There is no compliant way to perform integer division by zero. A checked division will prevent any
-      division by zero from happening. The programmer can then handle the returned Option.
+      division by zero from happening. The programmer can then handle the returned :std:``std::option::Option``.
 
       .. code-block:: rust
 
