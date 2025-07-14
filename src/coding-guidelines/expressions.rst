@@ -98,9 +98,9 @@ Expressions
       :id: rat_vLFlPWSCHRje
       :status: draft
 
-      The built-in semantics for these expressions can result in panics, or silent wraparound upon overflow or
-      division by zero occurs. It is recommended to explicitly declare what should happen during these events
-      with checked arithmetic functions.
+      The built-in semantics for these expressions can result in panics, or silent wrap around upon overflow
+      or division by zero occurs. It is recommended to explicitly declare what should happen during these
+      events with checked arithmetic functions.
 
    .. non_compliant_example::
       :id: non_compl_ex_0XeioBrgfh5z
@@ -152,7 +152,7 @@ Expressions
       :id: rat_7tF18FIwSYws
       :status: draft
 
-      The semantics for these expressions can result in panics, or silent wraparound upon overflow or division
+      The semantics for these expressions can result in panics, or silent wrap around upon overflow or division
       by zero occurs. It is recommended to explicitly declare what should happen during these events with
       checked arithmetic functions.
 
