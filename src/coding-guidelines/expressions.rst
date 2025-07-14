@@ -92,7 +92,9 @@ Expressions
    :scope: module
    :tags: numerics
 
-   This guideline applies when an `ArithmeticExpression` is used with operands of integer type.
+   This guideline applies when an `ArithmeticExpression
+   <https://rust-lang.github.io/fls/expressions.html#arithmetic-expressions>`_ is used with operands of
+   integer type.
 
    .. rationale::
       :id: rat_vLFlPWSCHRje
