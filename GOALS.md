@@ -37,7 +37,7 @@ A good first step is to open a new [coding guideline issue](https://github.com/r
 * Should be done in parallel with developing an addendum matrix to reduce burden of attaching these later
   * We can begin with DO 178 and ISO 26262 at perhaps chapter level, maybe subsection level _for now_ and expand later
 * Releases of the coding guidelines are tagged and released with versions of the stable compiler which they support
-* Upstream Clippy lints which will cover decideable guidelines
+* Upstream Clippy lints which will cover decidable guidelines
 
 ## Goals obtained by discussion with Tooling Subcommittee
 
