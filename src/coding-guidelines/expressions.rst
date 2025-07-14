@@ -84,12 +84,12 @@ Expressions
 
 .. guideline:: Do not divide by 0
    :id: gui_kMbiWbn8Z6g5
-   :category: Mandatory
+   :category: mandatory
    :status: draft
    :release: latest
    :fls: fls_Q9dhNiICGIfr
-   :decidability: Undecidable
-   :scope: System
+   :decidability: undecidable
+   :scope: system
    :tags: numerics
 
    This guideline applies when unsigned integer or two’s complement division is performed. This includes the
