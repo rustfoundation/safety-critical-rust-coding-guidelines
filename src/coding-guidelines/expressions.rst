@@ -17,14 +17,14 @@ Expressions
    :scope: module
    :tags: readability, reduce-human-error
 
-   Code must not rely on Rust's type inference when doing explicit pointer casts via ``var as Type`` or ``core::mem::transmute``.
-   Instead, explicitly specify the complete target type in the ``as`` expression or ``core::mem::transmute`` call expression.
+   Code must not rely on Rust's type inference when doing explicit pointer casts via ``var as Type`` or :std:`core::mem::transmute`.
+   Instead, explicitly specify the complete target type in the ``as`` expression or :std:`core::mem::transmute` call expression.
 
    .. rationale::
       :id: rat_h8LdJQ1MNKu9
       :status: draft
 
-      ``var as Type`` casts and ``core::mem::transmute``\s between raw pointer types are generally valid and unchecked by the compiler as long the target pointer type is a thin pointer.
+      ``var as Type`` casts and :std:`core::mem::transmute`\s between raw pointer types are generally valid and unchecked by the compiler as long the target pointer type is a thin pointer.
       Not specifying the concrete target pointer type allows the compiler to infer it from the surroundings context which may result in the cast accidentally changing due to surrounding type changes resulting in semantically invalid pointer casts.
 
       Raw pointers have a variety of invariants to manually keep track of.
@@ -123,7 +123,7 @@ Expressions
 
       A pointer-to-address cast is not symmetrical because the resulting pointer may not point to a valid object,
       may not point to an object of the right type, or may not be properly aligned.
-      If a conversion in this direction is needed, :std:``std::mem::transmute`` will communicate the intent to perform
+      If a conversion in this direction is needed, :std:`std::mem::transmute` will communicate the intent to perform
       an unsafe operation.
 
    .. non_compliant_example::
@@ -214,7 +214,7 @@ Expressions
    The ``as`` operator shall not be used with an expression of numeric type as the left operand,
    and any pointer type as the right operand.
 
-   :std:``std::mem::transmute`` shall not be used with any numeric type (including floating point types)
+   :std:`std::mem::transmute` shall not be used with any numeric type (including floating point types)
    as the argument to the ``Src`` parameter, and any pointer type as the argument to the ``Dst`` parameter.
 
    .. rationale::
@@ -231,7 +231,7 @@ Expressions
       originally performed in a differently-sized address space.
 
       While ``as`` can notionally be used to create a null pointer, the functions
-      ``core::ptr::null`` and ``core::ptr::null_mut`` are the more idiomatic way to do this.
+      :std:`core::ptr::null` and :std:`core::ptr::null_mut` are the more idiomatic way to do this.
 
    .. non_compliant_example::
       :id: non_compl_ex_0ydPk7VENSrA
