@@ -158,7 +158,8 @@ Expressions
       during these events with checked arithmetic functions.
 
       In a particularly performance sensitive critical section of the code it may be necessary to use the
-      unchecked methods in tandem with assurances that the arguments will never meet the panic conditions.
+      unchecked methods in tandem with assurances that the arguments will never meet the undefined behavior
+      conditions.
 
    .. non_compliant_example::
       :id: non_compl_ex_JeRRIgVjq8IE
