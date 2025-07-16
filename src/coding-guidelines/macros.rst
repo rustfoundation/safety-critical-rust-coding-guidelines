@@ -371,7 +371,6 @@ Macros
 
         #[tokio::main]  // non-compliant
         async fn main() {
-
         }
 
    .. compliant_example::
