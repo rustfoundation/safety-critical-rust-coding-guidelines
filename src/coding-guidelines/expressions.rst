@@ -153,9 +153,9 @@ Expressions
       :id: rat_7tF18FIwSYws
       :status: draft
 
-      The semantics for these expressions can result in panics, or silent wrap around upon overflow or division
-      by zero occurs. It is recommended to explicitly declare what should happen during these events with
-      checked arithmetic functions.
+      The semantics for these expressions can result in undefined behavior in situations where an equivalent
+      checked operation would return ``None``. It is recommended to explicitly declare what should happen
+      during these events with checked arithmetic functions.
 
       In a particularly performance sensitive critical section of the code it may be necessary to use the
       unchecked methods in tandem with assurances that the arguments will never meet the panic conditions.
@@ -164,8 +164,7 @@ Expressions
       :id: non_compl_ex_JeRRIgVjq8IE
       :status: draft
 
-      When the multiplication is performed, the evaluation could encounter wrapping or a panic that is not
-      handled explicitly.
+      When the multiplication is performed, the evaluation could result in undefined behavior.
 
       .. code-block:: rust
 
