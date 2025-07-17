@@ -92,8 +92,18 @@ Expressions
    :scope: system
    :tags: numerics
 
-   This guideline applies when unsigned integer or two’s complement division is performed. This includes the
-   evaluation of a remainder expression.
+   This guideline applies when unsigned integer or two’s complement division is performed during the
+   evaluation of an `ArithmeticExpression
+   <https://rust-lang.github.io/fls/expressions.html#arithmetic-expressions>`_.
+
+   Note that this includes the evaluation of a `RemainderExpression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_, which uses unsigned integer or two's
+   complement division.
+
+   This rule does not apply to evaluation of a :std:`core::ops::Div` trait on types other than `integer
+   types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_. The use of
+   :std:`std::num::NonZero` or is therefore a recommended way to avoid the undecidability of this
+   guideline.
 
    .. rationale::
       :id: rat_h84NjY2tLSBW
