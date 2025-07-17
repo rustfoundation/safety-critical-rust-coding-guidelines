@@ -18,13 +18,13 @@ Ferrocene Language Specification Conformance
 Various checks are performed against the ``:fls:`` option present in ``guideline`` directives to
 ensure they are valid.
 
-Coverage of the coding guidlines over the FLS is calculated.
+Coverage of the coding guidelines over the FLS is calculated.
 
 Each coding guideline has its ``:fls:`` option turned into a hyperlink to the corresponding element
 within the FLS to be able to navigate there directly.
 
 Further an ``spec.lock`` file located at ``root/src/spec.lock`` is validated against the currently
-deployed version of the Ferrocene Language Spec and the build is failed if there is discrepency.
+deployed version of the Ferrocene Language Spec and the build is failed if there is discrepancy.
 
 Links to the Rust standard library
 ==================================
