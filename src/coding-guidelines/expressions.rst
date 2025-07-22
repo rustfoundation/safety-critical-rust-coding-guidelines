@@ -83,7 +83,7 @@ Expressions
          fn with_base(_: &Base) { ... }
 
 
-.. guideline:: The ``as`` operator should not be used with numeric operands
+.. guideline:: The 'as' operator should not be used with numeric operands
    :id: gui_ADHABsmK9FXz
    :category: advisory
    :status: draft
