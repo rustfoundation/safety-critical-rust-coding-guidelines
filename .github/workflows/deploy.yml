@@ -29,7 +29,7 @@ jobs:
 
       - name: Add CNAME to be able to be seen at coding-guidelines.arewesafetycriticalyet.org
         run: |
-          echo "coding-guidelines.arewesafetycriticalyet.org" >> ./build/html/CNAME
+          echo "coding-guidelines.arewesafetycriticalyet.org" > ./build/html/CNAME
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
