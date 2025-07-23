@@ -39,8 +39,8 @@ We will examine each part:
       :scope: module
       :tags: numerics
 
-      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds. 
-      Instead, explicitly handle potential overflows using the standard library's checked, 
+      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
+      Instead, explicitly handle potential overflows using the standard library's checked,
       saturating, or wrapping operations.
 
       .. rationale::
@@ -50,7 +50,7 @@ We will examine each part:
          In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
          However, in release builds (with optimizations enabled), integer operations silently wrap
          around on overflow, creating potential for silent failures and security vulnerabilities.
-         
+
          Safety-critical software requires consistent and predictable behavior across all build
          configurations. Explicit handling of potential overflow conditions improves code clarity,
          maintainability, and reduces the risk of numerical errors in production.
@@ -58,9 +58,9 @@ We will examine each part:
       .. non_compliant_example::
          :id: non_compl_ex_PO5TyFsRTlWv
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Potential for silent overflow in release builds
                 current + velocity
@@ -69,9 +69,9 @@ We will examine each part:
       .. compliant_example::
          :id: compl_ex_WTe7GoPu5Ez0
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Explicitly handle potential overflow with checked addition
                 current.checked_add(velocity).expect("Position calculation overflowed")
@@ -91,10 +91,6 @@ We will examine each part:
       :decidability: decidable
       :scope: module
       :tags: numerics
-
-      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
-      Instead, explicitly handle potential overflows using the standard library's checked,
-      saturating, or wrapping operations.
 
 ``guideline`` Title
 -------------------
@@ -142,7 +138,7 @@ An organization or project **MAY** choose to recategorize any ``required`` guide
 ``advisory``
 ^^^^^^^^^^^^
 
-These are recommendations and **SHOULD** be applied. However, the category of ``advisory`` does not mean 
+These are recommendations and **SHOULD** be applied. However, the category of ``advisory`` does not mean
 that these items can be ignored, but rather that they **SHOULD** be followed as far as reasonably practical.
 Formal deviation is not necessary for advisory guidelines but, if the formal deviation process is not followed,
 alternative arrangements **MUST** be made for documenting non-compliances.
@@ -181,7 +177,7 @@ the ``status`` to ``retired``.
 * ``approved``
 * ``retired``
 
-Guidelines have a lifecycle. When they are first proposed and **MUST** be marked as ``draft`` 
+Guidelines have a lifecycle. When they are first proposed and **MUST** be marked as ``draft``
 to allow adoption and feedback to accrue. The Coding Guidelines Subcommittee **MUST**
 periodically review ``draft`` guidelines and either promote them to ``approved``
 or demote them to ``retired``.
@@ -196,8 +192,8 @@ For more, see :ref:`Guideline Lifecycle`.
 ``draft``
 ^^^^^^^^^
 
-These guidelines are not yet considered in force, but are mature enough they **MAY** be enforced. 
-No formal deviation is required as outlined in :ref:`Compliance`, but alternative arrangements 
+These guidelines are not yet considered in force, but are mature enough they **MAY** be enforced.
+No formal deviation is required as outlined in :ref:`Compliance`, but alternative arrangements
 **MUST** be made for documenting non-compliances.
 
 *Note*: ``draft`` guideline usage and feedback will help to either promote them to ``approved`` or demote
@@ -214,7 +210,7 @@ appropriate ``category``.
 
 These are guidelines for which no enforcement is expected and any non-compliance **MAY** be disregarded.
 
-*Note*: The ``retired`` ``status`` supercedes any ``category`` assigned a guideline, effectively
+*Note*: The ``retired`` ``status`` supersedes any ``category`` assigned a guideline, effectively
 conferring upon the guideline the ``category`` of ``disapplied`` with no ability to recategorize it
 to ``mandatory``, ``required``, or ``advisory``. The ``category`` assigned the guideline at the time
 it is retired is kept.
@@ -308,15 +304,29 @@ what it covers.
 Content **SHOULD** aim to be as short and self-contained as possible, while still explaining
 the scope of the guideline.
 
-Content **SHOULD NOT** cover the rationale for the guideline, which is done in the ``rationale`` section.
+Guideline content consists of an Amplification and any Exceptions, which are normative,
+supported by a Rationale and examples, which are not normative.
+The justification extended explanation for the guideline **SHOULD** appear in the non-normative
+Rationale rather than in the normative content.
 
 Amplification
 ^^^^^^^^^^^^^
 
-Guideline Content **MAY** contain a section titled *Amplification* followed by text that provides a more
-precise description of the guideline title. An amplification is normative; if it conflicts with the
-``guideline`` Title, the amplification **MUST** take precedence. This mechanism is convenient as it allows
-a complicated concept to be conveyed using a short Title.
+The *Amplification* is the block of text that **MAY** appear immediately below the guideline
+attribute block, before any other subheadings.
+If it is provided, the Amplification is normative; if it conflicts with the ``guideline`` Title,
+the Amplification **MUST** take precedence. This mechanism is convenient as it allows a complicated
+concept to be conveyed using a short Title and refined by the text below.
+
+Content in the Amplification **SHOULD NOT** cover the rationale for the guideline or any
+non-normative explanations, which **SHOULD** be provided in the ``rationale`` and examples sections
+where helpful.
+
+::
+
+      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
+      Instead, explicitly handle potential overflows using the standard library's checked,
+      saturating, or wrapping operations.
 
 Exception
 ^^^^^^^^^
@@ -327,8 +337,16 @@ some guidelines to be simplified. It is important to note that an exception is a
 a guideline does not apply. Code that complies with a guideline by virtue of an exception does not
 require a deviation.
 
+If it is provided, the Exception is normative; if it conflicts with the ``guideline`` Title or the
+Amplification, the Exception takes precedence over both. Depending on the individual guideline, it
+may be clearer to have an Amplification or Title with an explicit Exception overriding parts of
+their description, or it may be clearer to express excepted cases as integrated sentences in the
+Amplification. This decision is editorial.
+
 ``rationale``
 =============
+
+Each Guideline **MUST** provide a *Rationale* for its inclusion and enforcement.
 
 ::
 
@@ -339,7 +357,7 @@ require a deviation.
          In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
          However, in release builds (with optimizations enabled), integer operations silently wrap
          around on overflow, creating potential for silent failures and security vulnerabilities.
-         
+
          Safety-critical software requires consistent and predictable behavior across all build
          configurations. Explicit handling of potential overflow conditions improves code clarity,
          maintainability, and reduces the risk of numerical errors in production.
@@ -363,7 +381,13 @@ The ``status`` option of a ``rationale`` **MUST** match the ``status`` of its pa
 Rationale Content
 -----------------
 
-TODO(pete.levasseur)
+The content of the rationale **SHOULD** provide the relevant context for why this guideline is useful.
+The Rationale **SHOULD** make reference to any undefined behaviors or known errors associated
+with the subject of the guideline.
+The Rationale **MAY** make reference to other guidelines or to external documents cited in the
+References.
+
+The Rationale **SHOULD** be supported by code examples wherever concise examples are possible.
 
 ``non_compliant_example``
 =========================
@@ -373,9 +397,9 @@ TODO(pete.levasseur)
       .. non_compliant_example::
          :id: non_compl_ex_PO5TyFsRTlWv
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Potential for silent overflow in release builds
                 current + velocity
@@ -384,7 +408,7 @@ TODO(pete.levasseur)
 ``non_compliant_example`` ``id``
 --------------------------------
 
-A unique identifier for each ``non_compliant_example``. ``non_compliant_example`` identifiers 
+A unique identifier for each ``non_compliant_example``. ``non_compliant_example`` identifiers
 **MUST** begin with ``non_compl_ex_``.
 
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.
@@ -408,10 +432,10 @@ The ``non_compliant_example`` is neither normative, nor exhaustive. ``guideline`
 ``non_compliant_example`` Code Explanation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Code Explanation of a `non_compliant_example` **MUST** explain in prose the reason the guideline
+The Code Explanation of a ``non_compliant_example`` **MUST** explain in prose the reason the guideline
 when not applied results in code which is undesirable.
 
-The Code Explanation of a `non_compliant_example` **MAY** be a simple explanation no longer than
+The Code Explanation of a ``non_compliant_example`` **MAY** be a simple explanation no longer than
 a sentence.
 
 The Code Explanation of a ``non_compliant_example`` **SHOULD** be no longer than necessary to explain
@@ -435,14 +459,20 @@ than the current guideline.
 ``compliant_example``
 =====================
 
+A compliant example **SHOULD** be omitted when the guideline forbids an action entirely, i.e. there
+is no compliant way to achieve the goal of the non-compliant code, rather than giving an irrelevant
+example (or encouraging strange workarounds).
+When there is a clear and idiomatic compliant way to achieve the goal, a compliant example **SHOULD**
+be provided after the corresponding non-compliant example.
+
 ::
 
       .. compliant_example::
          :id: compl_ex_WTe7GoPu5Ez0
          :status: draft
-      
+
           .. code-block:: rust
-      
+
             fn calculate_next_position(current: u32, velocity: u32) -> u32 {
                 // Explicitly handle potential overflow with checked addition
                 current.checked_add(velocity).expect("Position calculation overflowed")
@@ -451,7 +481,7 @@ than the current guideline.
 ``compliant_example`` ``id``
 ----------------------------
 
-A unique identifier for each ``compliant_example``. ``compliant_example`` identifiers 
+A unique identifier for each ``compliant_example``. ``compliant_example`` identifiers
 **MUST** begin with ``compl_ex_``.
 
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.

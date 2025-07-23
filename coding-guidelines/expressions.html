@@ -12,11 +12,11 @@
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/modern.css?v=803738c0" />
 
   
@@ -116,7 +116,7 @@
              
   <section id="expressions">
 <h1>Expressions<a class="headerlink" href="#expressions" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-b4a1d156">
+<div class="need_container docutils container" id="SNCB-7702798f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_HDnAZ7EZ4z6G">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -128,7 +128,7 @@
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
 <div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">readability</span><span class="needs_spacer">, </span><span class="needs_data">reduce-human-error</span></span></span></div>
 <div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">required</span></span></div>
-<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/expressions.html#type-cast-expressions" class="fls-id">fls_1qhsun1vyarz</a></span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/expressions.html#type-cast-expressions" class="fls-id">fls_1qhsun1vyarz</a></span></span></div>
 <div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
 <div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
 <div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">&lt;TODO&gt;</span></span></div>
@@ -138,9 +138,9 @@
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s type inference when doing explicit pointer casts via <code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> or <code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code>.
-Instead, explicitly specify the complete target type in the <code class="docutils literal notranslate"><span class="pre">as</span></code> expression or <code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code> call expression.</p>
-<div class="need_container docutils container" id="SNCB-8da1e6db">
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s type inference when doing explicit pointer casts via <code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>.
+Instead, explicitly specify the complete target type in the <code class="docutils literal notranslate"><span class="pre">as</span></code> expression or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a> call expression.</p>
+<div class="need_container docutils container" id="SNCB-f781e1e8">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_h8LdJQ1MNKu9">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -156,7 +156,7 @@ Instead, explicitly specify the complete target type in the <code class="docutil
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p><code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> casts and <code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code>s between raw pointer types are generally valid and unchecked by the compiler as long the target pointer type is a thin pointer.
+<tr class="need content row-odd"><td class="need content" colspan="1"><p><code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> casts and <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>s between raw pointer types are generally valid and unchecked by the compiler as long the target pointer type is a thin pointer.
 Not specifying the concrete target pointer type allows the compiler to infer it from the surroundings context which may result in the cast accidentally changing due to surrounding type changes resulting in semantically invalid pointer casts.</p>
 <p>Raw pointers have a variety of invariants to manually keep track of.
 Specifying the concrete types in these scenarios allows the compiler to catch some of these potential issues for the user.</p>
@@ -165,7 +165,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-dea796f3">
+<div class="need_container docutils container" id="SNCB-2d97ca29">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_V37Pl103aUW4">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -206,7 +206,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-b0ddc638">
+<div class="need_container docutils container" id="SNCB-c411961b">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_W08ckDrkOhkt">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -240,6 +240,429 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 <span class="p">}</span>
 
 <span class="k">fn</span><span class="w"> </span><span class="nf">with_base</span><span class="p">(</span><span class="n">_</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">Base</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">..</span><span class="p">.</span><span class="w"> </span><span class="p">}</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-e5a92970">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_ADHABsmK9FXz">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">The 'as' operator should not be used with numeric operands</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_ADHABsmK9FXz" title="gui_ADHABsmK9FXz">gui_ADHABsmK9FXz</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">subset</span><span class="needs_spacer">, </span><span class="needs_data">reduce-human-error</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">advisory</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/expressions.html#fls_otaxe9okhdr1" class="fls-id">fls_otaxe9okhdr1</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">&lt;TODO&gt;</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_v56bjjcveLxQ" title="gui_ADHABsmK9FXz">rat_v56bjjcveLxQ</a>, <a class="reference internal" href="#non_compl_ex_hzGUYoMnK59w" title="gui_ADHABsmK9FXz">non_compl_ex_hzGUYoMnK59w</a>, <a class="reference internal" href="#compl_ex_uilHTIOgxD37" title="gui_ADHABsmK9FXz">compl_ex_uilHTIOgxD37</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>The binary operator <code class="docutils literal notranslate"><span class="pre">as</span></code> should not be used with:</p>
+<ul class="simple">
+<li><p>a numeric type, including all supported integer, floating, and machine-dependent arithmetic types; or</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bool</span></code>; or</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">char</span></code></p></li>
+</ul>
+<p>as either the right operand or the type of the left operand.</p>
+<p><strong>Exception:</strong> <code class="docutils literal notranslate"><span class="pre">as</span></code> may be used with <code class="docutils literal notranslate"><span class="pre">usize</span></code> as the right operand and an expression of raw pointer
+type as the left operand.</p>
+<div class="need_container docutils container" id="SNCB-d6458847">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_v56bjjcveLxQ">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_v56bjjcveLxQ" title="rat_v56bjjcveLxQ">rat_v56bjjcveLxQ</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_ADHABsmK9FXz" title="rat_v56bjjcveLxQ">gui_ADHABsmK9FXz</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Although the conversions performed by <code class="docutils literal notranslate"><span class="pre">as</span></code> between numeric types are all well-defined, <code class="docutils literal notranslate"><span class="pre">as</span></code> coerces
+the value to fit in the destination type, which may result in unexpected data loss if the value needs to
+be truncated, rounded, or produce a nearest possible non-equal value.</p>
+<p>Although some conversions are lossless, others are not symmetrical. Instead of relying on either a defined
+lossy behaviour or risking loss of precision, the code can communicate intent by using <code class="docutils literal notranslate"><span class="pre">Into</span></code> or <code class="docutils literal notranslate"><span class="pre">From</span></code>
+and <code class="docutils literal notranslate"><span class="pre">TryInto</span></code> or <code class="docutils literal notranslate"><span class="pre">TryFrom</span></code> to signal which conversions are intended to perfectly preserve the original
+value, and which are intended to be fallible. The latter cannot be used from const functions, indicating
+that these should avoid using fallible conversions.</p>
+<p>A pointer-to-address cast does not lose value, but will be truncated unless the destination type is large
+enough to hold the address value. The <code class="docutils literal notranslate"><span class="pre">usize</span></code> type is guaranteed to be wide enough for this purpose.</p>
+<p>A pointer-to-address cast is not symmetrical because the resulting pointer may not point to a valid object,
+may not point to an object of the right type, or may not be properly aligned.
+If a conversion in this direction is needed, <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> will communicate the intent to perform
+an unsafe operation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-6ce201dd">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_hzGUYoMnK59w">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_hzGUYoMnK59w" title="non_compl_ex_hzGUYoMnK59w">non_compl_ex_hzGUYoMnK59w</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_ADHABsmK9FXz" title="non_compl_ex_hzGUYoMnK59w">gui_ADHABsmK9FXz</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p><code class="docutils literal notranslate"><span class="pre">as</span></code> used here can change the value range or lose precision.
+Even when it doesn’t, nothing enforces the correct behaviour or communicates whether
+we intend to allow lossy conversions, or only expect valid conversions.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">f1</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="n">w</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">char</span><span class="p">;</span><span class="w">           </span><span class="c1">// non-compliant</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - changes value range, converting negative values</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">i64</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - could use .into()</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f32</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - lossy</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f64</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - could use .into()</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f32</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - lossy</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">g</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">i64</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - lossy despite object size</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p1</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">b</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">usize</span><span class="p">;</span><span class="w">        </span><span class="c1">// compliant by exception</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u16</span><span class="p">;</span><span class="w">          </span><span class="c1">// non-compliant - may lose address range</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u64</span><span class="p">;</span><span class="w">          </span><span class="c1">// non-compliant - use usize to indicate intent</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// non-compliant - prefer transmute</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// non-compliant (and most likely not in a valid address range)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-7370d468">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_uilHTIOgxD37">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_uilHTIOgxD37" title="compl_ex_uilHTIOgxD37">compl_ex_uilHTIOgxD37</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_ADHABsmK9FXz" title="compl_ex_uilHTIOgxD37">gui_ADHABsmK9FXz</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Valid conversions that are guaranteed to preserve exact values can be communicated
+better with <code class="docutils literal notranslate"><span class="pre">into()</span></code> or <code class="docutils literal notranslate"><span class="pre">from()</span></code>.
+Valid conversions that risk losing value, where doing so would be an error, can
+communicate this and include an error check, with <code class="docutils literal notranslate"><span class="pre">try_into</span></code> or <code class="docutils literal notranslate"><span class="pre">try_from</span></code>.
+Other forms of conversion may find <code class="docutils literal notranslate"><span class="pre">transmute</span></code> better communicates their intent.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">f2</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="n">w</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">char</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">into</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nb">Result</span><span class="w"> </span><span class="o">&lt;</span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="p">.</span><span class="n">try_into</span><span class="p">();</span><span class="w"> </span><span class="c1">// produce an error on range clip</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="kt">i64</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">.</span><span class="n">into</span><span class="p">();</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">f32</span><span class="p">::</span><span class="n">from</span><span class="p">(</span><span class="n">x</span><span class="p">);</span><span class="w">  </span><span class="c1">// u16 is within range, u32 is not</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">f64</span><span class="p">::</span><span class="n">from</span><span class="p">(</span><span class="n">d</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// let f = f32::from(e); // no From exists</span>
+
+<span class="w">  </span><span class="c1">// let g = ...            // no From exists</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">h</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p1</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">h</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">usize</span><span class="p">;</span><span class="w">     </span><span class="c1">// (compliant)</span>
+
+<span class="w">  </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">a2</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">p1</span><span class="p">);</span><span class="w">  </span><span class="c1">// OK</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">a3</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">p1</span><span class="p">);</span><span class="w">  </span><span class="c1">// OK, size is checked</span>
+<span class="w">    </span><span class="c1">// let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">p2</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">a1</span><span class="p">);</span><span class="w"> </span><span class="c1">// OK</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">p3</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">a1</span><span class="p">);</span><span class="w"> </span><span class="c1">// OK</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// does something entirely different,</span>
+<span class="w">    </span><span class="c1">// reinterpreting the bits of z as the IEEE bit pattern of a double</span>
+<span class="w">    </span><span class="c1">// precision object, rather than converting the integer value</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">f1</span><span class="p">:</span><span class="w"> </span><span class="kt">f64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">z</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-2ce649f2">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_PM8Vpf7lZ51U">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">An integer shall not be converted to a pointer</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_PM8Vpf7lZ51U" title="gui_PM8Vpf7lZ51U">gui_PM8Vpf7lZ51U</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">subset</span><span class="needs_spacer">, </span><span class="needs_data">undefined-behavior</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">&lt;TODO&gt;</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/expressions.html#fls_59mpteeczzo" class="fls-id">fls_59mpteeczzo</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">&lt;TODO&gt;</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_YqhEiWTj9z6L" title="gui_PM8Vpf7lZ51U">rat_YqhEiWTj9z6L</a>, <a class="reference internal" href="#non_compl_ex_0ydPk7VENSrA" title="gui_PM8Vpf7lZ51U">non_compl_ex_0ydPk7VENSrA</a>, <a class="reference internal" href="#compl_ex_oneKuF52yzrx" title="gui_PM8Vpf7lZ51U">compl_ex_oneKuF52yzrx</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>The <code class="docutils literal notranslate"><span class="pre">as</span></code> operator shall not be used with an expression of numeric type as the left operand,
+and any pointer type as the right operand.</p>
+<p><a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> shall not be used with any numeric type (including floating point types)
+as the argument to the <code class="docutils literal notranslate"><span class="pre">Src</span></code> parameter, and any pointer type as the argument to the <code class="docutils literal notranslate"><span class="pre">Dst</span></code> parameter.</p>
+<div class="need_container docutils container" id="SNCB-68e099e5">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_YqhEiWTj9z6L">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_YqhEiWTj9z6L" title="rat_YqhEiWTj9z6L">rat_YqhEiWTj9z6L</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_PM8Vpf7lZ51U" title="rat_YqhEiWTj9z6L">gui_PM8Vpf7lZ51U</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>A pointer created from an arbitrary arithmetic expression may designate an invalid address,
+including an address that does not point to a valid object, an address that points to an
+object of the wrong type, or an address that is not properly aligned. Use of such a pointer
+to access memory will result in undefined behavior.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">as</span></code> operator also does not check that the size of the source operand is the same as
+the size of a pointer, which may lead to unexpected results if the address computation was
+originally performed in a differently-sized address space.</p>
+<p>While <code class="docutils literal notranslate"><span class="pre">as</span></code> can notionally be used to create a null pointer, the functions
+<a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aptr%3A%3Anull"><code class="docutils literal notranslate"><span class="pre">core::ptr::null</span></code></a> and <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aptr%3A%3Anull_mut"><code class="docutils literal notranslate"><span class="pre">core::ptr::null_mut</span></code></a> are the more idiomatic way to do this.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-a39030fd">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_0ydPk7VENSrA">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_0ydPk7VENSrA" title="non_compl_ex_0ydPk7VENSrA">non_compl_ex_0ydPk7VENSrA</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_PM8Vpf7lZ51U" title="non_compl_ex_0ydPk7VENSrA">gui_PM8Vpf7lZ51U</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Any use of <code class="docutils literal notranslate"><span class="pre">as</span></code> or <code class="docutils literal notranslate"><span class="pre">transmute</span></code> to create a pointer from an arithmetic address value
+is non-compliant:</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">f1</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">z</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="n">w</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// not compliant</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// not compliant</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">z</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// not compliant</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p4</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// not compliant despite being the right size</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="kt">f64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">10.0</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// let p5 = f as * const u32;  // not valid</span>
+
+<span class="w">  </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// let p5: * const u32 = std::mem::transmute(x);  // not valid</span>
+<span class="w">    </span><span class="c1">// let p6: * const u32 = std::mem::transmute(y);  // not valid</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">p7</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">z</span><span class="p">);</span><span class="w"> </span><span class="c1">// not compliant</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">p8</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">w</span><span class="p">);</span><span class="w"> </span><span class="c1">// not compliant</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">p9</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">f</span><span class="p">);</span><span class="w"> </span><span class="c1">// not compliant, and very strange</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-b56de6ea">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oneKuF52yzrx">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_oneKuF52yzrx" title="compl_ex_oneKuF52yzrx">compl_ex_oneKuF52yzrx</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_PM8Vpf7lZ51U" title="compl_ex_oneKuF52yzrx">gui_PM8Vpf7lZ51U</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>There is no compliant example of this operation.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-148a6d87">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_iv9yCMHRgpE0">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">An integer shall not be converted to an invalid pointer</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_iv9yCMHRgpE0" title="gui_iv9yCMHRgpE0">gui_iv9yCMHRgpE0</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">defect</span><span class="needs_spacer">, </span><span class="needs_data">undefined-behavior</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">&lt;TODO&gt;</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/expressions.html#fls_9wgldua1u8yt" class="fls-id">fls_9wgldua1u8yt</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">undecidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">system</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">&lt;TODO&gt;</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_OhxKm751axKw" title="gui_iv9yCMHRgpE0">rat_OhxKm751axKw</a>, <a class="reference internal" href="#non_compl_ex_CkytKjRQezfQ" title="gui_iv9yCMHRgpE0">non_compl_ex_CkytKjRQezfQ</a>, <a class="reference internal" href="#compl_ex_oBoluiKSvREu" title="gui_iv9yCMHRgpE0">compl_ex_oBoluiKSvREu</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>An expression of numeric type shall not be converted to a pointer if the resulting pointer
+is incorrectly aligned, does not point to an entity of the referenced type, or is an invalid representation.</p>
+<div class="need_container docutils container" id="SNCB-fa2ee1ca">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_OhxKm751axKw">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_OhxKm751axKw" title="rat_OhxKm751axKw">rat_OhxKm751axKw</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_iv9yCMHRgpE0" title="rat_OhxKm751axKw">gui_iv9yCMHRgpE0</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>The mapping between pointers and integers must be consistent with the addressing structure of the
+execution environment. Issues may arise, for example, on architectures that have a segmented memory model.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-520ff060">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_CkytKjRQezfQ">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_CkytKjRQezfQ" title="non_compl_ex_CkytKjRQezfQ">non_compl_ex_CkytKjRQezfQ</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_iv9yCMHRgpE0" title="non_compl_ex_CkytKjRQezfQ">gui_iv9yCMHRgpE0</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This example makes assumptions about the layout of the address space that do not hold on all platforms.
+The manipulated address may have discarded part of the original address space, and the flag may
+silently interfere with the address value. On platforms where pointers are 64-bits this may have
+particularly unexpected results.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">f1</span><span class="p">(</span><span class="n">flag</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">ptr</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="cm">/* ... */</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">rep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ptr</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">usize</span><span class="p">;</span>
+<span class="w">  </span><span class="n">rep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">rep</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0x7fffff</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="p">((</span><span class="n">flag</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">usize</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">23</span><span class="p">);</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rep</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-746bcf89">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oBoluiKSvREu">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_oBoluiKSvREu" title="compl_ex_oBoluiKSvREu">compl_ex_oBoluiKSvREu</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_iv9yCMHRgpE0" title="compl_ex_oBoluiKSvREu">gui_iv9yCMHRgpE0</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant solution uses a struct to provide storage for both the pointer and the flag value.
+This solution is portable to machines of different word sizes, both smaller and larger than 32 bits,
+working even when pointers cannot be represented in any integer type.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">PtrFlag</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">pointer</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<span class="w">  </span><span class="n">flag</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">f2</span><span class="p">(</span><span class="n">flag</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">ptr</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">ptrflag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PtrFlag</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">pointer</span><span class="p">:</span><span class="w"> </span><span class="nc">ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">flag</span><span class="p">:</span><span class="w"> </span><span class="nc">flag</span>
+<span class="w">  </span><span class="p">};</span>
+<span class="w">  </span><span class="cm">/* ... */</span>
+<span class="p">}</span>
 </pre></div>
 </div>
 </td>

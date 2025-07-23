@@ -101,21 +101,22 @@ Macros
    :tags: reduce-human-error
 
    Functions should always be preferred over macros, except when macros provide essential functionality that functions cannot, such as variadic interfaces, compile-time code generation, or syntax extensions via custom derive and attribute macros.
-    
+
    |
 
-   .. rationale:: 
+   .. rationale::
       :id: rat_M9bp23ctkzQ7
       :status: draft
 
-      Macros are powerful but they come at the cost of readability, complexity, and maintainability. They obfuscate control flow and type signatures.
+      Although the compiler reports both the macro expansion and its invocation site, diagnostics originating within macros can be more difficult to interpret than those from ordinary function or type definitions. Complex or deeply nested macros may obscure intent and hinder static analysis, increasing the risk of misinterpretation or overlooked errors during code review.
 
-      **Debugging Complexity** 
+
+      **Debugging Complexity**
 
       - Errors point to expanded code rather than source locations, making it difficult to trace compile-time errors back to the original macro invocation.
 
       **Optimization**
-      
+
       - Macros may inhibit compiler optimizations that work better with functions.
       - Macros act like ``#[inline(always)]`` functions, which can lead to code bloat.
       - They don't benefit from the compiler's inlining heuristics, missing out on selective inlining where the compiler decides when inlining is beneficial.
@@ -133,7 +134,7 @@ Macros
       :status: draft
 
       Using a macro where a simple function would suffice, leads to hidden mutation:
-   
+
       .. code-block:: rust
 
         macro_rules! increment_and_double {
@@ -161,7 +162,7 @@ Macros
       .. code-block:: rust
 
         fn increment_and_double(x: &mut i32) -> i32 {
-            *x += 1; // mutation is explicit 
+            *x += 1; // mutation is explicit
             *x * 2
         }
         let mut num = 5;
@@ -171,7 +172,7 @@ Macros
 
       The function version makes the mutation and borrowing explicit in its signature, improving readability, safety, and debuggability.
 
-      
+
 
 .. guideline:: Shall not use Function-like Macros
    :id: gui_WJlWqgIxmE8P
@@ -354,7 +355,7 @@ Macros
    Attribute macros shall neither be declared nor invoked.
    Prefer less powerful macros that only extend source code.
 
-   .. rationale:: 
+   .. rationale::
       :id: rat_X8uCF5yx7Mpo
       :status: draft
 
@@ -365,9 +366,9 @@ Macros
       :status: draft
 
       Explanation of code example.
-   
+
       .. code-block:: rust
-   
+
         #[tokio::main]  // non-compliant
         async fn main() {
 
@@ -378,18 +379,18 @@ Macros
       :status: draft
 
       Explanation of code example.
-   
+
       .. code-block:: rust
-   
+
         fn example_function() {
             // Compliant implementation
         }
-   
+
 .. guideline:: Do not hide unsafe blocks within macro expansions
-   :id: gui_FRLaMIMb4t3S                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
-   :category: required                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-   :status: draft                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
-   :release: todo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+   :id: gui_FRLaMIMb4t3S
+   :category: required
+   :status: draft
+   :release: todo
    :fls: fls_4vjbkm4ceymk
    :decidability: todo
    :scope: todo
@@ -397,7 +398,7 @@ Macros
 
    Description of the guideline goes here.
 
-   .. rationale:: 
+   .. rationale::
       :id: rat_WJubG7KuUDLW
       :status: draft
 
@@ -455,7 +456,7 @@ Macros
 
       The following is a macro which shows referring to a vector entity using a non-global path. Depending on
       where the macro is used a different `Vec` could be used than is intended. If scope where this is used
-      defines a struct `Vec` which is not preset at the macro defintion, the macro user might be intending to
+      defines a struct `Vec` which is not preset at the macro definition, the macro user might be intending to
       use that in the macro.
 
       .. code-block:: rust

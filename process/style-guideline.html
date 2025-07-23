@@ -12,11 +12,11 @@
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
-      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
+      <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
       <link rel="stylesheet" type="text/css" href="../_static/sphinx-needs/modern.css?v=803738c0" />
 
   
@@ -183,10 +183,6 @@ for specifying requirements levels.</p>
    <span class="p">:</span><span class="n">decidability</span><span class="p">:</span> <span class="n">decidable</span>
    <span class="p">:</span><span class="n">scope</span><span class="p">:</span> <span class="n">module</span>
    <span class="p">:</span><span class="n">tags</span><span class="p">:</span> <span class="n">numerics</span>
-
-   <span class="n">Code</span> <span class="n">must</span> <span class="ow">not</span> <span class="n">rely</span> <span class="n">on</span> <span class="n">Rust</span><span class="s1">&#39;s implicit integer wrapping behavior that occurs in release builds.</span>
-   <span class="n">Instead</span><span class="p">,</span> <span class="n">explicitly</span> <span class="n">handle</span> <span class="n">potential</span> <span class="n">overflows</span> <span class="n">using</span> <span class="n">the</span> <span class="n">standard</span> <span class="n">library</span><span class="s1">&#39;s checked,</span>
-   <span class="n">saturating</span><span class="p">,</span> <span class="ow">or</span> <span class="n">wrapping</span> <span class="n">operations</span><span class="o">.</span>
 </pre></div>
 </div>
 <section id="guideline-title">
@@ -280,7 +276,7 @@ appropriate <code class="docutils literal notranslate"><span class="pre">categor
 <section id="retired">
 <h5><code class="docutils literal notranslate"><span class="pre">retired</span></code><a class="headerlink" href="#retired" title="Link to this heading"></a></h5>
 <p>These are guidelines for which no enforcement is expected and any non-compliance <strong>MAY</strong> be disregarded.</p>
-<p><em>Note</em>: The <code class="docutils literal notranslate"><span class="pre">retired</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code> supercedes any <code class="docutils literal notranslate"><span class="pre">category</span></code> assigned a guideline, effectively
+<p><em>Note</em>: The <code class="docutils literal notranslate"><span class="pre">retired</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code> supersedes any <code class="docutils literal notranslate"><span class="pre">category</span></code> assigned a guideline, effectively
 conferring upon the guideline the <code class="docutils literal notranslate"><span class="pre">category</span></code> of <code class="docutils literal notranslate"><span class="pre">disapplied</span></code> with no ability to recategorize it
 to <code class="docutils literal notranslate"><span class="pre">mandatory</span></code>, <code class="docutils literal notranslate"><span class="pre">required</span></code>, or <code class="docutils literal notranslate"><span class="pre">advisory</span></code>. The <code class="docutils literal notranslate"><span class="pre">category</span></code> assigned the guideline at the time
 it is retired is kept.</p>
@@ -355,13 +351,25 @@ similar guidelines.</p>
 what it covers.</p>
 <p>Content <strong>SHOULD</strong> aim to be as short and self-contained as possible, while still explaining
 the scope of the guideline.</p>
-<p>Content <strong>SHOULD NOT</strong> cover the rationale for the guideline, which is done in the <code class="docutils literal notranslate"><span class="pre">rationale</span></code> section.</p>
+<p>Guideline content consists of an Amplification and any Exceptions, which are normative,
+supported by a Rationale and examples, which are not normative.
+The justification extended explanation for the guideline <strong>SHOULD</strong> appear in the non-normative
+Rationale rather than in the normative content.</p>
 <section id="amplification">
 <h5>Amplification<a class="headerlink" href="#amplification" title="Link to this heading"></a></h5>
-<p>Guideline Content <strong>MAY</strong> contain a section titled <em>Amplification</em> followed by text that provides a more
-precise description of the guideline title. An amplification is normative; if it conflicts with the
-<code class="docutils literal notranslate"><span class="pre">guideline</span></code> Title, the amplification <strong>MUST</strong> take precedence. This mechanism is convenient as it allows
-a complicated concept to be conveyed using a short Title.</p>
+<p>The <em>Amplification</em> is the block of text that <strong>MAY</strong> appear immediately below the guideline
+attribute block, before any other subheadings.
+If it is provided, the Amplification is normative; if it conflicts with the <code class="docutils literal notranslate"><span class="pre">guideline</span></code> Title,
+the Amplification <strong>MUST</strong> take precedence. This mechanism is convenient as it allows a complicated
+concept to be conveyed using a short Title and refined by the text below.</p>
+<p>Content in the Amplification <strong>SHOULD NOT</strong> cover the rationale for the guideline or any
+non-normative explanations, which <strong>SHOULD</strong> be provided in the <code class="docutils literal notranslate"><span class="pre">rationale</span></code> and examples sections
+where helpful.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Code</span> <span class="n">must</span> <span class="ow">not</span> <span class="n">rely</span> <span class="n">on</span> <span class="n">Rust</span><span class="s1">&#39;s implicit integer wrapping behavior that occurs in release builds.</span>
+<span class="n">Instead</span><span class="p">,</span> <span class="n">explicitly</span> <span class="n">handle</span> <span class="n">potential</span> <span class="n">overflows</span> <span class="n">using</span> <span class="n">the</span> <span class="n">standard</span> <span class="n">library</span><span class="s1">&#39;s checked,</span>
+<span class="n">saturating</span><span class="p">,</span> <span class="ow">or</span> <span class="n">wrapping</span> <span class="n">operations</span><span class="o">.</span>
+</pre></div>
+</div>
 </section>
 <section id="exception">
 <h5>Exception<a class="headerlink" href="#exception" title="Link to this heading"></a></h5>
@@ -370,11 +378,17 @@ situations in which the guideline does not apply. The use of exceptions permits 
 some guidelines to be simplified. It is important to note that an exception is a situation in which
 a guideline does not apply. Code that complies with a guideline by virtue of an exception does not
 require a deviation.</p>
+<p>If it is provided, the Exception is normative; if it conflicts with the <code class="docutils literal notranslate"><span class="pre">guideline</span></code> Title or the
+Amplification, the Exception takes precedence over both. Depending on the individual guideline, it
+may be clearer to have an Amplification or Title with an explicit Exception overriding parts of
+their description, or it may be clearer to express excepted cases as integrated sentences in the
+Amplification. This decision is editorial.</p>
 </section>
 </section>
 </section>
 <section id="rationale">
 <h3><code class="docutils literal notranslate"><span class="pre">rationale</span></code><a class="headerlink" href="#rationale" title="Link to this heading"></a></h3>
+<p>Each Guideline <strong>MUST</strong> provide a <em>Rationale</em> for its inclusion and enforcement.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">rationale</span><span class="p">::</span>
    <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">rat_kYiIiW8R2qD1</span>
    <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
@@ -402,7 +416,12 @@ compliance.</p>
 </section>
 <section id="rationale-content">
 <h4>Rationale Content<a class="headerlink" href="#rationale-content" title="Link to this heading"></a></h4>
-<p>TODO(pete.levasseur)</p>
+<p>The content of the rationale <strong>SHOULD</strong> provide the relevant context for why this guideline is useful.
+The Rationale <strong>SHOULD</strong> make reference to any undefined behaviors or known errors associated
+with the subject of the guideline.
+The Rationale <strong>MAY</strong> make reference to other guidelines or to external documents cited in the
+References.</p>
+<p>The Rationale <strong>SHOULD</strong> be supported by code examples wherever concise examples are possible.</p>
 </section>
 </section>
 <section id="non-compliant-example">
@@ -438,9 +457,9 @@ compliance.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> is neither normative, nor exhaustive. <code class="docutils literal notranslate"><span class="pre">guideline</span></code> Content <strong>MUST</strong> take precedence.</p>
 <section id="non-compliant-example-code-explanation">
 <h5><code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> Code Explanation<a class="headerlink" href="#non-compliant-example-code-explanation" title="Link to this heading"></a></h5>
-<p>The Code Explanation of a <cite>non_compliant_example</cite> <strong>MUST</strong> explain in prose the reason the guideline
+<p>The Code Explanation of a <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <strong>MUST</strong> explain in prose the reason the guideline
 when not applied results in code which is undesirable.</p>
-<p>The Code Explanation of a <cite>non_compliant_example</cite> <strong>MAY</strong> be a simple explanation no longer than
+<p>The Code Explanation of a <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <strong>MAY</strong> be a simple explanation no longer than
 a sentence.</p>
 <p>The Code Explanation of a <code class="docutils literal notranslate"><span class="pre">non_compliant_example</span></code> <strong>SHOULD</strong> be no longer than necessary to explain
 the Code Example that follows.</p>
@@ -460,6 +479,11 @@ than the current guideline.</p>
 </section>
 <section id="compliant-example">
 <h3><code class="docutils literal notranslate"><span class="pre">compliant_example</span></code><a class="headerlink" href="#compliant-example" title="Link to this heading"></a></h3>
+<p>A compliant example <strong>SHOULD</strong> be omitted when the guideline forbids an action entirely, i.e. there
+is no compliant way to achieve the goal of the non-compliant code, rather than giving an irrelevant
+example (or encouraging strange workarounds).
+When there is a clear and idiomatic compliant way to achieve the goal, a compliant example <strong>SHOULD</strong>
+be provided after the corresponding non-compliant example.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">compliant_example</span><span class="p">::</span>
    <span class="p">:</span><span class="nb">id</span><span class="p">:</span> <span class="n">compl_ex_WTe7GoPu5Ez0</span>
    <span class="p">:</span><span class="n">status</span><span class="p">:</span> <span class="n">draft</span>
