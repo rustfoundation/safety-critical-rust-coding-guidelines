@@ -10,7 +10,6 @@
 from pathlib import Path
 import argparse
 import subprocess
-import sys
 import requests
 import json
 import time
@@ -20,6 +19,7 @@ EXTRA_WATCH_DIRS = ["exts", "themes"]
 
 SPEC_CHECKSUM_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
+
 
 def build_docs(
     root: Path,
@@ -68,15 +68,15 @@ def build_docs(
     # Add configuration options as needed
     if not spec_lock_consistency_check:
         conf_opt_values.append("enable_spec_lock_consistency=0")
-    if offline:  
+    if offline:
         conf_opt_values.append("offline=1")
-    if debug:  
+    if debug:
         conf_opt_values.append("debug=1")
 
     # Only add the --define argument if there are options to define
     if conf_opt_values:
         for opt in conf_opt_values:
-            args.append("--define") # each option needs its own --define
+            args.append("--define")  # each option needs its own --define
             args.append(opt)
 
     if serve:
@@ -89,7 +89,6 @@ def build_docs(
         args += ["-W", "--keep-going"]
 
     try:
-
         # Tracking build time
         timer_start = time.perf_counter()
         subprocess.run(
@@ -111,24 +110,24 @@ def build_docs(
     print(f"\nBuild finished in {timer_end - timer_start:.2f} seconds.")
     return dest / builder
 
-def update_spec_lockfile(spec_checksum_location, lockfile_location):
 
+def update_spec_lockfile(spec_checksum_location, lockfile_location):
     try:
         response = requests.get(spec_checksum_location, stream=True)
 
         response.raise_for_status()
 
-        with open(lockfile_location, 'wb') as file:
+        with open(lockfile_location, "wb") as file:
             for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     file.write(chunk)
 
-        with open(lockfile_location, 'r') as file:
+        with open(lockfile_location, "r") as file:
             data = json.load(file)
 
         print("-- read in --")
 
-        with open(lockfile_location, 'w') as outfile:
+        with open(lockfile_location, "w") as outfile:
             json.dump(data, outfile, indent=4, sort_keys=True)
 
         print("-- wrote back out --")
@@ -138,6 +137,7 @@ def update_spec_lockfile(spec_checksum_location, lockfile_location):
     except Exception as e:
         print(f"Error downloading file: {e}")
         return False
+
 
 def main(root):
     root = Path(root)
@@ -156,12 +156,10 @@ def main(root):
         "--ignore-spec-lock-diff",
         help="ignore spec.lock file differences with live release -- for WIP branches only",
         default=False,
-        action="store_true"
+        action="store_true",
     )
     parser.add_argument(
-        "--update-spec-lock-file",
-        help="update spec.lock file",
-        action="store_true"
+        "--update-spec-lock-file", help="update spec.lock file", action="store_true"
     )
     group.add_argument(
         "-s",
@@ -191,7 +189,12 @@ def main(root):
     if args.update_spec_lock_file:
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
-    rendered = build_docs(
-        root, "xml" if args.xml else "html", args.clear, args.serve, args.debug, args.offline, not args.ignore_spec_lock_diff, 
+    build_docs(
+        root,
+        "xml" if args.xml else "html",
+        args.clear,
+        args.serve,
+        args.debug,
+        args.offline,
+        not args.ignore_spec_lock_diff,
     )
-

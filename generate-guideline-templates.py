@@ -3,17 +3,19 @@
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
 import argparse
-import string
 import random
+import string
 
 # Configuration
 CHARS = string.ascii_letters + string.digits
 ID_LENGTH = 12
 
+
 def generate_id(prefix):
     """Generate a random ID with the given prefix."""
     random_part = "".join(random.choice(CHARS) for _ in range(ID_LENGTH))
     return f"{prefix}_{random_part}"
+
 
 def generate_guideline_template():
     """Generate a complete guideline template with all required sections."""
@@ -22,7 +24,7 @@ def generate_guideline_template():
     rationale_id = generate_id("rat")
     non_compliant_example_id = generate_id("non_compl_ex")
     compliant_example_id = generate_id("compl_ex")
-    
+
     template = f""".. guideline:: Title Here
    :id: {guideline_id}
    :category:
@@ -67,34 +69,37 @@ def generate_guideline_template():
 """
     return template
 
+
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Generate guideline templates with randomly generated IDs"
     )
     parser.add_argument(
-        "-n", 
-        "--number-of-templates", 
-        type=int, 
+        "-n",
+        "--number-of-templates",
+        type=int,
         default=1,
-        help="Number of templates to generate (default: 1)"
+        help="Number of templates to generate (default: 1)",
     )
     return parser.parse_args()
+
 
 def main():
     """Generate the specified number of guideline templates."""
     args = parse_args()
     num_templates = args.number_of_templates
-    
+
     for i in range(num_templates):
         if num_templates > 1:
-            print(f"=== Template {i+1} ===\n")
-        
+            print(f"=== Template {i + 1} ===\n")
+
         template = generate_guideline_template()
         print(template)
-        
+
         if num_templates > 1 and i < num_templates - 1:
             print("\n" + "=" * 80 + "\n")
+
 
 if __name__ == "__main__":
     main()

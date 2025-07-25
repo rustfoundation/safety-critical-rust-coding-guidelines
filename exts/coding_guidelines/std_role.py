@@ -5,6 +5,7 @@ from docutils import nodes
 from sphinx.roles import SphinxRole
 from urllib.parse import quote
 
+
 class StdRefRole(SphinxRole):
     def run(self):
         text, target = parse_target_from_text(self.text)
