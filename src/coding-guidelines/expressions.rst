@@ -83,6 +83,61 @@ Expressions
          fn with_base(_: &Base) { ... }
 
 
+.. guideline:: Do not divide by 0
+   :id: gui_kMbiWbn8Z6g5
+   :category: mandatory
+   :status: draft
+   :release: latest
+   :fls: fls_Q9dhNiICGIfr
+   :decidability: undecidable
+   :scope: system
+   :tags: numerics
+
+   This guideline applies when unsigned integer or two’s complement division is performed during the
+   evaluation of an `ArithmeticExpression
+   <https://rust-lang.github.io/fls/expressions.html#arithmetic-expressions>`_.
+
+   This includes the evaluation of a `RemainderExpression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_, which uses unsigned integer or two's
+   complement division.
+
+   This rule does not apply to evaluation of a :std:`core::ops::Div` trait on types other than `integer
+   types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
+
+   .. rationale::
+      :id: rat_h84NjY2tLSBW
+      :status: draft
+
+      Integer division by zero results in a panic, which is an abnormal program state and may terminate the
+      process. The use of :std:`std::num::NonZero` as the divisor is a recommended way to avoid the
+      undecidability of this guideline.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_LLs3vY8aGz0F
+      :status: draft
+
+      When the division is performed, the right operand is evaluated to zero and the program panics.
+
+      .. code-block:: rust
+
+         let x = 0;
+         let x = 5 / x;
+
+   .. compliant_example::
+      :id: compl_ex_Ri9pP5Ch3kbb
+      :status: draft
+
+      There is no compliant way to perform integer division by zero. A checked division will prevent any
+      division by zero from happening. The programmer can then handle the returned :std:``std::option::Option``.
+
+      .. code-block:: rust
+
+         let result = match 5u8.checked_div(0) {
+            None => 0
+            Some(r) => r
+         };
+
+
 .. guideline:: The 'as' operator should not be used with numeric operands
    :id: gui_ADHABsmK9FXz
    :category: advisory
