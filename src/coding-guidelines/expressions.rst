@@ -132,7 +132,10 @@ Expressions
 
       .. code-block:: rust
 
-         let x = 5u8.checked_div(0);
+         let result = match 5u8.checked_div(0) {
+            None => 0
+            Some(r) => r
+         };
 
 
 .. guideline:: The 'as' operator should not be used with numeric operands
