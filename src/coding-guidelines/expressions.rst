@@ -97,7 +97,7 @@ Expressions
    evaluation of an `ArithmeticExpression
    <https://rust-lang.github.io/fls/expressions.html#arithmetic-expressions>`_.
 
-   Note that this includes the evaluation of a `RemainderExpression
+   This includes the evaluation of a `RemainderExpression
    <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_, which uses unsigned integer or two's
    complement division.
 
