@@ -99,6 +99,10 @@ needs_tags = [
     dict(name="readability", description="Readability-related guideline"),
     dict(name="reduce-human-error", description="Reducing human error guideline"),
     dict(name="numerics", description="Numerics-related guideline"),
+    dict(name="undefined-behavior", description="Numerics-related guideline"),
+
+    dict(name="defect", description="Guideline associated with the language-subset profile"),
+    dict(name="subset", description="Guideline associated with the defect-prevention profile"),
 ]
 
 needs_categories = [

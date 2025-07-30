@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "builder",
     "tqdm",
+    "m2r",
     "sphinx>=8.2.3",
     "sphinx-autobuild>=2024.10.3",
     "sphinx-needs>=5.1.0",

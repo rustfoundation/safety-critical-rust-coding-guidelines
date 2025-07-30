@@ -111,7 +111,7 @@ We have the same chapter layout as the [Ferrocene Language Specification](https:
 
 ### Guideline template
 
-We have a script `./generate-guideline-templates.py` which which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
+We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
 
 You can the copy and paste this guideline from the command line into the correct chapter.
 
