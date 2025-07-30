@@ -102,15 +102,15 @@ Expressions
    complement division.
 
    This rule does not apply to evaluation of a :std:`core::ops::Div` trait on types other than `integer
-   types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_. The use of
-   :std:`std::num::NonZero` or is therefore a recommended way to avoid the undecidability of this
-   guideline.
+   types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
 
    .. rationale::
       :id: rat_h84NjY2tLSBW
       :status: draft
 
-      Integer division by zero results in a panic, which is an abnormal program state and may terminate the process.
+      Integer division by zero results in a panic, which is an abnormal program state and may terminate the
+      process. The use of :std:`std::num::NonZero` as the divisor is a recommended way to avoid the
+      undecidability of this guideline.
 
    .. non_compliant_example::
       :id: non_compl_ex_LLs3vY8aGz0F
