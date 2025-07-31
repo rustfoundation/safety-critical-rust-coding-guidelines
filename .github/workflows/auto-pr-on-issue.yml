@@ -1,0 +1,52 @@
+name: Auto Guideline PR
+
+on:
+  issues:
+    types:
+      - labeled
+
+jobs:
+  auto-pr:
+    if: "github.event.label.name == 'sign-off: create pr from issue'"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+
+      - name: Run Python script to generate guideline file
+        run: |
+          cat <<EOF | uv run python scripts/auto-pr-helper.py --save
+          ${{ toJson(github.event.issue) }}
+          EOF
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: |
+            src/coding-guidelines/
+          commit-message: |
+            Add guideline for issue #${{ github.event.issue.number }}
+
+            Co-authored-by: ${{ github.event.issue.user.login }} <${{ github.event.issue.user.login }}@users.noreply.github.com>
+
+          branch: guideline-${{ github.event.issue.number }}
+          title: "[auto-pr] #${{ github.event.issue.number }}: ${{ github.event.issue.title }}"
+          body: |
+            This PR was automatically generated from issue #${{ github.event.issue.number }}.
+
+            **Authored by:** @${{ github.event.issue.user.login }}
+
+            Closes #${{ github.event.issue.number }}.

@@ -25,10 +25,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          export PATH="/root/.cargo/bin:$PATH"
-          uv --version
+        uses: astral-sh/setup-uv@v6
       - name: Build documentation
         run: |
           mkdir -p build

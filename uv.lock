@@ -195,6 +195,16 @@ wheels = [
 ]
 
 [[package]]
+name = "m2r"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docutils" },
+    { name = "mistune" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/94/65/fd40fbdc608298e760affb95869c3baed237dfe5649d62da1eaa1deca8f3/m2r-0.3.1.tar.gz", hash = "sha256:aafb67fc49cfb1d89e46a3443ac747e15f4bb42df20ed04f067ad9efbee256ab", size = 16622 }
+
+[[package]]
 name = "markupsafe"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -230,6 +240,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/80/0985960e4b89922cb5a0bac0ed39c5b96cbc1a536a99f30e8c220a996ed9/MarkupSafe-3.0.2-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:131a3c7689c85f5ad20f9f6fb1b866f402c445b220c19fe4308c0b147ccd2ad9", size = 24098 },
     { url = "https://files.pythonhosted.org/packages/82/78/fedb03c7d5380df2427038ec8d973587e90561b2d90cd472ce9254cf348b/MarkupSafe-3.0.2-cp313-cp313t-win32.whl", hash = "sha256:ba8062ed2cf21c07a9e295d5b8a2a5ce678b913b45fdf68c32d95d6c1291e0b6", size = 15208 },
     { url = "https://files.pythonhosted.org/packages/4f/65/6079a46068dfceaeabb5dcad6d674f5f5c61a6fa5673746f42a9f4c233b3/MarkupSafe-3.0.2-cp313-cp313t-win_amd64.whl", hash = "sha256:e444a31f8db13eb18ada366ab3cf45fd4b31e4db1236a4448f68778c1d1a5a2f", size = 15739 },
+]
+
+[[package]]
+name = "mistune"
+version = "0.8.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/a4/509f6e7783ddd35482feda27bc7f72e65b5e7dc910eca4ab2164daf9c577/mistune-0.8.4.tar.gz", hash = "sha256:59a3429db53c50b5c6bcc8a07f8848cb00d7dc8bdb431a4ab41920d201d4756e", size = 58322 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/09/ec/4b43dae793655b7d8a25f76119624350b4d65eb663459eb9603d7f1f0345/mistune-0.8.4-py2.py3-none-any.whl", hash = "sha256:88a1051873018da288eee8538d476dffe1262495144b33ecb586c4ab266bb8d4", size = 16220 },
 ]
 
 [[package]]
@@ -353,6 +372,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "builder" },
+    { name = "m2r" },
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-needs" },
@@ -363,6 +383,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "builder", virtual = "builder" },
+    { name = "m2r" },
     { name = "sphinx", specifier = ">=8.2.3" },
     { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
     { name = "sphinx-needs", specifier = ">=5.1.0" },

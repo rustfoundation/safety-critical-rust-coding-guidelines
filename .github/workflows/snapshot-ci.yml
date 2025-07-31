@@ -1,0 +1,23 @@
+name: Snapshot Tests for auto-pr
+
+on:
+  push:
+    paths:
+      - 'generate_guideline_templates.py'
+      - 'scripts/auto-pr-helper.py'
+      - '.github/auto-pr-tests/**'
+  workflow_dispatch:      # also allow manual runs
+
+jobs:
+  snapshot-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run snapshot tests
+        run: |
+          uv run python .github/auto-pr-tests/test_runner.py
