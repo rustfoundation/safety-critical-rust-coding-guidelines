@@ -82,7 +82,7 @@ Expressions
 
          fn with_base(_: &Base) { ... }
 
-.. guideline:: Do not use builtin integer arithmetic expressions
+.. guideline:: Do not use integer type as divisor
    :id: gui_7y0GAMmtMhch
    :category: required
    :status: draft
@@ -92,46 +92,46 @@ Expressions
    :scope: module
    :tags: numerics
 
-   This guideline applies when an `ArithmeticExpression
-   <https://rust-lang.github.io/fls/expressions.html#arithmetic-expressions>`_ is used with operands of
-   integer type.
+   This guideline applies when a `Division Expression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `RemainderExpression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is used with a RightOperand of
+   `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
 
    .. rationale::
       :id: rat_vLFlPWSCHRje
       :status: draft
 
-      The built-in semantics for these expressions can result in panics, or silent wrap around upon overflow
-      or division by zero occurs. It is recommended to explicitly declare what should happen during these
-      events with checked arithmetic functions.
+      The built-in semantics for these expressions can result in panics when division by zero occurs. It is
+      recommended to either use checked arithmetic functions to explicitly specify the behavior in such
+      situations or to use :std:`std::num::NonZero` as a divisor to avoid division by zero.
 
    .. non_compliant_example::
       :id: non_compl_ex_0XeioBrgfh5z
       :status: draft
 
       When the division is performed, the right operand is evaluated to zero and the program panics.
-      When the addition is performed, either silent overflow happens or a panic depending on the build
-      configuration.
 
       .. code-block:: rust
 
          let x = 0;
          let x = 5 / x;
-         let y = 135u8
-         let y = 200u8 + y;
 
    .. compliant_example::
       :id: compl_ex_k1CD6xoZxhXb
       :status: draft
 
-      The developer must explicitly indicate the intended behavior when a division by zero or arithmetic
-      overflow occurs when using checked arithmetic methods.
+      The developer must explicitly indicate the intended behavior when a division by zero occurs, or use a
+      type for which it is invalid to have a value of zero.
 
       .. code-block:: rust
 
          let x = 0;
          let result = match 5u32.checked_div(x) {
-            None => 0
-            Some(r) => r
+           None => 0
+           Some(r) => r
+         }
+         if let Some(divisor) = match NonZero::<u32>::new(x) {
+           let result = 5 / divisor;
          }
          let y = 135u8
          let y = 200u8.wrapping_add(y);
