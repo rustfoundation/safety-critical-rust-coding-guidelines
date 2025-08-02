@@ -50,6 +50,3 @@ jobs:
             **Authored by:** @${{ github.event.issue.user.login }}
 
             Closes #${{ github.event.issue.number }}.
-
-  build:
-    uses: ./.github/workflows/build-guidelines.yml
