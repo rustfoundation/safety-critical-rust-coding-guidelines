@@ -90,3 +90,41 @@ Associated Items
                   }
                   Ok(result)
               }
+
+.. guideline:: Test
+    :id: gui_Gv6hB2wCM8PD 
+    :category: advisory
+    :status: draft
+    :release: tbd-tbd
+    :fls: fls_tbd
+    :decidability: decidable
+    :scope: module
+    :tags: reduce-human-error
+
+
+
+    .. rationale:: 
+        :id: rat_XbjxmSr0Cr9e 
+        :status: draft
+
+        Here's why
+
+    .. non_compliant_example::
+        :id: non_compl_ex_GnSNFKlUGhrL 
+        :status: draft
+
+        Explanation
+
+        .. code-block:: rust
+
+            Code
+
+    .. compliant_example::
+        :id: compl_ex_wIzuJ8DrCmG7 
+        :status: draft
+
+        Explanation
+
+        .. code-block:: rust
+
+            Code
