@@ -84,7 +84,7 @@ Expressions
 
 .. guideline:: Do not use integer type as divisor
    :id: gui_7y0GAMmtMhch
-   :category: required
+   :category: advisory
    :status: draft
    :release: latest
    :fls: fls_Q9dhNiICGIfr
