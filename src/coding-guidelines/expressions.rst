@@ -85,7 +85,7 @@ Expressions
 
 .. guideline:: Do not divide by 0
    :id: gui_kMbiWbn8Z6g5
-   :category: mandatory
+   :category: required
    :status: draft
    :release: latest
    :fls: fls_Q9dhNiICGIfr
