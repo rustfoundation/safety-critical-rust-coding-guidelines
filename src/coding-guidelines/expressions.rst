@@ -114,7 +114,8 @@ Expressions
       .. code-block:: rust
 
          let x = 0;
-         let x = 5 / x;
+         let y = 5 / x;
+         let x = 5 % x;
 
    .. compliant_example::
       :id: compl_ex_k1CD6xoZxhXb
@@ -126,12 +127,12 @@ Expressions
       .. code-block:: rust
 
          let x = 0;
-         let result = match 5u32.checked_div(x) {
-           None => 0
-           Some(r) => r
-         }
          if let Some(divisor) = match NonZero::<u32>::new(x) {
            let result = 5 / divisor;
+         }
+         let result = match 5u32.checked_rem(x) {
+           None => 0
+           Some(r) => r
          }
 
 
