@@ -131,8 +131,8 @@ Expressions
            let result = 5 / divisor;
          }
          let result = match 5u32.checked_rem(x) {
-           None => 0
-           Some(r) => r
+           None => 0,
+           Some(r) => r,
          }
 
 
