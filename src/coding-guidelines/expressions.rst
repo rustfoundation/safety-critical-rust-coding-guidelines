@@ -82,6 +82,59 @@ Expressions
 
          fn with_base(_: &Base) { ... }
 
+.. guideline:: Do not use integer type as divisor
+   :id: gui_7y0GAMmtMhch
+   :category: advisory
+   :status: draft
+   :release: latest
+   :fls: fls_Q9dhNiICGIfr
+   :decidability: decidable
+   :scope: module
+   :tags: numerics
+
+   This guideline applies when a `Division Expression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `RemainderExpression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is used with a RightOperand of
+   `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
+
+   .. rationale::
+      :id: rat_vLFlPWSCHRje
+      :status: draft
+
+      The built-in semantics for these expressions can result in panics when division by zero occurs. It is
+      recommended to either use checked arithmetic functions to explicitly specify the behavior in such
+      situations or to use :std:`std::num::NonZero` as a divisor to avoid division by zero.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_0XeioBrgfh5z
+      :status: draft
+
+      When the division is performed, the right operand is evaluated to zero and the program panics.
+
+      .. code-block:: rust
+
+         let x = 0;
+         let y = 5 / x;
+         let x = 5 % x;
+
+   .. compliant_example::
+      :id: compl_ex_k1CD6xoZxhXb
+      :status: draft
+
+      The developer must explicitly indicate the intended behavior when a division by zero occurs, or use a
+      type for which it is invalid to have a value of zero.
+
+      .. code-block:: rust
+
+         let x = 0;
+         if let Some(divisor) = match NonZero::<u32>::new(x) {
+           let result = 5 / divisor;
+         }
+         let result = match 5u32.checked_rem(x) {
+           None => 0,
+           Some(r) => r,
+         }
+
 
 .. guideline:: The 'as' operator should not be used with numeric operands
    :id: gui_ADHABsmK9FXz
