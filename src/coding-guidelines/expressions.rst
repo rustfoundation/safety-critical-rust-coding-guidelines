@@ -91,7 +91,7 @@ Expressions
    :fls: fls_Q9dhNiICGIfr
    :decidability: undecidable
    :scope: system
-   :tags: numerics
+   :tags: numerics, defect
 
    This guideline applies when unsigned integer or two’s complement division is performed during the
    evaluation of an `ArithmeticExpression
