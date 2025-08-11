@@ -90,7 +90,7 @@ Expressions
    :fls: fls_Q9dhNiICGIfr
    :decidability: decidable
    :scope: module
-   :tags: numerics
+   :tags: numerics, subset
 
    This guideline applies when a `Division Expression
    <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `RemainderExpression
