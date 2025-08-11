@@ -130,12 +130,26 @@ Expressions
       There is no compliant way to perform integer division by zero. A checked division will prevent any
       division by zero from happening. The programmer can then handle the returned :std:``std::option::Option``.
 
+      Alternatively the check for zero can be performed manually, however as the complexity of the control
+      flow leading to the invariant increases it becomes harder for programmers and static analysis tools to
+      reason about.
+
       .. code-block:: rust
 
          let result = match 5u8.checked_div(0) {
-            None => 0
-            Some(r) => r
+             None => 0
+             Some(r) => r
          };
+
+         let x = 0;
+         if (x != 0) {
+             let x = 5 / x;
+         }
+         else {
+             let x = 0;
+         }
+
+
 
 
 .. guideline:: The 'as' operator should not be used with numeric operands
