@@ -101,15 +101,20 @@ Expressions
       :id: rat_vLFlPWSCHRje
       :status: draft
 
-      The built-in semantics for these expressions can result in panics when division by zero occurs. It is
-      recommended to either use checked arithmetic functions to explicitly specify the behavior in such
-      situations or to use :std:`std::num::NonZero` as a divisor to avoid division by zero.
+      The built-in semantics for these expressions can result in panics when division by zero occurs.It is recommended to either:
+
+      * Use checked division functions, which ensure the programmer handles the case when the divisor is zero, or
+      * To create divisors using :std:`std::num::NonZero`, which then allows the programmer to perform those
+        operations knowing that their divisor is not zero.
+
+      Since the compiler can assume the value of :std:`std::num::NonZero` is not zero, the check for zero
+      while dividing with standard integer types can be elided.
 
    .. non_compliant_example::
       :id: non_compl_ex_0XeioBrgfh5z
       :status: draft
 
-      When the division is performed, the right operand is evaluated to zero and the program panics.
+      When either the division or remainder are performed, the right operand is evaluated to zero and the program panics.
 
       .. code-block:: rust
 
@@ -121,8 +126,11 @@ Expressions
       :id: compl_ex_k1CD6xoZxhXb
       :status: draft
 
-      The developer must explicitly indicate the intended behavior when a division by zero occurs, or use a
-      type for which it is invalid to have a value of zero.
+      There is no compliant way to divide with an integer type, however here the developer explicitly:
+
+      * Uses a checked division function, which make sure a zero divisor is handled separately, and
+      * Creates a divisor using :std:`std::num::NonZero`, which outsources the check for zero to the
+        construction of that struct.
 
       .. code-block:: rust
 
