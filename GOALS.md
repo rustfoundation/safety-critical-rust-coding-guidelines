@@ -54,4 +54,6 @@ A good first step is to open a new [coding guideline issue](https://github.com/r
 * For the initial version to be complete coverage of the Rust programming languages pieces
   * "Something" shipped to alleviate pressure at organizations is better than "nothing available"
 * For any version to be conflict-free with various members' or their organizations' viewpoints
-  * Members and their organizations may take different stances on how pieces of the Rust programming language should be viewed and approached. This is okay and expected. We'd like to ship something that we can obtain broad consensus on and worst case scenario there may be a section here or there which you may need to adjust in an internal version that'd downstream.
+  * Members and their organizations may take different stances on how pieces of the Rust programming language should be viewed and approached. This is **okay and expected**.
+  * We'd like to ship something that we can obtain broad consensus on.
+  * Worst case scenario: there may be a section here or there which you may need to adjust in an internal version that'd downstream.
