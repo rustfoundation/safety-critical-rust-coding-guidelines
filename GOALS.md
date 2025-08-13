@@ -28,7 +28,7 @@ A good first step is to open a new [coding guideline issue](https://github.com/r
 
 # Goals
 
-* Coding guidelines that make a "best effort" attempt at cataloging common pieces (e.g. struct or unsafe) of the Rust programming language and how they fit into a safety-critical project
+* Coding guidelines that make a "best effort" attempt at cataloging common pieces (e.g. functions, arithmetic, unsafe) of the Rust programming language and how they fit into a safety-critical project
   * We will use [MISRA Compliance: 2020](https://misra.org.uk/app/uploads/2021/06/MISRA-Compliance-2020.pdf) for categorization
   * Includes rationale with links to parts of the Rust Project and wider Rust community for guidance
   * Could later be refined according to various standards, e.g. DO 178 or ISO 26262
