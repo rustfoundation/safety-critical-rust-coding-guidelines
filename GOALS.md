@@ -36,7 +36,7 @@ A good first step is to open a new [coding guideline issue](https://github.com/r
   * May include considerations of "what" is being built, e.g. broadly speaking library software: (potentially broke down further into low-level driver code, a framework system for real-time applications, SDKs) vs application software
 * Should be done in parallel with developing an addendum matrix to reduce burden of attaching these later
   * We can begin with DO 178 and ISO 26262 at perhaps chapter level, maybe subsection level _for now_ and expand later
-* Releases of the coding guidelines are tagged and released with versions of the stable compiler which they support
+* Releases of the coding guidelines are released and tagged with the versions of stable Rust that they support (e.g. `1.42`)
 * Upstream Clippy lints which will cover decidable guidelines
 
 ## Goals obtained by discussion with Tooling Subcommittee
