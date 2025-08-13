@@ -44,7 +44,9 @@ A good first step is to open a new [coding guideline issue](https://github.com/r
 * Make a label for each which _in theory_ is decidable or not
 * Include for each guideline a minimum of one compliant and one non-compliant example of code, to help illustrate its exact meaning and context.
 * Consider only the language reference / spec, not the tooling availability when writing the coding guidelines
-* Evidence-based with statistics around human error when programming Rust to support both 1. what guidelines are written and 2. why a suggestion was made
+* Guidelines should be evidence-based, with statistics around human error when programming Rust, to support:
+  1. What guidelines are written, and 
+  2. Why a specific suggestion was made
 * Produce the guidelines in an artifact that's easily machine readable and consistent format to make it easier to consume by tool vendors as a baseline (e.g. multiple JSON files, one per language piece, also potentially one large JSON concatenated together)
 
 # Non-goals
