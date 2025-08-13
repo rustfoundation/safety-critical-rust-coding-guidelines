@@ -2,7 +2,9 @@
 
 Coding Guidelines for Safety Critical Rust developed by the [Safety Critical Rust Consortium][safety-critical-rust-consortium].
 
-[View the latest rendered guidelines online](https://rustfoundation.github.io/safety-critical-rust-coding-guidelines/)
+[View the latest rendered guidelines online](https://coding-guidelines.arewesafetycriticalyet.org/)
+
+Check out the [coding guideline goals](GOALS.md).
 
 _Note_: Early, subject to changes.
 
@@ -108,6 +110,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ### Chapter layout mirrors Ferrocene Language Specification
 
 We have the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute you may find a section from the FLS of interest and then write a guideline in the corresponding chapter of these coding guidelines.
+
+### Submit coding guideline issue
+
+For a new coding guideline you'd like to contribute, start with opening a [coding guideline issue](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/new?template=CODING-GUIDELINE.yml).
+
+Once an issue has been well-developed enough it's then time to write up the guideline.
 
 ### Guideline template
 
