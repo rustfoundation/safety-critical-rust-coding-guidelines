@@ -128,11 +128,10 @@ Expressions
       :status: draft
 
       There is no compliant way to perform integer division by zero. A checked division will prevent any
-      division by zero from happening. The programmer can then handle the returned :std:``std::option::Option``.
+      division by zero from happening. The programmer can then handle the returned :std:`std::option::Option`.
 
-      Alternatively the check for zero can be performed manually, however as the complexity of the control
-      flow leading to the invariant increases it becomes harder for programmers and static analysis tools to
-      reason about.
+      The check for zero can also be performed manually. However, as the complexity of the control
+      flow leading to the invariant increases, it becomes increasingly harder to reason about it. For both programmers and static analysis tools.
 
       .. code-block:: rust
 
