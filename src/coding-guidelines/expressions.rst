@@ -121,7 +121,7 @@ Expressions
       .. code-block:: rust
 
          let x = 0;
-         let x = 5 / x;
+         let y = 5 / x; // This line will panic.
 
    .. compliant_example::
       :id: compl_ex_Ri9pP5Ch3kbb
@@ -135,18 +135,19 @@ Expressions
 
       .. code-block:: rust
 
+         // Example 1: using the checked division API
          let result = match 5u8.checked_div(0) {
              None => 0
              Some(r) => r
          };
-
+         
+         // Example 2: performing zero-checks by hand
          let x = 0;
-         if (x != 0) {
-             let x = 5 / x;
-         }
-         else {
-             let x = 0;
-         }
+         let y = if x != 0 {
+             5 / x
+         } else {
+             0
+         };
 
 
 
