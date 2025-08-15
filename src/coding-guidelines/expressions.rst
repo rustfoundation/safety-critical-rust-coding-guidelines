@@ -121,8 +121,8 @@ Expressions
       .. code-block:: rust
 
          let x = 0;
-         let y = 5 / x;
-         let x = 5 % x;
+         let y = 5 / x; // This line will panic.
+         let z = 5 % x; // This line would also panic.
 
    .. compliant_example::
       :id: compl_ex_k1CD6xoZxhXb
@@ -132,7 +132,7 @@ Expressions
 
       * Uses a checked division function, which ensures a zero divisor is handled separately, and
       * Creates a divisor using :std:`std::num::NonZero`, which outsources the check for zero to the
-        construction of that struct.
+        construction of that struct. It's worth noting that such a divisor can be used multiple times after it's been created, whilst keeping the guarantee that such divisions will be safe.
 
       .. code-block:: rust
 
