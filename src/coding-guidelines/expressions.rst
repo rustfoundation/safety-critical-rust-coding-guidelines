@@ -92,7 +92,7 @@ Expressions
    :scope: module
    :tags: numerics, subset
 
-   This guideline applies when a `Division Expression
+   This guideline applies when a `DivisionExpression
    <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `RemainderExpression
    <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is used with a RightOperand of
    `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
@@ -130,7 +130,7 @@ Expressions
 
       There is no compliant way to divide with an integer type, however here the developer explicitly:
 
-      * Uses a checked division function, which make sure a zero divisor is handled separately, and
+      * Uses a checked division function, which ensures a zero divisor is handled separately, and
       * Creates a divisor using :std:`std::num::NonZero`, which outsources the check for zero to the
         construction of that struct.
 
