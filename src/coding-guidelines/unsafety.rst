@@ -43,8 +43,8 @@ Unsafety
 
         .. code-block:: rust
 
-            mod bad {
-                fn get_value(data: &[i32], index: usize) -> i32 {
+            pub mod bad {
+                pub fn get_value(data: &[i32], index: usize) -> i32 {
                     unsafe {
                         data.get_unchecked(usize)
                     }
@@ -60,8 +60,8 @@ Unsafety
 
         .. code-block:: rust
 
-            mod good {
-                fn get_value(data: &[i32], index: usize) -> i32 {
+            pub mod good {
+                pub fn get_value(data: &[i32], index: usize) -> i32 {
                     assert!(usize < data.len());
                     unsafe {
                         data.get_unchecked(usize)
