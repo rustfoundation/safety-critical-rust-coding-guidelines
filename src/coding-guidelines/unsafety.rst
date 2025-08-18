@@ -37,14 +37,14 @@ Unsafety
 
         .. code-block:: rust
 
-            fn example_function() {
+            fn example_function() -> bool {
                 unsafe {
                     std::transmute<bool>(3_u8)
                 }
             }
 
-        A necessary condition to read the value behind a pointer is that it points to a live allocation.
-        This is never the case for the live pointer, therefore reading a null pointer is undefined behavior.
+        A necessary condition to read the value behind a pointer is that it points to a valid allocation.
+        This is never the case for a null pointer, therefore reading it is undefined behavior.
         See the safety precondition of :std:`std::ptr::read`.
 
         .. code-block:: rust
@@ -55,4 +55,31 @@ Unsafety
                 }
             }
 
+    .. compliant_example::
+        :id: compl_ex_mt8h0T3BtONt 
+        :status: draft
+
+        Since ``0_u8`` is defined to represent the ``false`` value of bool, this example is free of
+        undefined behavior.
+
+        .. code-block:: rust
+
+            fn example_function() -> bool {
+                unsafe {
+                    std::transmute<bool>(0_u8);
+                }
+            }
+
+        ``ptr`` points to a valid, aligned and properly initialized allocation.
+        Therefore, it satisfies all safety preconditions of :std:`std::ptr::read` and can be read
+        without undefined behavior.
+
+        .. code-block:: rust
+
+            fn example_function() {
+                let ptr = Box::new(42).into_raw();
+                unsafe {
+                    std::ptr::read(ptr);
+                }
+            }
 
