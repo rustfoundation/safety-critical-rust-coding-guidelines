@@ -105,7 +105,6 @@ body:
     attributes:
       label: Scope
       description: Module - This guideline can be checked at the module level. Crate - This guideline can be checked at the crate level. System - This guideline must be checked alongside the entire source. If unsure, choose "System" as it's the most strict and will likely be revisited.
-      multiple: true
       options:
         - Module
         - Crate
