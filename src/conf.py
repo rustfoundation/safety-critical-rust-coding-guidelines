@@ -97,11 +97,15 @@ needs_tags = [
     dict(name="security", description="Security-related guideline"),
     dict(name="performance", description="Performance-related guideline"),
     dict(name="readability", description="Readability-related guideline"),
-    dict(name="reduce-human-error", description="Reducing human error guideline"),
+    dict(name="reduce-human-error", description="Guideline that helps prevent human error"),
     dict(name="numerics", description="Numerics-related guideline"),
-    dict(name="undefined-behavior", description="Numerics-related guideline"),
-    dict(name="stack-overflow", description="Stack-overflow-related guideline"),
+    dict(name="undefined-behavior", description="Guideline related to Undefined Behavior"),
+    dict(name="stack-overflow", description="Guideline related to Stack Overflow"),
 
+    dict(name="maintainability", description="Maintainability-related guideline"),
+    dict(name="portability", description="Portability-related guideline"),
+    dict(name="surprising-behavior", description="Guideline related to surprising or unexpected behavior"),
+    
     dict(name="subset", description="Guideline associated with the language-subset profile"),
     dict(name="defect", description="Guideline associated with the defect-prevention profile"),
 ]
