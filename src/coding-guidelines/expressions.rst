@@ -108,8 +108,9 @@ Expressions
       * To create divisors using :std:`std::num::NonZero`, which then allows the programmer to perform those
         operations knowing that their divisor is not zero.
 
-      Since the compiler can assume the value of :std:`std::num::NonZero` is not zero, the check for zero
-      while dividing with standard integer types can be elided.
+      **Note:** since the compiler can assume the value of a :std:`std::num::NonZero`
+      variable to not be zero, checks for zero when dividing by it can be elided in the
+      final binary, increasing overall performance beyond what normal division can have.
 
    .. non_compliant_example::
       :id: non_compl_ex_0XeioBrgfh5z
@@ -128,7 +129,7 @@ Expressions
       :id: compl_ex_k1CD6xoZxhXb
       :status: draft
 
-      There is no compliant way to divide with an integer type, however here the developer explicitly:
+      There is no compliant way to divide with an integer type. Here, instead, the developer explicitly:
 
       * Uses a checked division function, which ensures a zero divisor is handled separately, and
       * Creates a divisor using :std:`std::num::NonZero`, which outsources the check for zero to the
