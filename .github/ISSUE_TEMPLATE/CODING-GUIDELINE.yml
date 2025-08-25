@@ -49,7 +49,6 @@ body:
     attributes:
       label: Category
       description: Mandatory - required, no deviation possible. Required - required, deviation possible for each instance. Advisory - suggested, deviation possible to remove requirement for project-wide. Disapplied - need not be applied, very optional. Suggest using Mandatory very sparingly, if in doubt submit as Disapplied.
-      multiple: true
       options:
         - Mandatory
         - Required
