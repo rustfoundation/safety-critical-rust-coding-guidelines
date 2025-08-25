@@ -82,6 +82,70 @@ Expressions
 
          fn with_base(_: &Base) { ... }
 
+.. guideline:: Do not use integer type as divisor
+   :id: gui_7y0GAMmtMhch
+   :category: advisory
+   :status: draft
+   :release: latest
+   :fls: fls_Q9dhNiICGIfr
+   :decidability: decidable
+   :scope: module
+   :tags: numerics, subset
+
+   This guideline applies when a `DivisionExpression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `RemainderExpression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is used with a RightOperand of
+   `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
+
+   .. rationale::
+      :id: rat_vLFlPWSCHRje
+      :status: draft
+
+      The built-in semantics for these expressions can result in panics when division by zero occurs. It is
+      recommended to either:
+
+      * Use checked division functions, which ensure the programmer handles the case when the divisor is zero, or
+      * To create divisors using :std:`std::num::NonZero`, which then allows the programmer to perform those
+        operations knowing that their divisor is not zero.
+
+      **Note:** since the compiler can assume the value of a :std:`std::num::NonZero`
+      variable to not be zero, checks for zero when dividing by it can be elided in the
+      final binary, increasing overall performance beyond what normal division can have.
+
+   .. non_compliant_example::
+      :id: non_compl_ex_0XeioBrgfh5z
+      :status: draft
+
+      When either the division or remainder are performed, the right operand is evaluated to zero and the
+      program panics.
+
+      .. code-block:: rust
+
+         let x = 0;
+         let y = 5 / x; // This line will panic.
+         let z = 5 % x; // This line would also panic.
+
+   .. compliant_example::
+      :id: compl_ex_k1CD6xoZxhXb
+      :status: draft
+
+      There is no compliant way to divide with an integer type. Here, instead, the developer explicitly:
+
+      * Uses a checked division function, which ensures a zero divisor is handled separately, and
+      * Creates a divisor using :std:`std::num::NonZero`, which outsources the check for zero to the
+        construction of that struct. It's worth noting that such a divisor can be used multiple times after it's been created, whilst keeping the guarantee that such divisions will be safe.
+
+      .. code-block:: rust
+
+         let x = 0;
+         if let Some(divisor) = match NonZero::<u32>::new(x) {
+           let result = 5 / divisor;
+         }
+         let result = match 5u32.checked_rem(x) {
+           None => 0,
+           Some(r) => r,
+         }
+
 
 .. guideline:: Do not divide by 0
    :id: gui_kMbiWbn8Z6g5
