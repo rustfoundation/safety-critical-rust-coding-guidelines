@@ -9,6 +9,8 @@ jobs:
       steps:
         - name: Check out the repo
           uses: actions/checkout@v4
+        - name: Install uv
+          uses: astral-sh/setup-uv@v6
         - name: Update FLS
           run: "./make.py --update-spec-lock-file"
         - name: Create Pull Request
