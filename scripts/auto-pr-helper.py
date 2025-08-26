@@ -1,9 +1,10 @@
-import json
-import re
 import argparse
-import sys
+import json
 import os
+import re
+import sys
 from textwrap import indent
+
 from m2r import convert
 
 scriptpath = "../"
@@ -26,7 +27,7 @@ def extract_form_fields(issue_body: str) -> dict:
     This function parses issues json into a dict of important fields
     """
 
-    fields = {v: "" for v in issue_header_map.values()}
+    fields = dict.fromkeys(issue_header_map.values(), "")
 
     lines = issue_body.splitlines()
     current_key = None
