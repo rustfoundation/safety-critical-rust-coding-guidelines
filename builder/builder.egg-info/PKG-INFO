@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: builder
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+
+# Builder
+
+A minimal project which creates `build_cli.py` to allow us to build the Safety-Critical Coding Guidelines.
