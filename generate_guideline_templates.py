@@ -3,8 +3,8 @@
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
 import argparse
-import string
 import random
+import string
 from textwrap import dedent, indent
 
 # Configuration
@@ -118,11 +118,6 @@ def generate_id(prefix):
 
 def generate_guideline_template():
     """Generate a complete guideline template with all required sections."""
-    # Generate IDs for all sections
-    guideline_id = generate_id("gui")
-    rationale_id = generate_id("rat")
-    non_compliant_example_id = generate_id("non_compl_ex")
-    compliant_example_id = generate_id("compl_ex")
 
     template = guideline_rst_template(
         guideline_title="Title Here",

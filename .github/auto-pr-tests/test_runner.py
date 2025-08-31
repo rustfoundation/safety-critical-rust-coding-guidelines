@@ -1,7 +1,7 @@
-import subprocess
-import re
-from pathlib import Path
 import difflib
+import re
+import subprocess
+from pathlib import Path
 
 
 def normalize_ids(text: str) -> str:
