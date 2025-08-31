@@ -19,3 +19,31 @@ members = ["builder"]
 
 [tool.uv.sources]
 builder = { workspace = true }
+
+[tool.ruff]
+
+lint.select = [
+  "F",        # Pyflakes rules
+  "W",        # PyCodeStyle warnings
+  "E",        # PyCodeStyle errors
+  "I",        # Sort Imports
+  "TID",      # Some good import practices
+  "C4",       # Catch incorrect use of comprehensions, dict, list, etc
+]
+# Remove or reduce ignores to catch more issues
+lint.ignore = [
+    "E501",  # Ignore long lines, bc we use them frequently while composing .rst templates
+    "W293",  # Ignore white spaces in blank lines
+    "W291",  # Ignore Trailing white lines
+    "E402",  # Ignore "Imports must be at the top of the file" enforcement bc `auto-pr-helper.py` needs it
+    "C401",  # Ignore `Unnecessary generator` checks, further tests are needed in fls_checks.py
+]
+
+[tool.ruff.lint.flake8-comprehensions]
+allow-dict-calls-with-keyword-arguments = true
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.3",
+]
+

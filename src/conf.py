@@ -10,20 +10,20 @@ sys.path.append(os.path.abspath("../exts"))
 
 # -- Project information -----------------------------------------------------
 
-project = 'Safety-Critical Rust Coding Guidelines'
-copyright = '2025, Contributors to Coding Guidelines Subcommittee'
-author = 'Contributors to Coding Guidelines Subcommittee'
-release = '0.1'
+project = "Safety-Critical Rust Coding Guidelines"
+copyright = "2025, Contributors to Coding Guidelines Subcommittee"
+author = "Contributors to Coding Guidelines Subcommittee"
+release = "0.1"
 
 # -- General configuration ---------------------------------------------------
 
 # Add sphinx-needs to extensions
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.autosectionlabel',
-    'sphinx_needs',
-    'coding_guidelines',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosectionlabel",
+    "sphinx_needs",
+    "coding_guidelines",
 ]
 
 # Basic needs configuration
@@ -39,29 +39,29 @@ needs_types = [
         "title": "Guideline",
         "prefix": "gui_",
         "color": "#BFD8D2",
-        "style": "node"
+        "style": "node",
     },
     {
         "directive": "rationale",
         "title": "Rationale",
         "prefix": "rat_",
         "color": "#DF744A",
-        "style": "node"
+        "style": "node",
     },
     {
         "directive": "compliant_example",
         "title": "Compliant Example",
         "prefix": "compl_ex_",
         "color": "#729FCF",
-        "style": "node"
+        "style": "node",
     },
     {
         "directive": "non_compliant_example",
         "title": "Non-Compliant Example",
         "prefix": "non_compl_ex_",
         "color": "#729FCF",
-        "style": "node"
-    }
+        "style": "node",
+    },
 ]
 
 # Define custom sections for needs
@@ -71,7 +71,7 @@ needs_layouts = {
             "content",
             "rationale",
             "non_compliant_example",
-            "compliant_example"
+            "compliant_example",
         ]
     }
 }
@@ -80,7 +80,11 @@ needs_layouts = {
 needs_render_contexts = {
     "guideline": {
         "content": ["content"],
-        "extra_content": ["rationale", "non_compliant_example", "non_compliant_example"]
+        "extra_content": [
+            "rationale",
+            "non_compliant_example",
+            "non_compliant_example",
+        ],
     }
 }
 
@@ -89,7 +93,9 @@ needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example
 
 needs_statuses = [
     dict(name="draft", description="This guideline is in draft stage", color="#999999"),
-    dict(name="approved", description="This guideline has been approved", color="#00FF00"),
+    dict(
+        name="approved", description="This guideline has been approved", color="#00FF00"
+    ),
     dict(name="retired", description="This guideline is retired", color="#FF0000"),
 ]
 
@@ -113,35 +119,85 @@ needs_tags = [
 needs_categories = [
     dict(name="mandatory", description="This guideline is mandatory", color="#999999"),
     dict(name="required", description="This guideline is required", color="#FFCC00"),
-    dict(name="advisory", description="This guideline is advisory, should be followed when able", color="#FFCC00"),
-    dict(name="disapplied", description="This guideline is advisory, should be followed when able", color="#FFCC00"),
+    dict(
+        name="advisory",
+        description="This guideline is advisory, should be followed when able",
+        color="#FFCC00",
+    ),
+    dict(
+        name="disapplied",
+        description="This guideline is advisory, should be followed when able",
+        color="#FFCC00",
+    ),
 ]
 
 needs_decidabilities = [
-    dict(name="decidable", description="This guideline can be automatically checked with tooling", color="#999999"),
-    dict(name="undecidable", description="This guideline cannot be automatically checked with tooling", color="#999999"),
+    dict(
+        name="decidable",
+        description="This guideline can be automatically checked with tooling",
+        color="#999999",
+    ),
+    dict(
+        name="undecidable",
+        description="This guideline cannot be automatically checked with tooling",
+        color="#999999",
+    ),
 ]
 
 needs_scopes = [
-    dict(name="module", description="This guideline can be checked at the module level", color="#999999"),
-    dict(name="crate", description="This guideline can be checked at the crate level", color="#FFCC00"),
-    dict(name="system", description="This guideline must be checked alongside the entire source", color="#FFCC00"),
+    dict(
+        name="module",
+        description="This guideline can be checked at the module level",
+        color="#999999",
+    ),
+    dict(
+        name="crate",
+        description="This guideline can be checked at the crate level",
+        color="#FFCC00",
+    ),
+    dict(
+        name="system",
+        description="This guideline must be checked alongside the entire source",
+        color="#FFCC00",
+    ),
 ]
 
 needs_releases = [
-    dict(name="1.85.0", description="This guideline can be checked at the module level", color="#999999"),
-    dict(name="1.85.1", description="This guideline can be checked at the module level", color="#999999"),
+    dict(
+        name="1.85.0",
+        description="This guideline can be checked at the module level",
+        color="#999999",
+    ),
+    dict(
+        name="1.85.1",
+        description="This guideline can be checked at the module level",
+        color="#999999",
+    ),
 ]
 
 # Enable needs export
-needs_extra_options = ["category", "recommendation", "fls", "decidability", "scope", "release"]
+needs_extra_options = [
+    "category",
+    "recommendation",
+    "fls",
+    "decidability",
+    "scope",
+    "release",
+]
 
 
 # Required guideline fields
-required_guideline_fields = ['category', 'release', 'fls', 'decidability', 'scope', 'tags'] # Id is automatically generated
+required_guideline_fields = [
+    "category",
+    "release",
+    "fls",
+    "decidability",
+    "scope",
+    "tags",
+]  # Id is automatically generated
 
 # -- Options for HTML output -------------------------------------------------
 
 # Configure the theme
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
