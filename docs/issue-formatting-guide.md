@@ -28,7 +28,10 @@ This guide outlines our team's Markdown standards for writing issues and pull re
 - Simple blockquotes: `> This is a quote.`.
 
 ---
-## Not Allowed (Breaks Conversion)
+## Unsupported formatting (breaks conversion from Issue => Pull Request)
+
+The following types of formatting are not currently supported in the bodies of text submitted. This may change in the future if we find ways to support them.
+
 - **Nested formatting:** Combining different formatting styles, like **bold around `inline code`**, is unreliable.
 - **Markdown headings:** Using `#`, `##`, or `###` conflicts with Sphinx's heading structure.
 - **Complex lists:** Lists with inconsistent indentation or mixed bullet types often fail.
