@@ -5,7 +5,7 @@ This guide outlines our team's Markdown standards for writing issues and pull re
 
 ---
 
-## Allowed (Safe) Markdown
+## Supported formatting (does not break conversion from Issue => Pull Request)
 - **Bold** for emphasis or labels (`**Important Note**`).
 - *Italics* for a single word or phrase (`*Warning*`).
 - `inline code` for identifiers and short tokens (`cargo build`).
