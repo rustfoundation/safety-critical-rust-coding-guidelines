@@ -44,7 +44,7 @@ A machine-parseable artifact will be available at `build/html/needs.json`. (ToDo
 A record with checksums of the contents is available at `build/html/guidelines-ids.json`. Users of the coding guidelines can reference this file to determine if there have been changes to coding guidelines contents they should be aware of.
 
 
-## Running builds offline
+### Running builds offline
 
 If you're working without internet access or want to avoid reaching out to remote resources, you can pass the `--offline` flag:
 
@@ -57,7 +57,7 @@ This prevents the build system from attempting to fetch remote resources, such a
 It is recommended to use `--offline` if you are running `make.py` frequently during development. The builder fetches data from [the Ferrocene Language Specification website](https://spec.ferrocene.dev/paragraph-ids.json), which may rate-limit repeated requests—leading to delays or failed builds. Using `--offline` can significantly improve build speed and avoid unnecessary network issues during iterative work.
 
 
-## Build breaking due to out-dated spec lock file
+### Build breaking due to out-dated spec lock file
 
 It's a fairly common occurrence for the build to break due to an out of date spec lock file, located at:
 
@@ -107,15 +107,45 @@ Open a new PR with only the changes necessary to rationalize the guidelines with
 
 We will use the Coding Guidelines Work Items [board](https://github.com/orgs/rustfoundation/projects/1) as a means to break the work down into smaller chunks that can be tackled in a reasonable manner.
 
-## Contribution of existing guidelines
-
-We are very open to receiving contributed coding guidelines in whole or in part and wholly originally contributions based on learnings from past organizational experience using Rust in safety-critical projects.
-
 ## Contributing to the coding guidelines
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-### Have an idea? Want to discuss it?
+### Diagram for contribution workflow
+
+```mermaid
+flowchart TD
+  Start(["Start"])
+  CodingGuidelineIdea["Coding Guideline Idea"]
+  DiscussOnZulip[/"(Optional)<br>Discuss on Zulip"/]
+  CodingGuidelineIssue["Coding Guideline Issue"]
+  CodingGuidelinePR["Coding Guideline <br> Pull Request"]
+  Main[[main]]
+  End(["End"])
+
+  %% new: small local hop nodes (no self-loops)
+  IssueReview{{"2: subcommittee member<br>reviews within 14 days<br><br>contributor updates issue"}}
+  PRReview{{"4: subcommittee members<br>review within 14 days<br><br>contributor discusses on<br>PR as needed"}}
+
+  Start -- contributor thinks of idea --> CodingGuidelineIdea
+  CodingGuidelineIdea -- 0: optionally post on Zulip --> DiscussOnZulip
+  DiscussOnZulip -- 1: contributor creates <br> coding guideline issue --> CodingGuidelineIssue
+
+  %% replace Issue self-loop
+  CodingGuidelineIssue --> IssueReview --> CodingGuidelineIssue
+
+  CodingGuidelineIssue -- 3: subcommittee member <br> assigns label to <br> generate pull request --> CodingGuidelinePR
+
+  %% replace PR self-loop
+  CodingGuidelinePR --> PRReview --> CodingGuidelinePR
+
+  CodingGuidelinePR -- 5: contributor applies <br> feedback to coding <br> guideline issue --> CodingGuidelineIssue
+  CodingGuidelineIssue -- 6: subcomittee member <br> confirms changes; <br> assigns label to <br> regenerate PR --> CodingGuidelinePR
+  CodingGuidelinePR -- 7: subcommittee member <br> approves, adds <br> to merge queue; <br> gets merged to main --> Main
+  Main -- process complete --> End
+```
+
+### 0. Have an idea for a coding guideline? Want to discuss it?
 
 While not mandatory, sometimes you'd like to check into the feasiblity of a guideline or discuss it with others to ensure it's not overlapping an existing guideline. Feel free to drop by the Safety-Critical Rust Consortium's Zulip stream: [here](https://rust-lang.zulipchat.com/#narrow/channel/445688-safety-critical-consortium). Please open a new topic per coding guideline you'd like to discuss.
 
