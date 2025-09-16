@@ -103,40 +103,81 @@ Once you have completed the above steps, you will now update the local copy of t
 
 Open a new PR with only the changes necessary to rationalize the guidelines with the new FLS text.
 
+## Outline & issue breakdown
+
+We will use the Coding Guidelines Work Items [board](https://github.com/orgs/rustfoundation/projects/1) as a means to break the work down into smaller chunks that can be tackled in a reasonable manner.
+
+## Contribution of existing guidelines
+
+We are very open to receiving contributed coding guidelines in whole or in part and wholly originally contributions based on learnings from past organizational experience using Rust in safety-critical projects.
+
 ## Contributing to the coding guidelines
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-### Chapter layout mirrors Ferrocene Language Specification
+### Have an idea? Want to discuss it?
+
+While not mandatory, sometimes you'd like to check into the feasiblity of a guideline or discuss it with others to ensure it's not overlapping an existing guideline. Feel free to drop by the Safety-Critical Rust Consortium's Zulip stream: [here](https://rust-lang.zulipchat.com/#narrow/channel/445688-safety-critical-consortium). Please open a new topic per coding guideline you'd like to discuss.
+
+### Preamble: chapter layout mirrors Ferrocene Language Specification
 
 We have the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute you may find a section from the FLS of interest and then write a guideline in the corresponding chapter of these coding guidelines.
 
-### Submit coding guideline issue
+### 1. Submit coding guideline issue
 
 For a new coding guideline you'd like to contribute, start with opening a [coding guideline issue](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/new?template=CODING-GUIDELINE.yml).
 
-Once an issue has been well-developed enough it's then time to write up the guideline.
+#### 1.a Finding the FLS ID
+
+Note that the FLS ID should be filled according to the FLS paragraph ID for which the guideline is covering. One way to go about finding this is to inspect the page using your web browser. You'll be looking for something like:
+
+```html
+<p><span class="spec-paragraph-id" id="fls_4rhjpdu4zfqj">4.1:1</span>
+```
+
+You would then pull `fls_4rhjpdu4zfqj` to place in the FLS ID field.
+
+### 2. A subcommittee member reviews the coding guideline issue, works with you the contributor
+
+A member of the Coding Guidelines Subcommittee should get you a first review with some feedback within 14 days of submission. You'll work with one or more members to flesh out the concept and ensure the guideline is well prepared.
+
+### 3. A pull request is generated from the coding guideline issue
+
+Once an issue has been well-developed enough, a subcommittee member will mark the issue with the label `sign-off: create pr from issue` to generate a pull request. You will see a GitHub Workflow trigger and a pull request will be created momentarily.
+
+### 4. Contributor responds to feedback given on pull request
+
+The generated pull request may attract additional feedback or simply be an easier place to suggest targeted edits.
+
+As the contributor of the coding guideline and opener of the issue, you'll respond to comments, discuss, all the normal things on the pull request.
+
+### 5. Contributor applies updates to coding guidelines issue
+
+If you agree with the suggested changes, rather than making changes on the opened pull request, you will return to the original issue you opened via the coding guideline issue template and make the updates there.
+
+### 6. A subcommittee member generates new pull request contents from coding guidelines issue
+
+When you have completed all feedback given to you, ping one of the subcommittee members. They will then remove and affix the label `sign-off: create pr from issue` to push the changes made in the issue to the already opened pull request.
+
+### 7. A subcommittee member merges the coding guideline pull request
+
+Once the coding guideline contents have passed review, a subcommittee member will approve the pull request, and put it on the merge queue to be merged.
+
+### 8. You contributed a coding guideline
+
+That's it!
+
+## Writing a guideline locally (less typical, not recommended)
+
+While it is possible to create guidelines locally and open pull requests yourself, we encourage contributors to make use of the process described above since it handled some of the fiddly details for you as a guideline writer.
+
+Generally speaking, pull requests for guidelines which do not follow the issue to pull request workflow described above will be closed with a recommendation to follow the workflow.
 
 ### Guideline template
 
 We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
 
 You can the copy and paste this guideline from the command line into the correct chapter.
-
-### Filling out the guideline
-
-Reference `src/conf.py` to see valid selections for unfilled options in the guideline template.
-
-Note that the `:fls:` option should be filled according to the FLS paragraph ID for which the guideline is covering. One way to go about finding this is to inspect the page using your web browser. You'll be looking for something like:
-
-```html
-<p><span class="spec-paragraph-id" id="fls_4rhjpdu4zfqj">4.1:1</span>
-```
-
-You would then pull `fls_4rhjpdu4zfqj` to place in the `:fls:` option.
-
-Existing guidelines can also serve as examples on how guidelines are filled.
-
 
 ## [Code of Conduct][code-of-conduct]
 
