@@ -115,34 +115,24 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```mermaid
 flowchart TD
-  Start(["Start"])
-  CodingGuidelineIdea["Coding Guideline Idea"]
-  DiscussOnZulip[/"(Optional)<br>Discuss on Zulip"/]
-  CodingGuidelineIssue["Coding Guideline Issue"]
-  CodingGuidelinePR["Coding Guideline <br> Pull Request"]
-  Main[[main]]
-  End(["End"])
+  Start(["Start"]) --> Idea["Coding Guideline Idea"]
+  Idea --> Zulip[/"(Optional)<br>0: Contributor brings <br> to discuss on Zulip"/]
+  Zulip --> CreateIssue{{"1: Contributor creates <br> issue"}}
+  CreateIssue --> Issue["Coding Guideline Issue"]
 
-  %% new: small local hop nodes (no self-loops)
-  IssueReview{{"2: subcommittee member<br>reviews within 14 days<br><br>contributor updates issue"}}
-  PRReview{{"4: subcommittee members<br>review within 14 days<br><br>contributor discusses on<br>PR as needed"}}
+  %% short local loops (no long edges)
+  S2{{"2: Review started <br> by subcommittee <br> member in <= 14 days <br><br> Contributor updates accordingly"}} --> Issue
+  Issue --> S2
 
-  Start -- contributor thinks of idea --> CodingGuidelineIdea
-  CodingGuidelineIdea -- 0: optionally post on Zulip --> DiscussOnZulip
-  DiscussOnZulip -- 1: contributor creates <br> coding guideline issue --> CodingGuidelineIssue
+  Issue --> S3{{"3: Subcommitte member <br> assigns label<br>to generate PR"}} --> PR["Coding Guideline<br>Pull Request"]
 
-  %% replace Issue self-loop
-  CodingGuidelineIssue --> IssueReview --> CodingGuidelineIssue
+  S4{{"4: PR review started <br> by subcommittee member <br> in <= 14 days <br><br> Contributor discusses on PR"}} --> PR
+  PR --> S4
 
-  CodingGuidelineIssue -- 3: subcommittee member <br> assigns label to <br> generate pull request --> CodingGuidelinePR
-
-  %% replace PR self-loop
-  CodingGuidelinePR --> PRReview --> CodingGuidelinePR
-
-  CodingGuidelinePR -- 5: contributor applies <br> feedback to coding <br> guideline issue --> CodingGuidelineIssue
-  CodingGuidelineIssue -- 6: subcomittee member <br> confirms changes; <br> assigns label to <br> regenerate PR --> CodingGuidelinePR
-  CodingGuidelinePR -- 7: subcommittee member <br> approves, adds <br> to merge queue; <br> gets merged to main --> Main
-  Main -- process complete --> End
+  PR --> S5{{"5: Contributor applies <br> feedback to issue"}} --> Issue
+  Issue --> S6{{"6: Subcommittee member <br> confirms changes;<br> regenerates PR"}} --> PR
+  PR --> S7{{"7: Subcommittee member <br> approves & queues;<br>merges to main"}} --> Main[[main]]
+  Main --> End(["8: End"])
 ```
 
 ### 0. Have an idea for a coding guideline? Want to discuss it?
