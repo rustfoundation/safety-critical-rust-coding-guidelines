@@ -9,6 +9,12 @@ body:
     attributes:
       value: |
         Thanks for filling out a coding guideline!
+
+        Please briefly read through the [coding guideline issue formatting guide]
+        (https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/blob/main/docs/issue-formatting-guide.md)
+        to ensure that when a maintainer assigns the `sign-off: create pr from issue`
+        label the issue's Markdown gets converted correctly to reStructuredText
+        for the coding guideline.
   - type: dropdown
     id: chapter
     attributes:
