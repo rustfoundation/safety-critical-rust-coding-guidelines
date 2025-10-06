@@ -37,6 +37,6 @@ There will be an addendum which covers how various safety standards like ISO 262
 * For the initial version to have complete coverage of the Rust programming language
   * "Something" shipped to alleviate pressure at organizations is better than "nothing is available" even if we have to heavily subset the language
 * For any version to be conflict-free with various members' or their organizations' viewpoints
-  * Members and their organizations may take different stances on how Rust programming language constructs should be viewed and approached. This is **okay and expected**.
+  * Members and their organizations may take different stances on how The Rust Programming Language's constructs should be viewed and approached. This is **okay and expected**.
   * We'd like to ship something that we can obtain broad consensus on.
   * Worst case scenario: there may be a section here or there which you may need to adjust in an internal version that'd downstream.
