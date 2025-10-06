@@ -2,7 +2,7 @@
 
 ## Elevator pitch
 
-We will make Rust coding guidelines are available within this repository, deployed to an accessible location on the internet which comply with relevant standards for various safety-critical industries such as: IEC 61508, ISO 26262, and DO 178.
+We will make Rust coding guidelines available within this repository. The coding guidelines will additionally be deployed to an accessible location on the internet. These coding guideliens will comply with relevant standards for various safety-critical industries such as: IEC 61508, ISO 26262, and DO 178.
 
 ## Detailed
 
