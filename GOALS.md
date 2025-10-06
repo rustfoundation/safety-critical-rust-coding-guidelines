@@ -20,7 +20,7 @@ There will be an addendum which covers how various safety standards like ISO 262
 * We will develop an addendum matrix to reduce burden of attaching these later
   * We will begin with DO 178 and ISO 26262 at perhaps chapter level, maybe subsection level _for now_ and expand later
 * We will release the coding guidelines tagged with the versions of stable Rust that they support (e.g. `1.42`)
-* We will create Clippy lints which will cover decidable guidelines
+* We will find or create Clippy lints which will cover decidable guidelines
 
 ### Criteria obtained by discussion with Tooling Subcommittee
 
