@@ -30,7 +30,9 @@ There will be an addendum which covers how various safety standards like ISO 262
 * We aim to produce evidence-based guidelines, with statistics around human error when programming Rust, to support:
   1. What guidelines are written, and 
   2. Why a specific suggestion was made
-* We will produce the guidelines in an artifact that's easily machine readable and consistent format to make it easier to consume by tool vendors as a baseline (e.g. multiple JSON files, one per language piece, also potentially one large JSON concatenated together)
+* We will produce the guidelines in an artifact that's easily machine readable and consistent format to make it easier to consume by tool vendors to some minimal viable artifact.
+  * a `needs.json` containing the contents of the coding guidelines
+  * a `guidelines-ids.json` which has hashes of the guidelines contents which can be used to check against and break a tool vendors build until audit is performed
 
 # Explicit non-goals
 
