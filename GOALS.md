@@ -24,7 +24,7 @@ There will be an addendum which covers how various safety standards like ISO 262
 
 ### Criteria obtained by discussion with Tooling Subcommittee
 
-* We will affix a label for each guideline, which describes whether said guideline is decidable or not (in the theory of computation sense)
+* We will affix a label for each guideline, which describes whether said guideline is decidable or not (in the [theory of computation sense](https://en.wikipedia.org/wiki/Decidability_(logic)))
 * We will include for each guideline a minimum of one compliant and one non-compliant example of code, to help illustrate its exact meaning and context.
 * We will consider only the language reference / spec, not the tooling availability when writing the coding guidelines
 * We aim to produce evidence-based guidelines, with statistics around human error when programming Rust, to support:
