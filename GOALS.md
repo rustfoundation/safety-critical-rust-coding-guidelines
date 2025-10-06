@@ -34,7 +34,7 @@ There will be an addendum which covers how various safety standards like ISO 262
 
 # Explicit non-goals
 
-* For the initial version to be complete coverage of the Rust programming language
+* For the initial version to have complete coverage of the Rust programming language
   * "Something" shipped to alleviate pressure at organizations is better than "nothing is available" even if we have to heavily subset the language
 * For any version to be conflict-free with various members' or their organizations' viewpoints
   * Members and their organizations may take different stances on how Rust programming language constructs should be viewed and approached. This is **okay and expected**.
