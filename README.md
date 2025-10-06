@@ -8,6 +8,32 @@ Check out the [coding guideline goals](GOALS.md).
 
 _Note_: Early, subject to changes.
 
+## Table of Contents
+- [Building the coding guidelines](#building-the-coding-guidelines)
+   - [Running builds offline](#running-builds-offline)
+   - [Build breaking due to out-dated spec lock file](#build-breaking-due-to-out-dated-spec-lock-file)
+   - [Continuing work while on a feature branch](#continuing-work-while-on-a-feature-branch)
+   - [If you need to audit the difference](#if-you-need-to-audit-the-difference)
+- [Outline \& issue breakdown](#outline--issue-breakdown)
+- [Contributing to the coding guidelines](#contributing-to-the-coding-guidelines)
+   - [Diagram for contribution workflow](#diagram-for-contribution-workflow)
+   - [0. Have an idea for a coding guideline? Want to discuss it?](#0-have-an-idea-for-a-coding-guideline-want-to-discuss-it)
+   - [Preamble: chapter layout mirrors Ferrocene Language Specification](#preamble-chapter-layout-mirrors-ferrocene-language-specification)
+   - [1. Submit coding guideline issue](#1-submit-coding-guideline-issue)
+   - [1.a Finding the FLS ID](#1a-finding-the-fls-id)
+   - [2. A subcommittee member reviews the coding guideline issue, works with you the contributor](#2-a-subcommittee-member-reviews-the-coding-guideline-issue-works-with-you-the-contributor)
+   - [3. A pull request is generated from the coding guideline issue](#3-a-pull-request-is-generated-from-the-coding-guideline-issue)
+   - [4. Contributor responds to feedback given on pull request](#4-contributor-responds-to-feedback-given-on-pull-request)
+   - [5. Contributor applies updates to coding guidelines issue](#5-contributor-applies-updates-to-coding-guidelines-issue)
+   - [6. A subcommittee member generates new pull request contents from coding guidelines issue](#6-a-subcommittee-member-generates-new-pull-request-contents-from-coding-guidelines-issue)
+   - [7. A subcommittee member merges the coding guideline pull request](#7-a-subcommittee-member-merges-the-coding-guideline-pull-request)
+   - [8. You contributed a coding guideline](#8-you-contributed-a-coding-guideline)
+- [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
+   - [Guideline template](#guideline-template)
+- [Code of Conduct](#code-of-conduct)
+- [Licenses](#licenses)
+- [Other Policies](#other-policies)
+
 ## Building the coding guidelines
 
 The Safety-Critical Rust Coding Guidelines use `Sphinx` and `Sphinx-Needs` to build a rendered version of the coding guidelines, and `uv` to install and manage Python dependencies (including Sphinx itself). To simplify building the rendered version, we created a script called `make.py` that takes care of invoking Sphinx with the right flags.
