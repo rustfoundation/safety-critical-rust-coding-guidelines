@@ -3,28 +3,41 @@
 
 from sphinx.errors import SphinxError
 from sphinx_needs.data import SphinxNeedsData
-import logging
 
-logger = logging.getLogger('sphinx')
+from .common import bar_format, get_tqdm, logger
+
 
 class IntegrityCheckError(SphinxError):
     category = "Integrity Check Error"
 
+
 def validate_required_fields(app, env):
     """
-    Validate the required fields defined in conf.py 
+    Validate the required fields defined in conf.py
     """
     logger.debug("Validating required fields")
     data = SphinxNeedsData(env)
     needs = data.get_needs_view()
 
-    required_fields = app.config.required_guideline_fields  # Access the configured values
+    required_fields = (
+        app.config.required_guideline_fields
+    )  # Access the configured values
 
-    for key, value in needs.items():
-        if value.get('type') == 'guideline':
+    # prefiltering: this is mainly done for tqdm progress
+    guidelines = {k: v for k, v in needs.items() if v.get("type") == "guideline"}
+    pbar = get_tqdm(
+        iterable=guidelines.items(),
+        desc="Checking for required fields",
+        bar_format=bar_format,
+        unit="need",
+    )
+
+    for key, value in pbar:
+        if value.get("type") == "guideline":
             missing_fields = []
             for field in required_fields:
-                if value.get(field) in  (None, '', []):
+                pbar.set_postfix(field=field if field is not None else "Missing")
+                if value.get(field) in (None, "", []):
                     missing_fields.append(field)
 
             if missing_fields:
@@ -34,6 +47,5 @@ def validate_required_fields(app, env):
                     f"{', '.join(missing_fields)}"
                 )
                 logger.error(error_message)
-                app.builder.statuscode = 1
-                raise IntegrityCheckError(error_message) 
-            logger.info("No missing required field")
+                app.builder.statuscode = 1  # mark the build as failed (0 means success)
+                raise IntegrityCheckError(error_message)

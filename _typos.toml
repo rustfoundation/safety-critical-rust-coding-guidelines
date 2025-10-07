@@ -1,0 +1,9 @@
+[default]
+extend-ignore-identifiers-re = [
+  # Ignore Sphinx directives for typos
+  "gui_.*",
+  "rat_.*",
+  "compl_ex_.*",
+  "non_compl_ex_.*",
+]
+

@@ -2,11 +2,15 @@
 
 Coding Guidelines for Safety Critical Rust developed by the [Safety Critical Rust Consortium][safety-critical-rust-consortium].
 
+[View the latest rendered guidelines online](https://rustfoundation.github.io/safety-critical-rust-coding-guidelines/)
+
 _Note_: Early, subject to changes.
 
 ## Building the coding guidelines
 
 The Safety-Critical Rust Coding Guidelines use `Sphinx` and `Sphinx-Needs` to build a rendered version of the coding guidelines, and `uv` to install and manage Python dependencies (including Sphinx itself). To simplify building the rendered version, we created a script called `make.py` that takes care of invoking Sphinx with the right flags.
+
+If you still need to install `uv` you can follow the [steps outlined](https://docs.astral.sh/uv/getting-started/installation/) on Astral's website.
 
 You can build the rendered version by running:
 
@@ -107,7 +111,7 @@ We have the same chapter layout as the [Ferrocene Language Specification](https:
 
 ### Guideline template
 
-We have a script `./generate-guideline-templates.py` which which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
+We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
 
 You can the copy and paste this guideline from the command line into the correct chapter.
 

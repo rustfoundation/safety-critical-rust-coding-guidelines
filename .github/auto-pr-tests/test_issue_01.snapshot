@@ -1,0 +1,41 @@
+=====CONTENT=====
+
+.. guideline:: test ga
+    :id: gui_3Wl9gOTto7p2 
+    :category: advisory
+    :status: draft
+    :release: 1.1.1-1.1.1
+    :fls: fls_fsdjkfslkdfj
+    :decidability: decidable
+    :scope: crate
+    :tags: test gatest ga
+
+    hehehehe
+
+    .. rationale:: 
+        :id: rat_PVjXjtM9G383 
+        :status: draft
+
+        test ga
+
+    .. non_compliant_example::
+        :id: non_compl_ex_ABSVsT97MwLG 
+        :status: draft
+
+        test ga
+
+        .. code-block:: rust
+
+            dfhsdfkjshdfskdjhftest ga
+
+    .. compliant_example::
+        :id: compl_ex_Z9TjeDsRTnwL 
+        :status: draft
+
+        test ga
+
+        .. code-block:: rust
+
+            test ga
+
+=====CONTENT=END=====
