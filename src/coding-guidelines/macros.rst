@@ -479,7 +479,7 @@ Macros
       :status: draft
 
       The following is a macro refers to Vec using a global path. Even if there is a different struct called
-      `Vec` defined in the scope of the macro usage, this macro will unambigiously use the `Vec` from the
+      `Vec` defined in the scope of the macro usage, this macro will unambiguously use the `Vec` from the
       Standard Library.
 
       .. code-block:: rust
