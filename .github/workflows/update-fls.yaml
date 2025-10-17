@@ -12,7 +12,8 @@ jobs:
         - name: Install uv
           uses: astral-sh/setup-uv@v6
         - name: Update FLS
-          run: "./make.py --update-spec-lock-file"
+          run: |
+            ./test_update_fls.sh
         - name: Create Pull Request
           uses: peter-evans/create-pull-request@v4
           with:
