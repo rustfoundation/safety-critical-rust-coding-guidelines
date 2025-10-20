@@ -572,15 +572,15 @@ Expressions
         .. code-block:: rust
 
             fn bad_shl(bits: u32, shift: i32) -> u32 {
-                  bits << shift
-              }
+               bits << shift
+            }
 
-              let bits : u32 = 61;
-              let shifts = vec![-1, 4, 40];
+            let bits : u32 = 61;
+            let shifts = vec![-1, 4, 40];
 
-              for sh in shifts {
-                  println!("{bits} << {sh} = {}", bad_shl(bits, sh));
-              }
+            for sh in shifts {
+               println!("{bits} << {sh} = {}", bad_shl(bits, sh));
+            }
 
     .. compliant_example::
         :id: compl_ex_xpPQqYeEPGIo 
@@ -602,15 +602,15 @@ Expressions
         .. code-block:: rust
 
             fn good_shl(bits: u32, shift: u32) -> Option<u32> {
-                  bits.checked_shl(shift)
-              }
+               bits.checked_shl(shift)
+            }
 
-              let bits : u32 = 61;
-              // let shifts = vec![-1, 4, 40];
-              //                    ^--- Would not typecheck, as checked_shl
-              //                         only accepts positive shift amounts
-              let shifts = vec![4, 40];
+            let bits : u32 = 61;
+            // let shifts = vec![-1, 4, 40];
+            //                    ^--- Would not typecheck, as checked_shl
+            //                         only accepts positive shift amounts
+            let shifts = vec![4, 40];
 
-              for sh in shifts {
-                  println!("{bits} << {sh} = {:?}", good_shl(bits, sh));
-              }
+            for sh in shifts {
+               println!("{bits} << {sh} = {:?}", good_shl(bits, sh));
+            }
