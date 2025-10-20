@@ -559,11 +559,11 @@ Expressions
         .. code-block:: rust
 
             let bits : u32 = 61;
-              let shifts = vec![-1, 4, 40];
+            let shifts = vec![-1, 4, 40];
 
-              for sh in shifts {
-                  println!("{bits} << {sh} = {}", bits << sh);
-              }
+            for sh in shifts {
+               println!("{bits} << {sh} = {}", bits << sh);
+            }
 
     .. compliant_example::
         :id: compl_ex_Ux1WqHbGKV73 
@@ -588,12 +588,12 @@ Expressions
         .. code-block:: rust
 
             let bits : u32 = 61;
-              let shifts = vec![-1, 4, 40];
+            let shifts = vec![-1, 4, 40];
 
-              for sh in shifts {
-                  if 0 <= sh && sh < 32 {
-                      println!("{bits} << {sh} = {}", bits << sh);
-                  } else {
-                      println!("Performing {bits} << {sh} would be meaningless and crash-prone; we avoided it!");
-                  }
-              }
+            for sh in shifts {
+               if 0 <= sh && sh < 32 {
+                     println!("{bits} << {sh} = {}", bits << sh);
+               } else {
+                     println!("Performing {bits} << {sh} would be meaningless and crash-prone; we avoided it!");
+               }
+            }
