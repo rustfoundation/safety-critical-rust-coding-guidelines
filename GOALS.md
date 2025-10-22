@@ -17,8 +17,9 @@ There will be an addendum which covers how various safety standards like ISO 262
   * We include a rationale with links to parts of the Rust Project and wider Rust community for guidance
   * We will include linkage where appropriate to to various standards, e.g. CERT C, MISRA C, DO 178, ISO 26262
   * We will include practical recommendations on how to use this piece of the language using compliant and non-compliant examples
-* We will develop an addendum matrix to reduce burden of attaching these later
-  * We will begin with DO 178 and ISO 26262 at perhaps chapter level, maybe subsection level _for now_ and expand later
+* We will develop an addendum matrix to 1. clarify which safety standards are supported 2. lower burden of users
+  * We will begin with DO 178 and ISO 26262
+  * We will begin perhaps chapter level, maybe subsection level _for now_ and may expand granularity of matrix mapping later
 * We will release the coding guidelines tagged with the versions of stable Rust that they support (e.g. `1.42`)
 * We will find or create Clippy lints which will cover decidable guidelines
 
