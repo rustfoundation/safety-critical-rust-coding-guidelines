@@ -1,38 +1,33 @@
-# Contributing
-
-## Contributing to a Rust Foundation Project
-
-Thank you for your interest in contributing to this Rust Foundation project. 
-We are happy and excited to review and accept your pull requests.
+```suggestion
+# Contributing to the coding guidelines
 
 ## Table of Contents
 
 - [Contributing to the coding guidelines](#contributing-to-the-coding-guidelines)
-   - [Diagram for contribution workflow](#diagram-for-contribution-workflow)
-   - [0. Have an idea for a coding guideline? Want to discuss it?](#0-have-an-idea-for-a-coding-guideline-want-to-discuss-it)
-   - [Preamble: chapter layout mirrors Ferrocene Language Specification](#preamble-chapter-layout-mirrors-ferrocene-language-specification)
-   - [1. Submit coding guideline issue](#1-submit-coding-guideline-issue)
-   - [1.a Finding the FLS ID](#1a-finding-the-fls-id)
-   - [2. A subcommittee member reviews the coding guideline issue, works with you the contributor](#2-a-subcommittee-member-reviews-the-coding-guideline-issue-works-with-you-the-contributor)
-   - [3. A pull request is generated from the coding guideline issue](#3-a-pull-request-is-generated-from-the-coding-guideline-issue)
-   - [4. Contributor responds to feedback given on pull request](#4-contributor-responds-to-feedback-given-on-pull-request)
-   - [5. Contributor applies updates to coding guidelines issue](#5-contributor-applies-updates-to-coding-guidelines-issue)
-   - [6. A subcommittee member generates new pull request contents from coding guidelines issue](#6-a-subcommittee-member-generates-new-pull-request-contents-from-coding-guidelines-issue)
-   - [7. A subcommittee member merges the coding guideline pull request](#7-a-subcommittee-member-merges-the-coding-guideline-pull-request)
-   - [8. You contributed a coding guideline](#8-you-contributed-a-coding-guideline)
-- [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
-   - [Guideline template](#guideline-template)
-- [Before You Begin Contributing](#before-you-begin-contributing)
-   - [Licenses](#licenses)
-   - [Code of Conduct](#code-of-conduct)
-- [Contribution Process](#contribution-process)
-   - [Issues](#issues)
+  - [Table of Contents](#table-of-contents)
+  - [Contribution Workflow](#contribution-workflow)
+    - [Note on Chapter Layout](#note-on-chapter-layout)
+    - [0) Bring up the idea for discussion](#0-bring-up-the-idea-for-discussion)
+    - [1) Submit coding guideline issue](#1-submit-coding-guideline-issue)
+      - [1.1) Finding the FLS ID](#11-finding-the-fls-id)
+    - [2) Create a Draft with a Member](#2-create-a-draft-with-a-member)
+    - [3) A Pull Request is generated](#3-a-pull-request-is-generated)
+    - [4) Iterate on Feedback](#4-iterate-on-feedback)
+      - [4.1) Apply changes to the Guideline's Issue](#41-apply-changes-to-the-guidelines-issue)
+      - [4.2) Re-generate the Pull Request](#42-re-generate-the-pull-request)
+    - [5) Your Guideline gets merged](#5-your-guideline-gets-merged)
+    - [You just contributed a coding guideline!](#you-just-contributed-a-coding-guideline)
+  - [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
+    - [Guideline template](#guideline-template)
+  - [Before You Begin Contributing](#before-you-begin-contributing)
+    - [Licenses](#licenses)
+    - [Code of Conduct](#code-of-conduct)
+  - [Contribution Process](#contribution-process)
+    - [Issues](#issues)
 
-## Contributing to the coding guidelines
+## Contribution Workflow
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-### Diagram for contribution workflow
+Here's a diagram of the overall process:
 
 ```mermaid
 flowchart TD
