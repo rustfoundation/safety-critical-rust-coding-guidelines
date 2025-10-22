@@ -32,7 +32,7 @@ There will be an addendum which covers how various safety standards like ISO 262
   2. Why a specific suggestion was made
 * We will produce the guidelines in an artifact that's easily machine readable and of a consistent format, to make it easier to consume by tool vendors to some minimal viable artifact.
   * a `needs.json` containing the contents of the coding guidelines
-  * a `guidelines-ids.json` which has hashes of the guidelines contents which can be used to check against and break a tool vendors build until audit is performed
+  * a `guidelines-ids.json` which has hashes of the guidelines' contents, which can be used to check against (and break) a tool vendor's build, until an audit is performed
 
 # Explicit non-goals
 
