@@ -38,7 +38,16 @@ There will be an addendum which covers how various safety standards like ISO 262
 # Explicit non-goals
 
 * For the initial version to have complete coverage of the Rust programming language
-  * "Something" shipped to alleviate pressure at organizations is better than "nothing is available" even if we have to heavily subset the language
+  * "Something" shipped to alleviate pressure at organizations is better than "nothing is available"
+  * An accepted means of delivering partially complete coding guidelines by IEC 61508 and other
+    similar safety standards is to subset the language.
+    * Language subsetting as defined in IEC 61508 and ISO 26262 may be used to prevent the usage
+      of certain language constructs which are not suitable for use in safety-critical systems.
+    * The same mechanism can be used to subset out portions of the Rust programming language for
+      which we do not yet have a sufficient degree of coverage via the coding guidelines.
+    * For a more detailed treatment, please see IEC 61508:2010-7, Annex C: "C.2.6.2 Coding standards"
+      for a breakdown in a table and "C.4.2 Language subsets" for rationale.
+      * A commented version of IEC 61508 is available [here](https://share.ansi.org/Shared%20Documents/News%20and%20Publications/Other%20Documents/IEC%2061508%20Commented%20Version.pdf) from ANSI.
 * For any version to be conflict-free with various members' or their organizations' viewpoints
   * Members and their organizations may take different stances on how The Rust Programming Language's constructs should be viewed and approached. This is **okay and expected**.
   * We'd like to ship something that we can obtain broad consensus on.
