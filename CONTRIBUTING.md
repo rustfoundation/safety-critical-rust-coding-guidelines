@@ -51,21 +51,24 @@ flowchart TD
   Main --> End(["8: End"])
 ```
 
-### 0. Have an idea for a coding guideline? Want to discuss it?
-
-While not mandatory, sometimes you'd like to check into the feasiblity of a guideline or discuss it with others to ensure it's not overlapping an existing guideline. Feel free to drop by the Safety-Critical Rust Consortium's Zulip stream: [here](https://rust-lang.zulipchat.com/#narrow/channel/445688-safety-critical-consortium). Please open a new topic per coding guideline you'd like to discuss.
-
-### Preamble: chapter layout mirrors Ferrocene Language Specification
+### Note on Chapter Layout
 
 We have the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute you may find a section from the FLS of interest and then write a guideline in the corresponding chapter of these coding guidelines.
 
-### 1. Submit coding guideline issue
+### 0) Bring up the idea for discussion
+
+Have an idea for a coding guideline? Want to discuss it?
+
+While not mandatory, sometimes you'd like to check into the feasiblity of a guideline or discuss it with others to ensure it's not overlapping an existing guideline. Feel free to drop by the Safety-Critical Rust Consortium's Zulip stream: [here](https://rust-lang.zulipchat.com/#narrow/channel/445688-safety-critical-consortium). Please open a new topic per coding guideline you'd like to discuss.
+
+### 1) Submit coding guideline issue
 
 For a new coding guideline you'd like to contribute, start with opening a [coding guideline issue](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/new?template=CODING-GUIDELINE.yml).
 
-#### 1.a Finding the FLS ID
+#### 1.1) Finding the FLS ID
 
 Note that the FLS ID should be filled according to the FLS paragraph ID for which the guideline is covering. One way to go about finding this is to inspect the page using your web browser. You'll be looking for something like:
+
 
 ```html
 <p><span class="spec-paragraph-id" id="fls_4rhjpdu4zfqj">4.1:1</span>
