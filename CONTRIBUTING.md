@@ -76,35 +76,36 @@ Note that the FLS ID should be filled according to the FLS paragraph ID for whic
 
 You would then pull `fls_4rhjpdu4zfqj` to place in the FLS ID field.
 
-### 2. A subcommittee member reviews the coding guideline issue, works with you the contributor
+### 2) Create a Draft with a Member
 
 A member of the Coding Guidelines Subcommittee should get you a first review with some feedback within 14 days of submission. You'll work with one or more members to flesh out the concept and ensure the guideline is well prepared.
 
-### 3. A pull request is generated from the coding guideline issue
+### 3) A Pull Request is generated
 
 Once an issue has been well-developed enough, a subcommittee member will mark the issue with the label `sign-off: create pr from issue` to generate a pull request. You will see a GitHub Workflow trigger and a pull request will be created momentarily.
 
-### 4. Contributor responds to feedback given on pull request
+### 4) Iterate on Feedback
 
-The generated pull request may attract additional feedback or simply be an easier place to suggest targeted edits.
+The generated Pull Request may attract additional feedback or simply be an easier place to suggest targeted edits.
 
 As the contributor of the coding guideline and opener of the issue, you'll respond to comments, discuss, all the normal things on the pull request.
 
-### 5. Contributor applies updates to coding guidelines issue
+#### 4.1) Apply changes to the Guideline's Issue
 
-If you agree with the suggested changes, rather than making changes on the opened pull request, you will return to the original issue you opened via the coding guideline issue template and make the updates there.
+If you agree with the suggested changes, then rather than making changes on the opened pull request, you will return to the original issue you opened via the coding guideline issue template, and make the updates there.
 
-### 6. A subcommittee member generates new pull request contents from coding guidelines issue
+#### 4.2) Re-generate the Pull Request
 
 When you have completed all feedback given to you, ping one of the subcommittee members. They will then remove and affix the label `sign-off: create pr from issue` to push the changes made in the issue to the already opened pull request.
 
-### 7. A subcommittee member merges the coding guideline pull request
+### 5) Your Guideline gets merged
 
 Once the coding guideline contents have passed review, a subcommittee member will approve the pull request, and put it on the merge queue to be merged.
 
-### 8. You contributed a coding guideline
+### You just contributed a coding guideline!
 
 That's it!
+
 
 ## Writing a guideline locally (less typical, not recommended)
 
