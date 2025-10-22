@@ -1,4 +1,3 @@
-```suggestion
 # Contributing to the coding guidelines
 
 ## Table of Contents
