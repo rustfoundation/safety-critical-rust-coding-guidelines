@@ -13,7 +13,7 @@ There will be an addendum which covers how various safety standards like ISO 262
 ## Criteria
 
 * We produce coding guidelines that make a "best effort" attempt at cataloging common pieces (e.g. functions, arithmetic, unsafe) of the Rust programming language and how they fit into a safety-critical project
-  * We will use [MISRA Compliance: 2020](https://misra.org.uk/app/uploads/2021/06/MISRA-Compliance-2020.pdf) for categorization
+  * We will use [MISRA Compliance: 2020](https://misra.org.uk/app/uploads/2021/06/MISRA-Compliance-2020.pdf) for categorization purposes: Mandatory, Required, Advisory, Disapplied. See section 5 of MISRA Compliance: 2020 for more details.
   * We include a rationale with links to parts of the Rust Project and wider Rust community for guidance
   * We will include linkage where appropriate to to various standards, e.g. CERT C, MISRA C, DO 178, ISO 26262
   * We will include practical recommendations on how to use this piece of the language using compliant and non-compliant examples
