@@ -105,7 +105,7 @@ A unique identifier for each guideline. Guideline identifiers **MUST** begin wit
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.
 See ``status`` below for more.
 
-**MUST** be generated using the ``generate-guideline-templates.py`` script to ensure
+**MUST** be generated using the ``generate_guideline_templates.py`` script to ensure
 compliance.
 
 ``category``
@@ -370,7 +370,7 @@ A unique identifier for each rationale. Rationale identifiers **MUST** begin wit
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.
 See ``status`` below for more.
 
-**MUST** be generated using the ``generate-guideline-templates.py`` script to ensure
+**MUST** be generated using the ``generate_guideline_templates.py`` script to ensure
 compliance.
 
 ``rationale`` ``status``
@@ -414,7 +414,7 @@ A unique identifier for each ``non_compliant_example``. ``non_compliant_example`
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.
 See ``status`` below for more.
 
-**MUST** be generated using the ``generate-guideline-templates.py`` script to ensure
+**MUST** be generated using the ``generate_guideline_templates.py`` script to ensure
 compliance.
 
 ``non_compliant_example`` ``status``
@@ -487,7 +487,7 @@ A unique identifier for each ``compliant_example``. ``compliant_example`` identi
 These identifiers are considered **stable** across releases and **MUST NOT** be removed.
 See ``status`` below for more.
 
-**MUST** be generated using the ``generate-guideline-templates.py`` script to ensure
+**MUST** be generated using the ``generate_guideline_templates.py`` script to ensure
 compliance.
 
 ``compliant_example`` ``status``
