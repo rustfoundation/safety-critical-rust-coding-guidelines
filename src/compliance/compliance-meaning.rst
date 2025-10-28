@@ -5,3 +5,5 @@
 
 Compliance Meaning
 ==================
+
+We follow MISRA Compliance 2020.
