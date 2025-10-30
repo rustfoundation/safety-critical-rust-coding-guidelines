@@ -14,7 +14,7 @@ If you still need to install `uv` you can follow the [steps outlined](https://do
 
 You can build the rendered version by running:
 
-On Linux-like systems:
+On Linux-like and macOS systems:
 
 ```shell
    ./make.py
