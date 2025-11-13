@@ -81,7 +81,7 @@ A member of the Coding Guidelines Subcommittee should get you a first review wit
 
 ### 3) A Pull Request is generated
 
-Once an issue has been well-developed enough, a subcommittee member will mark the issue with the label `sign-off: create pr from issue` to generate a pull request. You will see a GitHub Workflow trigger and a pull request will be created momentarily.
+Once an issue has been well-developed enough, a subcommittee member will mark the issue with the label `sign-off: create pr from issue` to generate a pull request. You will see a GitHub Workflow trigger and a pull request will be automatically created.
 
 ### 4) Iterate on Feedback
 
