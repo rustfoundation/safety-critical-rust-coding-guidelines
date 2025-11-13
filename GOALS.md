@@ -6,7 +6,7 @@ We will make Rust coding guidelines available within this repository. The coding
 
 ## Detailed
 
-In general these coding guidelines will be a set of rules of do / do not do with examples which should cover all "general" aspects of the Rust programming language, e.g. enums, structs, traits, and so on. We will use the [FLS](https://rust-lang.github.io/fls/index.html) as a means to ensure we have a reasonable coverage of the language.
+These coding guidelines will be a set of rules in the form of `do` / `do not do`, with examples covering all "general" aspects of the Rust programming language, e.g. enums, structs, traits, and so on. We will use the [FLS](https://rust-lang.github.io/fls/index.html) as a means to ensure we have a reasonable coverage of the language.
 
 There will be an addendum which covers how various safety standards like ISO 26262 map onto the coding guidelines.
 
