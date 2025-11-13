@@ -62,7 +62,7 @@ If you want to discuss the feasibility of a guideline or discuss it with others 
 
 ### 1) Submit coding guideline issue
 
-For a new coding guideline you'd like to contribute, start with opening a [coding guideline issue](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/new?template=CODING-GUIDELINE.yml).
+To add a new coding guideline, open a [coding guideline issue](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/new?template=CODING-GUIDELINE.yml).
 
 #### 1.1) Finding the FLS ID
 
