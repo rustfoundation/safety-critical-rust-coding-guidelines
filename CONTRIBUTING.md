@@ -54,11 +54,11 @@ flowchart TD
 
 The Safety Critical Rust Coding guidelines has the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute a new guideline, find a section from the FLS that interests you, then write a guideline in the corresponding chapter of these coding guidelines.
 
-### 0) Bring up the idea for discussion
+### 0) (Optional) Bring the idea up for discussion
 
 Have an idea for a coding guideline? Want to discuss it?
 
-While not mandatory, sometimes you'd like to check into the feasiblity of a guideline or discuss it with others to ensure it's not overlapping an existing guideline. Feel free to drop by the Safety-Critical Rust Consortium's Zulip stream: [here](https://rust-lang.zulipchat.com/#narrow/channel/445688-safety-critical-consortium). Please open a new topic per coding guideline you'd like to discuss.
+If you want to discuss the feasibility of a guideline or discuss it with others to ensure it's not too similar an existing guideline, drop by the [Safety-Critical Rust Consortium's Zulip stream](https://rust-lang.zulipchat.com/#narrow/channel/445688-safety-critical-consortium) and open a new topic.
 
 ### 1) Submit coding guideline issue
 
