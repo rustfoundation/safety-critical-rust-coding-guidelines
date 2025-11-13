@@ -15,7 +15,7 @@ _Note_: Early, subject to changes.
    - [Continuing work while on a feature branch](#continuing-work-while-on-a-feature-branch)
    - [If you need to audit the difference](#if-you-need-to-audit-the-difference)
 - [Outline \& issue breakdown](#outline--issue-breakdown)
-- [Contribution](#contribution)
+- [Contributing](#contributing)
 - [Code of Conduct](#code-of-conduct)
 - [Licenses](#licenses)
 - [Other Policies](#other-policies)
