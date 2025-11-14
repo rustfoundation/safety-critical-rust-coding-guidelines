@@ -4,7 +4,179 @@
 .. default-domain:: coding-guidelines
 
 Expressions
-===========
+==========
+
+.. guideline:: Ensure that operations on integers do not result in arithmetic overflow
+    :id: gui_dCquvqE1csI3
+    :category: required
+    :status: draft
+    :release: 1.0 - latest
+    :fls: fls_oFIRXBPXu6Zv
+    :decidability: decideable
+    :scope: system
+    :tags: security, performance, numerics
+
+    To avoid runtime panics and unexpected wraparound behavior, it is important to avoid arithmetic overflow.
+    In cases where wraparound behavior is intentional, explicit wrapping functions can be used.
+    At the same time, it is important to allow inline arithmetic expressions for readability.
+    Range checking can be accomplished using a variety of mechanisms, provided that the possibility of arithemetic overflow is elimianted.
+
+    .. rationale::
+        :id: rat_LvrS1jTCXEOk
+        :status: draft
+
+        It is important to avoid runtime panics in safety-critical software.
+        Wraparound can result in unexpected values, which can lead to logic errors.
+
+    .. non_compliant_example::
+        :id: non_compl_ex_cCh2RQUXeH0N
+        :status: draft
+
+        This noncompliant code example can result in a signed integer overflow during the addition of the signed operands si_a and si_b:
+
+        .. code-block:: rust
+
+            fn func(si_a: i32, si_b: i32) {
+              let sum: i32 = si_a + si_b;
+              // ...
+            }
+
+    .. compliant_example::
+        :id: compl_ex_BgUHiRB4kc4b_1
+        :status: draft
+
+        This compliant solution ensures that the addition operation cannot result
+        in arithmetic overflow, based on the maximum range of a signed 32-bit integer.
+        However, a more restrictive range may also be used.
+
+        .. code-block:: rust
+
+            enum ArithmeticError {
+                Overflow,
+	        DivisionByZero,
+            }
+
+
+            use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
+
+	    fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
+                use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
+
+                if (si_b > 0 && si_a > INT_MAX - si_b)
+                    || (si_b < 0 && si_a < INT_MIN - si_b)
+                {
+                    Err(ArithmeticError::Overflow)
+                } else {
+                    Ok(si_a + si_b)
+                }
+            }
+
+            fn sub(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
+                use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
+
+                if (si_b < 0 && si_a > INT_MAX + si_b)
+                    || (si_b > 0 && si_a < INT_MIN + si_b)
+                {
+                   Err(ArithmeticError::Overflow)
+                } else {
+                   Ok(si_a - si_b)
+                }
+            }
+
+	    fn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
+                use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
+
+                if si_a == 0 || si_b == 0 {
+                    return Ok(0);
+                }
+
+                // Detect overflow before performing multiplication
+                if (si_a == -1 && si_b == INT_MIN) || (si_b == -1 && si_a == INT_MIN) {
+                    Err(ArithmeticError::Overflow)
+                } else if (si_a > 0 && (si_b > INT_MAX / si_a || si_b < INT_MIN / si_a))
+                    || (si_a < 0 && (si_b > INT_MIN / si_a || si_b < INT_MAX / si_a))
+                {
+                    Err(ArithmeticError::Overflow)
+                } else {
+                    Ok(si_a * si_b)
+                }
+
+    .. compliant_example::
+        :id: compl_ex_BgUHiRB4kc4c
+        :status: draft
+
+        This compliant example uses safe checked addition instead of manual bounds checks.
+
+        .. code-block:: rust
+
+            fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
+                si_a.checked_add(si_b).ok_or(ArithmeticError::Overflow)
+            }
+
+            fn sub(a: i32, b: i32) -> Result<i32, ArithmeticError> {
+                a.checked_sub(b).ok_or(ArithmeticError::Overflow)
+            }
+
+            fn mul(a: i32, b: i32) -> Result<i32, ArithmeticError> {
+                a.checked_mul(b).ok_or(ArithmeticError::Overflow)
+            }
+
+    .. compliant_example::
+        :id: compl_ex_BgUHiRB4kc4b
+        :status: draft
+
+        Wrapping behavior must be explicitly requested. This compliant example uses wrapping operations.
+
+        .. code-block:: rust
+
+
+            fn add(a: i32, b: i32) -> i32 {
+                a.wrapping_add(b)
+            }
+
+            fn sub(a: i32, b: i32) -> i32 {
+                a.wrapping_sub(b)
+            }
+
+            fn mul(a: i32, b: i32) -> i32 {
+                a.wrapping_mul(b)
+            }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_cCh2RQUXeH0O
+        :status: draft
+
+        This noncompliant code example example prevents divide-by-zero errors, but does not prevent arithmetic overflow.
+
+        .. code-block:: rust
+
+
+            fn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {
+                if s_b == 0 {
+                    Err(DivError::DivisionByZero)
+                } else {
+                    Ok(s_a / s_b)
+                }
+            }
+
+    .. compliant_example::
+        :id: compl_ex_BgUHiRB4kc4d
+        :status: draft
+
+        This compliant solution eliminates the possibility of both divide-by-zero errors and arithmetic overflow:
+
+        .. code-block:: rust
+
+
+            fn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {
+                if s_b == 0 {
+                    Err("division by zero")
+                } else if s_a == i64::MIN && s_b == -1 {
+                    Err("arithmetic overflow")
+                } else {
+                    Ok(s_a / s_b)
+                }
+            }
 
 .. guideline:: Avoid as underscore pointer casts
    :id: gui_HDnAZ7EZ4z6G
@@ -504,7 +676,6 @@ Expressions
           /* ... */
         }
 
-
 .. guideline:: Integer shift shall only be performed through `checked_` APIs
     :id: gui_RHvQj8BHlz9b 
     :category: required
@@ -790,3 +961,4 @@ Expressions
                      println!("Performing {bits} << {sh} would be meaningless and crash-prone; we avoided it!");
                }
             }
+
