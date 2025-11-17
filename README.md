@@ -2,9 +2,23 @@
 
 Coding Guidelines for Safety Critical Rust developed by the [Safety Critical Rust Consortium][safety-critical-rust-consortium].
 
-[View the latest rendered guidelines online](https://rustfoundation.github.io/safety-critical-rust-coding-guidelines/)
+[View the latest rendered guidelines online](https://coding-guidelines.arewesafetycriticalyet.org/)
+
+Check out the [coding guideline goals](GOALS.md).
 
 _Note_: Early, subject to changes.
+
+## Table of Contents
+- [Building the coding guidelines](#building-the-coding-guidelines)
+   - [Running builds offline](#running-builds-offline)
+   - [Build breaking due to out-dated spec lock file](#build-breaking-due-to-out-dated-spec-lock-file)
+   - [Continuing work while on a feature branch](#continuing-work-while-on-a-feature-branch)
+   - [If you need to audit the difference](#if-you-need-to-audit-the-difference)
+- [Outline \& issue breakdown](#outline--issue-breakdown)
+- [Contributing](#contributing)
+- [Code of Conduct](#code-of-conduct)
+- [Licenses](#licenses)
+- [Other Policies](#other-policies)
 
 ## Building the coding guidelines
 
@@ -42,7 +56,7 @@ A machine-parseable artifact will be available at `build/html/needs.json`. (ToDo
 A record with checksums of the contents is available at `build/html/guidelines-ids.json`. Users of the coding guidelines can reference this file to determine if there have been changes to coding guidelines contents they should be aware of.
 
 
-## Running builds offline
+### Running builds offline
 
 If you're working without internet access or want to avoid reaching out to remote resources, you can pass the `--offline` flag:
 
@@ -55,7 +69,7 @@ This prevents the build system from attempting to fetch remote resources, such a
 It is recommended to use `--offline` if you are running `make.py` frequently during development. The builder fetches data from [the Ferrocene Language Specification website](https://spec.ferrocene.dev/paragraph-ids.json), which may rate-limit repeated requests—leading to delays or failed builds. Using `--offline` can significantly improve build speed and avoid unnecessary network issues during iterative work.
 
 
-## Build breaking due to out-dated spec lock file
+### Build breaking due to out-dated spec lock file
 
 It's a fairly common occurrence for the build to break due to an out of date spec lock file, located at:
 
@@ -101,34 +115,15 @@ Once you have completed the above steps, you will now update the local copy of t
 
 Open a new PR with only the changes necessary to rationalize the guidelines with the new FLS text.
 
-## Contributing to the coding guidelines
+## Outline & issue breakdown
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+We will use the Coding Guidelines Work Items [board](https://github.com/orgs/rustfoundation/projects/1) as a means to break the work down into smaller chunks that can be tackled in a reasonable manner.
 
-### Chapter layout mirrors Ferrocene Language Specification
+## Contributing
 
-We have the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute you may find a section from the FLS of interest and then write a guideline in the corresponding chapter of these coding guidelines.
+Thank you for your interest in contributing to the Safety-Critical Rust Coding Guidelines!
 
-### Guideline template
-
-We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
-
-You can the copy and paste this guideline from the command line into the correct chapter.
-
-### Filling out the guideline
-
-Reference `src/conf.py` to see valid selections for unfilled options in the guideline template.
-
-Note that the `:fls:` option should be filled according to the FLS paragraph ID for which the guideline is covering. One way to go about finding this is to inspect the page using your web browser. You'll be looking for something like:
-
-```html
-<p><span class="spec-paragraph-id" id="fls_4rhjpdu4zfqj">4.1:1</span>
-```
-
-You would then pull `fls_4rhjpdu4zfqj` to place in the `:fls:` option.
-
-Existing guidelines can also serve as examples on how guidelines are filled.
-
+Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for the details on how to do so.
 
 ## [Code of Conduct][code-of-conduct]
 
