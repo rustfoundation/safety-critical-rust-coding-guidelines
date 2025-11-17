@@ -111,7 +111,7 @@ needs_tags = [
     dict(name="maintainability", description="Maintainability-related guideline"),
     dict(name="portability", description="Portability-related guideline"),
     dict(name="surprising-behavior", description="Guideline related to surprising or unexpected behavior"),
-    
+
     dict(name="subset", description="Guideline associated with the language-subset profile"),
     dict(name="defect", description="Guideline associated with the defect-prevention profile"),
 ]
@@ -201,3 +201,4 @@ required_guideline_fields = [
 # Configure the theme
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+templates_path = ['_templates']
