@@ -474,7 +474,7 @@ Expressions
     :scope: module
     :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
 
-    In particular, the user should only perform left shifts via the `\ ``checked_shl`` <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_ function and right shifts via the `\ ``checked_shr`` <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function. Both of these functions exist in `\ ``core`` <https://doc.rust-lang.org/core/index.html>`_.
+    In particular, the user should only perform left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_ function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function. Both of these functions exist in `core <https://doc.rust-lang.org/core/index.html>`_.
 
     This rule applies to the following primitive types:
 
@@ -567,7 +567,7 @@ Expressions
 
         This shows **Reason 1** prominently.
 
-        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (\ ``N`` being the bit-length of the value being shifted) are both meaningless.
+        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (N being the bit-length of the value being shifted) are both meaningless.
 
         .. code-block:: rust
 
@@ -591,7 +591,7 @@ Expressions
 
         * Both ``Debug`` and ``Release`` give the same exact output, which addresses **Reason 1**.
         * Shifting by negative values is impossible due to the fact that ``checked_shl`` only accepts unsigned integers as shift lengths.
-        * Shifting by more than ``N - 1`` (\ ``N`` being the bit-length of the value being shifted) returns a ``None`` value:
+        * Shifting by more than ``N - 1`` (N being the bit-length of the value being shifted) returns a ``None`` value:
           .. code-block::
 
              61 << 4 = Some(976)
