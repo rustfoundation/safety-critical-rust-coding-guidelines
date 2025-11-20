@@ -21,6 +21,34 @@ from generate_guideline_templates import (
 def md_to_rst(markdown: str) -> str:
     return convert(markdown)
 
+def normalize_md(issue_body: str) -> str:
+    """
+    Fix links and mixed bold/code that confuse Markdown parser
+    """
+    # Fix links with inline-code: [`link`](url) => [link](url)
+    issue_body = re.sub(
+        r"\[\s*`([^`]+)`\s*\]\(([^)]+)\)",
+        r"[\1](\2)",
+        issue_body
+    )
+
+    # Fix mixed bold/code formatting
+    # **`code`** => `code`
+    issue_body = re.sub(
+        r"\*\*`([^`]+)`\*\*",
+        r"`\1`",
+        issue_body
+    )
+
+    # `**code**` => `code`
+    issue_body = re.sub(
+        r"`\*\*([^`]+)\*\*`",
+        r"`\1`",
+        issue_body
+    )
+
+    return issue_body
+
 
 def extract_form_fields(issue_body: str) -> dict:
     """
@@ -139,7 +167,10 @@ if __name__ == "__main__":
 
     issue_number = json_issue["number"]
     issue_title = json_issue["title"]
+
     issue_body = json_issue["body"]
+    issue_body = normalize_md(issue_body)
+
     fields = extract_form_fields(issue_body)
     chapter = fields["chapter"]
     content = guideline_template(fields)
