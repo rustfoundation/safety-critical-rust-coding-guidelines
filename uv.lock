@@ -182,16 +182,6 @@ wheels = [
 ]
 
 [[package]]
-name = "m2r"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "docutils" },
-    { name = "mistune" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/94/65/fd40fbdc608298e760affb95869c3baed237dfe5649d62da1eaa1deca8f3/m2r-0.3.1.tar.gz", hash = "sha256:aafb67fc49cfb1d89e46a3443ac747e15f4bb42df20ed04f067ad9efbee256ab", size = 16622, upload-time = "2022-11-17T08:12:08.781Z" }
-
-[[package]]
 name = "markupsafe"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -210,15 +200,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mistune"
-version = "0.8.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2d/a4/509f6e7783ddd35482feda27bc7f72e65b5e7dc910eca4ab2164daf9c577/mistune-0.8.4.tar.gz", hash = "sha256:59a3429db53c50b5c6bcc8a07f8848cb00d7dc8bdb431a4ab41920d201d4756e", size = 58322, upload-time = "2018-10-11T06:59:27.908Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/ec/4b43dae793655b7d8a25f76119624350b4d65eb663459eb9603d7f1f0345/mistune-0.8.4-py2.py3-none-any.whl", hash = "sha256:88a1051873018da288eee8538d476dffe1262495144b33ecb586c4ab266bb8d4", size = 16220, upload-time = "2018-10-11T06:59:26.044Z" },
-]
-
-[[package]]
 name = "packaging"
 version = "24.2"
 source = { registry = "https://pypi.org/simple" }
@@ -234,6 +215,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7c/2d/c3338d48ea6cc0feb8446d8e6937e1408088a72a39937982cc6111d17f84/pygments-2.19.1.tar.gz", hash = "sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f", size = 4968581, upload-time = "2025-01-06T17:26:30.443Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8a/0b/9fcc47d19c48b59121088dd6da2488a49d5f72dacf8262e2790a1d2c7d15/pygments-2.19.1-py3-none-any.whl", hash = "sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c", size = 1225293, upload-time = "2025-01-06T17:26:25.553Z" },
+]
+
+[[package]]
+name = "pypandoc"
+version = "1.16.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/18/9f5f70567b97758625335209b98d5cb857e19aa1a9306e9749567a240634/pypandoc-1.16.2.tar.gz", hash = "sha256:7a72a9fbf4a5dc700465e384c3bb333d22220efc4e972cb98cf6fc723cdca86b", size = 31477, upload-time = "2025-11-13T16:30:29.608Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bb/e9/b145683854189bba84437ea569bfa786f408c8dc5bc16d8eb0753f5583bf/pypandoc-1.16.2-py3-none-any.whl", hash = "sha256:c200c1139c8e3247baf38d1e9279e85d9f162499d1999c6aa8418596558fe79b", size = 19451, upload-time = "2025-11-13T16:30:07.66Z" },
 ]
 
 [[package]]
@@ -338,7 +328,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "builder" },
-    { name = "m2r" },
+    { name = "pypandoc" },
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-needs" },
@@ -354,7 +344,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "builder", editable = "builder" },
-    { name = "m2r" },
+    { name = "pypandoc" },
     { name = "sphinx", specifier = ">=8.2.3" },
     { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
     { name = "sphinx-needs", specifier = ">=5.1.0" },
