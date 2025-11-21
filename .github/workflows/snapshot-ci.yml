@@ -19,7 +19,7 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Install Pandoc
-        uses: jgm/pandoc-action@v2
+        uses: pandoc/actions/setup@v1
 
       - name: Run snapshot tests
         run: |
