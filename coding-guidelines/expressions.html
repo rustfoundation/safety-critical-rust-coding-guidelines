@@ -116,7 +116,7 @@
              
   <section id="expressions">
 <h1>Expressions<a class="headerlink" href="#expressions" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-955dec6e">
+<div class="need_container docutils container" id="SNCB-4344b13f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_HDnAZ7EZ4z6G">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -140,7 +140,7 @@
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s type inference when doing explicit pointer casts via <code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>.
 Instead, explicitly specify the complete target type in the <code class="docutils literal notranslate"><span class="pre">as</span></code> expression or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a> call expression.</p>
-<div class="need_container docutils container" id="SNCB-b0001890">
+<div class="need_container docutils container" id="SNCB-7d9c4c3d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_h8LdJQ1MNKu9">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -165,7 +165,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-f6e4dc78">
+<div class="need_container docutils container" id="SNCB-fad72a50">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_V37Pl103aUW4">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -206,7 +206,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-2fae5dd8">
+<div class="need_container docutils container" id="SNCB-a080e4c9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_W08ckDrkOhkt">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -252,7 +252,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-1dcdb4f1">
+<div class="need_container docutils container" id="SNCB-b98c8435">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_7y0GAMmtMhch">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -276,7 +276,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>This guideline applies when a <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression">DivisionExpression</a> or <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression">RemainderExpression</a> is used with a RightOperand of
 <a class="reference external" href="https://rust-lang.github.io/fls/types-and-traits.html#integer-types">integer type</a>.</p>
-<div class="need_container docutils container" id="SNCB-fdf9999d">
+<div class="need_container docutils container" id="SNCB-fce4b2c0">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_vLFlPWSCHRje">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -307,7 +307,7 @@ final binary, increasing overall performance beyond what normal division can hav
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c4cf643e">
+<div class="need_container docutils container" id="SNCB-7379de66">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_0XeioBrgfh5z">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -335,7 +335,7 @@ program panics.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-a432bdea">
+<div class="need_container docutils container" id="SNCB-46bfea64">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_k1CD6xoZxhXb">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -377,7 +377,7 @@ construction of that struct. It’s worth noting that such a divisor can be used
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c22622ea">
+<div class="need_container docutils container" id="SNCB-27ca9559">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_kMbiWbn8Z6g5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -405,7 +405,7 @@ evaluation of an <a class="reference external" href="https://rust-lang.github.io
 complement division.</p>
 <p>This rule does not apply to evaluation of a <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aops%3A%3ADiv"><code class="docutils literal notranslate"><span class="pre">core::ops::Div</span></code></a> trait on types other than <a class="reference external" href="https://rust-lang.github.io/fls/types-and-traits.html#integer-types">integer
 types</a>.</p>
-<div class="need_container docutils container" id="SNCB-0f1565d7">
+<div class="need_container docutils container" id="SNCB-3ed07d3c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_h84NjY2tLSBW">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -428,7 +428,7 @@ undecidability of this guideline.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fc0486f5">
+<div class="need_container docutils container" id="SNCB-b9423489">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_LLs3vY8aGz0F">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -454,7 +454,7 @@ undecidability of this guideline.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-5b1f999b">
+<div class="need_container docutils container" id="SNCB-3ace05ed">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Ri9pP5Ch3kbb">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -499,7 +499,7 @@ flow leading to the invariant increases, it becomes increasingly harder to reaso
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-0ec1d313">
+<div class="need_container docutils container" id="SNCB-f3343e58">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_ADHABsmK9FXz">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -530,7 +530,7 @@ flow leading to the invariant increases, it becomes increasingly harder to reaso
 <p>as either the right operand or the type of the left operand.</p>
 <p><strong>Exception:</strong> <code class="docutils literal notranslate"><span class="pre">as</span></code> may be used with <code class="docutils literal notranslate"><span class="pre">usize</span></code> as the right operand and an expression of raw pointer
 type as the left operand.</p>
-<div class="need_container docutils container" id="SNCB-731d4d10">
+<div class="need_container docutils container" id="SNCB-80eed709">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_v56bjjcveLxQ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -565,7 +565,7 @@ an unsafe operation.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-ebc38ffe">
+<div class="need_container docutils container" id="SNCB-6668a365">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_hzGUYoMnK59w">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -610,7 +610,7 @@ we intend to allow lossy conversions, or only expect valid conversions.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-d4144de9">
+<div class="need_container docutils container" id="SNCB-9624f2d6">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_uilHTIOgxD37">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -674,7 +674,7 @@ Other forms of conversion may find <code class="docutils literal notranslate"><s
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-cff0c346">
+<div class="need_container docutils container" id="SNCB-5d52da92">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_PM8Vpf7lZ51U">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -700,7 +700,7 @@ Other forms of conversion may find <code class="docutils literal notranslate"><s
 and any pointer type as the right operand.</p>
 <p><a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> shall not be used with any numeric type (including floating point types)
 as the argument to the <code class="docutils literal notranslate"><span class="pre">Src</span></code> parameter, and any pointer type as the argument to the <code class="docutils literal notranslate"><span class="pre">Dst</span></code> parameter.</p>
-<div class="need_container docutils container" id="SNCB-c4370c80">
+<div class="need_container docutils container" id="SNCB-6418e9d3">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_YqhEiWTj9z6L">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -730,7 +730,7 @@ originally performed in a differently-sized address space.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-5d2141ba">
+<div class="need_container docutils container" id="SNCB-bacb6739">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_0ydPk7VENSrA">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -774,7 +774,7 @@ is non-compliant:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-aa63364c">
+<div class="need_container docutils container" id="SNCB-10970118">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oneKuF52yzrx">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -800,7 +800,7 @@ is non-compliant:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6404cdec">
+<div class="need_container docutils container" id="SNCB-1096cedc">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_iv9yCMHRgpE0">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -824,7 +824,7 @@ is non-compliant:</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>An expression of numeric type shall not be converted to a pointer if the resulting pointer
 is incorrectly aligned, does not point to an entity of the referenced type, or is an invalid representation.</p>
-<div class="need_container docutils container" id="SNCB-ef42dc27">
+<div class="need_container docutils container" id="SNCB-02d2b7c0">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_OhxKm751axKw">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -846,7 +846,7 @@ execution environment. Issues may arise, for example, on architectures that have
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-481933d2">
+<div class="need_container docutils container" id="SNCB-b2767804">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_CkytKjRQezfQ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -879,7 +879,7 @@ particularly unexpected results.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fbe9a1a4">
+<div class="need_container docutils container" id="SNCB-0dfdf191">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oBoluiKSvREu">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -922,6 +922,214 @@ working even when pointers cannot be represented in any integer type.</p>
 </tbody>
 </table>
 </div>
+<div class="need_container docutils container" id="SNCB-d1b077a6">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_RHvQj8BHlz9b">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">Integer shift shall only be performed through `checked_` APIs</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_RHvQj8BHlz9b" title="gui_RHvQj8BHlz9b">gui_RHvQj8BHlz9b</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">numerics</span><span class="needs_spacer">, </span><span class="needs_data">reduce-human-error</span><span class="needs_spacer">, </span><span class="needs_data">maintainability</span><span class="needs_spacer">, </span><span class="needs_data">portability</span><span class="needs_spacer">, </span><span class="needs_data">surprising-behavior</span><span class="needs_spacer">, </span><span class="needs_data">subset</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">required</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/glossary.html#shift-left-expression" class="fls-id">fls_sru4wi5jomoe</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.7.0-latest</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_3MpR8QfHodGT" title="gui_RHvQj8BHlz9b">rat_3MpR8QfHodGT</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcn" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcn</a>, <a class="reference internal" href="#compl_ex_xpPQqYeEPGIo" title="gui_RHvQj8BHlz9b">compl_ex_xpPQqYeEPGIo</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>In particular, the user should only perform left shifts via the <a class="reference external" href="https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22">checked_shl</a> function and right shifts via the <a class="reference external" href="https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22">checked_shr</a> function. Both of these functions exist in <a class="reference external" href="https://doc.rust-lang.org/core/index.html">core</a>.</p>
+<p>This rule applies to the following primitive types:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">i8</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i16</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i32</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i64</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i128</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u8</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u16</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u32</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u64</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u128</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">usize</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">isize</span></code></p></li>
+</ul>
+<div class="need_container docutils container" id="SNCB-b6ab57bd">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_3MpR8QfHodGT">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_3MpR8QfHodGT" title="rat_3MpR8QfHodGT">rat_3MpR8QfHodGT</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_RHvQj8BHlz9b" title="rat_3MpR8QfHodGT">gui_RHvQj8BHlz9b</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This is a Subset rule, directly inspired by <a class="reference external" href="https://wiki.sei.cmu.edu/confluence/x/ItcxBQ">INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand</a>.</p>
+<p>In Rust these out-of-range shifts don’t give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.</p>
+<ul>
+<li><p><strong>Reason 1: inconsistent behavior</strong></p>
+<p>The behavior of shift operations depends on the compilation mode. Say for example, that we have a number <code class="docutils literal notranslate"><span class="pre">x</span></code> of type <code class="docutils literal notranslate"><span class="pre">uN</span></code>, and we perform the operation</p>
+<p><code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">&lt;&lt;</span> <span class="pre">M</span></code></p>
+<p>Then, it will behave like this:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Compilation Mode</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">M</span> <span class="pre">&lt;</span> <span class="pre">N</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">&lt;</span> <span class="pre">0</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">&lt;=</span> <span class="pre">M</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Debug</p></td>
+<td><p>Shifts normally</p></td>
+<td><p>Panics</p></td>
+<td><p>Panics</p></td>
+</tr>
+<tr class="row-odd"><td><p>Release</p></td>
+<td><p>Shifts normally</p></td>
+<td><p>Shifts by <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">mod</span> <span class="pre">N</span></code></p></td>
+<td><p>Shifts by <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">mod</span> <span class="pre">N</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<div><p>Note: the behavior is exactly the same for the <code class="docutils literal notranslate"><span class="pre">&gt;&gt;</span></code> operator.</p>
+</div></blockquote>
+<p>Panicking in <code class="docutils literal notranslate"><span class="pre">Debug</span></code> is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of <code class="docutils literal notranslate"><span class="pre">Release</span></code>. Such inconsistencies aren’t acceptable in Safety Critical scenarios.</p>
+<p>Therefore, a consistently-behaved operation should be required for performing shifts.</p>
+</li>
+<li><p><strong>Reason 2: programmer intent</strong></p>
+<p>There is no scenario in which it makes sense to perform a shift of negative length, or of more than <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">-</span> <span class="pre">1</span></code> bits. The operation itself becomes meaningless.</p>
+<p>Therefore, an API that restricts the length of the shift to the range <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">N</span> <span class="pre">-</span> <span class="pre">1]</span></code> should be used instead of the <code class="docutils literal notranslate"><span class="pre">&lt;&lt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&gt;&gt;</span></code> operators.</p>
+</li>
+<li><p><strong>The Solution</strong></p>
+<p>The ideal solution for this exists in <code class="docutils literal notranslate"><span class="pre">core</span></code>: <code class="docutils literal notranslate"><span class="pre">checked_shl</span></code> and <code class="docutils literal notranslate"><span class="pre">checked_shr</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;T&gt;::checked_shl(M)</span></code> returns a value of type <code class="docutils literal notranslate"><span class="pre">Option&lt;T&gt;</span></code>, in the following way:</p>
+<ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">M</span> <span class="pre">&lt;</span> <span class="pre">0</span></code>, the output is <code class="docutils literal notranslate"><span class="pre">None</span></code></p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">M</span> <span class="pre">&lt;</span> <span class="pre">N</span></code> for <code class="docutils literal notranslate"><span class="pre">T</span></code> of <code class="docutils literal notranslate"><span class="pre">N</span></code> bits, then the output is <code class="docutils literal notranslate"><span class="pre">Some(T)</span></code></p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">&lt;=</span> <span class="pre">M</span></code>, the output is <code class="docutils literal notranslate"><span class="pre">None</span></code></p></li>
+</ul>
+<p>This API has consistent behavior across <code class="docutils literal notranslate"><span class="pre">Debug</span></code> and <code class="docutils literal notranslate"><span class="pre">Release</span></code>, and makes the programmer intent explicit, which effectively solves this issue.</p>
+</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-f61141c2">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcn">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcn" title="non_compl_ex_O9FZuazu3Lcn">non_compl_ex_O9FZuazu3Lcn</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_RHvQj8BHlz9b" title="non_compl_ex_O9FZuazu3Lcn">gui_RHvQj8BHlz9b</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>As seen in the example below:</p>
+<ul>
+<li><p>A <code class="docutils literal notranslate"><span class="pre">Debug</span></code> build <strong>panics</strong>,</p></li>
+<li><p>Whereas a <code class="docutils literal notranslate"><span class="pre">Release</span></code> build prints the values:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">61</span> <span class="o">&lt;&lt;</span> <span class="o">-</span><span class="mi">1</span> <span class="o">=</span> <span class="mi">2147483648</span>
+<span class="mi">61</span> <span class="o">&lt;&lt;</span> <span class="mi">4</span> <span class="o">=</span> <span class="mi">976</span>
+<span class="mi">61</span> <span class="o">&lt;&lt;</span> <span class="mi">40</span> <span class="o">=</span> <span class="mi">15616</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>This shows <strong>Reason 1</strong> prominently.</p>
+<p><strong>Reason 2</strong> is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">-</span> <span class="pre">1</span></code> (N being the bit-length of the value being shifted) are both meaningless.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">bad_shl</span><span class="p">(</span><span class="n">bits</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">shift</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="n">bits</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">shift</span>
+<span class="p">}</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">bits</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">61</span><span class="p">;</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">shifts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">40</span><span class="p">];</span>
+
+<span class="k">for</span><span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">shifts</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{bits} &lt;&lt; {sh} = {}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">bad_shl</span><span class="p">(</span><span class="n">bits</span><span class="p">,</span><span class="w"> </span><span class="n">sh</span><span class="p">));</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-063f7aae">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_xpPQqYeEPGIo">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_xpPQqYeEPGIo" title="compl_ex_xpPQqYeEPGIo">compl_ex_xpPQqYeEPGIo</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_RHvQj8BHlz9b" title="compl_ex_xpPQqYeEPGIo">gui_RHvQj8BHlz9b</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>As seen in the example below:</p>
+<ul>
+<li><p>Both <code class="docutils literal notranslate"><span class="pre">Debug</span></code> and <code class="docutils literal notranslate"><span class="pre">Release</span></code> give the same exact output, which addresses <strong>Reason 1</strong>.</p></li>
+<li><p>Shifting by negative values is impossible due to the fact that <code class="docutils literal notranslate"><span class="pre">checked_shl</span></code> only accepts unsigned integers as shift lengths.</p></li>
+<li><p>Shifting by more than <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">-</span> <span class="pre">1</span></code> (N being the bit-length of the value being shifted) returns a <code class="docutils literal notranslate"><span class="pre">None</span></code> value:
+.. code-block:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">61</span> <span class="o">&lt;&lt;</span> <span class="mi">4</span> <span class="o">=</span> <span class="n">Some</span><span class="p">(</span><span class="mi">976</span><span class="p">)</span>
+<span class="mi">61</span> <span class="o">&lt;&lt;</span> <span class="mi">40</span> <span class="o">=</span> <span class="kc">None</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>The last 2 observations show how this addresses <strong>Reason 2</strong>.</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">good_shl</span><span class="p">(</span><span class="n">bits</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">shift</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="kt">u32</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="n">bits</span><span class="p">.</span><span class="n">checked_shl</span><span class="p">(</span><span class="n">shift</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">let</span><span class="w"> </span><span class="n">bits</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">61</span><span class="p">;</span>
+<span class="c1">// let shifts = vec![-1, 4, 40];</span>
+<span class="c1">//                    ^--- Would not typecheck, as checked_shl</span>
+<span class="c1">//                         only accepts positive shift amounts</span>
+<span class="kd">let</span><span class="w"> </span><span class="n">shifts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">40</span><span class="p">];</span>
+
+<span class="k">for</span><span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">shifts</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{bits} &lt;&lt; {sh} = {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">good_shl</span><span class="p">(</span><span class="n">bits</span><span class="p">,</span><span class="w"> </span><span class="n">sh</span><span class="p">));</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
 </section>
 
 
@@ -941,7 +1149,9 @@ working even when pointers cannot be represented in any integer type.</p>
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
     provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   
+  
+        This site is powered through <a href="https://www.netlify.com">Netlify</a>.
+
 
 </footer>
         </div>
