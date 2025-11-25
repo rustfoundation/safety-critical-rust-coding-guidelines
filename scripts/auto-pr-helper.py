@@ -3,7 +3,7 @@ import json
 import os
 import re
 import sys
-from textwrap import indent
+from textwrap import indent, dedent
 
 from m2r import convert
 
@@ -20,6 +20,34 @@ from generate_guideline_templates import (
 
 def md_to_rst(markdown: str) -> str:
     return convert(markdown)
+
+def normalize_md(issue_body: str) -> str:
+    """
+    Fix links and mixed bold/code that confuse Markdown parser
+    """
+    # Fix links with inline-code: [`link`](url) => [link](url)
+    issue_body = re.sub(
+        r"\[\s*`([^`]+)`\s*\]\(([^)]+)\)",
+        r"[\1](\2)",
+        issue_body
+    )
+
+    # Fix mixed bold/code formatting
+    # **`code`** => `code`
+    issue_body = re.sub(
+        r"\*\*`([^`]+)`\*\*",
+        r"`\1`",
+        issue_body
+    )
+
+    # `**code**` => `code`
+    issue_body = re.sub(
+        r"`\*\*([^`]+)\*\*`",
+        r"`\1`",
+        issue_body
+    )
+
+    return issue_body
 
 
 def extract_form_fields(issue_body: str) -> dict:
@@ -85,9 +113,15 @@ def guideline_template(fields: dict) -> str:
             lines = lines[1:]
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
+
+        # Dedent before adding indentation
+        dedented_code = dedent("\n".join(lines))
+
+        # Add required indentation
         indented_code = "\n".join(
-            f"         {line}" for line in lines
-        )  # Adds the required indentation
+            f"       {line}" for line in dedented_code.splitlines()
+        )
+
         return f"\n\n{indented_code}\n"
 
     amplification_text = indent(md_to_rst(get("amplification")), " " * 12)
@@ -139,7 +173,10 @@ if __name__ == "__main__":
 
     issue_number = json_issue["number"]
     issue_title = json_issue["title"]
+
     issue_body = json_issue["body"]
+    issue_body = normalize_md(issue_body)
+
     fields = extract_form_fields(issue_body)
     chapter = fields["chapter"]
     content = guideline_template(fields)
