@@ -20,7 +20,6 @@ Expressions
     Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
     Use explicit wrapping or saturation semantics in cases where these behaviors are intentional.
     Range checking can be accomplished using a variety of mechanisms, provided that the possibility of arithmetic overflow is elimianted.
-    Inline arithmetic expressions are often important for readability.
 
     .. rationale::
         :id: rat_LvrS1jTCXEOk
