@@ -14,6 +14,7 @@ else
     if [ $ZEROAFFECTED -eq "0" ]; then
       ./make.py --update-spec-lock-file
       rm test.txt
+      echo 'true' >> "$CAN_AUTOMATICALLY_UPDATE"
       exit 1 # Can be updated automatically
     else
       ./make.py --update-spec-lock-file
