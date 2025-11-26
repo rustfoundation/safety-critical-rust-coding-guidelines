@@ -17,16 +17,16 @@ Expressions
     :scope: system
     :tags: security, performance, numerics
 
-    To avoid runtime panics and unexpected wraparound behavior, it is important to avoid arithmetic overflow.
-    In cases where wraparound behavior is intentional, explicit wrapping functions can be used.
-    On the other hand, it is important to allow inline arithmetic expressions for readability.
+    Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
+    Use explicit wrapping or saturation semantics in cases where these behaviors are intentional.
     Range checking can be accomplished using a variety of mechanisms, provided that the possibility of arithmetic overflow is elimianted.
+    Inline arithmetic expressions are often important for readability.
 
     .. rationale::
         :id: rat_LvrS1jTCXEOk
         :status: draft
 
-        Avoid runtime panics in safety-critical software.
+        Avoid runtime panics in safety-related software.
         Wraparound can result in unexpected values, which can lead to logic errors.
 
     .. non_compliant_example::
@@ -37,7 +37,7 @@ Expressions
 
         .. code-block:: rust
 
-            fn func(si_a: i32, si_b: i32) {
+            fn add(si_a: i32, si_b: i32) {
               let sum: i32 = si_a + si_b;
               // ...
             }
@@ -48,7 +48,7 @@ Expressions
 
         This compliant solution ensures that the addition operation cannot result
         in arithmetic overflow, based on the maximum range of a signed 32-bit integer.
-        However, a more restrictive range may also be used.
+        A more restrictive range may also be used.
 
         .. code-block:: rust
 
@@ -101,6 +101,7 @@ Expressions
         :status: draft
 
         This compliant example uses safe checked addition instead of manual bounds checks.
+        Checked functions can reduce readibility when complex arithmetic expressions are needed.
 
         .. code-block:: rust
 
@@ -120,7 +121,7 @@ Expressions
         :id: compl_ex_BgUHiRB4kc4b
         :status: draft
 
-        Wrapping behavior must be explicitly requested. This compliant example uses wrapping operations.
+        Wrapping behavior must be explicitly requested. This compliant example uses wrapping functions.
 
         .. code-block:: rust
 
@@ -173,7 +174,29 @@ Expressions
 
         Saturation semantics means that any result that falls outside the valid range of the integer type is clamped to the maximum or minimum value instead wrapping around or resulting in an error.
         Saturation semantics always conform to this rule because they ensure that integer operations do not result in arithmetic overflow.
-        This compliant solution defines several functions that perform basic integer operations using saturation semantics.
+        This compliant solution uses saturating functions to provide saturation semantics for some basic arithmetic operations.
+
+        .. code-block:: rust
+
+            fn add(a: i32, b: i32) -> i32 {
+                a.saturating_add(b)
+            }
+
+            fn sub(a: i32, b: i32) -> i32 {
+                a.saturating_sub(b)
+            }
+
+            fn mul(a: i32, b: i32) -> i32 {
+                a.saturating_mul(b)
+            }
+
+    .. compliant_example::
+        :id: compl_ex_BgUHiSB4kd4b
+        :status: draft
+
+        ``Saturating<T>`` is a wrapper type in Rust’s standard library (``core::num::Saturating<T>``) that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
+        The ``Saturating<T>`` is useful when you have a section of code or a data type where all arithmetic must be saturating.
+        This compliant solution uses the ``Saturating<T>`` type to define several functions that perform basic integer operations using saturation semantics.
 
         .. code-block:: rust
 
@@ -204,7 +227,6 @@ Expressions
         This noncompliant code example example prevents divide-by-zero errors, but does not prevent arithmetic overflow.
 
         .. code-block:: rust
-
 
             fn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {
                 if s_b == 0 {
