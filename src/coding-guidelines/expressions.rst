@@ -6,7 +6,8 @@
 Expressions
 ==========
 
-.. guideline:: Ensure that operations on integers do not result in arithmetic overflow
+
+.. guideline:: Ensure that integer operations do not result in arithmetic overflow
     :id: gui_dCquvqE1csI3
     :category: required
     :status: draft
@@ -18,21 +19,21 @@ Expressions
 
     To avoid runtime panics and unexpected wraparound behavior, it is important to avoid arithmetic overflow.
     In cases where wraparound behavior is intentional, explicit wrapping functions can be used.
-    At the same time, it is important to allow inline arithmetic expressions for readability.
-    Range checking can be accomplished using a variety of mechanisms, provided that the possibility of arithemetic overflow is elimianted.
+    On the other hand, it is important to allow inline arithmetic expressions for readability.
+    Range checking can be accomplished using a variety of mechanisms, provided that the possibility of arithmetic overflow is elimianted.
 
     .. rationale::
         :id: rat_LvrS1jTCXEOk
         :status: draft
 
-        It is important to avoid runtime panics in safety-critical software.
+        Avoid runtime panics in safety-critical software.
         Wraparound can result in unexpected values, which can lead to logic errors.
 
     .. non_compliant_example::
         :id: non_compl_ex_cCh2RQUXeH0N
         :status: draft
 
-        This noncompliant code example can result in a signed integer overflow during the addition of the signed operands si_a and si_b:
+        This noncompliant code example can result in arithmetic overflow during the addition of the signed operands ``si_a`` and ``si_b``:
 
         .. code-block:: rust
 
@@ -53,15 +54,12 @@ Expressions
 
             enum ArithmeticError {
                 Overflow,
-	        DivisionByZero,
+	            DivisionByZero,
             }
-
 
             use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
 
-	    fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
-                use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
-
+	        fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 if (si_b > 0 && si_a > INT_MAX - si_b)
                     || (si_b < 0 && si_a < INT_MIN - si_b)
                 {
@@ -72,8 +70,6 @@ Expressions
             }
 
             fn sub(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
-                use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
-
                 if (si_b < 0 && si_a > INT_MAX + si_b)
                     || (si_b > 0 && si_a < INT_MIN + si_b)
                 {
@@ -83,9 +79,7 @@ Expressions
                 }
             }
 
-	    fn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
-                use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
-
+	        fn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 if si_a == 0 || si_b == 0 {
                     return Ok(0);
                 }
@@ -100,6 +94,7 @@ Expressions
                 } else {
                     Ok(si_a * si_b)
                 }
+            }
 
     .. compliant_example::
         :id: compl_ex_BgUHiRB4kc4c
@@ -129,7 +124,6 @@ Expressions
 
         .. code-block:: rust
 
-
             fn add(a: i32, b: i32) -> i32 {
                 a.wrapping_add(b)
             }
@@ -140,6 +134,36 @@ Expressions
 
             fn mul(a: i32, b: i32) -> i32 {
                 a.wrapping_mul(b)
+            }
+
+    .. compliant_example::
+        :id: compl_ex_BgUHiSB4kc4b
+        :status: draft
+
+        Saturation semantics means that any result that falls outside the valid range of the integer type is clamped to the maximum or minimum value instead wrapping around or resulting in an error.
+        Saturation semantics always conform to this rule because they ensure that integer operations do not result in arithmetic overflow.
+        This compliant solution defines several functions that perform basic integer operations using saturation semantics.
+
+        .. code-block:: rust
+
+            use std::num::Saturating;
+
+            fn add(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {
+                si_a + si_b
+            }
+
+            fn sub(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {
+                si_a - si_b
+            }
+
+            fn mul(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {
+                si_a * si_b
+            }
+
+            fn main() {    
+                let si_a = Saturating(i32::MAX);
+                let si_b = Saturating(i32::MAX);
+                println!("Adding {} by {} has a sum of {}", si_a, si_b, add(si_a, si_b))
             }
 
     .. non_compliant_example::
