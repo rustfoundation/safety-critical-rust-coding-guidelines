@@ -137,6 +137,37 @@ Expressions
             }
 
     .. compliant_example::
+        :id: compl_ex_BhUHiRB4kc4b
+        :status: draft
+
+        Wrapping behavior call also be implemented using the ``Wrapping<T>`` type as in this compliant solution.
+        The ``Wrapping<T``> type is a ``struct`` found in the ``std::num`` module that explicitly enables two's complement wrapping arithmetic for the inner type ``T`` (which must be an integer or ``usize/isize``). 
+        The ``Wrapping<T>`` type provides a consistent way to force wrapping behavior in all build modes,
+        which is useful in specific scenarios like implementing cryptography or hash functions where wrapping arithmetic is the intended behavior.
+
+        .. code-block:: rust
+
+            use std::num::Wrapping;
+
+            fn add(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {
+                si_a + si_b
+            }
+
+            fn sub(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {
+                si_a - si_b
+            }
+
+            fn mul(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {
+                si_a * si_b
+            }
+
+            fn main() {    
+                let si_a = Wrapping(i32::MAX);
+                let si_b = Wrapping(i32::MAX);
+                println!("Adding {} by {} has a sum of {}", si_a, si_b, add(si_a, si_b))
+            }
+
+    .. compliant_example::
         :id: compl_ex_BgUHiSB4kc4b
         :status: draft
 
