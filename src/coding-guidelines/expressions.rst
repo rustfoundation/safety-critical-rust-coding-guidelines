@@ -92,17 +92,17 @@ Expressions
    :scope: module
    :tags: numerics, subset
 
-   This guideline applies when a `DivisionExpression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `RemainderExpression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is used with a RightOperand of
+   This guideline applies when a `division expression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `remainder expression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is used with a right operand of
    `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
 
    .. rationale::
       :id: rat_vLFlPWSCHRje
       :status: draft
 
-      The built-in semantics for these expressions can result in panics when division by zero occurs. It is
-      recommended to either:
+      The built-in semantics for these expressions can result in panics when division by zero occurs.
+      It is recommended to either:
 
       * Use checked division functions, which ensure the programmer handles the case when the divisor is zero, or
       * To create divisors using :std:`std::num::NonZero`, which then allows the programmer to perform those
