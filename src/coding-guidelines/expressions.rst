@@ -17,16 +17,30 @@ Expressions
     :scope: system
     :tags: security, performance, numerics
 
-    Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
-    Use explicit wrapping or saturation semantics in cases where these behaviors are intentional.
-    Range checking can be accomplished using a variety of mechanisms, provided that the possibility of arithmetic overflow is elimianted.
+    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ of both signed and unsigned integer types. 
+
+    This rule applies to the following primitive types:
+
+    * ``i8``
+    * ``i16``
+    * ``i32``
+    * ``i64``
+    * ``i128``
+    * ``u8``
+    * ``u16``
+    * ``u32``
+    * ``u64``
+    * ``u128``
+    * ``usize``
+    * ``isize``
 
     .. rationale::
         :id: rat_LvrS1jTCXEOk
         :status: draft
 
-        Avoid runtime panics in safety-related software.
-        Wraparound can result in unexpected values, which can lead to logic errors.
+        Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
+        Use explicit wrapping or saturation semantics in cases where these behaviors are intentional.
+        Range checking can be used to eliminate the possibility of arithmetic overflow.
 
     .. non_compliant_example::
         :id: non_compl_ex_cCh2RQUXeH0N
