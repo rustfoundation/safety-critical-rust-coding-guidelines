@@ -18,6 +18,8 @@ Expressions
     :tags: security, performance, numerics
 
     Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ of both signed and unsigned integer types. 
+    Arithmetic overflow panics in debug mode, but wrapsaround in release mode.
+    Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.
 
     This rule applies to the following primitive types:
 
