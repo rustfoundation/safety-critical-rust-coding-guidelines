@@ -159,7 +159,7 @@ Expressions
       :id: compl_ex_k1CD6xoZxhXc
       :status: draft
 
-      Another compliant solution is to create a divisor using :std:`std::num::NonZero`,
+      This compliant solution creates a divisor using :std:`std::num::NonZero`,
       :std:`std::num::NonZero` is a wrapper around primitive integer types that guarantees the contained value is never zero.
       :std:`std::num::NonZero` creates a new type that represents a value that is known not to be zero,
       ensuring that functions operating on these types can safely assume that zero is not a possible input. 
@@ -208,6 +208,9 @@ Expressions
    This rule does not apply to evaluation of a :std:`core::ops::Div` trait on types other than `integer
    types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
 
+   This rule is a less strict version of "Do not use an integer type as a divisor during integer division".
+   All code that complies with that rule also complies with this rule.
+
    .. rationale::
       :id: rat_h84NjY2tLSBW
       :status: draft
@@ -227,34 +230,11 @@ Expressions
          let z = 5 % x; // Also results in a panic.
 
    .. compliant_example::
-      :id: compl_ex_Ri9pP5Ch3kbb
-      :status: draft
-
-      Integer division by zero must be avoided.
-      Checked division prevents division by zero from occuring.
-      The programmer can then handle the returned :std:`std::option::Option`.
-      Using checked division and remainder is particularly important in the signed integer case,
-      where arithmetic overflow can also occur when dividing the minimum representable value by -1.
-
-      .. code-block:: rust
-
-         // Using the checked division API
-         let y = match 5i32.checked_div(0) {
-             None => 0
-             Some(r) => r
-         };
-
-         // Using the checked remainder API
-         let z = match 5i32.checked_rem(0) {
-             None => 0
-             Some(r) => r
-         };         
-
-   .. compliant_example::
       :id: compl_ex_Ri9pP5Ch3kcc
       :status: draft
 
-      The check for zero can also be performed manually, as in this compliant example.
+      Compliant examples from "Do not use an integer type as a divisor during integer division" are also valid for this rule.
+      Additionally, the check for zero can also be performed manually, as in this compliant example.
       However, as the complexity of the control flow leading to the invariant increases,
       it becomes increasingly harder for both programmers and static analysis tools to reason about it.
       The test for arithmetic overflow is not necessary for unsigned integers.
@@ -274,23 +254,6 @@ Expressions
          } else {
              0u32
          };
-
-   .. compliant_example::
-      :id: compl_ex_k1CD6xoZxhXc
-      :status: draft
-
-      Another compliant solution is to create a divisor using :std:`std::num::NonZero`,
-      :std:`std::num::NonZero` is a wrapper around primitive integer types that guarantees the contained value is never zero.
-      :std:`std::num::NonZero` creates a new type that represents a value that is known not to be zero,
-      ensuring that functions operating on these types can safely assume that zero is not a possible input. 
-      The test for arithmetic overflow in this compliant example is unnecessary because ``divisor`` is an unsigned integer type.
-
-      .. code-block:: rust
-
-         let x = 0u32;
-         if let Some(divisor) = match NonZero::<u32>::new(x) {
-            let result = 5u32 / divisor;
-         }
 
 .. guideline:: The 'as' operator should not be used with numeric operands
    :id: gui_ADHABsmK9FXz
