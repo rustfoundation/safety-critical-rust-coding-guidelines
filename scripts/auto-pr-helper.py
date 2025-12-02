@@ -3,7 +3,7 @@ import json
 import os
 import re
 import sys
-from textwrap import indent, dedent
+from textwrap import dedent, indent
 
 from m2r import convert
 
