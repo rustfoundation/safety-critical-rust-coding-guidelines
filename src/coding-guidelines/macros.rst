@@ -61,6 +61,12 @@ Macros
    Macros should be expressed using declarative syntax
    in preference to procedural syntax.
 
+   .. amplification::
+      A function should not be defined with the ``proc_macro`` attribute.
+      A crate should not be defined with the ``proc-macro`` crate type.
+
+      This rule applies to the definition of a macro and not to its point of use.
+
    .. rationale::
       :id: rat_AmCavSymv3Ev
       :status: draft
@@ -69,6 +75,15 @@ Macros
       This means they can be harder to understand, and cannot be as easily proved to work as intended.
       Procedural macros can have arbitrary side effects, which can exhaust compiler resources or
       expose a vulnerability for users of adopted code.
+
+      Although procedural macros are defined as functions and can therefore be analyzed using
+      the same tools as normal functions, this also means they inherit the undecidable nature
+      of functions in the general case. Excessive use of procedural macros can therefore make
+      other analyses undecidable.
+
+      This rule does not apply to the code making use of a macro (or crate exporting a macro),
+      because the user should not need to know how a macro was defined in order to make use of
+      the API it presents.
 
    .. non_compliant_example::
       :id: non_compl_ex_pJhVZW6a1HP9
@@ -496,3 +511,124 @@ Macros
                 }
             };
         }
+
+.. guideline:: A macro shall not be used in place of a function
+   :id: gui_qPCvGRtb6vpv
+   :category: required
+   :status: draft
+   :release: todo
+   :fls: fls_xa7lp0zg1ol2
+   :decidability: decidable
+   :scope: crate
+   :tags: reduce-human-error
+
+   A declarative macro shall not be defined unless it uses:
+
+   * repetition; or
+   * fragment specifiers other than ``expr`` and ``ty``; or
+   * more than one matcher; or a non-trivial matcher.
+
+   .. rationale::
+      :id: rat_oXWYyWv7gXI9
+      :status: draft
+
+      TODO
+
+   .. non_compliant_example::
+      :id: non_compl_ex_F4rPifJaEmj7
+      :status: draft
+
+      TODO
+
+      .. code-block:: rust
+
+        // TODO
+
+   .. compliant_example::
+      :id: compl_ex_hua1GbeUyM9k
+      :status: draft
+
+      TODO
+
+      .. code-block:: rust
+
+        // TODO
+
+.. guideline:: Procedural macros shall not access external resources
+   :id: gui_0bnJSWVGgjtw
+   :category: required
+   :status: draft
+   :release: todo
+   :fls: fls_wn1i6hzg2ff7
+   :decidability: undecidable
+   :scope: system
+   :tags: security
+
+   A procedural macro shall not open, read from, or write to a file;
+   or otherwise manipulate a system resource outside of the program state.
+
+   .. rationale::
+      :id: rat_GI4qxFMViqfJ
+      :status: draft
+
+      TODO
+
+   .. non_compliant_example::
+      :id: non_compl_ex_Lpfy1ftIfcgA
+      :status: draft
+
+      TODO
+
+      .. code-block:: rust
+
+        // TODO
+
+   .. compliant_example::
+      :id: compl_ex_UmlijMTL4wKt
+      :status: draft
+
+      TODO
+
+      .. code-block:: rust
+
+        // TODO
+
+.. guideline:: Path-based lookup should be used for macro identifiers.
+   :id: gui_PZhWVPOxJfun
+   :category: advisory
+   :status: draft
+   :release: todo
+   :fls: fls_xa7lp0zg1ol2
+   :decidability: decidable
+   :scope: crate
+   :tags: reduce-human-error
+
+   Textual lookup should not be used for macro identifiers, except for
+   identifiers declared at the same module scope level as the macro invocation.
+
+   .. rationale::
+      :id: rat_7HUrUw73D0p8
+      :status: draft
+
+      TODO
+
+   .. non_compliant_example::
+      :id: non_compl_ex_bYWzpug5K6jl
+      :status: draft
+
+      TODO
+
+      .. code-block:: rust
+
+        // TODO
+
+   .. compliant_example::
+      :id: compl_ex_WYfmFC3iw5e3
+      :status: draft
+
+      TODO
+
+      .. code-block:: rust
+
+        // TODO
+
