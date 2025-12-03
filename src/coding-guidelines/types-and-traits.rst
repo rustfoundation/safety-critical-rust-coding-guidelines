@@ -14,7 +14,7 @@ Types and Traits
    :fls: fls_cokwseo3nnr
    :decidability: undecidable
    :scope: module
-   :tags: types, safety, clarity
+   :tags: types, safety, understandability
 
    Parameters and variables with logically distinct types must be statically distinguishable by the type system.
 
