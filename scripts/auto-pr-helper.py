@@ -3,7 +3,7 @@ import json
 import os
 import re
 import sys
-from textwrap import indent
+from textwrap import dedent, indent
 
 from m2r import convert
 
@@ -113,9 +113,15 @@ def guideline_template(fields: dict) -> str:
             lines = lines[1:]
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
+
+        # Dedent before adding indentation
+        dedented_code = dedent("\n".join(lines))
+
+        # Add required indentation
         indented_code = "\n".join(
-            f"         {line}" for line in lines
-        )  # Adds the required indentation
+            f"       {line}" for line in dedented_code.splitlines()
+        )
+
         return f"\n\n{indented_code}\n"
 
     amplification_text = indent(md_to_rst(get("amplification")), " " * 12)
