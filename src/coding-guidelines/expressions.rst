@@ -135,7 +135,7 @@ Expressions
       :id: compl_ex_k1CD6xoZxhXb
       :status: draft
 
-      Checked division prevents division by zero from occuring.
+      Checked division prevents division by zero from occurring.
       The programmer can then handle the returned :std:`std::option::Option`.
       Using checked division and remainder is particularly important in the signed integer case,
       where arithmetic overflow can also occur when dividing the minimum representable value by -1.
