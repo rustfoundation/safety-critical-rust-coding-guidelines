@@ -23,7 +23,7 @@ FFI
         :id: rat_LnIHMWRaC19F 
         :status: draft
 
-        If the languages on the FFI boundary to not agree on the type or its layout, size and alignment properties, undefined behavior might be invoked. It is therefore critical to reduce the possibility of such misalignment to an absolute minimum. Developers and/or tools shall therefore follow a set of strict rules that govern how a foreign type definition shall be translated to Rust.
+        If the languages on the FFI boundary do not agree on the type or its layout, size and alignment properties, undefined behavior might be invoked. It is therefore critical to reduce the possibility of such misalignment to an absolute minimum. Developers and/or tools shall therefore follow a set of strict rules that govern how a foreign type definition shall be translated to Rust.
 
         Since the only ubiquitously supported foreign calling ABI is the calling ABI of the C programming language, this rule will state how C types are to be translated. For any other language or ABI, it is required to document the respective translation rules.
 
