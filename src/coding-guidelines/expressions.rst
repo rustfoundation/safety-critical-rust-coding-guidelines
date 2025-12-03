@@ -209,7 +209,8 @@ Expressions
    This rule does not apply to evaluation of the :std:`core::ops::Div` trait on types other than `integer
    types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
 
-   This rule is a less strict version of "Do not use an integer type as a divisor during integer division".
+
+   This rule is a less strict version of `Do not use an integer type as a divisor during integer division`.
    All code that complies with that rule also complies with this rule.
 
    .. rationale::
