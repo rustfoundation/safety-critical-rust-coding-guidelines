@@ -5,7 +5,7 @@ import re
 import sys
 from textwrap import dedent, indent
 
-from m2r import convert
+import pypandoc
 
 scriptpath = "../"
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +19,39 @@ from generate_guideline_templates import (
 
 
 def md_to_rst(markdown: str) -> str:
-    return convert(markdown)
+    return pypandoc.convert_text(
+        markdown,
+        'rst',
+        format='markdown',
+        extra_args=['--wrap=none']
+    )
+
+
+def normalize_list_separation(text: str) -> str:
+    """
+    Ensures every new list block is preceded by a blank line,
+    required for robust parsing by Pandoc when targeting RST
+    """
+    # Regex to identify any line that starts a Markdown list item (* or -)
+    _list_item_re = re.compile(r"^[ \t]*[*-][ \t]+")
+
+    output_buffer = []
+    for line in text.splitlines():
+        is_item = bool(_list_item_re.match(line))
+
+        # Get the last line appended to the output buffer
+        prev = output_buffer[-1] if output_buffer else ""
+
+        # Check if a blank line needs to be inserted before list
+        # (Current is item) AND (Prev is not blank) AND (Prev is not an item)
+        if is_item and prev.strip() and not _list_item_re.match(prev):
+            # Insert a blank line to clearly separate the new list block
+            output_buffer.append("")
+
+        output_buffer.append(line)
+
+    return "\n".join(output_buffer)
+
 
 def normalize_md(issue_body: str) -> str:
     """
@@ -176,6 +208,7 @@ if __name__ == "__main__":
 
     issue_body = json_issue["body"]
     issue_body = normalize_md(issue_body)
+    issue_body = normalize_list_separation(issue_body)
 
     fields = extract_form_fields(issue_body)
     chapter = fields["chapter"]
