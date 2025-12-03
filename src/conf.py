@@ -104,8 +104,7 @@ needs_tags = [
     dict(name="safety", description="The degree to which a product or system avoids endangering human life, health, property, or the environment under defined operating conditions."),
     dict(name="performance", description="Performance-related guideline"),
     dict(name="readability", description="Readability-related guideline"),
-    dict(name="understandability", description="Understandability is a sub-characteristic of usability in the ISO/IEC 25000 quality model, which measures how easy it is for users to understand the functions and usage of a software product. It is also a separate quality characteristic for data, referring to how well data can be read and interpreted by users with the help of appropriate languages, symbols, and units. 
-"),
+    dict(name="understandability", description="Understandability is a sub-characteristic of usability in the ISO/IEC 25000 quality model, which measures how easy it is for users to understand the functions and usage of a software product. It is also a separate quality characteristic for data, referring to how well data can be read and interpreted by users with the help of appropriate languages, symbols, and units."),
     dict(name="reduce-human-error", description="Guideline that helps prevent human error"),
     dict(name="numerics", description="Numerics-related guideline"),
     dict(name="undefined-behavior", description="Guideline related to Undefined Behavior"),
