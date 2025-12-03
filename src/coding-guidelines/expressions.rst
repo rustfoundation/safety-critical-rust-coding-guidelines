@@ -206,7 +206,7 @@ Expressions
     * ``usize``
     * ``isize``
 
-   This rule does not apply to evaluation of a :std:`core::ops::Div` trait on types other than `integer
+   This rule does not apply to evaluation of the :std:`core::ops::Div` trait on types other than `integer
    types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
 
    This rule is a less strict version of "Do not use an integer type as a divisor during integer division".
