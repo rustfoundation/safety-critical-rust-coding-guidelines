@@ -118,7 +118,7 @@ Expressions
       :status: draft
 
       Integer division and integer remainder division both panic when the right operand has a value of zero.
-      Division by zero is undefined in mathematics because it leads to contradictions and there is no consistent value that can be assigned.
+      Division by zero is undefined in mathematics because it leads to contradictions and there is no consistent value that can be assigned as its result.
 
    .. non_compliant_example::
       :id: non_compl_ex_0XeioBrgfh5z
