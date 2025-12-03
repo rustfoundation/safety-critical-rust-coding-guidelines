@@ -234,7 +234,7 @@ Expressions
       :id: compl_ex_Ri9pP5Ch3kcc
       :status: draft
 
-      Compliant examples from "Do not use an integer type as a divisor during integer division" are also valid for this rule.
+      Compliant examples from `Do not use an integer type as a divisor during integer division` are also valid for this rule.
       Additionally, the check for zero can also be performed manually, as in this compliant example.
       However, as the complexity of the control flow leading to the invariant increases,
       it becomes increasingly harder for both programmers and static analysis tools to reason about it.
