@@ -238,7 +238,8 @@ Expressions
       Additionally, the check for zero can also be performed manually, as in this compliant example.
       However, as the complexity of the control flow leading to the invariant increases,
       it becomes increasingly harder for both programmers and static analysis tools to reason about it.
-      The test for arithmetic overflow is not necessary for unsigned integers.
+
+      Note that the test for arithmetic overflow is not necessary for unsigned integers.
 
       .. code-block:: rust
 
