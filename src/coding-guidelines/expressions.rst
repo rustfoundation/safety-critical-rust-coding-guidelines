@@ -159,7 +159,7 @@ Expressions
       :id: compl_ex_k1CD6xoZxhXc
       :status: draft
 
-      This compliant solution creates a divisor using :std:`std::num::NonZero`,
+      This compliant solution creates a divisor using :std:`std::num::NonZero`.
       :std:`std::num::NonZero` is a wrapper around primitive integer types that guarantees the contained value is never zero.
       :std:`std::num::NonZero` creates a new type that represents a value that is known not to be zero,
       ensuring that functions operating on these types can safely assume that zero is not a possible input. 
