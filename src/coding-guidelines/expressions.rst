@@ -184,7 +184,7 @@ Expressions
    :tags: numerics, defect
 
    Integer division by zero results in a panic.
-   This includes both signed and unsigned integers and division expressions `division expressions
+   This includes both `division expressions
    <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ and `remainder expressions
    <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_.
 
