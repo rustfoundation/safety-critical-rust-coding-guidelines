@@ -6,7 +6,6 @@
 Expressions
 ===========
 
-
 .. guideline:: Avoid as underscore pointer casts
    :id: gui_HDnAZ7EZ4z6G
    :category: required
@@ -96,7 +95,7 @@ Expressions
    `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_  
    during a `division expression
    <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `remainder expression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is when the left operand also has integer type.
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ when the left operand also has integer type.
 
     This rule applies to the following primitive integer types:
 
@@ -162,9 +161,10 @@ Expressions
       This compliant solution creates a divisor using :std:`std::num::NonZero`.
       :std:`std::num::NonZero` is a wrapper around primitive integer types that guarantees the contained value is never zero.
       :std:`std::num::NonZero::new` creates a new binding that represents a value that is known not to be zero.
-      This in turn ensures that functions operating on its value can safely assume that they are not being given zero as their input. 
+      This ensures that functions operating on its value can correctly assume that they are not being given zero as their input. 
 
-      Note that the test for arithmetic overflow in this compliant example (which is a possibility for non-zero negative divisors, namely, ``-1``) is unnecessary because ``divisor`` is an unsigned integer type.
+      Note that the test for arithmetic overflow that occurs when dividing the minimum representable value by -1 is unnecessary
+      in this compliant example because the result of the division expression is an unsigned integer type.
 
       .. code-block:: rust
 
@@ -191,7 +191,7 @@ Expressions
    Division and remainder expressions on signed integers are also susceptible to arithmetic overflow.
    Overflow is covered in full by the guideline `Ensure that integer operations do not result in arithmetic overflow`.
 
-    This rule applies to the following primitive integer types:
+   This rule applies to the following primitive integer types:
 
     * ``i8``
     * ``i16``
@@ -208,7 +208,6 @@ Expressions
 
    This rule does not apply to evaluation of the :std:`core::ops::Div` trait on types other than `integer
    types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
-
 
    This rule is a less strict version of `Do not use an integer type as a divisor during integer division`.
    All code that complies with that rule also complies with this rule.
@@ -236,7 +235,7 @@ Expressions
       :status: draft
 
       Compliant examples from `Do not use an integer type as a divisor during integer division` are also valid for this rule.
-      Additionally, the check for zero can also be performed manually, as in this compliant example.
+      Additionally, the check for zero can be performed manually, as in this compliant example.
       However, as the complexity of the control flow leading to the invariant increases,
       it becomes increasingly harder for both programmers and static analysis tools to reason about it.
 
