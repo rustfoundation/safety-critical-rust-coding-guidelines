@@ -189,7 +189,7 @@ Expressions
    <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_.
 
    Division and remainder expressions on signed integers are also susceptible to arithmetic overflow.
-   This issue is covered by the guideline `Ensure that integer operations do not result in arithmetic overflow`.
+   Overflow is covered in full by the guideline `Ensure that integer operations do not result in arithmetic overflow`.
 
     This rule applies to the following primitive integer types:
 
