@@ -163,7 +163,8 @@ Expressions
       :std:`std::num::NonZero` is a wrapper around primitive integer types that guarantees the contained value is never zero.
       :std:`std::num::NonZero::new` creates a new binding that represents a value that is known not to be zero.
       This in turn ensures that functions operating on its value can safely assume that they are not being given zero as their input. 
-      The test for arithmetic overflow in this compliant example is unnecessary because ``divisor`` is an unsigned integer type.
+
+      Note that the test for arithmetic overflow in this compliant example (which is a possibility for non-zero negative divisors, namely, ``-1``) is unnecessary because ``divisor`` is an unsigned integer type.
 
       .. code-block:: rust
 
