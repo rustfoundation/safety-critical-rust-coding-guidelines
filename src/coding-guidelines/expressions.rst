@@ -4,7 +4,7 @@
 .. default-domain:: coding-guidelines
 
 Expressions
-==========
+===========
 
 
 .. guideline:: Ensure that integer operations do not result in arithmetic overflow
