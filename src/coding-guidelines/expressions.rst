@@ -18,7 +18,6 @@ Expressions
     :tags: security, performance, numerics
 
     Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ of both signed and unsigned integer types. 
-    Arithmetic overflow will panic in debug mode, but wraparound in release mode.
     Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.
 
     This rule applies to the following primitive types:
@@ -41,7 +40,9 @@ Expressions
         :status: draft
 
         Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
-        Use explicit wrapping or saturation semantics in cases where these behaviors are intentional.
+        Arithmetic overflow will panic in debug mode, but wraparound in release mode, resulting in inconsistent behavior.
+        Use explicit `wrapping <https://doc.rust-lang.org/std/num/struct.Wrapping.html>`_ or
+        `saturating <https://doc.rust-lang.org/std/num/struct.Saturating.html>`_ semantics where these behaviors are intentional.
         Range checking can be used to eliminate the possibility of arithmetic overflow.
 
     .. non_compliant_example::
@@ -61,20 +62,26 @@ Expressions
         :id: compl_ex_BgUHiRB4kc4b_1
         :status: draft
 
-        This compliant solution ensures that the addition operation cannot result
-        in arithmetic overflow, based on the maximum range of a signed 32-bit integer.
-        A more restrictive range may also be used.
+        This compliant solution ensures that the addition operation cannot result in arithmetic overflow,
+        based on the maximum range of a signed 32-bit integer.
+        Functions such as 
+        `overflowing_add <https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_add>`_,
+        `overflowing_sub <https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_sub>`_, and 
+        `overflowing_mul <https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_mul>`_
+        can also be used to detect overflow.
+        Code that invoked these functions would typically further restrict the range of possible values,
+        based on the anticipated range of the inputs.
 
         .. code-block:: rust
 
             enum ArithmeticError {
                 Overflow,
-	            DivisionByZero,
+                DivisionByZero,
             }
 
             use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
 
-	        fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
+            fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 if (si_b > 0 && si_a > INT_MAX - si_b)
                     || (si_b < 0 && si_a < INT_MIN - si_b)
                 {
@@ -88,13 +95,13 @@ Expressions
                 if (si_b < 0 && si_a > INT_MAX + si_b)
                     || (si_b > 0 && si_a < INT_MIN + si_b)
                 {
-                   Err(ArithmeticError::Overflow)
+                    Err(ArithmeticError::Overflow)
                 } else {
-                   Ok(si_a - si_b)
+                    Ok(si_a - si_b)
                 }
             }
 
-	        fn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
+            fn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 if si_a == 0 || si_b == 0 {
                     return Ok(0);
                 }
@@ -180,7 +187,7 @@ Expressions
             fn main() {    
                 let si_a = Wrapping(i32::MAX);
                 let si_b = Wrapping(i32::MAX);
-                println!("Adding {} by {} has a sum of {}", si_a, si_b, add(si_a, si_b))
+                println!("{} + {} = {}", si_a, si_b, add(si_a, si_b))
             }
 
     .. compliant_example::
