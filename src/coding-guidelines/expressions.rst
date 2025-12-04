@@ -116,7 +116,7 @@ Expressions
         :status: draft
 
         This compliant example uses safe checked addition instead of manual bounds checks.
-        Checked functions can reduce readibility when complex arithmetic expressions are needed.
+        Checked functions can reduce readability when complex arithmetic expressions are needed.
 
         .. code-block:: rust
 
