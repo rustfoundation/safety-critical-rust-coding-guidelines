@@ -244,7 +244,7 @@ Expressions
             fn main() {    
                 let si_a = Saturating(i32::MAX);
                 let si_b = Saturating(i32::MAX);
-                println!("Adding {} by {} has a sum of {}", si_a, si_b, add(si_a, si_b))
+                println!("{} + {} = {}", si_a, si_b, add(si_a, si_b))
             }
 
     .. non_compliant_example::
