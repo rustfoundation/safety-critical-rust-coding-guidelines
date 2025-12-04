@@ -164,7 +164,7 @@ Expressions
         :status: draft
 
         Wrapping behavior call also be achieved using the ``Wrapping<T>`` type as in this compliant solution.
-        The ``Wrapping<T``> type is a ``struct`` found in the ``std::num`` module that explicitly enables two's complement wrapping arithmetic for the inner type ``T`` (which must be an integer or ``usize/isize``). 
+        ``Wrapping<T>`` type is a ``struct`` found in the ``std::num`` module that explicitly enables two's complement wrapping arithmetic for the inner type ``T`` (which must be an integer or ``usize/isize``). 
         The ``Wrapping<T>`` type provides a consistent way to force wrapping behavior in all build modes,
         which is useful in specific scenarios like implementing cryptography or hash functions where wrapping arithmetic is the intended behavior.
 
