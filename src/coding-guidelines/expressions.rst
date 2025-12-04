@@ -6,7 +6,6 @@
 Expressions
 ===========
 
-
 .. guideline:: Avoid as underscore pointer casts
    :id: gui_HDnAZ7EZ4z6G
    :category: required
@@ -82,7 +81,7 @@ Expressions
 
          fn with_base(_: &Base) { ... }
 
-.. guideline:: Do not use integer type as divisor
+.. guideline:: Do not use an integer type as a divisor during integer division
    :id: gui_7y0GAMmtMhch
    :category: advisory
    :status: draft
@@ -92,32 +91,39 @@ Expressions
    :scope: module
    :tags: numerics, subset
 
-   This guideline applies when a `DivisionExpression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `RemainderExpression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ is used with a RightOperand of
-   `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
+   Do not provide a right operand of
+   `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_  
+   during a `division expression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `remainder expression
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ when the left operand also has integer type.
+
+    This rule applies to the following primitive integer types:
+
+    * ``i8``
+    * ``i16``
+    * ``i32``
+    * ``i64``
+    * ``i128``
+    * ``u8``
+    * ``u16``
+    * ``u32``
+    * ``u64``
+    * ``u128``
+    * ``usize``
+    * ``isize``
 
    .. rationale::
       :id: rat_vLFlPWSCHRje
       :status: draft
 
-      The built-in semantics for these expressions can result in panics when division by zero occurs. It is
-      recommended to either:
-
-      * Use checked division functions, which ensure the programmer handles the case when the divisor is zero, or
-      * To create divisors using :std:`std::num::NonZero`, which then allows the programmer to perform those
-        operations knowing that their divisor is not zero.
-
-      **Note:** since the compiler can assume the value of a :std:`std::num::NonZero`
-      variable to not be zero, checks for zero when dividing by it can be elided in the
-      final binary, increasing overall performance beyond what normal division can have.
+      Integer division and integer remainder division both panic when the right operand has a value of zero.
+      Division by zero is undefined in mathematics because it leads to contradictions and there is no consistent value that can be assigned as its result.
 
    .. non_compliant_example::
       :id: non_compl_ex_0XeioBrgfh5z
       :status: draft
 
-      When either the division or remainder are performed, the right operand is evaluated to zero and the
-      program panics.
+      Both the division and remainder operations in this non-compliant example will panic if evaluated because the right operand is zero.
 
       .. code-block:: rust
 
@@ -129,23 +135,43 @@ Expressions
       :id: compl_ex_k1CD6xoZxhXb
       :status: draft
 
-      There is no compliant way to divide with an integer type. Here, instead, the developer explicitly:
-
-      * Uses a checked division function, which ensures a zero divisor is handled separately, and
-      * Creates a divisor using :std:`std::num::NonZero`, which outsources the check for zero to the
-        construction of that struct. It's worth noting that such a divisor can be used multiple times after it's been created, whilst keeping the guarantee that such divisions will be safe.
+      Checked division prevents division by zero from occurring.
+      The programmer can then handle the returned :std:`std::option::Option`.
+      Using checked division and remainder is particularly important in the signed integer case,
+      where arithmetic overflow can also occur when dividing the minimum representable value by -1.
 
       .. code-block:: rust
 
-         let x = 0;
-         if let Some(divisor) = match NonZero::<u32>::new(x) {
-           let result = 5 / divisor;
-         }
-         let result = match 5u32.checked_rem(x) {
-           None => 0,
-           Some(r) => r,
-         }
+         // Using the checked division API
+         let y = match 5i32.checked_div(0) {
+             None => 0
+             Some(r) => r
+         };
 
+         // Using the checked remainder API
+         let z = match 5i32.checked_rem(0) {
+             None => 0
+             Some(r) => r
+         };
+
+   .. compliant_example::
+      :id: compl_ex_k1CD6xoZxhXc
+      :status: draft
+
+      This compliant solution creates a divisor using :std:`std::num::NonZero`.
+      :std:`std::num::NonZero` is a wrapper around primitive integer types that guarantees the contained value is never zero.
+      :std:`std::num::NonZero::new` creates a new binding that represents a value that is known not to be zero.
+      This ensures that functions operating on its value can correctly assume that they are not being given zero as their input. 
+
+      Note that the test for arithmetic overflow that occurs when dividing the minimum representable value by -1 is unnecessary
+      in this compliant example because the result of the division expression is an unsigned integer type.
+
+      .. code-block:: rust
+
+         let x = 0u32;
+         if let Some(divisor) = match NonZero::<u32>::new(x) {
+            let result = 5u32 / divisor;
+         }
 
 .. guideline:: Do not divide by 0
    :id: gui_kMbiWbn8Z6g5
@@ -157,64 +183,79 @@ Expressions
    :scope: system
    :tags: numerics, defect
 
-   This guideline applies when unsigned integer or two’s complement division is performed during the
-   evaluation of an `ArithmeticExpression
-   <https://rust-lang.github.io/fls/expressions.html#arithmetic-expressions>`_.
+   Integer division by zero results in a panic.
+   This includes both `division expressions
+   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ and `remainder expressions
+   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_.
 
-   This includes the evaluation of a `RemainderExpression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_, which uses unsigned integer or two's
-   complement division.
+   Division and remainder expressions on signed integers are also susceptible to arithmetic overflow.
+   Overflow is covered in full by the guideline `Ensure that integer operations do not result in arithmetic overflow`.
 
-   This rule does not apply to evaluation of a :std:`core::ops::Div` trait on types other than `integer
+   This rule applies to the following primitive integer types:
+
+    * ``i8``
+    * ``i16``
+    * ``i32``
+    * ``i64``
+    * ``i128``
+    * ``u8``
+    * ``u16``
+    * ``u32``
+    * ``u64``
+    * ``u128``
+    * ``usize``
+    * ``isize``
+
+   This rule does not apply to evaluation of the :std:`core::ops::Div` trait on types other than `integer
    types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
+
+   This rule is a less strict version of `Do not use an integer type as a divisor during integer division`.
+   All code that complies with that rule also complies with this rule.
 
    .. rationale::
       :id: rat_h84NjY2tLSBW
       :status: draft
 
-      Integer division by zero results in a panic, which is an abnormal program state and may terminate the
-      process. The use of :std:`std::num::NonZero` as the divisor is a recommended way to avoid the
-      undecidability of this guideline.
+      Integer division by zero results in a panic; an abnormal program state that may terminate the process and must be avoided.
 
    .. non_compliant_example::
       :id: non_compl_ex_LLs3vY8aGz0F
       :status: draft
 
-      When the division is performed, the right operand is evaluated to zero and the program panics.
+      This non-compliant example panics when the right operand is zero for either the division or remainder operations.
 
       .. code-block:: rust
 
          let x = 0;
-         let y = 5 / x; // This line will panic.
+         let y = 5 / x; // Results in a panic.
+         let z = 5 % x; // Also results in a panic.
 
    .. compliant_example::
-      :id: compl_ex_Ri9pP5Ch3kbb
+      :id: compl_ex_Ri9pP5Ch3kcc
       :status: draft
 
-      There is no compliant way to perform integer division by zero. A checked division will prevent any
-      division by zero from happening. The programmer can then handle the returned :std:`std::option::Option`.
+      Compliant examples from `Do not use an integer type as a divisor during integer division` are also valid for this rule.
+      Additionally, the check for zero can be performed manually, as in this compliant example.
+      However, as the complexity of the control flow leading to the invariant increases,
+      it becomes increasingly harder for both programmers and static analysis tools to reason about it.
 
-      The check for zero can also be performed manually. However, as the complexity of the control
-      flow leading to the invariant increases, it becomes increasingly harder to reason about it. For both programmers and static analysis tools.
+      Note that the test for arithmetic overflow is not necessary for unsigned integers.
 
       .. code-block:: rust
 
-         // Example 1: using the checked division API
-         let result = match 5u8.checked_div(0) {
-             None => 0
-             Some(r) => r
-         };
-         
-         // Example 2: performing zero-checks by hand
-         let x = 0;
-         let y = if x != 0 {
-             5 / x
+         // Checking for zero by hand
+         let x = 0u32;
+         let y = if x != 0u32 {
+             5u32 / x
          } else {
-             0
+             0u32
          };
 
-
-
+         let z = if x != 0u32 {
+             5u32 % x
+         } else {
+             0u32
+         };
 
 .. guideline:: The 'as' operator should not be used with numeric operands
    :id: gui_ADHABsmK9FXz
