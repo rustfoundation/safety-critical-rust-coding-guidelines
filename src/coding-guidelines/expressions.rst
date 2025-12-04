@@ -221,7 +221,7 @@ Expressions
         :id: compl_ex_BgUHiSB4kd4b
         :status: draft
 
-        ``Saturating<T>`` is a wrapper type in Rust’s standard library (``core::num::Saturating<T>``) that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
+        ``Saturating<T>`` is a wrapper type in Rust’s ``core`` library (``core::num::Saturating<T>``) that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
         ``Saturating<T>`` is useful when you have a section of code or a data type where all arithmetic must be saturating.
         This compliant solution uses the ``Saturating<T>`` type to define several functions that perform basic integer operations using saturation semantics.
 
