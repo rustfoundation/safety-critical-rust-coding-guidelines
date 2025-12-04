@@ -13,7 +13,7 @@ Expressions
     :status: draft
     :release: 1.0 - latest
     :fls: fls_oFIRXBPXu6Zv
-    :decidability: decideable
+    :decidability: decidable
     :scope: system
     :tags: security, performance, numerics
 
