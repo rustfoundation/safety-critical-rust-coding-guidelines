@@ -101,17 +101,20 @@ needs_statuses = [
 
 needs_tags = [
     dict(name="security", description="Security-related guideline"),
+    dict(name="safety", description="The degree to which a product or system avoids endangering human life, health, property, or the environment under defined operating conditions."),
     dict(name="performance", description="Performance-related guideline"),
     dict(name="readability", description="Readability-related guideline"),
+    dict(name="understandability", description="Understandability is a sub-characteristic of usability in the ISO/IEC 25000 quality model, which measures how easy it is for users to understand the functions and usage of a software product. It is also a separate quality characteristic for data, referring to how well data can be read and interpreted by users with the help of appropriate languages, symbols, and units."),
     dict(name="reduce-human-error", description="Guideline that helps prevent human error"),
     dict(name="numerics", description="Numerics-related guideline"),
     dict(name="undefined-behavior", description="Guideline related to Undefined Behavior"),
     dict(name="stack-overflow", description="Guideline related to Stack Overflow"),
 
-    dict(name="maintainability", description="Maintainability-related guideline"),
-    dict(name="portability", description="Portability-related guideline"),
+    dict(name="maintainability", description="How effectively and efficiently a product or system can be modified. This includes improvements, fault corrections, and adaptations to changes in the environment or requirements. It is considered a crucial software quality characteristic."),
+    dict(name="portability", description="The degree to which a system, product, or component can be effectively and efficiently transferred from one hardware, software, or other operational or usage environment to another."),
     dict(name="surprising-behavior", description="Guideline related to surprising or unexpected behavior"),
 
+    dict(name="types", description="Guideline associated with the correct use of types"),
     dict(name="subset", description="Guideline associated with the language-subset profile"),
     dict(name="defect", description="Guideline associated with the defect-prevention profile"),
 ]
