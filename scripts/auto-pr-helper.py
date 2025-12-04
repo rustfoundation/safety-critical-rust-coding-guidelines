@@ -151,7 +151,7 @@ def guideline_template(fields: dict) -> str:
 
         # Add required indentation
         indented_code = "\n".join(
-            f"       {line}" for line in dedented_code.splitlines()
+            f"         {line}" for line in dedented_code.splitlines()
         )
 
         return f"\n\n{indented_code}\n"
