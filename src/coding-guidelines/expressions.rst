@@ -194,9 +194,14 @@ Expressions
         :id: compl_ex_BgUHiSB4kc4b
         :status: draft
 
-        Saturation semantics means that any result that falls outside the valid range of the integer type is clamped to the maximum or minimum value instead wrapping around or resulting in an error.
-        Saturation semantics always conform to this rule because they ensure that integer operations do not result in arithmetic overflow.
-        This compliant solution uses saturating functions to provide saturation semantics for some basic arithmetic operations.
+        Saturation semantics means that instead of wrapping around or resulting in an error,
+        any result that falls outside the valid range of the integer type is clamped:
+
+        - To the maximum value, if the result were to be greater than the maximum value, or
+        - To the minimum value, if the result were to be smaller than the minimum,
+
+        Saturation semantics always conform to this rule because they ensure that integer operations do not result in arithmetic overflow. 
+        This compliant solution shows how to use saturating functions to provide saturation semantics for some basic arithmetic operations.
 
         .. code-block:: rust
 
