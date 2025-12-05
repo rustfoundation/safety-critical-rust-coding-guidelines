@@ -795,7 +795,6 @@ Expressions
 
     This rule applies to the following primitive types:
 
-
     * ``i8``
     * ``i16``
     * ``i32``
@@ -815,37 +814,36 @@ Expressions
 
         This is a Subset rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
-        In Rust these out-of-range shifts don't give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.
+        Out-of-range shifts are not undefined behavior, but are problematic for the following reasons:
 
 
         * 
-          **Reason 1: inconsistent behavior**
+          **Inconsistent behavior**
 
-          The behavior of shift operations depends on the compilation mode. Say for example, that we have a number ``x`` of type ``uN``\ , and we perform the operation
+          The behavior of shift operations depends on the compilation mode.
+          A shift of an unsigned integer value ``x`` by ``M`` positions:
 
-          ``x << M`` 
+          ``x << M  // left shift``
+          ``x >> M  // right shift`` 
 
-          Then, it will behave like this:
+          has the following behavior:
           
           +------------------+-----------------+-----------------------+-----------------------+
           | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
           +==================+=================+=======================+=======================+
-          | Debug            | Shifts normally | Panics                | Panics                |
+          | Debug            | Shifts ``M`` positions | Panics         | Panics                |
           +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts normally | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
+          | Release          | Shifts ``M`` positions | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
           +------------------+-----------------+-----------------------+-----------------------+
 
           ..
-
-             Note: the behavior is exactly the same for the ``>>`` operator.
-
 
           Panicking in ``Debug`` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of ``Release``. Such inconsistencies aren't acceptable in Safety Critical scenarios.
 
           Therefore, a consistently-behaved operation should be required for performing shifts.
 
         * 
-          **Reason 2: programmer intent**
+          **Programmer intent**
 
           There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
 
