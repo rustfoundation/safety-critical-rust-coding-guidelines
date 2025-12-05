@@ -1,25 +1,115 @@
-### `auto-pr-helper.py`
+# Scripts
 
-This script is a utility for automating the generation of guidelines. It takes a GitHub issue's JSON data from standard input, parses its body (which is expected to follow a specific issue template), and converts it into a formatted reStructuredText (`.rst`) guideline.
+This directory contains utility scripts for managing coding guidelines.
+
+**Location: scripts/README.md (replaces existing file)**
+
+## Scripts Overview
+
+| Script | Purpose |
+|--------|---------|
+| `auto-pr-helper.py` | Transforms issue JSON to RST format (used by auto-PR workflow) |
+| `generate-rst-comment.py` | Generates GitHub comment with RST preview |
+| `guideline_utils.py` | Shared utility functions for guideline processing |
 
 ---
 
-### How to Use
+## `guideline_utils.py`
 
-The script reads a JSON payload from **standard input**. The most common way to provide this input is by using a pipe (`|`) to feed the output of another command into the script.
+A shared module containing common functions used by other scripts:
 
-#### 1. Using a Local JSON File
+- `md_to_rst()` - Convert Markdown to reStructuredText using Pandoc
+- `normalize_md()` - Fix Markdown formatting issues
+- `normalize_list_separation()` - Ensure proper list formatting for Pandoc
+- `extract_form_fields()` - Parse issue body into field dictionary
+- `guideline_template()` - Generate RST from fields dictionary
+- `chapter_to_filename()` - Convert chapter name to filename slug
+- `save_guideline_file()` - Append guideline to chapter file
 
-For local testing, you can use `cat` to pipe the contents of a saved GitHub issue JSON file into the script.
+---
+
+## `auto-pr-helper.py`
+
+This script transforms a GitHub issue's JSON data into reStructuredText format for coding guidelines.
+
+### Usage
 
 ```bash
-cat path/to/your_issue.json | uv run scripts/auto-pr-helper.py
+# From a local JSON file
+cat path/to/issue.json | uv run python scripts/auto-pr-helper.py
+
+# From GitHub API directly
+curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/123 | uv run python scripts/auto-pr-helper.py
+
+# Save the output to the appropriate chapter file
+cat path/to/issue.json | uv run python scripts/auto-pr-helper.py --save
 ```
 
-#### 2. Fetching from the GitHub API directly
-You can fetch the data for a live issue directly from the GitHub API using curl and pipe it to the script. This is useful for getting the most up-to-date content.
+### Options
+
+- `--save`: Save the generated RST content to the appropriate chapter file in `src/coding-guidelines/`
+
+---
+
+## `generate-rst-comment.py`
+
+This script generates a formatted GitHub comment containing an RST preview of a coding guideline. It's used by the RST Preview Comment workflow to post helpful comments on coding guideline issues.
+
+### Usage
 
 ```bash
-curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/156 | uv run ./scripts/auto-pr-helper.py
+# From a local JSON file
+cat path/to/issue.json | uv run python scripts/generate-rst-comment.py
+
+# From GitHub API directly
+curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/123 | uv run python scripts/generate-rst-comment.py
 ```
+
+### Output
+
+The script outputs a Markdown-formatted comment that includes:
+
+1. **Instructions** on how to use the RST content
+2. **Target file path** indicating which chapter file to add the guideline to
+3. **Collapsible RST content** that can be copied and pasted
+
+### Example Output
+
+```markdown
+## 📋 RST Preview for Coding Guideline
+
+This is an automatically generated preview...
+
+### 📁 Target File
+Add this guideline to: `src/coding-guidelines/concurrency.rst`
+
+### 📝 How to Use This
+1. Fork the repository...
+...
+
+<details>
+<summary>📄 Click to expand RST content</summary>
+
+\`\`\`rst
+.. guideline:: My Guideline Title
+    :id: gui_ABC123...
+\`\`\`
+
+</details>
+```
+
+---
+
+## How to Get Issue JSON from GitHub API
+
+To work with these scripts locally, you can fetch issue data from the GitHub API:
+
+```bash
+curl https://api.github.com/repos/OWNER/REPO/issues/ISSUE_NUMBER > issue.json
+```
+
+For example:
+
+```bash
+curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/156 > issue.json
 ```
