@@ -9,12 +9,13 @@
     - [0) Bring up the idea for discussion](#0-bring-up-the-idea-for-discussion)
     - [1) Submit coding guideline issue](#1-submit-coding-guideline-issue)
       - [1.1) Finding the FLS ID](#11-finding-the-fls-id)
-    - [2) Create a Draft with a Member](#2-create-a-draft-with-a-member)
-    - [3) A Pull Request is generated](#3-a-pull-request-is-generated)
-    - [4) Iterate on Feedback](#4-iterate-on-feedback)
-      - [4.1) Apply changes to the Guideline's Issue](#41-apply-changes-to-the-guidelines-issue)
-      - [4.2) Re-generate the Pull Request](#42-re-generate-the-pull-request)
-    - [5) Your Guideline gets merged](#5-your-guideline-gets-merged)
+    - [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment)
+    - [3) Create a Draft with a Member](#3-create-a-draft-with-a-member)
+    - [4) Contributor Creates the PR](#4-contributor-creates-the-pr)
+    - [5) Iterate on Feedback](#5-iterate-on-feedback)
+    - [6) Contributor Applies Feedback on Issue](#6-contributor-applies-feedback-on-issue)
+    - [7) Contributor Applies Regenerated Guideline to PR](#7-contributor-applies-regenerated-guideline-to-pr)
+    - [8) Your Guideline gets merged](#8-your-guideline-gets-merged)
     - [You just contributed a coding guideline!](#you-just-contributed-a-coding-guideline)
   - [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
     - [Guideline template](#guideline-template)
@@ -35,19 +36,21 @@ flowchart TD
   Zulip --> CreateIssue{{"1: Contributor creates <br> issue"}}
   CreateIssue --> Issue["Coding Guideline Issue"]
 
-  %% short local loops (no long edges)
-  S2{{"2: Review started <br> by subcommittee <br> member in <= 14 days <br><br> Contributor updates accordingly"}} --> Issue
+  S2{{"2: reStructured Text <br> generated as comment <br> on issue"}} --> Issue
   Issue --> S2
 
-  Issue --> S3{{"3: Subcommitte member <br> assigns label<br>to generate PR"}} --> PR["Coding Guideline<br>Pull Request"]
+  S3{{"3: Review started <br> by subcommittee <br> member in <= 14 days <br><br> Contributor updates accordingly"}} --> Issue
+  Issue --> S3
 
-  S4{{"4: PR review started <br> by subcommittee member <br> in <= 14 days <br><br> Contributor discusses on PR"}} --> PR
-  PR --> S4
+  Issue --> S4{{"4: Contributor creates a PR <br> using the reStructured Text <br> generated for them on issue"}} --> PR["Coding Guideline<br>Pull Request"]
 
-  PR --> S5{{"5: Contributor applies <br> feedback to issue"}} --> Issue
-  Issue --> S6{{"6: Subcommittee member <br> confirms changes;<br> regenerates PR"}} --> PR
-  PR --> S7{{"7: Subcommittee member <br> approves & queues;<br>merges to main"}} --> Main[[main]]
-  Main --> End(["8: End"])
+  S5{{"5: <br> 5.1 PR review started <br> by subcommittee member <br> in <= 14 days <br><br> 5.2 Contributor discusses on <br> PR with members <br><br> 5.3 Contributor updates on <br> feature branch or does <br> steps 6, 7 to regenerate <br> reStructuredText and <br> copy it onto feature branch"}} --> PR
+  PR --> S5
+
+  PR --> S6{{"(Optional) <br> 6: Contributor applies <br> feedback to issue"}} --> Issue
+  Issue --> S7{{"(Optional)<br> 7: Contributor applies updated <br> reStructured Text to Pull request"}} --> PR
+  PR --> S8{{"8: Subcommittee member <br> approves & queues;<br>merges to main"}} --> Main[[main]]
+  Main --> End(["9: End"])
 ```
 
 ### Note on Chapter Layout
@@ -75,29 +78,74 @@ Note that the FLS ID should be filled according to the FLS paragraph ID for whic
 
 You would then pull `fls_4rhjpdu4zfqj` to place in the FLS ID field.
 
-### 2) Create a Draft with a Member
 
-A member of the Coding Guidelines Subcommittee should get you a first review with some feedback within 14 days of submission. You'll work with one or more members to flesh out the concept and ensure the guideline is well prepared.
+### 2) Guideline Generated as a Comment
 
-### 3) A Pull Request is generated
+A GitHub Action will fire, adding a comment to your newly created issue with
+the contents of the coding guideline prepared written out correctly
+in reStructured Text.
 
-Once an issue has been well-developed enough, a subcommittee member will mark the issue with the label `sign-off: create pr from issue` to generate a pull request. You will see a GitHub Workflow trigger and a pull request will be automatically created.
+### 3) Create a Draft with a Member
 
-### 4) Iterate on Feedback
+A member of the Coding Guidelines Subcommittee should get you a first review
+with some feedback within 14 days of submission. You'll work with one or more
+members to flesh out the concept and ensure the guideline is well prepared.
+
+### 4) Contributor Creates the PR
+
+Once an issue has been well-developed enough, a subcommittee member will mark
+the issue with the label `sign-off: create pr` to denote the contributor
+should create a PR based on the contents of the latest comment containing
+the generated guideline from
+[2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
+
+Make sure to include the following in the body of your PR so that the
+corresponding issue will be closed upon the PR being closed. Note that
+`#xyz` corresponds to the number of the issue opened by
+[1) Submit coding guideline issue](#1-submit-coding-guideline-issue).
+
+Follow the guidance given in the comment with the guideline on which
+chapter to place the coding guideline.
+
+`closes #xyz`
+
+### 5) Iterate on Feedback
 
 The generated Pull Request may attract additional feedback or simply be an easier place to suggest targeted edits.
 
 As the contributor of the coding guideline and opener of the issue, you'll respond to comments, discuss, all the normal things on the pull request.
 
-#### 4.1) Apply changes to the Guideline's Issue
+If you agree with the suggested changes, you've got two options:
 
-If you agree with the suggested changes, then rather than making changes on the opened pull request, you will return to the original issue you opened via the coding guideline issue template, and make the updates there.
+- iterate directly on the Pull Request, if you're comfortable with reStructured Text to do so
+- if you'd rather make revisions in Markdown, you can return to the issue
+  from [1) Submit coding guideline issue](#1-submit-coding-guideline-issue)
+  to regenerate the reStructured Text guideline form by following steps
+  outlined in
+  [6) Contributor Applies Feedback on Issue](#6-contributor-applies-feedback-on-issue)
+  and
+  [7) Contributor Applies Regenerated Guideline to PR](#7-contributor-applies-regenerated-guideline-to-pr)
 
-#### 4.2) Re-generate the Pull Request
+### 6) Contributor Applies Feedback on Issue
 
-When you have completed all feedback given to you, ping one of the subcommittee members. They will then remove and affix the label `sign-off: create pr from issue` to push the changes made in the issue to the already opened pull request.
+(Optional, if not comfortable with reStructured Text from
+[5) Iterate on Feedback](#5-iterate-on-feedback))
 
-### 5) Your Guideline gets merged
+The contributor edits the body of the issue summmary, reflecting suggestions and then saves it.
+You will then momentarily see a new comment added to the issue containing the updated
+guideline content written in reStructured Text.
+
+### 7) Contributor Applies Regenerated Guideline to PR
+
+(Optional, if not comfortable with reStructured Text from
+[5) Iterate on Feedback](#5-iterate-on-feedback))
+
+The contributor then copy + pastes the contents of the guideline from
+[6) Contributor Applies Feedback on Issue](#6-contributor-applies-feedback-on-issue)
+and overwrites the contents of their feature branch, so that the feedback is
+reflected into the Pull Request.
+
+### 8) Your Guideline gets merged
 
 Once the coding guideline contents have passed review, a subcommittee member will approve the pull request, and put it on the merge queue to be merged.
 
@@ -108,9 +156,7 @@ That's it!
 
 ## Writing a guideline locally (less typical, not recommended)
 
-While it is possible to create guidelines locally and open pull requests yourself, we encourage contributors to make use of the process described above since it handled some of the fiddly details for you as a guideline writer.
-
-Generally speaking, pull requests for guidelines which do not follow the issue to pull request workflow described above will be closed with a recommendation to follow the workflow.
+While it is possible to create guidelines locally, we encourage contributors to make use of the process described above since it handled some of the fiddly details for you as a guideline writer.
 
 ### Guideline template
 
