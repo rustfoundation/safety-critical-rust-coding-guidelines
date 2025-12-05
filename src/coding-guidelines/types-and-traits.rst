@@ -7,7 +7,7 @@ Types and Traits
 ================
 
 .. guideline:: Use strong types to differentiate between logically distinct values
-   :id: gui_xztNdXA2oFNB
+   :id: gui_xztNdXA2oFNC
    :category: advisory
    :status: draft
    :release: 1.85.0;1.85.1
@@ -27,7 +27,7 @@ Types and Traits
    * You need to establish new invariants
    
    .. rationale::
-      :id: rat_kYiIiW8R2qD1
+      :id: rat_kYiIiW8R2qD2
       :status: draft
 
       This rule ensures that parameters and variables convey intent directly through the type system to avoid accidental misuse of values with identical primitives but different semantics.
@@ -49,7 +49,7 @@ Types and Traits
         Statically distinct types act as strong API contracts that can evolve independently from their underlying representations.
 
    .. non_compliant_example::
-      :id: non_compl_ex_PO5TyFsRTlWv
+      :id: non_compl_ex_PO5TyFsRTlWw
       :status: draft
 
       This noncompliant example uses primitive types directly, leading to potential confusion between ``distance`` and ``time``.
@@ -70,7 +70,7 @@ Types and Traits
          }
 
       .. non_compliant_example::
-      :id: non_compl_ex_PO5TyFsRTlWu
+      :id: non_compl_ex_PO5TyFsRTlWv
       :status: draft
 
       This noncompliant example uses aliases instead of distinct types.
@@ -99,7 +99,7 @@ Types and Traits
          }
 
    .. compliant_example::
-      :id: compl_ex_WTe7GoPu5Ez0
+      :id: compl_ex_WTe7GoPu5Ez1
       :status: draft
 
       This compliant example uses newtypes to create distinct types for ``Meters``, ``Seconds``, and ``MetersPerSecond``.
