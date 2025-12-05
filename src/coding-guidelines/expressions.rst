@@ -845,7 +845,8 @@ Expressions
         * 
           **Programmer intent**
 
-          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
+          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits.
+          The operation itself becomes meaningless.
 
           Therefore, an API that restricts the length of the shift to the range ``[0, N - 1]`` should be used instead of the ``<<`` and ``>>`` operators.
 
