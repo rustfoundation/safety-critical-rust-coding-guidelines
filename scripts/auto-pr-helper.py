@@ -12,13 +12,16 @@ into a formatted reStructuredText (.rst) guideline.
 Usage:
     cat issue.json | uv run python scripts/auto-pr-helper.py
     cat issue.json | uv run python scripts/auto-pr-helper.py --save
-
-Location: scripts/auto-pr-helper.py (replaces existing file)
 """
 
 import argparse
 import json
+import os
 import sys
+
+# Add the scripts directory to Python path so we can import guideline_utils
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, script_dir)
 
 from guideline_utils import (
     extract_form_fields,
