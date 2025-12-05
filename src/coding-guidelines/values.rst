@@ -133,7 +133,7 @@ Values
          let a = unsafe { std::mem::transmute::<_, [u8; 4]>(arr) }; // UB — not all elements initialized
 
    .. compliant_example::
-      :id: compl_ex_Ke869nSXuShT
+      :id: compl_ex_Ke869nSXuShU
       :status: draft
 
       The following code reads a union field:
