@@ -117,6 +117,8 @@ needs_tags = [
     dict(name="types", description="Guideline associated with the correct use of types"),
     dict(name="subset", description="Guideline associated with the language-subset profile"),
     dict(name="defect", description="Guideline associated with the defect-prevention profile"),
+
+    dict(name="unsafe", description="Guideline with noncompliant examples that require the unsafe keyword"),
 ]
 
 needs_categories = [
