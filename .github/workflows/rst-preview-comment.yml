@@ -1,0 +1,46 @@
+name: RST Preview Comment
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  post-rst-preview:
+    # Only run for issues created from the Coding Guideline template
+    # The template automatically adds the "coding guideline" label
+    if: contains(github.event.issue.labels.*.name, 'coding guideline')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install Pandoc
+        uses: pandoc/actions/setup@v1
+
+      - name: Generate RST preview comment
+        id: generate-comment
+        run: |
+          # Generate the comment content
+          COMMENT=$(cat <<'EOF' | uv run python scripts/generate-rst-comment.py
+          ${{ toJson(github.event.issue) }}
+          EOF
+          )
+
+          # Write to file to preserve formatting
+          echo "$COMMENT" > /tmp/comment-body.md
+
+      - name: Post or update comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body-path: /tmp/comment-body.md
+          comment-author: 'github-actions[bot]'
+          # Use a hidden marker to identify and update the same comment
+          body-includes: '<!-- rst-preview-comment -->'
+          edit-mode: replace
