@@ -9,12 +9,15 @@ It reads a GitHub issue JSON from stdin and outputs a formatted Markdown comment
 Usage:
     cat issue.json | uv run python scripts/generate-rst-comment.py
     curl https://api.github.com/repos/.../issues/123 | uv run python scripts/generate-rst-comment.py
-
-Location: scripts/generate-rst-comment.py (new file)
 """
 
 import json
+import os
 import sys
+
+# Add the scripts directory to Python path so we can import guideline_utils
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, script_dir)
 
 from guideline_utils import (
     chapter_to_filename,
