@@ -5,13 +5,15 @@
 """
 This script transforms a GitHub issue JSON into RST format for coding guidelines.
 
-It reads a GitHub issue's JSON data from standard input, parses its body
-(which is expected to follow a specific issue template), and converts it
+It reads a GitHub issue's JSON data from standard input, parses its body 
+(which is expected to follow a specific issue template), and converts it 
 into a formatted reStructuredText (.rst) guideline.
 
 Usage:
     cat issue.json | uv run python scripts/auto-pr-helper.py
     cat issue.json | uv run python scripts/auto-pr-helper.py --save
+
+Location: scripts/auto-pr-helper.py (replaces existing file)
 """
 
 import argparse
@@ -21,11 +23,10 @@ import sys
 from guideline_utils import (
     extract_form_fields,
     guideline_template,
-    normalize_md,
     normalize_list_separation,
+    normalize_md,
     save_guideline_file,
 )
-
 
 if __name__ == "__main__":
     # parse arguments

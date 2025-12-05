@@ -7,16 +7,16 @@ Shared utilities for parsing GitHub issues and generating RST guideline content.
 This module contains common functions used by:
 - auto-pr-helper.py (for automated PR generation)
 - generate-rst-comment.py (for generating preview comments)
+
+Location: scripts/guideline_utils.py
 """
 
+import os
 import re
+import sys
 from textwrap import dedent, indent
 
 import pypandoc
-
-# Import the template function and header map from the main module
-import sys
-import os
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(script_dir, ".."))

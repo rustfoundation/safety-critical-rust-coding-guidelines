@@ -17,11 +17,11 @@ import json
 import sys
 
 from guideline_utils import (
+    chapter_to_filename,
     extract_form_fields,
     guideline_template,
-    normalize_md,
     normalize_list_separation,
-    chapter_to_filename,
+    normalize_md,
 )
 
 
