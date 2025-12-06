@@ -135,7 +135,7 @@ If you agree with the suggested changes, you've got two options:
 ### 6) Contributor Applies Feedback on Issue
 
 (Optional, if not comfortable with reStructured Text from
-[5) Iterate on Feedback](#5-iterate-on-feedback))
+[5.2) Update the PR Based on Feedback](#52-update-the-pr-based-on-feedback))
 
 The contributor edits the body of the issue summmary, reflecting suggestions and then saves it.
 You will then momentarily see a new comment added to the issue containing the updated
@@ -144,7 +144,7 @@ guideline content written in reStructured Text.
 ### 7) Contributor Applies Regenerated Guideline to PR
 
 (Optional, if not comfortable with reStructured Text from
-[5) Iterate on Feedback](#5-iterate-on-feedback))
+[5.2) Update the PR Based on Feedback](#52-update-the-pr-based-on-feedback))
 
 The contributor then copy + pastes the contents of the guideline from
 [6) Contributor Applies Feedback on Issue](#6-contributor-applies-feedback-on-issue)
