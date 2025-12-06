@@ -137,7 +137,7 @@ If you agree with the suggested changes, you've got two options:
 (Optional, if not comfortable with reStructured Text from
 [5.2) Update the PR Based on Feedback](#52-update-the-pr-based-on-feedback))
 
-The contributor edits the body of the issue summmary, reflecting suggestions and then saves it.
+The contributor edits the body of the issue summary, reflecting suggestions and then saves it.
 You will then momentarily see a new comment added to the issue containing the updated
 guideline content written in reStructured Text.
 
