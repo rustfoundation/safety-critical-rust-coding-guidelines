@@ -13,6 +13,8 @@
     - [3) Create a Draft with a Member](#3-create-a-draft-with-a-member)
     - [4) Contributor Creates the PR](#4-contributor-creates-the-pr)
     - [5) Iterate on Feedback](#5-iterate-on-feedback)
+      - [5.1) Member Begins Review](#51-member-begins-review)
+      - [5.2) Update the PR Based on Feedback](#52-update-the-pr-based-on-feedback)
     - [6) Contributor Applies Feedback on Issue](#6-contributor-applies-feedback-on-issue)
     - [7) Contributor Applies Regenerated Guideline to PR](#7-contributor-applies-regenerated-guideline-to-pr)
     - [8) Your Guideline gets merged](#8-your-guideline-gets-merged)
@@ -111,9 +113,13 @@ chapter to place the coding guideline.
 
 ### 5) Iterate on Feedback
 
+#### 5.1) Member Begins Review
+
 The generated Pull Request may attract additional feedback or simply be an easier place to suggest targeted edits.
 
 As the contributor of the coding guideline and opener of the issue, you'll respond to comments, discuss, all the normal things on the pull request.
+
+#### 5.2) Update the PR Based on Feedback
 
 If you agree with the suggested changes, you've got two options:
 
