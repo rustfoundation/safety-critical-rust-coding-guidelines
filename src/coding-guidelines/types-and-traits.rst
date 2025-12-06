@@ -257,7 +257,7 @@ Types and Traits
             register(handler); // Error: ❌ may be inserted twice under some builds
 
     .. compliant_example::
-        :id: compl_ex_oiqSSclTXmIj 
+        :id: compl_ex_oiqSSclTXmIk
         :status: draft
 
         This compliant example keeps identity-sensitive logic inside a single crate:
