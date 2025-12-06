@@ -39,16 +39,16 @@ flowchart TD
   S2{{"2: reStructured Text <br> generated as comment <br> on issue"}} --> Issue
   Issue --> S2
 
-  S3{{"3: Review started <br> by subcommittee <br> member in <= 14 days <br><br> Contributor updates accordingly"}} --> Issue
+  S3{{"3: Review started by subcommittee member in <= 14 days <br><br> Contributor updates accordingly"}} --> Issue
   Issue --> S3
 
-  Issue --> S4{{"4: Contributor creates a PR <br> using the reStructured Text <br> generated for them on issue"}} --> PR["Coding Guideline<br>Pull Request"]
+  Issue --> S4{{"4: Contributor creates a PR using the reStructured Text generated for them on issue"}} --> PR["Coding Guideline<br>Pull Request"]
 
-  S5{{"5: <br> 5.1 PR review started <br> by subcommittee member <br> in <= 14 days <br><br> 5.2 Contributor discusses on <br> PR with members <br> and updates"}} --> PR
+  S5{{"5: <br> 5.1 PR review started by subcommittee member in <= 14 days <br><br> 5.2 Contributor discusses on PR with members and updates"}} --> PR
   PR --> S5
 
-  PR --> S6{{"(Optional) <br> 6: Contributor applies <br> feedback to issue"}} --> Issue
-  Issue --> S7{{"(Optional)<br> 7: Contributor applies updated <br> reStructured Text to Pull request"}} --> PR
+  PR --> S6{{"(Optional) <br> 6: Contributor applies feedback to issue"}} --> Issue
+  Issue --> S7{{"(Optional)<br> 7: Contributor applies updated reStructured Text to Pull request"}} --> PR
   PR --> S8{{"8: Subcommittee member <br> approves & queues;<br>merges to main"}} --> Main[[main]]
   Main --> End(["9: End"])
 ```
