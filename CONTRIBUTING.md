@@ -44,7 +44,7 @@ flowchart TD
 
   Issue --> S4{{"4: Contributor creates a PR <br> using the reStructured Text <br> generated for them on issue"}} --> PR["Coding Guideline<br>Pull Request"]
 
-  S5{{"5: <br> 5.1 PR review started <br> by subcommittee member <br> in <= 14 days <br><br> 5.2 Contributor discusses on <br> PR with members <br><br> 5.3 Contributor updates on <br> feature branch or does <br> steps 6, 7 to regenerate <br> reStructuredText and <br> copy it onto feature branch"}} --> PR
+  S5{{"5: <br> 5.1 PR review started <br> by subcommittee member <br> in <= 14 days <br><br> 5.2 Contributor discusses on <br> PR with members <br> and updates"}} --> PR
   PR --> S5
 
   PR --> S6{{"(Optional) <br> 6: Contributor applies <br> feedback to issue"}} --> Issue
