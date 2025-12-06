@@ -35,12 +35,20 @@ jobs:
           # Write to file to preserve formatting
           echo "$COMMENT" > /tmp/comment-body.md
 
-      - name: Post or update comment
-        uses: peter-evans/create-or-update-comment@v4
+      # Find existing comment from this bot with the hidden marker
+      - name: Find existing RST preview comment
+        id: fc
+        uses: peter-evans/find-comment@v3
         with:
           issue-number: ${{ github.event.issue.number }}
-          body-path: /tmp/comment-body.md
           comment-author: 'github-actions[bot]'
-          # Use a hidden marker to identify and update the same comment
           body-includes: '<!-- rst-preview-comment -->'
+
+      # Create a new comment or update the existing one
+      - name: Create or update RST preview comment
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          body-path: /tmp/comment-body.md
           edit-mode: replace
