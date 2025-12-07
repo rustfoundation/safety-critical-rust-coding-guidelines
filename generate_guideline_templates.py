@@ -69,14 +69,14 @@ def guideline_rst_template(
     indented_compliant_ex = indent(compliant_example.strip(), " " * 13)
     indented_non_compliant_ex = indent(non_compliant_ex.strip(), " " * 13)
 
-    # Build the exception section only if exceptions content is provided
+    # Build optional exception section
     exception_section = ""
     if exceptions and exceptions.strip():
         exception_section = f"""
-    **Exception**
+            **Exception**
 
-    {exceptions.strip()}
-"""
+            {exceptions.strip()}
+        """
 
     guideline_text = dedent(f"""
         .. guideline:: {guideline_title.strip()}
@@ -90,7 +90,9 @@ def guideline_rst_template(
             :tags: {tags}
 
             {amplification.strip()}
-{exception_section}
+
+            {exception_section.strip()}
+
             .. rationale:: 
                 :id: {rationale_id} 
                 :status: {norm(status)}
