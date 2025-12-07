@@ -45,6 +45,7 @@ def guideline_rst_template(
     scope: str,
     tags: str,
     amplification: str,
+    exceptions: str,
     rationale: str,
     non_compliant_ex_prose: str,
     non_compliant_ex: str,
@@ -67,6 +68,16 @@ def guideline_rst_template(
 
     indented_compliant_ex = indent(compliant_example.strip(), " " * 13)
     indented_non_compliant_ex = indent(non_compliant_ex.strip(), " " * 13)
+
+    # Build the exception section only if exceptions content is provided
+    exception_section = ""
+    if exceptions and exceptions.strip():
+        exception_section = f"""
+    **Exception**
+
+    {exceptions.strip()}
+"""
+
     guideline_text = dedent(f"""
         .. guideline:: {guideline_title.strip()}
             :id: {guideline_id} 
@@ -79,7 +90,7 @@ def guideline_rst_template(
             :tags: {tags}
 
             {amplification.strip()}
-
+{exception_section}
             .. rationale:: 
                 :id: {rationale_id} 
                 :status: {norm(status)}
@@ -130,6 +141,7 @@ def generate_guideline_template():
         scope="",
         tags="",
         amplification="Description of the guideline goes here.",
+        exceptions="",
         rationale="Explanation of why this guideline is important.",
         non_compliant_ex_prose="Explanation of code example.",
         non_compliant_ex=""" fn example_function() {\n          // Non-compliant implementation\n       } """,
