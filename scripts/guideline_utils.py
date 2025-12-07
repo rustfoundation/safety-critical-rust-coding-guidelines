@@ -184,7 +184,7 @@ def guideline_template(fields: dict) -> str:
         md_to_rst(get("compliant_example_prose")), " " * 16
     )
 
-    # Process exceptions field - convert to RST and indent appropriately
+    # Process exceptions field - convert MD to RST and pre-indent for multi-line support
     exceptions_raw = get("exceptions")
     exceptions_text = ""
     if exceptions_raw:
