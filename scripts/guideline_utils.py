@@ -184,6 +184,12 @@ def guideline_template(fields: dict) -> str:
         md_to_rst(get("compliant_example_prose")), " " * 16
     )
 
+    # Process exceptions field - convert to RST and indent appropriately
+    exceptions_raw = get("exceptions")
+    exceptions_text = ""
+    if exceptions_raw:
+        exceptions_text = indent(md_to_rst(exceptions_raw), " " * 12)
+
     guideline_text = guideline_rst_template(
         guideline_title=get("guideline_title"),
         category=get("category"),
@@ -195,6 +201,7 @@ def guideline_template(fields: dict) -> str:
         scope=get("scope"),
         tags=get("tags"),
         amplification=amplification_text,
+        exceptions=exceptions_text,
         rationale=rationale_text,
         non_compliant_ex_prose=non_compliant_ex_prose_text,
         non_compliant_ex=format_code_block(get("non_compliant_ex")),
