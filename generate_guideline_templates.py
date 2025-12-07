@@ -73,7 +73,7 @@ def guideline_rst_template(
     exception_section = ""
     if exceptions and exceptions.strip():
         exception_section = f"""
-            **Exception**
+            **Exceptions**
 
             {exceptions.strip()}
         """
