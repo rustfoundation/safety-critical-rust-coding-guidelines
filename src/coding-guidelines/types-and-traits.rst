@@ -64,7 +64,7 @@ Types and Traits
              current.checked_add(velocity).expect("Position calculation overflowed")
          }
 
-.. guideline:: Do Not Depend on Function Pointer Identity Across Crates
+.. guideline:: Do not depend on function pointer identity
     :id: gui_QbvIknd9qNF6 
     :category: required
     :status: draft
@@ -74,22 +74,35 @@ Types and Traits
     :scope: system
     :tags: surprising-behavior
 
-    Do not rely on the equality or stable identity of function pointers originating from different crates or that may be inlined,
-    duplicated, or instantiated differently across compilation units, codegen units, or optimization profiles.
+    Do not rely on the equality or stable identity of function pointers.
 
+   .. exception::
+      :id: rat_kYiIiW8R2qD3
+      :status: draft
+
+    ``#[no_mangle]`` functions are guaranteed to have a single instance.
+
+   .. rationale::
+      :id: rat_kYiIiW8R2qD2
+      :status: draft
+
+    Functions may be instantiated multiple times.  
+    They may, for example, be instantiated every time they are referenced.
+    Only ``#[no_mangle]`` functions are guaranteed to be instantiated a single time,
+    but can cause undefined behavior if they share a symbol with other identifiers.
+    
     Avoid assumptions about low-level metadata (such as symbol addresses) unless explicitly guaranteed by the Ferrocene Language Specification (FLS).
-    Function address identity is not guaranteed by Rust and must not be treated as stable.
+    Function address identity is not guaranteed and must not be treated as stable.
     Rust’s ``fn`` type is a zero-sized function item promoted to a function pointer, whose address is determined by the compiler backend.
-    When a function resides in a different crate, or when optimizations such as inlining,
-    link-time optimization, or codegen-unit partitioning are enabled,
+    When a function resides in a different crate or codegen-unit partitioning is enabled,
     the compiler may generate multiple distinct code instances for the same function or alter the address at which it is emitted.
 
-    Consequently, the following operations are not reliable:
+    Consequently, the following operations are unreliable for functions which are not ``#[no_mangle]``:
 
     - Comparing function pointers for equality (``fn1 == fn2``)
     - Assuming a unique function address
     - Using function pointers as identity keys (e.g., in maps, registries, matchers)
-    - Matching behavior based on function address
+    - Matching behavior based on function address unless you instruct the linker to put a (#[no_mangle]) function at a specific address
 
     This rule applies even when the functions are semantically identical, exported as ``pub``, or defined once in source form.
 
@@ -97,17 +110,17 @@ Types and Traits
         :id: rat_xcVE5Hfnbb2u 
         :status: draft
 
-        Compiler optimizations may cause function pointers originating from different crates to lose stable identity.
-        Observed behaviors include:
+        Compiler optimizations may cause function pointers to lose stable identity, for example:
 
-        - Cross-crate inlining producing multiple code instantiations
-        - Codegen-unit separation causing function emission in multiple units
-        - Incremental builds producing variant symbol addresses
-        - Link-time optimization merging or splitting functions unpredictably
+        - Cross-crate inlining can produce multiple code instantiations
+        - Codegen-unit separation can cause function emission in multiple codegen units
+        - Identical function implementations may be automatically merged as an optimization.
+          Functions that are equivalent based only on specific hardware semantics may be merged in the machine-specific backend.
+          Merging may also be performed as link-time optimization.
 
         This behavior has resulted in real-world issues,
         such as the bug reported in `rust-lang/rust#117047 <https://github.com/rust-lang/rust/issues/117047>`_,
-        where function pointer comparisons unexpectedly failed due to cross-crate inlining.
+        where function pointer comparisons unexpectedly failed because the function in question was instantiated multiple times.
 
         Violating this rule may cause:
 
@@ -181,14 +194,14 @@ Types and Traits
         :id: non_compl_ex_MkAkFxjRTijy 
         :status: draft
 
-        Function pointer used as a key is not guaranteed to have stable identity, as shown in this noncompliant example:
+        A function pointer used as a key is not guaranteed to have stable identity, as shown in this noncompliant example:
 
         .. code-block:: rust
 
             // crate A
             pub fn op_mul(x: i32) -> i32 { x * 2 }
 
-	    // crate B
+	        // crate B
             use crate_a::op_mul;
             use std::collections::HashMap;
 
@@ -226,7 +239,7 @@ Types and Traits
             pub const OP_MUL: Operation = Operation { id: 1, func: op_mul };
             pub const OP_ADD: Operation = Operation { id: 2, func: op_add };
 
-	    // crate B
+	        // crate B
 
             use crate_a::{Operation, OP_MUL, OP_ADD};
             use std::collections::HashMap;
