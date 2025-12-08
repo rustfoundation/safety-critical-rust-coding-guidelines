@@ -63,7 +63,7 @@ Types and Traits
              current.checked_add(velocity).expect("Position calculation overflowed")
          }
 
-.. guideline:: Do not compare raw pointers to allocations with different provenance
+.. guideline:: Do not access memory using a pointer with an incorrect provenance
     :id: gui_5iE7d65xGPpJ 
     :category: required
     :status: draft
@@ -73,9 +73,15 @@ Types and Traits
     :scope: system
     :tags: surprising-behavior
 
-    Do not compare raw pointers to allocations with different provenances for equality, inequality, or ordering.
+    Do not access memory using a pointer with an incorrect provenance.
+    Pointers, including values of reference type, have two components.
+    The pointer’s address identifies the memory location where the pointer is currently pointing.
+    The pointer’s provenance determines where and when the pointer is allowed to access memory.
 
-    Pointer comparisons are permitted only when both pointers are guaranteed to reference the same allocation or subobject.
+    Whether a memory access with a given pointer causes undefined behavior (UB) depends on both the address and the provenance:
+    the same address can access memory with one provenance but have undefined behavior with another provenance.
+
+    Pointer comparisons are permitted only when both pointers are guaranteed to reference the same allocation.
 
     Code shall not rely on:
 
@@ -83,27 +89,43 @@ Types and Traits
     - Assumed field layout of structs without ``repr(C)`` or ``repr(packed)``
     - Outcomes of pointer arithmetic across allocation boundaries
 
+    This rule ignores any metadata that may come with wide pointers;
+    it only pertains to thin pointers and the data part of a wide pointer.
+
     .. rationale:: 
         :id: rat_AFpgNhAMQ4eC 
         :status: draft
 
-        Although raw pointer comparison is not itself undefined behavior; comparing pointers with different provenance can give surprising results which might cause logic errors, portability issues, and inconsistent behavior across different optimization levels, builds, or platforms. Specifically, the result of comparing pointers with different providence is guaranteed to be the comparison of the pointer addresses. However, the addresses that are selected for allocations is unspecified.
+        Although raw pointer comparison is not itself undefined behavior;
+        comparing pointers with different provenance can give surprising results which might cause logic errors,
+        portability issues, and inconsistent behavior across different optimization levels, builds, or platforms.
+        Specifically, the result of comparing pointers with different providence is guaranteed to be the comparison of the pointer addresses.
+        However, the addresses that are selected for allocations is unspecified.
 
-        Pointer equality or ordering is only meaningful when both pointers are derived from the same allocated object or block of memory. Comparisons across unrelated allocations are semantically meaningless and must be avoided.
+        Pointer equality or ordering is only meaningful when both pointers are derived from the same allocated object or block of memory.
+        Comparisons across unrelated allocations are semantically meaningless and must be avoided.
 
     .. non_compliant_example::
         :id: non_compl_ex_c5NpFUId5lMo 
         :status: draft
 
-        This noncompliant example allocates two local ``u32`` variables on the stack. The order of these two variables in memory is unspecified behavior. The code then creates a raw pointer to ``v2`` and a raw pointer to ``v1``. Adds the address stored in ``v1`` to 1 × ``size_of::<u32>()`` = 4 bytes using `wrapping_offset <https://doc.rust-lang.org/std/primitive.pointer.html#method.wrapping_offset>`__ which:
+        This noncompliant example allocates two local ``u32`` variables on the stack. The order of these two variables in memory is unspecified behavior. 
+        The code then creates a raw pointer to ``v2`` and a raw pointer to ``v1``.
+        Adds the address stored in ``v1`` to 1 × ``size_of::<u32>()`` = 4 bytes using 
+        `wrapping_offset <https://doc.rust-lang.org/std/primitive.pointer.html#method.wrapping_offset>`__ which:
 
         - ignores provenance
         - may produce an arbitrary, invalid, or meaningless pointer
         - is always allowed but does not guarantee the pointer points to anything valid
 
-        Comparing two `values <https://rust-lang.github.io/fls/glossary.html#term_value>`__ of `raw pointer types <https://rust-lang.github.io/fls/glossary.html#term_raw_pointer_type>`__ compares the addresses of the `values <https://rust-lang.github.io/fls/glossary.html#term_value>`__.
+        Comparing two `values <https://rust-lang.github.io/fls/glossary.html#term_value>`__ of `raw pointer types 
+        <https://rust-lang.github.io/fls/glossary.html#term_raw_pointer_type>`__ compares the addresses of the 
+        `values <https://rust-lang.github.io/fls/glossary.html#term_value>`__.
 
-        This code then compares ptr (a pointer to ``v2``) with ``ptr2`` (a pointer to ``v1`` + 4 bytes). Because the stack layout is unspecified behavior, the result of this comparison depends on how the compiler the memory layout for ``v1`` and ``v2`` on the stack. The result may change across:
+        This code then compares ptr (a pointer to ``v2``) with ``ptr2`` (a pointer to ``v1`` + 4 bytes).
+        Because the stack layout is unspecified behavior,
+        the result of this comparison depends on how the compiler the memory layout for ``v1`` and ``v2`` on the stack.
+        The result may change across:
 
         - compiler versions
         - optimization levels
@@ -111,7 +133,8 @@ Types and Traits
         - small code changes
         - builds with or without link-time optimization
 
-        This noncompliant example does not contain undefined behavior (because no pointer is dereferenced) but it does depend on unspecified behavior, meaning that the program is valid, but the results are undefined.
+        This noncompliant example does not contain undefined behavior (because no pointer is dereferenced) but it does depend on unspecified behavior, 
+        meaning that the program is valid, but the results are undefined.
 
         .. code-block:: rust
 
@@ -132,9 +155,19 @@ Types and Traits
         :id: compl_ex_pBPeA9tBOnxj 
         :status: draft
 
-        This compliant example creates a mutable array of 16 bytes on the stack where all bytes are zero-initialized. The entire array is one contiguous allocation. The code creates a raw pointer ``p`` of type ``*const u8`` to the first element of the array (that is, ``buf[0]``). The ptr ``p`` points at the start of the allocation. The code then uses pointer arithmetic to compute a pointer ``q`` which points 4 elements past ``p``. Because the element type is ``u8``, this means “4 bytes past ``p``\ ”. The pointer arithmetic is safe as long as the resulting pointer stays within the same allocation (it does). This is permitted because pointer arithmetic is allowed within the same allocated object.
+        This compliant example creates a mutable array of 16 bytes on the stack where all bytes are zero-initialized.
+        The entire array is one contiguous allocation.
+        The code creates a raw pointer ``p`` of type ``*const u8`` to the first element of the array (that is, ``buf[0]``).
+        The ptr ``p`` points at the start of the allocation.
+        The code then uses pointer arithmetic to compute a pointer ``q`` which points 4 elements past ``p``.
+        Because the element type is ``u8``, this means “4 bytes past ``p``\ ”.
+        The pointer arithmetic is safe as long as the resulting pointer stays within the same allocation (it does).
+        This is permitted because pointer arithmetic is allowed within the same allocated object.
 
-        Finally, the code compares the numerical address values of ``p`` and ``q``. Pointer comparison is always allowed. Comparing pointers from the same allocation is meaningful and defined. Because ``p`` points to the beginning and ``q`` to a later part of the same array, ``same_block`` becomes ``true``.
+        Finally, the code compares the numerical address values of ``p`` and ``q``.
+        Pointer comparison is always allowed.
+        Comparing pointers from the same allocation is meaningful and defined.
+        Because ``p`` points to the beginning and ``q`` to a later part of the same array, ``same_block`` becomes ``true``.
 
         .. code-block:: rust
 
