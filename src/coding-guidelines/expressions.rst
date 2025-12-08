@@ -780,7 +780,7 @@ Expressions
           /* ... */
         }
 
-.. guideline:: Integer shift shall only be performed through `checked_` APIs
+.. guideline:: Avoid implementation-defined behavior in shift operations
     :id: gui_RHvQj8BHlz9b 
     :category: advisory
     :status: draft
@@ -790,9 +790,27 @@ Expressions
     :scope: module
     :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
 
-    In particular, the user should only perform left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_
-    function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function.
-    Both of these functions exist in `core <https://doc.rust-lang.org/core/index.html>`_.
+    Eliminate implementation-defined behavior caused by shifts outside of the range ``[0, N - 1]``.
+    A shift of an unsigned integer value ``x`` by ``M`` positions:
+
+    ``x << M  // left shift``
+    ``x >> M  // right shift``
+
+    has the following behavior:
+          
+          +------------------+-----------------+-----------------------+-----------------------+
+          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
+          +==================+=================+=======================+=======================+
+          | Debug            | Shifts ``M`` positions | Panics         | Panics                |
+          +------------------+-----------------+-----------------------+-----------------------+
+          | Release          | Shifts ``M`` positions | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
+          +------------------+-----------------+-----------------------+-----------------------+
+
+    Left shifts ``<<`` on signed integers are logical shifts and behave the same way as on unsigned integers:
+    vacated bits on the right (least significant bits) are filled with zeros. 
+
+    Right shifts ``>>`` on signed integers are arithmetic shifts;
+    they preserve the sign of the original number.
 
     This rule applies to the following primitive types:
 
@@ -809,35 +827,13 @@ Expressions
     * ``usize``
     * ``isize``
 
+    This rule is based on The CERT C Coding Standard Rule `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+
     .. rationale:: 
         :id: rat_3MpR8QfHodGT 
         :status: draft
 
-        This is a subset rule, directly inspired by 
-        `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
-
-        Out-of-range shifts are not undefined behavior, but are problematic for the following reasons:
-
-          The behavior of shift operations depends on the compilation mode.
-          A shift of an unsigned integer value ``x`` by ``M`` positions:
-
-          ``x << M  // left shift``
-          ``x >> M  // right shift``
-
-          has the following behavior:
-          
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
-          +==================+=================+=======================+=======================+
-          | Debug            | Shifts ``M`` positions | Panics         | Panics                |
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts ``M`` positions | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
-          +------------------+-----------------+-----------------------+-----------------------+
-
-          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits.
-          The operation itself becomes meaningless.
-
-          Therefore, an API that restricts the length of the shift to the range ``[0, N - 1]`` should be used instead of the ``<<`` and ``>>`` operators.
+        A shift of negative length, or of more than ``N - 1`` bits has implementation-defined behavior.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
@@ -845,9 +841,7 @@ Expressions
 
         As seen in the example below:
 
-        * A ``Debug`` build **panics**\ , 
-        * 
-          Whereas a ``Release`` build prints the values:
+        Whereas a ``Release`` build prints the values:
 
           .. code-block::
 
@@ -855,7 +849,7 @@ Expressions
              61 << 4 = 976
              61 << 40 = 15616
 
-        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (N being the bit-length of the value being shifted) are both meaningless.
+        Shifts by less than 0 or by more than ``N - 1`` (N being the bit-length of the value being shifted) result in implementation-defined behavior.
 
         .. code-block:: rust
 
@@ -874,26 +868,26 @@ Expressions
         :id: compl_ex_xpPQqYeEPGIo 
         :status: draft
 
-         A compliant solution for this exists in ``core``\ : ``checked_shl`` and ``checked_shr``.
+        This compliant example performs left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_
+        function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function.
+        Both of these functions are defined in `core <https://doc.rust-lang.org/core/index.html>`_.
 
-          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``\ , in the following way:
+          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``:
 
           * If ``M < 0``\ , the output is ``None``
           * If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
           * If ``N <= M``\ , the output is ``None``
 
-          This API makes the programmer intent explicit, which effectively solves this issue.
-        As seen in the example below:
+          Checked shift operations make programmer intent explicit and eliminate undefined behavior in edge cases.
+          Shifting by:
 
-        * Shifting by negative values is impossible due to the fact that ``checked_shl`` only accepts unsigned integers as shift lengths.
-        * Shifting by more than ``N - 1`` (N being the bit-length of the value being shifted) returns a ``None`` value:
+          * negative values is impossible because ``checked_shl`` only accepts unsigned integers as shift lengths.
+          * more than ``N - 1`` (N being the bit-length of the value being shifted) returns a ``None`` value:
 
           .. code-block::
 
              61 << 4 = Some(976)
              61 << 40 = None
-
-        The last 2 observations show how this addresses **Reason 2**.
 
         .. code-block:: rust
 
@@ -922,12 +916,13 @@ Expressions
     :scope: module
     :tags: numerics, surprising-behavior, defect
 
-    In particular, the user should limit the Right Hand Side (RHS) parameter used for left shifts and right shifts (i.e. the ``<<`` and ``>>`` binary operators) to only the range ``0..=N-1``\ , where ``N`` is the number of bits of the Left Hand Side (LHS) parameter. For example, in ``a << b``\ , if ``a`` is of type ``u32``\ , then ``b`` **must belong to** the range ``0..=31``.
+    In particular, the user should limit the Right Hand Side (RHS) parameter used for left shifts and right shifts
+    (i.e., the ``<<`` and ``>>`` binary operators) to only the range ``0..=N-1``\ , where ``N`` is the number of bits of the left hand side (LHS) parameter.
+    For example, in ``a << b``\ , if ``a`` is of type ``u32``\ , then ``b`` **must belong to** the range ``0..=31``.
 
     This rule applies to all types which implement the ``core::ops::Shl`` and / or ``core::ops::Shr`` traits, for Rust Version greater than or equal to ``1.6.0``.
 
     For versions prior to ``1.6.0``\ , this rule applies to all types for which the ``<<`` and ``>>`` operators are valid. That is, it applies to the following primitive types:
-
 
     * ``i8``
     * ``i16``
@@ -949,42 +944,12 @@ Expressions
         * Be able to recover by detecting and reporting the error, e.g. via panic.
         * Second recovery is to substitute an in range value for an out-of-range value (e.g., saturation semantics).
         * To terminate an optional operation that would result in an error: e.g., if (divisor != 0) { dividend / divisor }
-        
 
         This is a Defect Avoidance rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
-        In Rust these out-of-range shifts don't give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.
+        Out-of-range shifts have implementation-defined in release mode, but not undefined behavior.
 
-
-        * 
-          **Reason 1: inconsistent behavior**
-
-          The behavior of shift operations depends on the compilation mode. Say for example, that we have a number ``x`` of type ``uN``\ , and we perform the operation
-
-          ``x << M`` 
-
-          Then, it will behave like this:
-         
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
-          +==================+=================+=======================+=======================+
-          | Debug            | Shifts normally | Panics                | Panics                |
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts normally | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
-          +------------------+-----------------+-----------------------+-----------------------+
-         
-
-          ..
-
-             Note: the behavior is exactly the same for the ``>>`` operator.
-
-
-          Panicking in ``Debug`` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of ``Release``. Such inconsistencies aren't acceptable in Safety Critical scenarios.
-
-        * 
-          **Reason 2: programmer intent**
-
-          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
+        There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
 
         For both of these reasons, the programmer must ensure the RHS operator stays in the range ``0..=N-1``.
 
@@ -993,7 +958,6 @@ Expressions
         :status: draft
 
         As seen in the example below:
-
 
         * A ``Debug`` build **panics**\ , 
         * 
