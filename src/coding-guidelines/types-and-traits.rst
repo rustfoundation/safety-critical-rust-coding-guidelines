@@ -106,10 +106,68 @@ Types and Traits
         Comparisons across unrelated allocations are semantically meaningless and must be avoided.
 
     .. non_compliant_example::
+        :id: non_compl_ex_c5NpFUId5lMp 
+        :status: draft
+
+        This noncompliant example creates a mutable raw pointer and a shared reference to ``x``,
+        and derives a raw pointer from that shared reference.
+        The shared reference ``shrref`` is converted to a raw constant pointer, and then to a raw mutable pointer.
+
+        This produces another raw pointer ``shrptr`` to the same memory location ``x``, but its provenance is different:
+        - ``ptr`` is derived from from ``&mut x``
+        - ``shrptr`` is derived from a shared reference ``&x``
+        
+        As a result, this noncompliant example has undefined behavior when writing ``x`` through the shared reference ``shrptr``
+        attempting a write access using using a tag that only grants ``SharedReadOnly`` permission for this location.
+
+        .. code-block:: rust
+
+           fn main() {
+               unsafe {
+                   let mut x = 5;
+                   // Setup a mutable raw pointer and a shared reference to `x`,
+                   // and derive a raw pointer from that shared reference.
+                   let ptr = &mut x as *mut i32;
+                   let shrref = &*ptr;
+                   let shrptr = shrref as *const i32 as *mut i32;
+                   // `ptr` and `shrptr` point to the same address.
+                   assert_eq!(ptr, shrptr);
+                   // Writing `x` through `shrptr` is undefined behavior
+                   shrptr.write(0); 
+                   println!("x = {}", x);
+               }
+           }
+
+    .. compliant_example::
+        :id: compl_ex_pBPeA9tBOnxk
+        :status: draft
+
+        This compliant example eliminates the undefined behavior by writing to ``x`` through ``ptr`` which is derived directly from ``&mut x``.
+
+        .. code-block:: rust
+
+           fn main() {
+               unsafe {
+                   let mut x = 5;
+                   // Setup a mutable raw pointer and a shared reference to `x`,
+                   // and derive a raw pointer from that shared reference.
+                   let ptr = &mut x as *mut i32;
+                   let shrref = &*ptr;
+                   let shrptr = shrref as *const i32 as *mut i32;
+                   // `ptr` and `shrptr` point to the same address.
+                   assert_eq!(ptr, shrptr);
+                   // Eliminate UB by writing through `ptr`
+                   ptr.write(0); 
+                   println!("x = {}", x);
+               }
+           }
+
+    .. non_compliant_example::
         :id: non_compl_ex_c5NpFUId5lMo 
         :status: draft
 
-        This noncompliant example allocates two local ``u32`` variables on the stack. The order of these two variables in memory is unspecified behavior. 
+        This noncompliant example allocates two local ``u32`` variables on the stack.
+        The order of these two variables in memory is unspecified behavior. 
         The code then creates a raw pointer to ``v2`` and a raw pointer to ``v1``.
         Adds the address stored in ``v1`` to 1 × ``size_of::<u32>()`` = 4 bytes using 
         `wrapping_offset <https://doc.rust-lang.org/std/primitive.pointer.html#method.wrapping_offset>`__ which:
