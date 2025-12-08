@@ -719,7 +719,6 @@ Expressions
 
       There is no compliant example of this operation.
 
-
 .. guideline:: An integer shall not be converted to an invalid pointer
    :id: gui_iv9yCMHRgpE0
    :category: <TODO>
@@ -783,7 +782,7 @@ Expressions
 
 .. guideline:: Integer shift shall only be performed through `checked_` APIs
     :id: gui_RHvQj8BHlz9b 
-    :category: required
+    :category: advisory
     :status: draft
     :release: 1.7.0-latest
     :fls: fls_sru4wi5jomoe
@@ -791,7 +790,9 @@ Expressions
     :scope: module
     :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
 
-    In particular, the user should only perform left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_ function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function. Both of these functions exist in `core <https://doc.rust-lang.org/core/index.html>`_.
+    In particular, the user should only perform left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_
+    function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function.
+    Both of these functions exist in `core <https://doc.rust-lang.org/core/index.html>`_.
 
     This rule applies to the following primitive types:
 
@@ -812,19 +813,16 @@ Expressions
         :id: rat_3MpR8QfHodGT 
         :status: draft
 
-        This is a Subset rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+        This is a subset rule, directly inspired by 
+        `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
         Out-of-range shifts are not undefined behavior, but are problematic for the following reasons:
-
-
-        * 
-          **Inconsistent behavior**
 
           The behavior of shift operations depends on the compilation mode.
           A shift of an unsigned integer value ``x`` by ``M`` positions:
 
           ``x << M  // left shift``
-          ``x >> M  // right shift`` 
+          ``x >> M  // right shift``
 
           has the following behavior:
           
@@ -836,40 +834,16 @@ Expressions
           | Release          | Shifts ``M`` positions | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
           +------------------+-----------------+-----------------------+-----------------------+
 
-          ..
-
-          Panicking in ``Debug`` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of ``Release``. Such inconsistencies aren't acceptable in Safety Critical scenarios.
-
-          Therefore, a consistently-behaved operation should be required for performing shifts.
-
-        * 
-          **Programmer intent**
-
           There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits.
           The operation itself becomes meaningless.
 
           Therefore, an API that restricts the length of the shift to the range ``[0, N - 1]`` should be used instead of the ``<<`` and ``>>`` operators.
-
-        * 
-          **The Solution**
-
-          The ideal solution for this exists in ``core``\ : ``checked_shl`` and ``checked_shr``.
-
-          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``\ , in the following way:
-
-
-          * If ``M < 0``\ , the output is ``None``
-          * If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
-          * If ``N <= M``\ , the output is ``None``
-
-          This API has consistent behavior across ``Debug`` and ``Release``\ , and makes the programmer intent explicit, which effectively solves this issue.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
         :status: draft
 
         As seen in the example below:
-
 
         * A ``Debug`` build **panics**\ , 
         * 
@@ -880,8 +854,6 @@ Expressions
              61 << -1 = 2147483648
              61 << 4 = 976
              61 << 40 = 15616
-
-        This shows **Reason 1** prominently.
 
         **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (N being the bit-length of the value being shifted) are both meaningless.
 
@@ -902,12 +874,20 @@ Expressions
         :id: compl_ex_xpPQqYeEPGIo 
         :status: draft
 
+         A compliant solution for this exists in ``core``\ : ``checked_shl`` and ``checked_shr``.
+
+          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``\ , in the following way:
+
+          * If ``M < 0``\ , the output is ``None``
+          * If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
+          * If ``N <= M``\ , the output is ``None``
+
+          This API makes the programmer intent explicit, which effectively solves this issue.
         As seen in the example below:
 
-
-        * Both ``Debug`` and ``Release`` give the same exact output, which addresses **Reason 1**.
         * Shifting by negative values is impossible due to the fact that ``checked_shl`` only accepts unsigned integers as shift lengths.
         * Shifting by more than ``N - 1`` (N being the bit-length of the value being shifted) returns a ``None`` value:
+
           .. code-block::
 
              61 << 4 = Some(976)
@@ -965,6 +945,11 @@ Expressions
     .. rationale:: 
         :id: rat_tVkDl6gOqz25 
         :status: draft
+
+        * Be able to recover by detecting and reporting the error, e.g. via panic.
+        * Second recovery is to substitute an in range value for an out-of-range value (e.g., saturation semantics).
+        * To terminate an optional operation that would result in an error: e.g., if (divisor != 0) { dividend / divisor }
+        
 
         This is a Defect Avoidance rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
