@@ -32,6 +32,7 @@ Types and Traits
 
       This rule ensures that parameters and variables convey intent directly through the type system to avoid accidental misuse of values with identical primitives but different semantics.
       In particular:
+
       * Prevents mixing logically distinct values.
         Primitive types like ``u32`` or ``u64`` can represent lengths, counters, timestamps, durations, IDs, or other values.
         Different semantic domains can be confused, leading to incorrect computations.
@@ -69,7 +70,7 @@ Types and Traits
             let _result = travel(t, d);  // Compiles, but semantically incorrect
          }
 
-      .. non_compliant_example::
+   .. non_compliant_example::
       :id: non_compl_ex_PO5TyFsRTlWv
       :status: draft
 
