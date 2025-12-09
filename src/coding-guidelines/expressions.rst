@@ -905,6 +905,50 @@ Expressions
                  }
              }
 
+    .. compliant_example::
+        :id: compl_ex_xpPQqYeEPGIp
+        :status: draft
+
+        This compliant example demonstrates panic-free bitwise shift-left.
+        The call to ``bits.wrapping_shr(sh)`` yields ``bits << mask(sh)``,
+        where ``mask`` removes any high-order bits of ``sh`` that would cause the shift to exceed  the bitwidth of ``bits``.
+        Note that this is not the same as a rotate-left.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits : u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.wrapping_shr(sh));
+                 }
+             }
+
+    .. compliant_example::
+        :id: compl_ex_xpPQqYeEPGIq
+        :status: draft
+
+        The call to ``bits.overflowing_shl(sh)`` shifts ``bits`` left by ``sh`` bits.
+        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
+        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits: u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     let (result, overflowed) = bits.overflowing_shl(sh);
+                     if overflowed {
+                         println!("{bits} << {sh} shift too large");
+                     } else {
+                         println!("{bits} << {sh} = {result}");
+                     }
+                 }
+             }
+
 .. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand
     :id: gui_LvmzGKdsAgI5 
     :category: mandatory
@@ -915,60 +959,74 @@ Expressions
     :scope: module
     :tags: numerics, surprising-behavior, defect
 
-    In particular, the user should limit the Right Hand Side (RHS) parameter used for left shifts and right shifts
-    (i.e., the ``<<`` and ``>>`` binary operators) to only the range ``0..=N-1``\ , where ``N`` is the number of bits of the left hand side (LHS) parameter.
-    For example, in ``a << b``\ , if ``a`` is of type ``u32``\ , then ``b`` **must belong to** the range ``0..=31``.
+    Shifting negative positions or a value greater than or equal to the width of the left operand
+    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    are defined by this guideline to be *out-of-range shifts*.
+    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`_.
+    
+    If the types of both operands are integer types,
+    the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
+    shifted left by the number of positions speicifed by the right operand ``rhs``.
+    Vacated bits are filled with zeros. 
+    The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
+    cast to the type of the left operand.
+    If the value of the right operand is negative or greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
-    This rule applies to all types which implement the ``core::ops::Shl`` and / or ``core::ops::Shr`` traits, for Rust Version greater than or equal to ``1.6.0``.
+    If the types of both operands are integer types,
+    the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
+    whose bits are shifted right by the number of positions speicifed by the right operand ``rhs``.
+    If the type of the left operand is any signed integer type and is negative,
+    the vacated bits are filled with ones.
+    Otherwise, vacated bits are filled with zeros.
+    The expression ``lhs >> rhs`` evaluates to :math:`\mathrm{lhs} / 2^{\mathrm{rhs}}`,
+    cast to the type of the left operand.
+    If the value of the right operand is negative,
+    greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
-    For versions prior to ``1.6.0``\ , this rule applies to all types for which the ``<<`` and ``>>`` operators are valid. That is, it applies to the following primitive types:
+    This rule applies to the following primitive types:
 
     * ``i8``
     * ``i16``
     * ``i32``
     * ``i64``
     * ``i128``
-    * ``isize``
     * ``u8``
     * ``u16``
     * ``u32``
     * ``u64``
     * ``u128``
     * ``usize``
+    * ``isize``
+
+    Any type can support ``<<`` or ``>>`` if you implement the trait:
+
+    .. code-block:: rust
+
+       use core::ops::Shl;
+
+       impl Shl<u32> for MyType {
+           type Output = MyType;
+           fn shl(self, rhs: u32) -> Self::Output { … }
+       }
+
+    You may choose any type for the right operand (not just integers), because you control the implementation.
+
+    This rule is based on The CERT C Coding Standard Rule
+   `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
     .. rationale:: 
         :id: rat_tVkDl6gOqz25 
         :status: draft
 
-        * Be able to recover by detecting and reporting the error, e.g. via panic.
-        * Second recovery is to substitute an in range value for an out-of-range value (e.g., saturation semantics).
-        * To terminate an optional operation that would result in an error: e.g., if (divisor != 0) { dividend / divisor }
-
-        This is a Defect Avoidance rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
-
-        Out-of-range shifts have implementation-defined in release mode, but not undefined behavior.
-
-        There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
-
-        For both of these reasons, the programmer must ensure the RHS operator stays in the range ``0..=N-1``.
+        Avoid out-of-range shifts in shift left and shift right expressions.
+        Shifting by a negative value, or by a value greater than or equal to the width of the left operand
+        are non-sensical expressions which typically indicate a logic error has occured.
 
     .. non_compliant_example::
         :id: non_compl_ex_aTtUjdIuDdbv 
         :status: draft
-
-        As seen in the example below:
-
-        * A ``Debug`` build **panics**\ , 
-        * 
-          Whereas a ``Release`` build prints the values:
-
-          .. code-block::
-
-             61 << -1 = 2147483648
-             61 << 4 = 976
-             61 << 40 = 15616
-
-        This shows **Reason 1** prominently.
 
         **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (\ ``N`` being the bit-length of the value being shifted) are both meaningless.
 
@@ -999,7 +1057,6 @@ Expressions
              61 << 4 = 976
              Performing 61 << 40 would be meaningless and crash-prone; we avoided it!
 
-        The output shows how this addresses **Reason 2**.
 
         .. code-block:: rust
 
