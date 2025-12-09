@@ -780,7 +780,7 @@ Expressions
           /* ... */
         }
 
-.. guideline:: Avoid out of range shifts
+.. guideline:: Make all shift left and shift right expressions explicit
     :id: gui_RHvQj8BHlz9b 
     :category: advisory
     :status: draft
@@ -863,15 +863,13 @@ Expressions
 
         .. code-block:: rust
 
-            fn bad_shl(bits: u32, shift: i32) -> u32 {
-               bits << shift
-            }
+            fn main() {
+                let bits : u32 = 61;
+                let shifts = vec![-1, 4, 40];
 
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
-
-            for sh in shifts {
-               println!("{bits} << {sh} = {}", bad_shl(bits, sh));
+                for sh in shifts {
+                    println!("{bits} << {sh} = {:?}", bits << sh);
+                }
             }
 
     .. compliant_example::
@@ -896,20 +894,16 @@ Expressions
 
           .. code-block:: rust
 
-            fn good_shl(bits: u32, shift: u32) -> Option<u32> {
-               bits.checked_shl(shift)
-            }
+             fn main() {
+                 let bits : u32 = 61;
+                 // let shifts = vec![-1, 4, 40];
+                 //                    ^--- Compiler rejects negative shifts
+                 let shifts = vec![4, 40];
 
-            let bits : u32 = 61;
-            // let shifts = vec![-1, 4, 40];
-            //                    ^--- Does not typecheck, as `checked_shl`
-            //                         only accepts positive shift amounts
-            let shifts = vec![4, 40];
-
-            for sh in shifts {
-               println!("{bits} << {sh} = {:?}", good_shl(bits, sh));
-            }
-
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.checked_shl(sh));
+                 }
+             }
 
 .. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand
     :id: gui_LvmzGKdsAgI5 
