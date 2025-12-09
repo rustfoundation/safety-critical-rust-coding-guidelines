@@ -780,7 +780,7 @@ Expressions
           /* ... */
         }
 
-.. guideline:: Avoid implementation-defined behavior in shift operations
+.. guideline:: Avoid arithmetic overflow in shift left and shift right expressions
     :id: gui_RHvQj8BHlz9b 
     :category: advisory
     :status: draft
@@ -790,27 +790,29 @@ Expressions
     :scope: module
     :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
 
-    Eliminate implementation-defined behavior caused by shifts outside of the range ``[0, N - 1]``.
-    A shift of an unsigned integer value ``x`` by ``M`` positions:
+    Avoid `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ 
+    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_.
 
-    ``x << M  // left shift``
-    ``x >> M  // right shift``
+    If the types of both operands are integer types,
+    the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
+    shifted left by the number of positions speicifed by the right operand ``rhs``.
+    Vacated bits are filled with zeros. 
+    The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
+    cast to the type of the left operand.
+    If the value of the right operand is negative or greater than or equal to the width of the left operand,
+    then the operation results in an arithmetic overflow.
 
-    has the following behavior:
-          
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
-          +==================+=================+=======================+=======================+
-          | Debug            | Shifts ``M`` positions | Panics         | Panics                |
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts ``M`` positions | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
-          +------------------+-----------------+-----------------------+-----------------------+
-
-    Left shifts ``<<`` on signed integers are logical shifts and behave the same way as on unsigned integers:
-    vacated bits on the right (least significant bits) are filled with zeros. 
-
-    Right shifts ``>>`` on signed integers are arithmetic shifts;
-    they preserve the sign of the original number.
+    If the types of both operands are integer types,
+    the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
+    whose bits are shifted right by the number of positions speicifed by the right operand ``rhs``.
+    If the type of the left operand is any signed integer type and is negative,
+    the vacated bits are filled with ones.
+    Otherwise, vacated bits are filled with zeros.
+    The expression ``lhs >> rhs`` evaluates to :math:`\mathrm{lhs} / 2^{\mathrm{rhs}}`,
+    cast to the type of the left operand.
+    If the value of the right operand is negative,
+    greater than or equal to the width of the left operand,
+    then the operation results in an arithmetic overflow.
 
     This rule applies to the following primitive types:
 
@@ -827,13 +829,29 @@ Expressions
     * ``usize``
     * ``isize``
 
-    This rule is based on The CERT C Coding Standard Rule `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+    Any type can support << or >> if you implement the trait:
+
+    .. code-block:: rust
+
+       use core::ops::Shl;
+
+       impl Shl<u32> for MyType {
+           type Output = MyType;
+           fn shl(self, rhs: u32) -> Self::Output { … }
+       }
+
+    You may choose any RHS type you want (not just integers), because you control the implementation.
+
+    This rule is based on The CERT C Coding Standard Rule
+   `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
     .. rationale:: 
         :id: rat_3MpR8QfHodGT 
         :status: draft
 
-        A shift of negative length, or of more than ``N - 1`` bits has implementation-defined behavior.
+        Avoid arithmetic overflow in shift left and shift right expressions results in panics in debug mode and masks silently in release builds.
+        Shifting by a negative value, or by a value greater than or equal to the width of the left operand are non-sensical expressions which 
+        indicate a logic error has occured.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
