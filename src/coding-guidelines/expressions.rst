@@ -780,7 +780,7 @@ Expressions
           /* ... */
         }
 
-.. guideline:: Make all shift left and shift right expressions explicit
+.. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand
     :id: gui_RHvQj8BHlz9b 
     :category: advisory
     :status: draft
@@ -797,7 +797,7 @@ Expressions
     
     If the types of both operands are integer types,
     the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
-    shifted left by the number of positions speicifed by the right operand ``rhs``.
+    shifted left by the number of positions specified by the right operand ``rhs``.
     Vacated bits are filled with zeros. 
     The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
     cast to the type of the left operand.
@@ -872,6 +872,70 @@ Expressions
                 }
             }
 
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcn 
+        :status: draft
+
+        This noncompliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
+        than or equal to the width of the left operand.
+
+        .. code-block:: rust
+
+            fn main() {
+                let bits: u32 = 61;
+                let shifts = vec![-1, 0, 4, 40];
+
+                for sh in shifts {
+                    if sh >= 0 && sh < 32 {
+                        println!("{bits} << {sh} = {}", bits << sh);
+                    }
+                 }
+            }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcm
+        :status: draft
+
+        The call to ``bits.wrapping_shl(sh)`` in this noncompliant example yields ``bits << mask(sh)``,
+        where ``mask`` removes any high-order bits of ``sh`` that would cause the shift to exceed  the bitwidth of ``bits``.
+        Note that this is not the same as a rotate-left.
+        The ``wrapping_shl`` has the same behavior as the ``<<`` operator in release mode.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits : u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.wrapping_shl(sh));
+                 }
+             }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcp
+        :status: draft
+
+        The call to ``bits.overflowing_shl(sh)`` in this noncompliant shifts ``bits`` left by ``sh`` bits.
+        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
+        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits: u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     let (result, overflowed) = bits.overflowing_shl(sh);
+                     if overflowed {
+                         println!("{bits} << {sh} shift too large");
+                     } else {
+                         println!("{bits} << {sh} = {result}");
+                     }
+                 }
+             }
+
     .. compliant_example::
         :id: compl_ex_xpPQqYeEPGIo 
         :status: draft
@@ -902,50 +966,6 @@ Expressions
 
                  for sh in shifts {
                      println!("{bits} << {sh} = {:?}", bits.checked_shl(sh));
-                 }
-             }
-
-    .. compliant_example::
-        :id: compl_ex_xpPQqYeEPGIp
-        :status: draft
-
-        This compliant example demonstrates panic-free bitwise shift-left.
-        The call to ``bits.wrapping_shr(sh)`` yields ``bits << mask(sh)``,
-        where ``mask`` removes any high-order bits of ``sh`` that would cause the shift to exceed  the bitwidth of ``bits``.
-        Note that this is not the same as a rotate-left.
-
-          .. code-block:: rust
-
-             fn main() {
-                 let bits : u32 = 61;
-                 let shifts = vec![4, 40];
-
-                 for sh in shifts {
-                     println!("{bits} << {sh} = {:?}", bits.wrapping_shr(sh));
-                 }
-             }
-
-    .. compliant_example::
-        :id: compl_ex_xpPQqYeEPGIq
-        :status: draft
-
-        The call to ``bits.overflowing_shl(sh)`` shifts ``bits`` left by ``sh`` bits.
-        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
-        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
-
-          .. code-block:: rust
-
-             fn main() {
-                 let bits: u32 = 61;
-                 let shifts = vec![4, 40];
-
-                 for sh in shifts {
-                     let (result, overflowed) = bits.overflowing_shl(sh);
-                     if overflowed {
-                         println!("{bits} << {sh} shift too large");
-                     } else {
-                         println!("{bits} << {sh} = {result}");
-                     }
                  }
              }
 
@@ -1013,6 +1033,10 @@ Expressions
 
     You may choose any type for the right operand (not just integers), because you control the implementation.
 
+   This rule is a less strict but undecidable version of 
+   `Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand`.
+   All code that complies with that rule also complies with this rule.
+
     This rule is based on The CERT C Coding Standard Rule
    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
@@ -1025,49 +1049,67 @@ Expressions
         are non-sensical expressions which typically indicate a logic error has occured.
 
     .. non_compliant_example::
-        :id: non_compl_ex_aTtUjdIuDdbv 
+        :id: non_compl_ex_O9FZuazu3Lcn 
         :status: draft
 
-        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (\ ``N`` being the bit-length of the value being shifted) are both meaningless.
+        This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
         .. code-block:: rust
 
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
+            fn main() {
+                let bits : u32 = 61;
+                let shifts = vec![-1, 4, 40];
 
-            for sh in shifts {
-               println!("{bits} << {sh} = {}", bits << sh);
+                for sh in shifts {
+                    println!("{bits} << {sh} = {:?}", bits << sh);
+                }
             }
 
     .. compliant_example::
         :id: compl_ex_Ux1WqHbGKV73 
         :status: draft
 
-        As seen in the example below:
-
-
-        * Both ``Debug`` and ``Release`` give the same exact output, which addresses **Reason 1**.
-        * Out-of-range shifts are caught and avoided before they happen.
-        * 
-          The output shows what's happening:
-
-          .. code-block::
-
-             Performing 61 << -1 would be meaningless and crash-prone; we avoided it!
-             61 << 4 = 976
-             Performing 61 << 40 would be meaningless and crash-prone; we avoided it!
-
+        This compliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
+        than or equal to the width of the left operand.
 
         .. code-block:: rust
 
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
+            fn main() {
+                let bits: u32 = 61;
+                let shifts = vec![-1, 0, 4, 40];
 
-            for sh in shifts {
-               if 0 <= sh && sh < 32 {
-                     println!("{bits} << {sh} = {}", bits << sh);
-               } else {
-                     println!("Performing {bits} << {sh} would be meaningless and crash-prone; we avoided it!");
-               }
+                for sh in shifts {
+                    if sh >= 0 && sh < 32 {
+                        println!("{bits} << {sh} = {}", bits << sh);
+                    }
+                 }
             }
 
+    .. compliant_example::
+        :id: compl_ex_Ux1WqHbGKV74
+        :status: draft
+
+        The call to ``bits.overflowing_shl(sh)`` in this noncompliant shifts ``bits`` left by ``sh`` bits.
+        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
+        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
+
+          .. code-block:: rust
+
+             fn safe_shl(bits: u32, shift: u32) -> u32 {
+                 let (result, overflowed) = bits.overflowing_shl(shift);
+                 if overflowed {
+                     0
+                 } else {
+                     result
+                 }
+             }
+
+             fn main() {
+                 let bits: u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     let result = safe_shl(bits, sh);
+                     println!("{bits} << {sh} = {result}");
+                 }
+             }
