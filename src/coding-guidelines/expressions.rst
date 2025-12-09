@@ -806,7 +806,7 @@ Expressions
 
     If the types of both operands are integer types,
     the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
-    whose bits are shifted right by the number of positions speicifed by the right operand ``rhs``.
+    whose bits are shifted right by the number of positions specified by the right operand ``rhs``.
     If the type of the left operand is any signed integer type and is negative,
     the vacated bits are filled with ones.
     Otherwise, vacated bits are filled with zeros.
@@ -853,7 +853,7 @@ Expressions
 
         Avoid out-of-range shifts in shift left and shift right expressions.
         Shifting by a negative value, or by a value greater than or equal to the width of the left operand
-        are non-sensical expressions which typically indicate a logic error has occured.
+        are non-sensical expressions which typically indicate a logic error has occurred.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
@@ -986,7 +986,7 @@ Expressions
     
     If the types of both operands are integer types,
     the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
-    shifted left by the number of positions speicifed by the right operand ``rhs``.
+    shifted left by the number of positions specified by the right operand ``rhs``.
     Vacated bits are filled with zeros. 
     The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
     cast to the type of the left operand.
@@ -995,7 +995,7 @@ Expressions
 
     If the types of both operands are integer types,
     the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
-    whose bits are shifted right by the number of positions speicifed by the right operand ``rhs``.
+    whose bits are shifted right by the number of positions specified by the right operand ``rhs``.
     If the type of the left operand is any signed integer type and is negative,
     the vacated bits are filled with ones.
     Otherwise, vacated bits are filled with zeros.
@@ -1046,7 +1046,7 @@ Expressions
 
         Avoid out-of-range shifts in shift left and shift right expressions.
         Shifting by a negative value, or by a value greater than or equal to the width of the left operand
-        are non-sensical expressions which typically indicate a logic error has occured.
+        are non-sensical expressions which typically indicate a logic error has occurred.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
