@@ -788,7 +788,7 @@ Expressions
     :fls: fls_sru4wi5jomoe
     :decidability: decidable
     :scope: module
-    :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
+    :tags: numerics, reduce-human-error, maintainability, surprising-behavior, subset
 
     Shifting negative positions or a value greater than or equal to the width of the left operand
     in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
