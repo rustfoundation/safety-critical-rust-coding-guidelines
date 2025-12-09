@@ -780,7 +780,7 @@ Expressions
           /* ... */
         }
 
-.. guideline:: Avoid arithmetic overflow in shift left and shift right expressions
+.. guideline:: Avoid out of range shifts
     :id: gui_RHvQj8BHlz9b 
     :category: advisory
     :status: draft
@@ -790,9 +790,11 @@ Expressions
     :scope: module
     :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
 
-    Avoid `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ 
-    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_.
-
+    Shifting negative positions or a value greater than or equal to the width of the left operand
+    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    are defined by this guideline to be *out-of-range shifts*.
+    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`_.
+    
     If the types of both operands are integer types,
     the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
     shifted left by the number of positions speicifed by the right operand ``rhs``.
@@ -800,7 +802,7 @@ Expressions
     The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
     cast to the type of the left operand.
     If the value of the right operand is negative or greater than or equal to the width of the left operand,
-    then the operation results in an arithmetic overflow.
+    then the operation results in an out-of-range shift.
 
     If the types of both operands are integer types,
     the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
@@ -812,7 +814,7 @@ Expressions
     cast to the type of the left operand.
     If the value of the right operand is negative,
     greater than or equal to the width of the left operand,
-    then the operation results in an arithmetic overflow.
+    then the operation results in an out-of-range shift.
 
     This rule applies to the following primitive types:
 
@@ -829,7 +831,7 @@ Expressions
     * ``usize``
     * ``isize``
 
-    Any type can support << or >> if you implement the trait:
+    Any type can support ``<<`` or ``>>`` if you implement the trait:
 
     .. code-block:: rust
 
@@ -840,34 +842,24 @@ Expressions
            fn shl(self, rhs: u32) -> Self::Output { … }
        }
 
-    You may choose any RHS type you want (not just integers), because you control the implementation.
+    You may choose any type for the right operand (not just integers), because you control the implementation.
 
     This rule is based on The CERT C Coding Standard Rule
-   `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+   `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
     .. rationale:: 
         :id: rat_3MpR8QfHodGT 
         :status: draft
 
-        Avoid arithmetic overflow in shift left and shift right expressions results in panics in debug mode and masks silently in release builds.
-        Shifting by a negative value, or by a value greater than or equal to the width of the left operand are non-sensical expressions which 
-        indicate a logic error has occured.
+        Avoid out-of-range shifts in shift left and shift right expressions.
+        Shifting by a negative value, or by a value greater than or equal to the width of the left operand
+        are non-sensical expressions which typically indicate a logic error has occured.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
         :status: draft
 
-        As seen in the example below:
-
-        Whereas a ``Release`` build prints the values:
-
-          .. code-block::
-
-             61 << -1 = 2147483648
-             61 << 4 = 976
-             61 << 40 = 15616
-
-        Shifts by less than 0 or by more than ``N - 1`` (N being the bit-length of the value being shifted) result in implementation-defined behavior.
+        This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
         .. code-block:: rust
 
@@ -893,21 +885,16 @@ Expressions
           ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``:
 
           * If ``M < 0``\ , the output is ``None``
-          * If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
+          * If ``0 <= M < N`` for ``T`` of size ``N`` bits, then the output is ``Some(T)``
           * If ``N <= M``\ , the output is ``None``
 
-          Checked shift operations make programmer intent explicit and eliminate undefined behavior in edge cases.
+          Checked shift operations make programmer intent explicit and eliminates out-of-range shifts.
           Shifting by:
 
-          * negative values is impossible because ``checked_shl`` only accepts unsigned integers as shift lengths.
-          * more than ``N - 1`` (N being the bit-length of the value being shifted) returns a ``None`` value:
+          * negative values is impossible because ``checked_shl`` only accepts unsigned integers as shift lengths, and
+          * greater than or equal to the number of bits that exist in the left operand returns a ``None`` value.
 
-          .. code-block::
-
-             61 << 4 = Some(976)
-             61 << 40 = None
-
-        .. code-block:: rust
+          .. code-block:: rust
 
             fn good_shl(bits: u32, shift: u32) -> Option<u32> {
                bits.checked_shl(shift)
@@ -915,7 +902,7 @@ Expressions
 
             let bits : u32 = 61;
             // let shifts = vec![-1, 4, 40];
-            //                    ^--- Would not typecheck, as checked_shl
+            //                    ^--- Does not typecheck, as `checked_shl`
             //                         only accepts positive shift amounts
             let shifts = vec![4, 40];
 
