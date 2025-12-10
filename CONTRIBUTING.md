@@ -105,13 +105,20 @@ The contents of the PR should be based on the latest bot comment containing
 the generated guideline from
 [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
 
+Follow the guidance given in the
+[2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
+in section `Target File` to understand which file under
+[`src/coding-guidelines/](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/tree/main/src/coding-guidelines)
+to place the guideline content.
+
+the comment with the guideline on which
+chapter to place the coding guideline.
+
 Make sure to include the following in the body of your PR so that the
 corresponding issue will be closed upon the PR being closed. Note that
 `#xyz` corresponds to the number of the issue opened by
 [1) Submit coding guideline issue](#1-submit-coding-guideline-issue).
 
-Follow the guidance given in the comment with the guideline on which
-chapter to place the coding guideline.
 
 `closes #xyz`
 
