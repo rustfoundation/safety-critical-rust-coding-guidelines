@@ -65,8 +65,8 @@ Types and Traits
          }
 
          fn main() {
-            let d: u32 = 100_u32;
-            let t: u32 = 10_u32;
+            let d = 100;
+            let t = = 10;
             let _result = travel(t, d);  // Compiles, but semantically incorrect
          }
 
