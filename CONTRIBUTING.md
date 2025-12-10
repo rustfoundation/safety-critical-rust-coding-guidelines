@@ -38,19 +38,19 @@ flowchart TD
   Zulip --> CreateIssue{{"1: Contributor creates <br> issue"}}
   CreateIssue --> Issue["Coding Guideline Issue"]
 
-  S2{{"2: reStructured Text <br> generated as comment <br> on issue"}} --> Issue
+  S2{{"2: reStructuredText <br> generated as comment <br> on issue"}} --> Issue
   Issue --> S2
 
   S3{{"3: Review started by subcommittee member in <= 14 days <br><br> Contributor updates accordingly"}} --> Issue
   Issue --> S3
 
-  Issue --> S4{{"4: Contributor creates a PR using the reStructured Text generated for them on issue"}} --> PR["Coding Guideline<br>Pull Request"]
+  Issue --> S4{{"4: Contributor creates a PR using the reStructuredText generated for them on issue"}} --> PR["Coding Guideline<br>Pull Request"]
 
   S5{{"5: <br> 5.1 PR review started by subcommittee member in <= 14 days <br><br> 5.2 Contributor discusses on PR with members and updates"}} --> PR
   PR --> S5
 
   PR --> S6{{"(Optional) <br> 6: Contributor applies feedback to issue"}} --> Issue
-  Issue --> S7{{"(Optional)<br> 7: Contributor applies updated reStructured Text to Pull request"}} --> PR
+  Issue --> S7{{"(Optional)<br> 7: Contributor applies updated reStructuredText to Pull request"}} --> PR
   PR --> S8{{"8: Subcommittee member <br> approves & queues;<br>merges to main"}} --> Main[[main]]
   Main --> End(["9: End"])
 ```
@@ -85,7 +85,11 @@ You would then pull `fls_4rhjpdu4zfqj` to place in the FLS ID field.
 
 A GitHub Action will fire, adding a comment to your newly created issue with
 the contents of the coding guideline prepared written out correctly
-in reStructured Text.
+in reStructuredText.
+
+Note that if you later update the body of the coding guideline issue this will
+fire the GitHub Action again and update the original comment with the new
+contents converted to reStructuredText.
 
 ### 3) Create a Draft with a Member
 
