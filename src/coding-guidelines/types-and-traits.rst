@@ -65,8 +65,8 @@ Types and Traits
          }
 
          fn main() {
-            let d: Meters = 100;
-            let t: Seconds = 10;
+            let d: u32 = 100_u32;
+            let t: u32 = 10_u32;
             let _result = travel(t, d);  // Compiles, but semantically incorrect
          }
 
@@ -109,16 +109,28 @@ Types and Traits
 
        .. code-block:: rust
 
+         use std::ops::Div;
+
+         #[derive(Debug, Clone, Copy)]
          struct Meters(u32);
+
+         #[derive(Debug, Clone, Copy)]
          struct Seconds(u32);
+
+         #[derive(Debug, Clone, Copy)]
          struct MetersPerSecond(u32);
 
-         fn travel(distance: Meters, time: Seconds) -> MetersPerSecond {
-            MetersPerSecond(distance.0 / time.0)
-         }
+         impl Div<Seconds> for Meters {
+             type Output = MetersPerSecond;
 
-         fn main() {
-            let d = Meters(100);
-            let t = Seconds(10);
-            let _result = travel(d, t);  // Correct usage
-         }
+             fn div(self, rhs: Seconds) -> Self::Output {
+                  MetersPerSecond(self.0 / rhs.0)
+             }
+          }
+
+          fn main() {
+              let d = Meters(100);
+              let t = Seconds(10);
+              let result = d / t;  // Clean and type-safe!
+              println!("{:?}", result);  // MetersPerSecond(10)
+          }
