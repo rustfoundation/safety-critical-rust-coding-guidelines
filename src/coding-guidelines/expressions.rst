@@ -17,7 +17,7 @@ Expressions
     :scope: system
     :tags: security, performance, numerics
 
-    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ of both signed and unsigned integer types. 
+    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`__ of both signed and unsigned integer types. 
     Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.
 
     This rule applies to the following primitive types:
@@ -793,7 +793,7 @@ Expressions
     Shifting negative positions or a value greater than or equal to the width of the left operand
     in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
     are defined by this guideline to be *out-of-range shifts*.
-    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`_.
+    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`__.
     
     If the types of both operands are integer types,
     the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
@@ -839,13 +839,13 @@ Expressions
 
        impl Shl<u32> for MyType {
            type Output = MyType;
-           fn shl(self, rhs: u32) -> Self::Output { … }
+           fn shl(self, rhs: u32) -> Self::Output { /* ... */ }
        }
 
     You may choose any type for the right operand (not just integers), because you control the implementation.
 
     This rule is based on The CERT C Coding Standard Rule
-   `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
     .. rationale:: 
         :id: rat_3MpR8QfHodGT 
@@ -873,7 +873,7 @@ Expressions
             }
 
     .. non_compliant_example::
-        :id: non_compl_ex_O9FZuazu3Lcn 
+        :id: non_compl_ex_mvkgTL3kulZ5 
         :status: draft
 
         This noncompliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
@@ -1005,7 +1005,7 @@ Expressions
     in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
     are defined by this guideline to be *out-of-range shifts*.
     The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`_.
-    
+
     If the types of both operands are integer types,
     the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
     shifted left by the number of positions specified by the right operand ``rhs``.
@@ -1050,17 +1050,17 @@ Expressions
 
        impl Shl<u32> for MyType {
            type Output = MyType;
-           fn shl(self, rhs: u32) -> Self::Output { … }
+           fn shl(self, rhs: u32) -> Self::Output { /* ... */ }
        }
 
     You may choose any type for the right operand (not just integers), because you control the implementation.
 
-   This rule is a less strict but undecidable version of 
-   `Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand`.
-   All code that complies with that rule also complies with this rule.
+    This rule is a less strict but undecidable version of 
+    `Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand`.
+    All code that complies with that rule also complies with this rule.
 
     This rule is based on The CERT C Coding Standard Rule
-   `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
     .. rationale:: 
         :id: rat_tVkDl6gOqz25 
@@ -1071,7 +1071,7 @@ Expressions
         are non-sensical expressions which typically indicate a logic error has occurred.
 
     .. non_compliant_example::
-        :id: non_compl_ex_O9FZuazu3Lcn 
+        :id: non_compl_ex_KLiDMsCesLx7 
         :status: draft
 
         This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
