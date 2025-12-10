@@ -93,9 +93,7 @@ contents converted to reStructuredText.
 
 ### 3) Create a Draft with a Member
 
-A member of the Coding Guidelines Subcommittee should get you a first review
-with some feedback within 14 days of submission. You'll work with one or more
-members to flesh out the concept and ensure the guideline is well prepared.
+Within 14 days of your submission, a member of the Coding Guidelines Subcommittee should give you a first review. You'll work with them (and other members) to flesh out the concept and ensure the guideline is well prepared for a Pull Request.
 
 ### 4) Contributor Creates the PR
 
