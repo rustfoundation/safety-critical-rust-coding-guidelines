@@ -913,6 +913,28 @@ Expressions
              }
 
     .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcx
+        :status: draft
+
+        This noncompliant example uses ``bits.unbounded_shr(sh)``.
+        If ``sh`` is larger or equal to the width of ``bits``,
+        the entire value is shifted out,
+        which yields 0 for a positive number,
+        and -1 for a negative number.
+        The use of this function is noncompliant because it does not detect out-of-range shifts.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits : u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.unbounded_shr(sh));
+                 }
+             }
+
+    .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcp
         :status: draft
 
