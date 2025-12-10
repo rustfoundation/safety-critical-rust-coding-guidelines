@@ -98,8 +98,10 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 ### 4) Create the PR
 
 Once an issue has been well-developed enough, a subcommittee member will mark
-the issue with the label `sign-off: create pr` to denote the contributor
-should create a PR based on the contents of the latest comment containing
+the issue with the label `sign-off: create pr` to denote that you
+should create a Pull Request.
+
+The contents of the PR should be based on the latest bot comment containing
 the generated guideline from
 [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
 
