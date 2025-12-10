@@ -127,7 +127,7 @@ As the contributor of the coding guideline and opener of the issue, you'll respo
 
 If you agree with the suggested changes, you've got two options:
 
-- iterate directly on the Pull Request, if you're comfortable with reStructured Text to do so
+- Iterate directly on the Pull Request, if you're comfortable with reStructuredText to do so
 - if you'd rather make revisions in Markdown, you can return to the issue
   from [1) Submit coding guideline issue](#1-submit-coding-guideline-issue)
   to regenerate the reStructured Text guideline form by following steps
