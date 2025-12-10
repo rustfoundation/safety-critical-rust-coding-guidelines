@@ -95,7 +95,7 @@ contents converted to reStructuredText.
 
 Within 14 days of your submission, a member of the Coding Guidelines Subcommittee should give you a first review. You'll work with them (and other members) to flesh out the concept and ensure the guideline is well prepared for a Pull Request.
 
-### 4) Contributor Creates the PR
+### 4) Create the PR
 
 Once an issue has been well-developed enough, a subcommittee member will mark
 the issue with the label `sign-off: create pr` to denote the contributor
