@@ -11,7 +11,7 @@
       - [1.1) Finding the FLS ID](#11-finding-the-fls-id)
     - [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment)
     - [3) Create a Draft with a Member](#3-create-a-draft-with-a-member)
-    - [4) Contributor Creates the PR](#4-contributor-creates-the-pr)
+    - [4) Create the PR](#4-creates-the-pr)
     - [5) Iterate on Feedback](#5-iterate-on-feedback)
       - [5.1) Member Begins Review](#51-member-begins-review)
       - [5.2) Update the PR Based on Feedback](#52-update-the-pr-based-on-feedback)
