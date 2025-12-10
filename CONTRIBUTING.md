@@ -166,7 +166,7 @@ That's it!
 
 ## Writing a guideline locally (less typical, not recommended)
 
-While it is possible to create guidelines locally, we encourage contributors to make use of the process described above since it handled some of the fiddly details for you as a guideline writer.
+While it is possible to create guidelines locally, we encourage contributors to make use of the process described above since it handles some of the fiddly details for you as a guideline writer.
 
 ### Guideline template
 
