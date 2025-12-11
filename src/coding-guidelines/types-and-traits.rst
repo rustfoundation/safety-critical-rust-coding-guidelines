@@ -161,7 +161,7 @@ Types and Traits
     - Assumed field layout of structs without ``repr(C)`` or ``repr(packed)``
     - Outcomes of pointer arithmetic across allocation boundaries
 
-    This rule ignores any `metadata <https://doc.rust-lang.org/std/ptr/fn.metadata.html>`__ that may come with wide pointers;
+    This rule ignores any `metadata <https://doc.rust-lang.org/std/ptr/trait.Pointee.html#pointer-metadata>`__ that may come with wide pointers;
     it only pertains to thin pointers and the address part of a wide pointer.
 
     .. rationale:: 
