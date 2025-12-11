@@ -1,6 +1,33 @@
 {
   "documents": [
     {
+      "title": "Types and Traits",
+      "link": "coding-guidelines/types-and-traits.html",
+      "guidelines": [
+        {
+          "id": "gui_xztNdXA2oFNC",
+          "title": "Use strong types to differentiate between logically distinct values",
+          "link": "coding-guidelines/types-and-traits.html#gui_xztNdXA2oFNC",
+          "checksum": "b62c0cede6d667bbe08943175688887d89b9a7fe5f288f27c71509e79fda8115",
+          "rationale": {
+            "id": "rat_kYiIiW8R2qD2",
+            "link": "coding-guidelines/types-and-traits.html#rat_kYiIiW8R2qD2",
+            "checksum": "353bc213b2026002206d353abec430bec84467ca4a52c5f89f003fdf1ea81782"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_PO5TyFsRTlWv",
+            "link": "coding-guidelines/types-and-traits.html#non_compl_ex_PO5TyFsRTlWv",
+            "checksum": "e4c8141659a6c35b8761a10af1810a6d3e3fc37296a540770e990e1fbbbbfdaf"
+          },
+          "compliant_example": {
+            "id": "compl_ex_WTe7GoPu5Ez1",
+            "link": "coding-guidelines/types-and-traits.html#compl_ex_WTe7GoPu5Ez1",
+            "checksum": "d2069b96eca4714df1e32d3b3bc3d21f02dffdf3d4d487639300559d49c69c16"
+          }
+        }
+      ]
+    },
+    {
       "title": "Macros",
       "link": "coding-guidelines/macros.html",
       "guidelines": [
@@ -217,28 +244,196 @@
       ]
     },
     {
-      "title": "Types and Traits",
-      "link": "coding-guidelines/types-and-traits.html",
+      "title": "Expressions",
+      "link": "coding-guidelines/expressions.html",
       "guidelines": [
         {
-          "id": "gui_xztNdXA2oFNB",
-          "title": "Avoid Implicit Integer Wrapping",
-          "link": "coding-guidelines/types-and-traits.html#gui_xztNdXA2oFNB",
-          "checksum": "be290a1bee83d268288f7e5e1b4409899b6d497c735c51a747685c28c4a74159",
+          "id": "gui_dCquvqE1csI3",
+          "title": "Ensure that integer operations do not result in arithmetic overflow",
+          "link": "coding-guidelines/expressions.html#gui_dCquvqE1csI3",
+          "checksum": "5be129a425b948e4379587c4ab83def951313382a9150048cff6d4c87113dd09",
           "rationale": {
-            "id": "rat_kYiIiW8R2qD1",
-            "link": "coding-guidelines/types-and-traits.html#rat_kYiIiW8R2qD1",
-            "checksum": "998ee8bf9177a88e7a5e3de3199dea58924cbdfbafcc90aae8467fbfd5a17a01"
+            "id": "rat_LvrS1jTCXEOk",
+            "link": "coding-guidelines/expressions.html#rat_LvrS1jTCXEOk",
+            "checksum": "83ccbc780438a4377bef70d231da96c9dfede248bc805647688b5772c375486f"
           },
           "non_compliant_example": {
-            "id": "non_compl_ex_PO5TyFsRTlWv",
-            "link": "coding-guidelines/types-and-traits.html#non_compl_ex_PO5TyFsRTlWv",
-            "checksum": "beb3060e9445a24402c6637fe339b4bc022e359514faa30953ac567487386852"
+            "id": "non_compl_ex_cCh2RQUXeH0O",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_cCh2RQUXeH0O",
+            "checksum": "1b3bb166de2ab3c53953337dba0caa0f3496c4aebe3c4ecf0b02cbdbc8bfc1f5"
           },
           "compliant_example": {
-            "id": "compl_ex_WTe7GoPu5Ez0",
-            "link": "coding-guidelines/types-and-traits.html#compl_ex_WTe7GoPu5Ez0",
-            "checksum": "5bbf5bff6e2134b7a74833702492c09ebcc678cf8b1d20515d4c6a71251c9292"
+            "id": "compl_ex_BgUHiRB4kc4d",
+            "link": "coding-guidelines/expressions.html#compl_ex_BgUHiRB4kc4d",
+            "checksum": "70b69b0b0ad256ddfea78b6fa216be9e8530d90b81cc55e44f716b61c1d8cd6e"
+          }
+        },
+        {
+          "id": "gui_HDnAZ7EZ4z6G",
+          "title": "Avoid as underscore pointer casts",
+          "link": "coding-guidelines/expressions.html#gui_HDnAZ7EZ4z6G",
+          "checksum": "d159bf1323b56f7a473f3bd8c56486b3fbeb0599b99fd8476986b8bc198d704b",
+          "rationale": {
+            "id": "rat_h8LdJQ1MNKu9",
+            "link": "coding-guidelines/expressions.html#rat_h8LdJQ1MNKu9",
+            "checksum": "5ae75ee7ed8582749505a7d45d5e37add9dc36b403bd76c35a763d26e836242b"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_V37Pl103aUW4",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_V37Pl103aUW4",
+            "checksum": "e3dbb6bc86f4ecc75d758c734b9a4d9049cb8a5a898ed69050310001f5028e88"
+          },
+          "compliant_example": {
+            "id": "compl_ex_W08ckDrkOhkt",
+            "link": "coding-guidelines/expressions.html#compl_ex_W08ckDrkOhkt",
+            "checksum": "32d21d0b7451e260dc3327d2d93dff325322bddc7035720e93a93b85991fc039"
+          }
+        },
+        {
+          "id": "gui_7y0GAMmtMhch",
+          "title": "Do not use an integer type as a divisor during integer division",
+          "link": "coding-guidelines/expressions.html#gui_7y0GAMmtMhch",
+          "checksum": "3921f7885a16ee373aee8092f305e0656e862a2c80c1c86fd94b2589f6740610",
+          "rationale": {
+            "id": "rat_vLFlPWSCHRje",
+            "link": "coding-guidelines/expressions.html#rat_vLFlPWSCHRje",
+            "checksum": "d3dcb6e6847cb6a6fe0ecf7ee557b6e0c17bc1dd38f449fb2da709395d6a8609"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_0XeioBrgfh5z",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_0XeioBrgfh5z",
+            "checksum": "c88a5baae814c9068f3318b803224d99cae23995f8f83cb1e9de4a4c18596780"
+          },
+          "compliant_example": {
+            "id": "compl_ex_k1CD6xoZxhXc",
+            "link": "coding-guidelines/expressions.html#compl_ex_k1CD6xoZxhXc",
+            "checksum": "660d5b7f0ab23c884b2413a31fa4b5504b593520684c64d07037b78d9dff4c8e"
+          }
+        },
+        {
+          "id": "gui_kMbiWbn8Z6g5",
+          "title": "Do not divide by 0",
+          "link": "coding-guidelines/expressions.html#gui_kMbiWbn8Z6g5",
+          "checksum": "baf5986ae261ddb2946d8b9e7f694579a5ec226ef7e27ca92e142e3e41439975",
+          "rationale": {
+            "id": "rat_h84NjY2tLSBW",
+            "link": "coding-guidelines/expressions.html#rat_h84NjY2tLSBW",
+            "checksum": "0c938055f85d458cb28f3d20984ac00f112943775fe72df4bed42063cfada018"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_LLs3vY8aGz0F",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_LLs3vY8aGz0F",
+            "checksum": "2774eccd3d6a782c4f2f558600d62ca63133d1a2910b24b44ee1ec0466acc425"
+          },
+          "compliant_example": {
+            "id": "compl_ex_Ri9pP5Ch3kcc",
+            "link": "coding-guidelines/expressions.html#compl_ex_Ri9pP5Ch3kcc",
+            "checksum": "8f2c1e576b00d2cbe35a0955ca9870c1319d231c6b35ad191d7664b29e6b59f2"
+          }
+        },
+        {
+          "id": "gui_ADHABsmK9FXz",
+          "title": "The 'as' operator should not be used with numeric operands",
+          "link": "coding-guidelines/expressions.html#gui_ADHABsmK9FXz",
+          "checksum": "a07863b68a39bf85b7b44b4fdd70d717715c83507db1bad05ce9a24039da6cb6",
+          "rationale": {
+            "id": "rat_v56bjjcveLxQ",
+            "link": "coding-guidelines/expressions.html#rat_v56bjjcveLxQ",
+            "checksum": "39ebb5d5c64a9e4f1f53264f5d7a46a9babc047cd16d3d6e21504a39dd7f69fd"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_hzGUYoMnK59w",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_hzGUYoMnK59w",
+            "checksum": "54b670b6c21a0219eb3c2998a40d41a42369e7a80dec610d7e2ce7c00b70bbbd"
+          },
+          "compliant_example": {
+            "id": "compl_ex_uilHTIOgxD37",
+            "link": "coding-guidelines/expressions.html#compl_ex_uilHTIOgxD37",
+            "checksum": "8aa012330aa882eef6de9b10415852a835f5ad33ecfb73595c4a399b2be0108d"
+          }
+        },
+        {
+          "id": "gui_PM8Vpf7lZ51U",
+          "title": "An integer shall not be converted to a pointer",
+          "link": "coding-guidelines/expressions.html#gui_PM8Vpf7lZ51U",
+          "checksum": "39b6041084db114bcee44b709aacf743dbfa37bcb494af1798df51f2cde35421",
+          "rationale": {
+            "id": "rat_YqhEiWTj9z6L",
+            "link": "coding-guidelines/expressions.html#rat_YqhEiWTj9z6L",
+            "checksum": "d805d6414f4ba8384ad22529ce5cab1a15a01f7cab4516ad60c858e609374e7e"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_0ydPk7VENSrA",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_0ydPk7VENSrA",
+            "checksum": "fc26a7588c18d7347c5c2255b2591a1aff92e44655c59b2e2ca929a361374da1"
+          },
+          "compliant_example": {
+            "id": "compl_ex_oneKuF52yzrx",
+            "link": "coding-guidelines/expressions.html#compl_ex_oneKuF52yzrx",
+            "checksum": "ce6f782e05d51e9c17ecd5f405064e95605d1e41937daf5cce39f46a35b3324c"
+          }
+        },
+        {
+          "id": "gui_iv9yCMHRgpE0",
+          "title": "An integer shall not be converted to an invalid pointer",
+          "link": "coding-guidelines/expressions.html#gui_iv9yCMHRgpE0",
+          "checksum": "a011bb2f243344ba0c20112fbe6ad82bbe8880ebaa6cdd979683ee859234f67c",
+          "rationale": {
+            "id": "rat_OhxKm751axKw",
+            "link": "coding-guidelines/expressions.html#rat_OhxKm751axKw",
+            "checksum": "29351cbe37f730d00a8a5de75c8810335fdf36c76945b8cf035e693c79b4cdcc"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_CkytKjRQezfQ",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_CkytKjRQezfQ",
+            "checksum": "cae5beb0a547b5713f9abf9198829d62e0b7a9fae33e2aa671dc21b2130e2585"
+          },
+          "compliant_example": {
+            "id": "compl_ex_oBoluiKSvREu",
+            "link": "coding-guidelines/expressions.html#compl_ex_oBoluiKSvREu",
+            "checksum": "e5a79d4e52ede88eb85b440db73d87edfc95c068aab2b4d7fa519db8f90d49eb"
+          }
+        },
+        {
+          "id": "gui_RHvQj8BHlz9b",
+          "title": "Integer shift shall only be performed through `checked_` APIs",
+          "link": "coding-guidelines/expressions.html#gui_RHvQj8BHlz9b",
+          "checksum": "6913da4148fe6923f8008bdcb8e0f6c2b84c4eafd21cf4e829ac67650260a9c0",
+          "rationale": {
+            "id": "rat_3MpR8QfHodGT",
+            "link": "coding-guidelines/expressions.html#rat_3MpR8QfHodGT",
+            "checksum": "20db55e1f9449430ec6454e89e5a128644d1e65f0c1ab2a9dd94017c392b8bf6"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_O9FZuazu3Lcn",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_O9FZuazu3Lcn",
+            "checksum": "df5696d7792879fb877183cf78d7214c8a53d80213d0b6ddcfbeda3f7e903d0e"
+          },
+          "compliant_example": {
+            "id": "compl_ex_xpPQqYeEPGIo",
+            "link": "coding-guidelines/expressions.html#compl_ex_xpPQqYeEPGIo",
+            "checksum": "d1af2bc61843cacf9f83964f4277409bb880c6ccc1a3d284a32182e8d9f1797b"
+          }
+        },
+        {
+          "id": "gui_LvmzGKdsAgI5",
+          "title": "Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand",
+          "link": "coding-guidelines/expressions.html#gui_LvmzGKdsAgI5",
+          "checksum": "02cad32bed80b7f1c4a7f18c3a4787bec1ae478476cb130d11b7e2eb0c1c4428",
+          "rationale": {
+            "id": "rat_tVkDl6gOqz25",
+            "link": "coding-guidelines/expressions.html#rat_tVkDl6gOqz25",
+            "checksum": "d96e2f9078de4ce45ac6c7884414bfce477eebcf9c20f19c9efebfdc6fa5679a"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_aTtUjdIuDdbv",
+            "link": "coding-guidelines/expressions.html#non_compl_ex_aTtUjdIuDdbv",
+            "checksum": "8716ae4d8d3b1eedcfcf2dada7c7798f9f40f2f342936d82fe78008c5d5474eb"
+          },
+          "compliant_example": {
+            "id": "compl_ex_Ux1WqHbGKV73",
+            "link": "coding-guidelines/expressions.html#compl_ex_Ux1WqHbGKV73",
+            "checksum": "23dba2a2a610770fe3288024ca46a4810985436ec4db45e7491fe5b2987a1f91"
           }
         }
       ]
@@ -266,180 +461,6 @@
             "id": "compl_ex_9pK3h65rfceO",
             "link": "coding-guidelines/associated-items.html#compl_ex_9pK3h65rfceO",
             "checksum": "f17ba9ca45a322de33928ac8a30a052e71568e51916c274923ad05b140f8e404"
-          }
-        }
-      ]
-    },
-    {
-      "title": "Expressions",
-      "link": "coding-guidelines/expressions.html",
-      "guidelines": [
-        {
-          "id": "gui_HDnAZ7EZ4z6G",
-          "title": "Avoid as underscore pointer casts",
-          "link": "coding-guidelines/expressions.html#gui_HDnAZ7EZ4z6G",
-          "checksum": "09fc89373128f31a0ff1af3e2e4b283cae9fe07cda811217b577f84501c95c63",
-          "rationale": {
-            "id": "rat_h8LdJQ1MNKu9",
-            "link": "coding-guidelines/expressions.html#rat_h8LdJQ1MNKu9",
-            "checksum": "3e75b62845841f9fa8567c80682df8dd6a89da632489462e816fb812c84ebf8e"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_V37Pl103aUW4",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_V37Pl103aUW4",
-            "checksum": "15d5b0ed0d98e63e0227a2f1761e090e1144d6b86fbe2f7c23ea6e9ff7c2316c"
-          },
-          "compliant_example": {
-            "id": "compl_ex_W08ckDrkOhkt",
-            "link": "coding-guidelines/expressions.html#compl_ex_W08ckDrkOhkt",
-            "checksum": "fd494c967cb13b54f3d8c9b5e7bf82f1eca5ab3748063d3a18bfe497e27553cf"
-          }
-        },
-        {
-          "id": "gui_7y0GAMmtMhch",
-          "title": "Do not use an integer type as a divisor during integer division",
-          "link": "coding-guidelines/expressions.html#gui_7y0GAMmtMhch",
-          "checksum": "15b90f3808b1e9ae4d3f6e605a7045b42ab3c0a384bb6ae535b0de177216b60f",
-          "rationale": {
-            "id": "rat_vLFlPWSCHRje",
-            "link": "coding-guidelines/expressions.html#rat_vLFlPWSCHRje",
-            "checksum": "e238f8477530a5c0440660dba38062589c1ea01c72d3ac357271aad326c66adc"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_0XeioBrgfh5z",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_0XeioBrgfh5z",
-            "checksum": "6085fc1cb72ad6f28cd51ceedf724a4f54e5bdb3526b6acb608cde44df880827"
-          },
-          "compliant_example": {
-            "id": "compl_ex_k1CD6xoZxhXc",
-            "link": "coding-guidelines/expressions.html#compl_ex_k1CD6xoZxhXc",
-            "checksum": "b13cc921b50ccb16dd7def6fe3241a5e29ea2fd70e388fe49727105ee565fbdc"
-          }
-        },
-        {
-          "id": "gui_kMbiWbn8Z6g5",
-          "title": "Do not divide by 0",
-          "link": "coding-guidelines/expressions.html#gui_kMbiWbn8Z6g5",
-          "checksum": "a6451b8634f7c5b7b315ff337877a3e7f5fe5dcb1bff3badc4cb47b881b01c55",
-          "rationale": {
-            "id": "rat_h84NjY2tLSBW",
-            "link": "coding-guidelines/expressions.html#rat_h84NjY2tLSBW",
-            "checksum": "4afa831c371508742e54624fa6ad51d6818d6b4fef6b90d72e721db6cee32684"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_LLs3vY8aGz0F",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_LLs3vY8aGz0F",
-            "checksum": "b28f03cd1317fc4c6d24d3ecb6d37e5e5fdbe909abe1c87e538fe49c842be1b7"
-          },
-          "compliant_example": {
-            "id": "compl_ex_Ri9pP5Ch3kcc",
-            "link": "coding-guidelines/expressions.html#compl_ex_Ri9pP5Ch3kcc",
-            "checksum": "3ddbea1954a0f70a691558948f360152e8286991f98380ac6b59806e9bb15843"
-          }
-        },
-        {
-          "id": "gui_ADHABsmK9FXz",
-          "title": "The 'as' operator should not be used with numeric operands",
-          "link": "coding-guidelines/expressions.html#gui_ADHABsmK9FXz",
-          "checksum": "7867cf7094d5cbaef022e5c9bcb57ece839d735a3f4e4a267525ed84052ff8c4",
-          "rationale": {
-            "id": "rat_v56bjjcveLxQ",
-            "link": "coding-guidelines/expressions.html#rat_v56bjjcveLxQ",
-            "checksum": "c08d0134b6be2441083a240dfb7de83573e07a1a0e02beb55c9f51e4117cab46"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_hzGUYoMnK59w",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_hzGUYoMnK59w",
-            "checksum": "b0b314db07694861a55ddd3f6549d876e6f42896dc8ef7c6815aaff9e72e14e3"
-          },
-          "compliant_example": {
-            "id": "compl_ex_uilHTIOgxD37",
-            "link": "coding-guidelines/expressions.html#compl_ex_uilHTIOgxD37",
-            "checksum": "89ef76d53fb0d0f354a4f73d3f40df4fa1963e4a507dfa60abb2b57c096fe331"
-          }
-        },
-        {
-          "id": "gui_PM8Vpf7lZ51U",
-          "title": "An integer shall not be converted to a pointer",
-          "link": "coding-guidelines/expressions.html#gui_PM8Vpf7lZ51U",
-          "checksum": "77cb769c917201ec888703426b47042e803fac6c70ce77e2f3b6951e4c4dddf7",
-          "rationale": {
-            "id": "rat_YqhEiWTj9z6L",
-            "link": "coding-guidelines/expressions.html#rat_YqhEiWTj9z6L",
-            "checksum": "9f04514a2430fdfbe79634efd1f1afc9fba28491264a1ba31377ec444aa49a65"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_0ydPk7VENSrA",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_0ydPk7VENSrA",
-            "checksum": "b8043dc011ae6b40779f388e5c7657ad9037c0b50d82b98f86077ead2d243900"
-          },
-          "compliant_example": {
-            "id": "compl_ex_oneKuF52yzrx",
-            "link": "coding-guidelines/expressions.html#compl_ex_oneKuF52yzrx",
-            "checksum": "8058a5edb08776647f2832faaaaf0650fcbb33792fd7dd523fa3d74020805f26"
-          }
-        },
-        {
-          "id": "gui_iv9yCMHRgpE0",
-          "title": "An integer shall not be converted to an invalid pointer",
-          "link": "coding-guidelines/expressions.html#gui_iv9yCMHRgpE0",
-          "checksum": "1e54ee20a66bc7156434925f3dc8054002670a028adad45f8cc8a9648a327d90",
-          "rationale": {
-            "id": "rat_OhxKm751axKw",
-            "link": "coding-guidelines/expressions.html#rat_OhxKm751axKw",
-            "checksum": "f0815a311f224de49ab4ef4efe3b0f56ba5a45da46515d303df70498def9362b"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_CkytKjRQezfQ",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_CkytKjRQezfQ",
-            "checksum": "523ce5a8dcfcd12234f7b65fe107b87164955148e11e03f01eb55f36c9a4458f"
-          },
-          "compliant_example": {
-            "id": "compl_ex_oBoluiKSvREu",
-            "link": "coding-guidelines/expressions.html#compl_ex_oBoluiKSvREu",
-            "checksum": "623d93002a37bdbacc99db9f22acb990cd4a4417ecdb6f230b8ca6ebe4c2c8f9"
-          }
-        },
-        {
-          "id": "gui_RHvQj8BHlz9b",
-          "title": "Integer shift shall only be performed through `checked_` APIs",
-          "link": "coding-guidelines/expressions.html#gui_RHvQj8BHlz9b",
-          "checksum": "7246210baab0ed920eb710992460f0521d7a71390f413bb26127682691a6c157",
-          "rationale": {
-            "id": "rat_3MpR8QfHodGT",
-            "link": "coding-guidelines/expressions.html#rat_3MpR8QfHodGT",
-            "checksum": "f205b8a2ddcbc5e59e4042fd6fb0be3d18bce82de7a5ff83b263507af091bf46"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_O9FZuazu3Lcn",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_O9FZuazu3Lcn",
-            "checksum": "5b03d057c81af3ad7752bbd230b2aecb57472ac3c07e1abc26c2d199ad282c66"
-          },
-          "compliant_example": {
-            "id": "compl_ex_xpPQqYeEPGIo",
-            "link": "coding-guidelines/expressions.html#compl_ex_xpPQqYeEPGIo",
-            "checksum": "426b69e0e7436db70703e2d793fa0d6f5568ee70115e9d2e9f76e85d158699de"
-          }
-        },
-        {
-          "id": "gui_LvmzGKdsAgI5",
-          "title": "Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand",
-          "link": "coding-guidelines/expressions.html#gui_LvmzGKdsAgI5",
-          "checksum": "de97a882f4a60255e8b4bc593410a46ac0e4089243fb908513cb9ea121ebb203",
-          "rationale": {
-            "id": "rat_tVkDl6gOqz25",
-            "link": "coding-guidelines/expressions.html#rat_tVkDl6gOqz25",
-            "checksum": "db1285b8123d325e2c7d0302104d9ec3dd55bec79f5b38de55b00075387ce97b"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_aTtUjdIuDdbv",
-            "link": "coding-guidelines/expressions.html#non_compl_ex_aTtUjdIuDdbv",
-            "checksum": "f5296495ba85c5147d0c4a850b504bba71d4dfbcb778f47fcb4e17ebec38319b"
-          },
-          "compliant_example": {
-            "id": "compl_ex_Ux1WqHbGKV73",
-            "link": "coding-guidelines/expressions.html#compl_ex_Ux1WqHbGKV73",
-            "checksum": "0eb30df4ee3df3288aa0deca2281e16c1934e704aede63824cb6b05d7e7085ba"
           }
         }
       ]

@@ -116,65 +116,116 @@
              
   <section id="types-and-traits">
 <h1>Types and Traits<a class="headerlink" href="#types-and-traits" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-213b1b86">
-<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_xztNdXA2oFNB">
+<div class="need_container docutils container" id="SNCB-b71631fb">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_xztNdXA2oFNC">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
-<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">Avoid Implicit Integer Wrapping</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_xztNdXA2oFNB" title="gui_xztNdXA2oFNB">gui_xztNdXA2oFNB</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">Use strong types to differentiate between logically distinct values</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_xztNdXA2oFNC" title="gui_xztNdXA2oFNC">gui_xztNdXA2oFNC</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
 </div>
 </td>
 </tr>
 <tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
-<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">numerics</span></span></span></div>
-<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">required</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">types</span><span class="needs_spacer">, </span><span class="needs_data">safety</span><span class="needs_spacer">, </span><span class="needs_data">understandability</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">advisory</span></span></div>
 <div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/types-and-traits.html#fls_cokwseo3nnr" class="fls-id">fls_cokwseo3nnr</a></span></span></div>
-<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">undecidable</span></span></div>
 <div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
 <div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.85.0;1.85.1</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_kYiIiW8R2qD1" title="gui_xztNdXA2oFNB">rat_kYiIiW8R2qD1</a>, <a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWv" title="gui_xztNdXA2oFNB">non_compl_ex_PO5TyFsRTlWv</a>, <a class="reference internal" href="#compl_ex_WTe7GoPu5Ez0" title="gui_xztNdXA2oFNB">compl_ex_WTe7GoPu5Ez0</a></span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_kYiIiW8R2qD2" title="gui_xztNdXA2oFNC">rat_kYiIiW8R2qD2</a>, <a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWw" title="gui_xztNdXA2oFNC">non_compl_ex_PO5TyFsRTlWw</a>, <a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWv" title="gui_xztNdXA2oFNC">non_compl_ex_PO5TyFsRTlWv</a>, <a class="reference internal" href="#compl_ex_WTe7GoPu5Ez1" title="gui_xztNdXA2oFNC">compl_ex_WTe7GoPu5Ez1</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s implicit integer wrapping behavior that may occur in release
-builds. Instead, explicitly handle potential overflows using the standard library’s checked,
-saturating, or wrapping operations.</p>
-<div class="need_container docutils container" id="SNCB-f6e681ca">
-<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_kYiIiW8R2qD1">
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Parameters and variables with logically distinct types must be statically distinguishable by the type system.</p>
+<p>Use a newtype (e.g., <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">Meters(u32);</span></code>) when:</p>
+<ul class="simple">
+<li><p>Two or more quantities share the same underlying primitive representation but are logically distinct</p></li>
+<li><p>Confusing them would constitute a semantic error</p></li>
+<li><p>You need to improve type safety and encapsulation</p></li>
+<li><p>You need to enable trait-based behavior</p></li>
+<li><p>You need to establish new invariants</p></li>
+</ul>
+<div class="need_container docutils container" id="SNCB-de6b1f88">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_kYiIiW8R2qD2">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
-<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_kYiIiW8R2qD1" title="rat_kYiIiW8R2qD1">rat_kYiIiW8R2qD1</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_kYiIiW8R2qD2" title="rat_kYiIiW8R2qD2">rat_kYiIiW8R2qD2</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
 </div>
 </td>
 </tr>
 <tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNB" title="rat_kYiIiW8R2qD1">gui_xztNdXA2oFNB</a></span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="rat_kYiIiW8R2qD2">gui_xztNdXA2oFNC</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
-However, in release builds (with optimizations enabled), unless the flag <a class="reference external" href="https://github.com/rust-lang/rust/blob/master/src/doc/rustc/src/codegen-options/index.md#overflow-checks">overflow-checks</a> is
-turned on, integer operations silently wrap around on overflow, creating potential for silent
-failures and security vulnerabilities. Note that overflow-checks only brings the default panic
-behavior from debug into release builds, avoiding potential silent wrap arounds. Nonetheless,
-abrupt program termination is usually not suitable and, therefore, turning this flag on must
-not be used as a substitute of explicit handling. Furthermore, the behavior in release mode is
-under consideration by the The Rust Language Design Team and in the future overflow checking
-may be turned on by default in release builds (it is a <a class="reference external" href="https://lang-team.rust-lang.org/frequently-requested-changes.html#numeric-overflow-checking-should-be-on-by-default-even-in-release-mode">frequently requested change</a>).</p>
-<p>Safety-critical software requires consistent and predictable behavior across all build
-configurations. Explicit handling of potential overflow conditions improves code clarity,
-maintainability, and reduces the risk of numerical errors in production.</p>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This rule ensures that parameters and variables convey intent directly through the type system to avoid accidental misuse of values with identical primitives but different semantics.
+In particular:</p>
+<ul class="simple">
+<li><p>Prevents mixing logically distinct values.
+Primitive types like <code class="docutils literal notranslate"><span class="pre">u32</span></code> or <code class="docutils literal notranslate"><span class="pre">u64</span></code> can represent lengths, counters, timestamps, durations, IDs, or other values.
+Different semantic domains can be confused, leading to incorrect computations.
+The Rust type system prevents such mistakes when semantics are encoded into distinct types.</p></li>
+<li><p>Improves static safety.
+Statically distinct types allow the compiler to enforce domain distinctions.
+Accidental swapping of parameters or returning the wrong quantity becomes a compile-time error.</p></li>
+<li><p>Improves readability and discoverability.
+Intent-revealing names (<code class="docutils literal notranslate"><span class="pre">Meters</span></code>, <code class="docutils literal notranslate"><span class="pre">Seconds</span></code>, <code class="docutils literal notranslate"><span class="pre">UserId</span></code>) make code self-documenting.
+Type signatures become easier to read and understand.</p></li>
+<li><p>Enables domain-specific trait implementations.
+Statically distinct types allow you to implement <code class="docutils literal notranslate"><span class="pre">Add</span></code>, <code class="docutils literal notranslate"><span class="pre">Mul</span></code>, or custom traits in ways that match the domain logic.
+Aliases cannot do this, because they are not distinct types.</p></li>
+<li><p>Supports API evolution.
+Statically distinct types act as strong API contracts that can evolve independently from their underlying representations.</p></li>
+</ul>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-00c8ac91">
+<div class="need_container docutils container" id="SNCB-2f16d216">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWw">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWw" title="non_compl_ex_PO5TyFsRTlWw">non_compl_ex_PO5TyFsRTlWw</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="non_compl_ex_PO5TyFsRTlWw">gui_xztNdXA2oFNC</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example uses primitive types directly, leading to potential confusion between <code class="docutils literal notranslate"><span class="pre">distance</span></code> and <code class="docutils literal notranslate"><span class="pre">time</span></code>.
+Nothing prevents the caller from passing <code class="docutils literal notranslate"><span class="pre">time</span></code> as <code class="docutils literal notranslate"><span class="pre">distance</span></code> or vice-versa.
+The units of each type are not clear from the function signature alone.
+Mistakes compile cleanly and silently produce wrong results.</p>
+<blockquote>
+<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">travel</span><span class="p">(</span><span class="n">distance</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="n">distance</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">time</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">travel</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">);</span><span class="w">  </span><span class="c1">// Compiles, but semantically incorrect</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-030fba9d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWv">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -185,15 +236,31 @@ maintainability, and reduces the risk of numerical errors in production.</p>
 <tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNB" title="non_compl_ex_PO5TyFsRTlWv">gui_xztNdXA2oFNB</a></span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="non_compl_ex_PO5TyFsRTlWv">gui_xztNdXA2oFNC</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><blockquote>
-<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">calculate_next_position</span><span class="p">(</span><span class="n">current</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">velocity</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="c1">// Potential for silent overflow in release builds</span>
-<span class="w">    </span><span class="n">current</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">velocity</span>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example uses aliases instead of distinct types.
+Aliases do not create new types, so the compiler cannot enforce distinctions between <code class="docutils literal notranslate"><span class="pre">Meters</span></code> and <code class="docutils literal notranslate"><span class="pre">Seconds</span></code>.</p>
+<p>Aliases cannot do this, because they are not distinct types.
+This noncompliant example uses primitive types directly, leading to potential confusion between <code class="docutils literal notranslate"><span class="pre">distance</span></code> and <code class="docutils literal notranslate"><span class="pre">time</span></code>.
+Nothing prevents the caller from passing <code class="docutils literal notranslate"><span class="pre">time</span></code> as <code class="docutils literal notranslate"><span class="pre">distance</span></code> or vice-versa.
+The units of each type are not clear from the function signature alone.
+Mistakes compile cleanly and silently produce wrong results.</p>
+<blockquote>
+<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">type</span><span class="w"> </span><span class="nc">Meters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+<span class="k">type</span><span class="w"> </span><span class="nc">Seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+<span class="k">type</span><span class="w"> </span><span class="nc">MetersPerSecond</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">travel</span><span class="p">(</span><span class="n">distance</span><span class="p">:</span><span class="w"> </span><span class="nc">Meters</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="nc">Seconds</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">MetersPerSecond</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="n">distance</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">time</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="p">:</span><span class="w"> </span><span class="nc">Meters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="p">:</span><span class="w"> </span><span class="nc">Seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">travel</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">);</span><span class="w">  </span><span class="c1">// Compiles, but semantically incorrect</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -203,27 +270,51 @@ maintainability, and reduces the risk of numerical errors in production.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-11aea64c">
-<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_WTe7GoPu5Ez0">
+<div class="need_container docutils container" id="SNCB-39e3a6b3">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_WTe7GoPu5Ez1">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
-<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_WTe7GoPu5Ez0" title="compl_ex_WTe7GoPu5Ez0">compl_ex_WTe7GoPu5Ez0</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_WTe7GoPu5Ez1" title="compl_ex_WTe7GoPu5Ez1">compl_ex_WTe7GoPu5Ez1</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
 </div>
 </td>
 </tr>
 <tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
 <div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNB" title="compl_ex_WTe7GoPu5Ez0">gui_xztNdXA2oFNB</a></span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="compl_ex_WTe7GoPu5Ez1">gui_xztNdXA2oFNC</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><blockquote>
-<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">calculate_next_position</span><span class="p">(</span><span class="n">current</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">velocity</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="c1">// Explicitly handle potential overflow with checked addition</span>
-<span class="w">    </span><span class="n">current</span><span class="p">.</span><span class="n">checked_add</span><span class="p">(</span><span class="n">velocity</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&quot;Position calculation overflowed&quot;</span><span class="p">)</span>
-<span class="p">}</span>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example uses newtypes to create distinct types for <code class="docutils literal notranslate"><span class="pre">Meters</span></code>, <code class="docutils literal notranslate"><span class="pre">Seconds</span></code>, and <code class="docutils literal notranslate"><span class="pre">MetersPerSecond</span></code>.
+The compiler enforces correct usage, preventing accidental swapping of parameters.
+The function signature clearly conveys the intended semantics of each parameter and return value.</p>
+<blockquote>
+<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">ops</span><span class="p">::</span><span class="n">Div</span><span class="p">;</span>
+
+<span class="cp">#[derive(Debug, Clone, Copy)]</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Meters</span><span class="p">(</span><span class="kt">u32</span><span class="p">);</span>
+
+<span class="cp">#[derive(Debug, Clone, Copy)]</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Seconds</span><span class="p">(</span><span class="kt">u32</span><span class="p">);</span>
+
+<span class="cp">#[derive(Debug, Clone, Copy)]</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">MetersPerSecond</span><span class="p">(</span><span class="kt">u32</span><span class="p">);</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="n">Div</span><span class="o">&lt;</span><span class="n">Seconds</span><span class="o">&gt;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">Meters</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">type</span><span class="w"> </span><span class="nc">Output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MetersPerSecond</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">div</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">rhs</span><span class="p">:</span><span class="w"> </span><span class="nc">Seconds</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="p">::</span><span class="n">Output</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="n">MetersPerSecond</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">rhs</span><span class="p">.</span><span class="mi">0</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w"> </span><span class="p">}</span>
+
+<span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Meters</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Seconds</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">t</span><span class="p">;</span><span class="w">  </span><span class="c1">// Clean and type-safe!</span>
+<span class="w">     </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">);</span><span class="w">  </span><span class="c1">// MetersPerSecond(10)</span>
+<span class="w"> </span><span class="p">}</span>
 </pre></div>
 </div>
 </div></blockquote>
