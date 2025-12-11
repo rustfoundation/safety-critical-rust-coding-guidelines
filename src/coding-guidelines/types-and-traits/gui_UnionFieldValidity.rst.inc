@@ -8,8 +8,9 @@
    :category: required
    :status: draft
    :release: 1.85.0
+   :fls: fls_oFIRXBPXu6Zv
    :decidability: undecidable
-   :scope: expression
+   :scope: system
    :tags: defect, safety, undefined-behavior
 
    When reading from a union field, ensure that the underlying bytes constitute a valid value 
