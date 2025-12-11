@@ -8,6 +8,7 @@ from . import (
     fls_checks,
     fls_linking,
     guidelines_checks,
+    rust_examples,
     std_role,
     write_guidelines_ids,
 )
@@ -73,6 +74,9 @@ def setup(app):
     if app.config.debug:
         logger.setLevel(logging.INFO)
         common.disable_tqdm = True
+
+    # Set up rust_examples extension
+    rust_examples.setup(app)
 
     app.connect("env-check-consistency", guidelines_checks.validate_required_fields)
     app.connect("env-check-consistency", fls_checks.check_fls)

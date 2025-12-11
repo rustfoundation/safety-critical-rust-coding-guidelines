@@ -1,0 +1,444 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
+
+name: Check Rust Examples
+
+# This workflow is designed to be called from build-guidelines.yml
+# It does not have its own triggers to avoid duplicate runs
+on:
+  workflow_call:
+
+jobs:
+  # Test Rust examples across multiple toolchains (tests/ directory only)
+  test-examples:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Test with stable (latest) - all examples except nightly-only should pass
+          - rust: stable
+            name: Stable (latest)
+          # Test with an older version to verify version skipping works correctly
+          - rust: '1.75.0'
+            name: '1.75.0'
+          # Test with nightly for channel-specific examples
+          - rust: nightly
+            name: Nightly
+    
+    name: Test Examples (${{ matrix.name }})
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (${{ matrix.name }})
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Display Rust version
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Extract and test Rust examples
+        id: test-examples
+        run: |
+          mkdir -p build/examples
+          
+          # Run combined extract and test - only test the test examples, not src/
+          set -o pipefail  # Ensure pipe failures are captured
+          
+          uv run python scripts/extract_rust_examples.py \
+            --test \
+            --src-dir tests/rust-examples \
+            --prelude src/examples_prelude.rs \
+            --json build/examples/results.json \
+            --fail-on-error \
+            --verbose \
+            2>&1 | tee build/examples/test_output.log
+          
+          EXIT_CODE=${PIPESTATUS[0]}
+          
+          # Generate summary
+          echo "## 🧪 Rust Examples Test Results (${{ matrix.name }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Rust version:** \`$(rustc --version)\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f build/examples/results.json ]; then
+            TOTAL=$(jq '.total' build/examples/results.json)
+            PASSED=$(jq '.passed' build/examples/results.json)
+            FAILED=$(jq '.failed' build/examples/results.json)
+            SKIPPED=$(jq '.skipped // 0' build/examples/results.json)
+            
+            if [ "$FAILED" -eq 0 ]; then
+              if [ "$SKIPPED" -gt 0 ]; then
+                echo "✅ **$PASSED of $TOTAL examples passed, $SKIPPED skipped**" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "✅ **All $TOTAL examples passed!**" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "❌ **$FAILED of $TOTAL examples failed** ($SKIPPED skipped)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Failed Examples" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              jq -r '.results[] | select(.passed == false) | "- **\(.example.source_file):\(.example.line_number)**: \(.error_message)"' \
+                build/examples/results.json >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Show skipped examples if any
+            if [ "$SKIPPED" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Skipped Examples" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              jq -r '.results[] | select(.skipped == true) | "- **\(.example.source_file):\(.example.line_number)**: \(.skip_reason)"' \
+                build/examples/results.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            fi
+          fi
+          
+          exit $EXIT_CODE
+
+      - name: Compare against expected results
+        if: always()
+        run: |
+          echo "## 🔍 Expected Results Comparison (${{ matrix.name }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ ! -f build/examples/results.json ] || [ ! -f tests/rust-examples/expected-results.json ]; then
+            echo "⚠️ Missing results files for comparison" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          
+          # Determine which expected key to use based on matrix
+          case "${{ matrix.rust }}" in
+            stable) EXPECTED_KEY="stable" ;;
+            nightly) EXPECTED_KEY="nightly" ;;
+            *) EXPECTED_KEY="${{ matrix.rust }}" ;;
+          esac
+          
+          MISMATCHES=0
+          
+          # Compare each example against expected results
+          while read -r expected_line; do
+            LINE=$(echo "$expected_line" | jq -r '.line')
+            NAME=$(echo "$expected_line" | jq -r '.name')
+            EXPECTED=$(echo "$expected_line" | jq -r ".expected[\"$EXPECTED_KEY\"] // \"pass\"")
+            
+            # Find actual result for this line
+            ACTUAL_RESULT=$(jq -r --argjson line "$LINE" '.results[] | select(.example.line_number == $line)' build/examples/results.json)
+            
+            if [ -z "$ACTUAL_RESULT" ]; then
+              echo "⚠️ Line $LINE ($NAME): Not found in results" >> $GITHUB_STEP_SUMMARY
+              MISMATCHES=$((MISMATCHES + 1))
+              continue
+            fi
+            
+            PASSED=$(echo "$ACTUAL_RESULT" | jq -r '.passed')
+            SKIPPED=$(echo "$ACTUAL_RESULT" | jq -r '.skipped // false')
+            
+            if [ "$SKIPPED" = "true" ]; then
+              ACTUAL="skip"
+            elif [ "$PASSED" = "true" ]; then
+              ACTUAL="pass"
+            else
+              ACTUAL="fail"
+            fi
+            
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "❌ Line $LINE ($NAME): Expected **$EXPECTED**, got **$ACTUAL**" >> $GITHUB_STEP_SUMMARY
+              MISMATCHES=$((MISMATCHES + 1))
+            fi
+          done < <(jq -c '.examples[]' tests/rust-examples/expected-results.json)
+          
+          if [ "$MISMATCHES" -eq 0 ]; then
+            echo "✅ All results match expected values" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**$MISMATCHES mismatches found**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Upload example test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-examples-results-${{ matrix.rust }}
+          path: |
+            build/examples/results.json
+            build/examples/test_output.log
+            build/examples/examples.json
+          retention-days: 7
+
+      - name: Annotate failures in PR
+        if: failure() && github.event_name == 'pull_request'
+        run: |
+          if [ -f build/examples/results.json ]; then
+            jq -r '.results[] | select(.passed == false) | 
+              "::error file=\(.example.source_file),line=\(.example.line_number)::\(.error_message)"' \
+              build/examples/results.json
+          fi
+
+  # Analyze what toolchains are needed for guideline examples
+  analyze-requirements:
+    runs-on: ubuntu-latest
+    outputs:
+      needs_nightly: ${{ steps.analyze.outputs.needs_nightly }}
+      nightly_count: ${{ steps.analyze.outputs.nightly_count }}
+      version_requirements: ${{ steps.analyze.outputs.version_requirements }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Analyze toolchain requirements
+        id: analyze
+        run: |
+          # Get requirements as JSON (script outputs clean JSON to stdout)
+          REQUIREMENTS=$(uv run python scripts/extract_rust_examples.py \
+            --list-requirements \
+            --src-dir src/coding-guidelines)
+          
+          # Extract summary info
+          NEEDS_NIGHTLY=$(echo "$REQUIREMENTS" | jq '.summary.needs_nightly > 0')
+          NIGHTLY_COUNT=$(echo "$REQUIREMENTS" | jq '.summary.needs_nightly')
+          VERSION_REQS=$(echo "$REQUIREMENTS" | jq -c '.versions | keys')
+          
+          echo "needs_nightly=$NEEDS_NIGHTLY" >> $GITHUB_OUTPUT
+          echo "nightly_count=$NIGHTLY_COUNT" >> $GITHUB_OUTPUT
+          echo "version_requirements=$VERSION_REQS" >> $GITHUB_OUTPUT
+          
+          # Add to summary
+          echo "## 📊 Toolchain Requirements Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "$REQUIREMENTS" | jq -r '"- **Total examples:** \(.summary.total)"' >> $GITHUB_STEP_SUMMARY
+          echo "$REQUIREMENTS" | jq -r '"- **Default (stable, no version req):** \(.summary.default_only)"' >> $GITHUB_STEP_SUMMARY
+          echo "$REQUIREMENTS" | jq -r '"- **Needs nightly:** \(.summary.needs_nightly)"' >> $GITHUB_STEP_SUMMARY
+          echo "$REQUIREMENTS" | jq -r '"- **Needs specific version:** \(.summary.needs_specific_version)"' >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$NIGHTLY_COUNT" -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Nightly Examples" >> $GITHUB_STEP_SUMMARY
+            echo "$REQUIREMENTS" | jq -r '.channels.nightly[] | "- \(.file):\(.line)"' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Test guideline examples that work on stable with no version requirements
+  test-guidelines-stable:
+    runs-on: ubuntu-latest
+    needs: [test-examples, analyze-requirements]
+    name: Test Guidelines (Stable)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Display Rust version
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Test guideline examples (stable)
+        id: test-guidelines
+        run: |
+          mkdir -p build/examples
+          
+          set -o pipefail
+          
+          # Test all examples - those requiring newer versions or nightly will be skipped
+          uv run python scripts/extract_rust_examples.py \
+            --test \
+            --src-dir src/coding-guidelines \
+            --prelude src/examples_prelude.rs \
+            --json build/examples/guideline-results.json \
+            --fail-on-error \
+            --verbose \
+            2>&1 | tee build/examples/guideline_test_output.log
+          
+          EXIT_CODE=${PIPESTATUS[0]}
+          
+          # Generate summary
+          echo "## 📚 Guideline Examples Test Results (Stable)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Rust version:** \`$(rustc --version)\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f build/examples/guideline-results.json ]; then
+            TOTAL=$(jq '.total' build/examples/guideline-results.json)
+            PASSED=$(jq '.passed' build/examples/guideline-results.json)
+            FAILED=$(jq '.failed' build/examples/guideline-results.json)
+            SKIPPED=$(jq '.skipped // 0' build/examples/guideline-results.json)
+            
+            if [ "$FAILED" -eq 0 ]; then
+              if [ "$SKIPPED" -gt 0 ]; then
+                echo "✅ **$PASSED of $TOTAL guideline examples passed, $SKIPPED skipped**" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "✅ **All $TOTAL guideline examples passed!**" >> $GITHUB_STEP_SUMMARY
+              fi
+            else
+              echo "❌ **$FAILED of $TOTAL guideline examples failed** ($SKIPPED skipped)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Failed Examples" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              jq -r '.results[] | select(.passed == false) | "- **\(.example.source_file):\(.example.line_number)**: \(.error_message)"' \
+                build/examples/guideline-results.json >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ "$SKIPPED" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Skipped Examples" >> $GITHUB_STEP_SUMMARY
+              echo "_These require nightly or a specific Rust version and are tested separately._" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              jq -r '.results[] | select(.skipped == true) | "- **\(.example.source_file):\(.example.line_number)**: \(.skip_reason)"' \
+                build/examples/guideline-results.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            fi
+          fi
+          
+          exit $EXIT_CODE
+
+      - name: Upload guideline test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: guideline-examples-results-stable
+          path: |
+            build/examples/guideline-results.json
+            build/examples/guideline_test_output.log
+          retention-days: 7
+
+      - name: Annotate failures in PR
+        if: failure() && github.event_name == 'pull_request'
+        run: |
+          if [ -f build/examples/guideline-results.json ]; then
+            jq -r '.results[] | select(.passed == false) | 
+              "::error file=\(.example.source_file),line=\(.example.line_number)::\(.error_message)"' \
+              build/examples/guideline-results.json
+          fi
+
+  # Test guideline examples that require nightly (only if there are any)
+  test-guidelines-nightly:
+    runs-on: ubuntu-latest
+    needs: [test-examples, analyze-requirements]
+    if: needs.analyze-requirements.outputs.needs_nightly == 'true'
+    name: Test Guidelines (Nightly)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (nightly)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+
+      - name: Display Rust version
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Test nightly-only guideline examples
+        id: test-guidelines-nightly
+        run: |
+          mkdir -p build/examples
+          
+          set -o pipefail
+          
+          # Only test examples that require nightly
+          uv run python scripts/extract_rust_examples.py \
+            --test \
+            --src-dir src/coding-guidelines \
+            --prelude src/examples_prelude.rs \
+            --filter-channel nightly \
+            --json build/examples/guideline-nightly-results.json \
+            --fail-on-error \
+            --verbose \
+            2>&1 | tee build/examples/guideline_nightly_test_output.log
+          
+          EXIT_CODE=${PIPESTATUS[0]}
+          
+          # Generate summary
+          echo "## 📚 Guideline Examples Test Results (Nightly)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Rust version:** \`$(rustc --version)\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f build/examples/guideline-nightly-results.json ]; then
+            TOTAL=$(jq '.total' build/examples/guideline-nightly-results.json)
+            PASSED=$(jq '.passed' build/examples/guideline-nightly-results.json)
+            FAILED=$(jq '.failed' build/examples/guideline-nightly-results.json)
+            
+            if [ "$FAILED" -eq 0 ]; then
+              echo "✅ **All $TOTAL nightly examples passed!**" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **$FAILED of $TOTAL nightly examples failed**" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Failed Examples" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              jq -r '.results[] | select(.passed == false) | "- **\(.example.source_file):\(.example.line_number)**: \(.error_message)"' \
+                build/examples/guideline-nightly-results.json >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          exit $EXIT_CODE
+
+      - name: Upload nightly test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: guideline-examples-results-nightly
+          path: |
+            build/examples/guideline-nightly-results.json
+            build/examples/guideline_nightly_test_output.log
+          retention-days: 7
+
+  # Validate rustdoc attribute consistency
+  check-rustdoc-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for legacy code blocks
+        run: |
+          echo "## 📋 Rustdoc Format Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          LEGACY_COUNT=0
+          LEGACY_FILES=""
+          
+          for file in $(find src/coding-guidelines -name "*.rst" 2>/dev/null); do
+            COUNT=$(grep -c "^\s*\.\. code-block:: rust" "$file" 2>/dev/null || echo 0)
+            if [ "$COUNT" -gt 0 ]; then
+              LEGACY_FILES="$LEGACY_FILES\n- $file: $COUNT occurrences"
+              LEGACY_COUNT=$((LEGACY_COUNT + COUNT))
+            fi
+          done
+          
+          if [ "$LEGACY_COUNT" -eq 0 ]; then
+            echo "✅ All Rust code examples use the rust-example:: directive" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Found $LEGACY_COUNT code blocks using legacy format**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Files with legacy code-block:: rust:" >> $GITHUB_STEP_SUMMARY
+            echo -e "$LEGACY_FILES" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Consider migrating with: \`uv run python scripts/migrate_rust_examples.py\`" >> $GITHUB_STEP_SUMMARY
+          fi

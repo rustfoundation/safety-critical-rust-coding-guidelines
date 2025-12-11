@@ -30,11 +30,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Non-compliant implementation
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_Pw7YCh4Iv47Z
@@ -42,11 +44,13 @@ Macros
 
       Explanation of code example
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Compliant implementation
         }
+        #
+        # fn main() {}
 
 .. guideline:: Procedural macros should not be used
    :id: gui_66FSqzD55VRZ
@@ -76,9 +80,10 @@ Macros
 
       (example of a simple expansion using a proc-macro)
 
-      .. code-block:: rust
+      .. rust-example::
 
         // TODO
+        fn main() {}
 
    .. compliant_example::
       :id: compl_ex_4VFyucETB7C3
@@ -86,9 +91,10 @@ Macros
 
       (example of the same simple expansion using a declarative macro)
 
-      .. code-block:: rust
+      .. rust-example::
 
         // TODO
+        fn main() {}
 
 .. guideline:: A macro should not be used in place of a function
    :id: gui_2jjWUoF1teOY
@@ -135,7 +141,7 @@ Macros
 
       Using a macro where a simple function would suffice, leads to hidden mutation:
 
-      .. code-block:: rust
+      .. rust-example::
 
         macro_rules! increment_and_double {
             ($x:expr) => {
@@ -145,12 +151,15 @@ Macros
                 }
             };
         }
-        let mut num = 5;
-        let result = increment_and_double!(num);
-        println!("Result: {}, Num: {}", result, num);
-        // Result: 12, Num: 6
 
-      In this example, calling the macro both increments and returns the value in one go—without any clear indication in its “signature” that it mutates its argument. As a result, num is changed behind the scenes, which can surprise readers and make debugging more difficult.
+        fn main() {
+            let mut num = 5;
+            let result = increment_and_double!(num);
+            println!("Result: {}, Num: {}", result, num);
+            // Result: 12, Num: 6
+        }
+
+      In this example, calling the macro both increments and returns the value in one go—without any clear indication in its "signature" that it mutates its argument. As a result, num is changed behind the scenes, which can surprise readers and make debugging more difficult.
 
 
    .. compliant_example::
@@ -159,16 +168,19 @@ Macros
 
       The same functionality, implemented as a function with explicit borrowing:
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn increment_and_double(x: &mut i32) -> i32 {
             *x += 1; // mutation is explicit
             *x * 2
         }
-        let mut num = 5;
-        let result = increment_and_double(&mut num);
-        println!("Result: {}, Num: {}", result, num);
-        // Result: 12, Num: 6
+
+        fn main() {
+            let mut num = 5;
+            let result = increment_and_double(&mut num);
+            println!("Result: {}, Num: {}", result, num);
+            // Result: 12, Num: 6
+        }
 
       The function version makes the mutation and borrowing explicit in its signature, improving readability, safety, and debuggability.
 
@@ -198,11 +210,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Non-compliant implementation
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_AEKEOYhBWPMl
@@ -210,11 +224,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Compliant implementation
         }
+        #
+        # fn main() {}
 
 .. guideline:: Shall not invoke macros
    :id: gui_a1mHfjgKk4Xr
@@ -240,11 +256,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Non-compliant implementation
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_ti7GWHCOhUvT
@@ -252,11 +270,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Compliant implementation
         }
+        #
+        # fn main() {}
 
 .. guideline:: Shall not write code that expands macros
    :id: gui_uuDOArzyO3Qw
@@ -282,11 +302,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Non-compliant implementation
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_cFPg6y7upNdl
@@ -294,11 +316,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Compliant implementation
         }
+        #
+        # fn main() {}
 
 .. guideline:: Shall ensure complete hygiene of macros
    :id: gui_8hs33nyp0ipX
@@ -324,11 +348,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Non-compliant implementation
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_GLP05s9c1g8N
@@ -336,11 +362,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Compliant implementation
         }
+        #
+        # fn main() {}
 
 .. guideline:: Attribute macros shall not be used
    :id: gui_13XWp3mb0g2P
@@ -365,14 +393,17 @@ Macros
       :id: non_compl_ex_eW374waRPbeL
       :status: draft
 
-      Explanation of code example.
+      The ``#[test]`` attribute macro transforms the function into a test harness entry point.
 
-      .. code-block:: rust
+      .. rust-example::
+          :no_run:
 
-        #[tokio::main]  // non-compliant
-        async fn main() {
-
-        }
+          #[test]  // non-compliant: attribute macro rewrites the item
+          fn example_test() {
+              assert!(true);
+          }
+          #
+          # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_Mg8ePOgbGJeW
@@ -380,11 +411,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Compliant implementation
         }
+        #
+        # fn main() {}
 
 .. guideline:: Do not hide unsafe blocks within macro expansions
    :id: gui_FRLaMIMb4t3S
@@ -410,11 +443,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Non-compliant implementation
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_pO5gP1aj2v4F
@@ -422,11 +457,13 @@ Macros
 
       Explanation of code example.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn example_function() {
             // Compliant implementation
         }
+        #
+        # fn main() {}
 
 .. guideline:: Names in a macro definition shall use a fully qualified path
    :id: gui_SJMrWDYZ0dN4
@@ -459,19 +496,21 @@ Macros
       defines a struct `Vec` which is not preset at the macro definition, the macro user might be intending to
       use that in the macro.
 
-      .. code-block:: rust
+      .. rust-example::
 
-        #[macro_export]
-        macro_rules! vec {
-            ( $( $x:expr ),* ) => {
-                {
-                    let mut temp_vec = Vec::new(); // non-global path
-                    $(
-                        temp_vec.push($x);
-                    )*
-                    temp_vec
-                }
-            };
+        fn main() {
+            #[macro_export]
+            macro_rules! vec {
+                ( $( $x:expr ),* ) => {
+                    {
+                        let mut temp_vec = Vec::new(); // non-global path
+                        $(
+                            temp_vec.push($x);
+                        )*
+                        temp_vec
+                    }
+                };
+            }
         }
 
    .. compliant_example::
@@ -482,17 +521,19 @@ Macros
       `Vec` defined in the scope of the macro usage, this macro will unambiguously use the `Vec` from the
       Standard Library.
 
-      .. code-block:: rust
+      .. rust-example::
 
-        #[macro_export]
-        macro_rules! vec {
-            ( $( $x:expr ),* ) => {
-                {
-                    let mut temp_vec = ::std::vec::Vec::new(); // global path
-                    $(
-                        temp_vec.push($x);
-                    )*
-                    temp_vec
-                }
-            };
+        fn main() {
+            #[macro_export]
+            macro_rules! vec {
+                ( $( $x:expr ),* ) => {
+                    {
+                        let mut temp_vec = ::std::vec::Vec::new(); // global path
+                        $(
+                            temp_vec.push($x);
+                        )*
+                        temp_vec
+                    }
+                };
+            }
         }

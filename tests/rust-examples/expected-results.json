@@ -1,0 +1,81 @@
+{
+  "description": "Expected test results for tests/rust-examples/test-examples.rst",
+  "examples": [
+    {
+      "line": 25,
+      "name": "Edition 2021 (default)",
+      "expected": {
+        "stable": "pass",
+        "1.75.0": "pass",
+        "nightly": "pass"
+      }
+    },
+    {
+      "line": 42,
+      "name": "Edition 2018 explicit",
+      "expected": {
+        "stable": "pass",
+        "1.75.0": "pass",
+        "nightly": "pass"
+      }
+    },
+    {
+      "line": 61,
+      "name": "Edition 2015",
+      "expected": {
+        "stable": "pass",
+        "1.75.0": "pass",
+        "nightly": "pass"
+      }
+    },
+    {
+      "line": 82,
+      "name": "Version 1.79 (NonZero)",
+      "expected": {
+        "stable": "pass",
+        "1.75.0": "skip",
+        "nightly": "pass"
+      },
+      "version": "1.79"
+    },
+    {
+      "line": 101,
+      "name": "Version 1.87 (unbounded_shl)",
+      "expected": {
+        "stable": "pass",
+        "1.75.0": "skip",
+        "nightly": "pass"
+      },
+      "version": "1.87"
+    },
+    {
+      "line": 123,
+      "name": "Nightly channel (#![feature(test)])",
+      "expected": {
+        "stable": "skip",
+        "1.75.0": "skip",
+        "nightly": "pass"
+      },
+      "channel": "nightly"
+    },
+    {
+      "line": 144,
+      "name": "Combined edition + version",
+      "expected": {
+        "stable": "pass",
+        "1.75.0": "skip",
+        "nightly": "pass"
+      },
+      "version": "1.79"
+    },
+    {
+      "line": 170,
+      "name": "Standard example (no options)",
+      "expected": {
+        "stable": "pass",
+        "1.75.0": "pass",
+        "nightly": "pass"
+      }
+    }
+  ]
+}
