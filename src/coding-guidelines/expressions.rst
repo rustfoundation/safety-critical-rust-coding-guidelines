@@ -780,7 +780,7 @@ Expressions
           /* ... */
         }
 
-.. guideline:: Avoid out-or-range shifts
+.. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand
     :id: gui_RHvQj8BHlz9b 
     :category: advisory
     :status: draft
@@ -991,7 +991,7 @@ Expressions
                  }
              }
 
-.. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand
+.. guideline:: Avoid out-or-range shifts
     :id: gui_LvmzGKdsAgI5 
     :category: mandatory
     :status: draft
