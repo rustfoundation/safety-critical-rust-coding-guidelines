@@ -73,12 +73,12 @@ Types and Traits
     :scope: system
     :tags: surprising-behavior
 
-    Do not access memory using a pointer with an incorrect provenance.
+    Do not access memory using a pointer with an incorrect `provenance <https://doc.rust-lang.org/std/ptr/index.html#provenance>`__.
     Pointers, including values of reference type, have two components.
     The pointer’s address identifies the memory location where the pointer is currently pointing.
-    The pointer’s provenance determines where and when the pointer is allowed to access memory.
+    The pointer’s provenance determines where and when the pointer is allowed to access memory and if it is allowed to mutate the memory.
 
-    Whether a memory access with a given pointer causes undefined behavior (UB) depends on both the address and the provenance:
+    Whether a memory access with a given pointer causes undefined behavior (UB) depends on both the address and the provenance;
     the same address can access memory with one provenance but have undefined behavior with another provenance.
 
     Pointer comparisons are permitted only when both pointers are guaranteed to reference the same allocation.
@@ -89,8 +89,8 @@ Types and Traits
     - Assumed field layout of structs without ``repr(C)`` or ``repr(packed)``
     - Outcomes of pointer arithmetic across allocation boundaries
 
-    This rule ignores any metadata that may come with wide pointers;
-    it only pertains to thin pointers and the data part of a wide pointer.
+    This rule ignores any `metadata <https://doc.rust-lang.org/std/ptr/fn.metadata.html>`__ that may come with wide pointers;
+    it only pertains to thin pointers and the address part of a wide pointer.
 
     .. rationale:: 
         :id: rat_AFpgNhAMQ4eC 
