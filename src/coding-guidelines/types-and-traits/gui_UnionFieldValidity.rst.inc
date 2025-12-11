@@ -10,7 +10,7 @@
    :release: 1.85.0
    :decidability: undecidable
    :scope: expression
-   :tags: unions, safety, undefined-behavior
+   :tags: defect, safety, undefined-behavior
 
    When reading from a union field, ensure that the underlying bytes constitute a valid value 
    for that field's type.
