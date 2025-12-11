@@ -17,7 +17,7 @@ Expressions
     :scope: system
     :tags: security, performance, numerics
 
-    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ of both signed and unsigned integer types. 
+    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`__ of both signed and unsigned integer types. 
     Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.
 
     This rule applies to the following primitive types:
@@ -719,7 +719,6 @@ Expressions
 
       There is no compliant example of this operation.
 
-
 .. guideline:: An integer shall not be converted to an invalid pointer
    :id: gui_iv9yCMHRgpE0
    :category: <TODO>
@@ -781,20 +780,43 @@ Expressions
           /* ... */
         }
 
-.. guideline:: Integer shift shall only be performed through `checked_` APIs
+.. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand
     :id: gui_RHvQj8BHlz9b 
-    :category: required
+    :category: advisory
     :status: draft
     :release: 1.7.0-latest
     :fls: fls_sru4wi5jomoe
     :decidability: decidable
     :scope: module
-    :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
+    :tags: numerics, reduce-human-error, maintainability, surprising-behavior, subset
 
-    In particular, the user should only perform left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_ function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function. Both of these functions exist in `core <https://doc.rust-lang.org/core/index.html>`_.
+    Shifting negative positions or a value greater than or equal to the width of the left operand
+    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    are defined by this guideline to be *out-of-range shifts*.
+    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`__.
+    
+    If the types of both operands are integer types,
+    the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
+    shifted left by the number of positions specified by the right operand ``rhs``.
+    Vacated bits are filled with zeros. 
+    The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
+    cast to the type of the left operand.
+    If the value of the right operand is negative or greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
+
+    If the types of both operands are integer types,
+    the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
+    whose bits are shifted right by the number of positions specified by the right operand ``rhs``.
+    If the type of the left operand is any signed integer type and is negative,
+    the vacated bits are filled with ones.
+    Otherwise, vacated bits are filled with zeros.
+    The expression ``lhs >> rhs`` evaluates to :math:`\mathrm{lhs} / 2^{\mathrm{rhs}}`,
+    cast to the type of the left operand.
+    If the value of the right operand is negative,
+    greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
     This rule applies to the following primitive types:
-
 
     * ``i8``
     * ``i16``
@@ -809,131 +831,167 @@ Expressions
     * ``usize``
     * ``isize``
 
+    Any type can support ``<<`` or ``>>`` if you implement the trait:
+
+    .. code-block:: rust
+
+       use core::ops::Shl;
+
+       impl Shl<u32> for MyType {
+           type Output = MyType;
+           fn shl(self, rhs: u32) -> Self::Output { /* ... */ }
+       }
+
+    You may choose any type for the right operand (not just integers), because you control the implementation.
+
+    This rule is based on The CERT C Coding Standard Rule
+    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+
     .. rationale:: 
         :id: rat_3MpR8QfHodGT 
         :status: draft
 
-        This is a Subset rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
-
-        In Rust these out-of-range shifts don't give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.
-
-
-        * 
-          **Reason 1: inconsistent behavior**
-
-          The behavior of shift operations depends on the compilation mode. Say for example, that we have a number ``x`` of type ``uN``\ , and we perform the operation
-
-          ``x << M`` 
-
-          Then, it will behave like this:
-          
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
-          +==================+=================+=======================+=======================+
-          | Debug            | Shifts normally | Panics                | Panics                |
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts normally | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
-          +------------------+-----------------+-----------------------+-----------------------+
-
-          ..
-
-             Note: the behavior is exactly the same for the ``>>`` operator.
-
-
-          Panicking in ``Debug`` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of ``Release``. Such inconsistencies aren't acceptable in Safety Critical scenarios.
-
-          Therefore, a consistently-behaved operation should be required for performing shifts.
-
-        * 
-          **Reason 2: programmer intent**
-
-          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
-
-          Therefore, an API that restricts the length of the shift to the range ``[0, N - 1]`` should be used instead of the ``<<`` and ``>>`` operators.
-
-        * 
-          **The Solution**
-
-          The ideal solution for this exists in ``core``\ : ``checked_shl`` and ``checked_shr``.
-
-          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``\ , in the following way:
-
-
-          * If ``M < 0``\ , the output is ``None``
-          * If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
-          * If ``N <= M``\ , the output is ``None``
-
-          This API has consistent behavior across ``Debug`` and ``Release``\ , and makes the programmer intent explicit, which effectively solves this issue.
+        Avoid out-of-range shifts in shift left and shift right expressions.
+        Shifting by a negative value, or by a value greater than or equal to the width of the left operand
+        are non-sensical expressions which typically indicate a logic error has occurred.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
         :status: draft
 
-        As seen in the example below:
-
-
-        * A ``Debug`` build **panics**\ , 
-        * 
-          Whereas a ``Release`` build prints the values:
-
-          .. code-block::
-
-             61 << -1 = 2147483648
-             61 << 4 = 976
-             61 << 40 = 15616
-
-        This shows **Reason 1** prominently.
-
-        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (N being the bit-length of the value being shifted) are both meaningless.
+        This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
         .. code-block:: rust
 
-            fn bad_shl(bits: u32, shift: i32) -> u32 {
-               bits << shift
+            fn main() {
+                let bits : u32 = 61;
+                let shifts = vec![-1, 4, 40];
+
+                for sh in shifts {
+                    println!("{bits} << {sh} = {:?}", bits << sh);
+                }
             }
 
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
+    .. non_compliant_example::
+        :id: non_compl_ex_mvkgTL3kulZ5 
+        :status: draft
 
-            for sh in shifts {
-               println!("{bits} << {sh} = {}", bad_shl(bits, sh));
+        This noncompliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
+        than or equal to the width of the left operand.
+
+        .. code-block:: rust
+
+            fn main() {
+                let bits: u32 = 61;
+                let shifts = vec![-1, 0, 4, 40];
+
+                for sh in shifts {
+                    if sh >= 0 && sh < 32 {
+                        println!("{bits} << {sh} = {}", bits << sh);
+                    }
+                 }
             }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcm
+        :status: draft
+
+        The call to ``bits.wrapping_shl(sh)`` in this noncompliant example yields ``bits << mask(sh)``,
+        where ``mask`` removes any high-order bits of ``sh`` that would cause the shift to exceed  the bitwidth of ``bits``.
+        Note that this is not the same as a rotate-left.
+        The ``wrapping_shl`` has the same behavior as the ``<<`` operator in release mode.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits : u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.wrapping_shl(sh));
+                 }
+             }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcx
+        :status: draft
+
+        This noncompliant example uses ``bits.unbounded_shr(sh)``.
+        If ``sh`` is larger or equal to the width of ``bits``,
+        the entire value is shifted out,
+        which yields 0 for a positive number,
+        and -1 for a negative number.
+        The use of this function is noncompliant because it does not detect out-of-range shifts.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits : u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.unbounded_shr(sh));
+                 }
+             }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcp
+        :status: draft
+
+        The call to ``bits.overflowing_shl(sh)`` in this noncompliant shifts ``bits`` left by ``sh`` bits.
+        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
+        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
+
+          .. code-block:: rust
+
+             fn main() {
+                 let bits: u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     let (result, overflowed) = bits.overflowing_shl(sh);
+                     if overflowed {
+                         println!("{bits} << {sh} shift too large");
+                     } else {
+                         println!("{bits} << {sh} = {result}");
+                     }
+                 }
+             }
 
     .. compliant_example::
         :id: compl_ex_xpPQqYeEPGIo 
         :status: draft
 
-        As seen in the example below:
+        This compliant example performs left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_
+        function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function.
+        Both of these functions are defined in `core <https://doc.rust-lang.org/core/index.html>`_.
 
+          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``:
 
-        * Both ``Debug`` and ``Release`` give the same exact output, which addresses **Reason 1**.
-        * Shifting by negative values is impossible due to the fact that ``checked_shl`` only accepts unsigned integers as shift lengths.
-        * Shifting by more than ``N - 1`` (N being the bit-length of the value being shifted) returns a ``None`` value:
-          .. code-block::
+          * If ``M < 0``\ , the output is ``None``
+          * If ``0 <= M < N`` for ``T`` of size ``N`` bits, then the output is ``Some(T)``
+          * If ``N <= M``\ , the output is ``None``
 
-             61 << 4 = Some(976)
-             61 << 40 = None
+          Checked shift operations make programmer intent explicit and eliminates out-of-range shifts.
+          Shifting by:
 
-        The last 2 observations show how this addresses **Reason 2**.
+          * negative values is impossible because ``checked_shl`` only accepts unsigned integers as shift lengths, and
+          * greater than or equal to the number of bits that exist in the left operand returns a ``None`` value.
 
-        .. code-block:: rust
+          .. code-block:: rust
 
-            fn good_shl(bits: u32, shift: u32) -> Option<u32> {
-               bits.checked_shl(shift)
-            }
+             fn main() {
+                 let bits : u32 = 61;
+                 // let shifts = vec![-1, 4, 40];
+                 //                    ^--- Compiler rejects negative shifts
+                 let shifts = vec![4, 40];
 
-            let bits : u32 = 61;
-            // let shifts = vec![-1, 4, 40];
-            //                    ^--- Would not typecheck, as checked_shl
-            //                         only accepts positive shift amounts
-            let shifts = vec![4, 40];
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.checked_shl(sh));
+                 }
+             }
 
-            for sh in shifts {
-               println!("{bits} << {sh} = {:?}", good_shl(bits, sh));
-            }
-
-
-.. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand
+.. guideline:: Avoid out-or-range shifts
     :id: gui_LvmzGKdsAgI5 
     :category: mandatory
     :status: draft
@@ -943,127 +1001,137 @@ Expressions
     :scope: module
     :tags: numerics, surprising-behavior, defect
 
-    In particular, the user should limit the Right Hand Side (RHS) parameter used for left shifts and right shifts (i.e. the ``<<`` and ``>>`` binary operators) to only the range ``0..=N-1``\ , where ``N`` is the number of bits of the Left Hand Side (LHS) parameter. For example, in ``a << b``\ , if ``a`` is of type ``u32``\ , then ``b`` **must belong to** the range ``0..=31``.
+    Shifting negative positions or a value greater than or equal to the width of the left operand
+    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    are defined by this guideline to be *out-of-range shifts*.
+    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`_.
 
-    This rule applies to all types which implement the ``core::ops::Shl`` and / or ``core::ops::Shr`` traits, for Rust Version greater than or equal to ``1.6.0``.
+    If the types of both operands are integer types,
+    the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
+    shifted left by the number of positions specified by the right operand ``rhs``.
+    Vacated bits are filled with zeros. 
+    The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
+    cast to the type of the left operand.
+    If the value of the right operand is negative or greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
-    For versions prior to ``1.6.0``\ , this rule applies to all types for which the ``<<`` and ``>>`` operators are valid. That is, it applies to the following primitive types:
+    If the types of both operands are integer types,
+    the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
+    whose bits are shifted right by the number of positions specified by the right operand ``rhs``.
+    If the type of the left operand is any signed integer type and is negative,
+    the vacated bits are filled with ones.
+    Otherwise, vacated bits are filled with zeros.
+    The expression ``lhs >> rhs`` evaluates to :math:`\mathrm{lhs} / 2^{\mathrm{rhs}}`,
+    cast to the type of the left operand.
+    If the value of the right operand is negative,
+    greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
+    This rule applies to the following primitive types:
 
     * ``i8``
     * ``i16``
     * ``i32``
     * ``i64``
     * ``i128``
-    * ``isize``
     * ``u8``
     * ``u16``
     * ``u32``
     * ``u64``
     * ``u128``
     * ``usize``
+    * ``isize``
+
+    Any type can support ``<<`` or ``>>`` if you implement the trait:
+
+    .. code-block:: rust
+
+       use core::ops::Shl;
+
+       impl Shl<u32> for MyType {
+           type Output = MyType;
+           fn shl(self, rhs: u32) -> Self::Output { /* ... */ }
+       }
+
+    You may choose any type for the right operand (not just integers), because you control the implementation.
+
+    This rule is a less strict but undecidable version of 
+    `Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand`.
+    All code that complies with that rule also complies with this rule.
+
+    This rule is based on The CERT C Coding Standard Rule
+    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
     .. rationale:: 
         :id: rat_tVkDl6gOqz25 
         :status: draft
 
-        This is a Defect Avoidance rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
-
-        In Rust these out-of-range shifts don't give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.
-
-
-        * 
-          **Reason 1: inconsistent behavior**
-
-          The behavior of shift operations depends on the compilation mode. Say for example, that we have a number ``x`` of type ``uN``\ , and we perform the operation
-
-          ``x << M`` 
-
-          Then, it will behave like this:
-         
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
-          +==================+=================+=======================+=======================+
-          | Debug            | Shifts normally | Panics                | Panics                |
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts normally | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
-          +------------------+-----------------+-----------------------+-----------------------+
-         
-
-          ..
-
-             Note: the behavior is exactly the same for the ``>>`` operator.
-
-
-          Panicking in ``Debug`` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of ``Release``. Such inconsistencies aren't acceptable in Safety Critical scenarios.
-
-        * 
-          **Reason 2: programmer intent**
-
-          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
-
-        For both of these reasons, the programmer must ensure the RHS operator stays in the range ``0..=N-1``.
+        Avoid out-of-range shifts in shift left and shift right expressions.
+        Shifting by a negative value, or by a value greater than or equal to the width of the left operand
+        are non-sensical expressions which typically indicate a logic error has occurred.
 
     .. non_compliant_example::
-        :id: non_compl_ex_aTtUjdIuDdbv 
+        :id: non_compl_ex_KLiDMsCesLx7 
         :status: draft
 
-        As seen in the example below:
-
-
-        * A ``Debug`` build **panics**\ , 
-        * 
-          Whereas a ``Release`` build prints the values:
-
-          .. code-block::
-
-             61 << -1 = 2147483648
-             61 << 4 = 976
-             61 << 40 = 15616
-
-        This shows **Reason 1** prominently.
-
-        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (\ ``N`` being the bit-length of the value being shifted) are both meaningless.
+        This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
         .. code-block:: rust
 
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
+            fn main() {
+                let bits : u32 = 61;
+                let shifts = vec![-1, 4, 40];
 
-            for sh in shifts {
-               println!("{bits} << {sh} = {}", bits << sh);
+                for sh in shifts {
+                    println!("{bits} << {sh} = {:?}", bits << sh);
+                }
             }
 
     .. compliant_example::
         :id: compl_ex_Ux1WqHbGKV73 
         :status: draft
 
-        As seen in the example below:
-
-
-        * Both ``Debug`` and ``Release`` give the same exact output, which addresses **Reason 1**.
-        * Out-of-range shifts are caught and avoided before they happen.
-        * 
-          The output shows what's happening:
-
-          .. code-block::
-
-             Performing 61 << -1 would be meaningless and crash-prone; we avoided it!
-             61 << 4 = 976
-             Performing 61 << 40 would be meaningless and crash-prone; we avoided it!
-
-        The output shows how this addresses **Reason 2**.
+        This compliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
+        than or equal to the width of the left operand.
 
         .. code-block:: rust
 
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
+            fn main() {
+                let bits: u32 = 61;
+                let shifts = vec![-1, 0, 4, 40];
 
-            for sh in shifts {
-               if 0 <= sh && sh < 32 {
-                     println!("{bits} << {sh} = {}", bits << sh);
-               } else {
-                     println!("Performing {bits} << {sh} would be meaningless and crash-prone; we avoided it!");
-               }
+                for sh in shifts {
+                    if sh >= 0 && sh < 32 {
+                        println!("{bits} << {sh} = {}", bits << sh);
+                    }
+                 }
             }
 
+    .. compliant_example::
+        :id: compl_ex_Ux1WqHbGKV74
+        :status: draft
+
+        The call to ``bits.overflowing_shl(sh)`` in this noncompliant shifts ``bits`` left by ``sh`` bits.
+        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
+        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
+
+          .. code-block:: rust
+
+             fn safe_shl(bits: u32, shift: u32) -> u32 {
+                 let (result, overflowed) = bits.overflowing_shl(shift);
+                 if overflowed {
+                     0
+                 } else {
+                     result
+                 }
+             }
+
+             fn main() {
+                 let bits: u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     let result = safe_shl(bits, sh);
+                     println!("{bits} << {sh} = {result}");
+                 }
+             }
