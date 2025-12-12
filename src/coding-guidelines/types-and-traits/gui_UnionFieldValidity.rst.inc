@@ -192,6 +192,14 @@
              }
          }
 
+         fn main() {
+             let union_bool = SafeUnion::new_bool(true);
+             let union_int = SafeUnion::new_int(42);
+             
+             println!("Bool union as bool: {:?}", union_bool.get_bool());  // Some(true)
+             println!("Int union as bool: {:?}", union_int.get_bool());    // None
+         }
+
    .. compliant_example::
       :id: compl_ex_UnionSameField
       :status: draft
