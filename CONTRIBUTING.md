@@ -106,9 +106,9 @@ the generated guideline from
 [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
 
 Follow the guidance given in the
-[2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
-in section `Target File` to understand which file under
-[`src/coding-guidelines/](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/tree/main/src/coding-guidelines)
+[2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment)
+in under heading `Target File` to understand which file under
+[`src/coding-guidelines/`](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/tree/main/src/coding-guidelines)
 to place the guideline content.
 
 the comment with the guideline on which
