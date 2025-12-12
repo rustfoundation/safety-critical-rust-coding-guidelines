@@ -62,6 +62,13 @@ needs_types = [
         "color": "#729FCF",
         "style": "node",
     },
+    {
+        "directive": "bibliography",
+        "title": "Bibliography",
+        "prefix": "bib_",
+        "color": "#729FCF",
+        "style": "node",
+    },
 ]
 
 # Define custom sections for needs
@@ -89,7 +96,7 @@ needs_render_contexts = {
 }
 
 # Make sure these sections are included in the JSON
-needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example"]
+needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example", "bibliography"]
 
 needs_statuses = [
     dict(name="draft", description="This guideline is in draft stage", color="#999999"),
