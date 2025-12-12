@@ -30,25 +30,27 @@ Associated Items
 
         The below function ``concat_strings`` is not complaint because it call itself and depending on depth of data provided as input it could generate an stack overflow exception or undefine behavior.
 
-        .. code-block:: rust
+        .. rust-example::
 
             // Recursive enum to represent a string or a list of `MyEnum`
-              enum MyEnum {
-                  Str(String),
-                  List(Vec<MyEnum>),
-              }
+            enum MyEnum {
+                Str(String),
+                List(Vec<MyEnum>),
+            }
 
-              // Concatenates strings from a nested structure of `MyEnum` using recursion.
-              fn concat_strings(input: &[MyEnum]) -> String {
-                  let mut result = String::new();
-                  for item in input {
-                      match item {
-                          MyEnum::Str(s) => result.push_str(s),
-                          MyEnum::List(list) => result.push_str(&concat_strings(list)),
-                      }
-                  }
-                  result
-              }
+            // Concatenates strings from a nested structure of `MyEnum` using recursion.
+            fn concat_strings(input: &[MyEnum]) -> String {
+                let mut result = String::new();
+                for item in input {
+                    match item {
+                        MyEnum::Str(s) => result.push_str(s),
+                        MyEnum::List(list) => result.push_str(&concat_strings(list)),
+                    }
+                }
+                result
+            }
+            #
+            # fn main() {}
 
     .. compliant_example::
         :id: compl_ex_9pK3h65rfceO 
@@ -56,37 +58,39 @@ Associated Items
 
         The following code implements the same functionality using iteration instead of recursion. The ``stack`` variable is used to maintain the processing context at each step of the loop. This approach provides explicit control over memory usage. If the stack grows beyond a predefined limit due to the structure or size of the input, the function returns an error rather than risking a stack overflow or out-of-memory exception. This ensures more predictable and robust behavior in resource-constrained environments.
 
-        .. code-block:: rust
+        .. rust-example::
 
             // Recursive enum to represent a string or a list of `MyEnum`
-              enum MyEnum {
-                  Str(String),
-                  List(Vec<MyEnum>),
-              }
+            enum MyEnum {
+                Str(String),
+                List(Vec<MyEnum>),
+            }
 
-              /// Concatenates strings from a nested structure of `MyEnum` without using recursion.
-              /// Returns an error if the stack size exceeds `MAX_STACK_SIZE`.
-              fn concat_strings_non_recursive(input: &[MyEnum]) -> Result<String, &'static str> {
-                 const MAX_STACK_SIZE: usize = 1000;
-                 let mut result = String::new();
-                 let mut stack = Vec::new();
+            /// Concatenates strings from a nested structure of `MyEnum` without using recursion.
+            /// Returns an error if the stack size exceeds `MAX_STACK_SIZE`.
+            fn concat_strings_non_recursive(input: &[MyEnum]) -> Result<String, &'static str> {
+                const MAX_STACK_SIZE: usize = 1000;
+                let mut result = String::new();
+                let mut stack = Vec::new();
 
-                 // Add all items to the stack
-                 stack.extend(input.iter());
+                // Add all items to the stack
+                stack.extend(input.iter());
 
-                 while let Some(item) = stack.pop() {
-                      match item {
-                          MyEnum::Str(s) => result.insert_str(0, s),
-                          MyEnum::List(list) => {
-                              // Add list items to the stack
-                              for sub_item in list.iter() {
-                                  stack.push(sub_item);
-                                  if stack.len() > MAX_STACK_SIZE {
-                                      return Err("Too big structure");
-                                  }
-                              }
-                          }
-                      }
-                  }
-                  Ok(result)
-              }
+                while let Some(item) = stack.pop() {
+                    match item {
+                        MyEnum::Str(s) => result.insert_str(0, s),
+                        MyEnum::List(list) => {
+                            // Add list items to the stack
+                            for sub_item in list.iter() {
+                                stack.push(sub_item);
+                                if stack.len() > MAX_STACK_SIZE {
+                                    return Err("Too big structure");
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(result)
+            }
+            #
+            # fn main() {}

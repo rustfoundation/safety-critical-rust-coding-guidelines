@@ -17,7 +17,7 @@ Expressions
     :scope: system
     :tags: security, performance, numerics
 
-    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`_ of both signed and unsigned integer types. 
+    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`__ of both signed and unsigned integer types. 
     Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.
 
     This rule applies to the following primitive types:
@@ -51,12 +51,14 @@ Expressions
 
         This noncompliant code example can result in arithmetic overflow during the addition of the signed operands ``si_a`` and ``si_b``:
 
-        .. code-block:: rust
+        .. rust-example::
 
             fn add(si_a: i32, si_b: i32) {
-              let sum: i32 = si_a + si_b;
+              let _sum: i32 = si_a + si_b;
               // ...
             }
+            #
+            # fn main() {}
 
     .. compliant_example::
         :id: compl_ex_BgUHiRB4kc4b_1
@@ -72,13 +74,10 @@ Expressions
         Code that invoked these functions would typically further restrict the range of possible values,
         based on the anticipated range of the inputs.
 
-        .. code-block:: rust
+        .. rust-example::
 
-            enum ArithmeticError {
-                Overflow,
-                DivisionByZero,
-            }
-
+            # #[derive(Debug)]
+            # enum ArithmeticError { Overflow, DivisionByZero }
             use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
 
             fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
@@ -117,6 +116,8 @@ Expressions
                     Ok(si_a * si_b)
                 }
             }
+            #
+            # fn main() {}
 
     .. compliant_example::
         :id: compl_ex_BgUHiRB4kc4c
@@ -125,8 +126,10 @@ Expressions
         This compliant example uses safe checked addition instead of manual bounds checks.
         Checked functions can reduce readability when complex arithmetic expressions are needed.
 
-        .. code-block:: rust
+        .. rust-example::
 
+            # #[derive(Debug)]
+            # enum ArithmeticError { Overflow, DivisionByZero }
             fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 si_a.checked_add(si_b).ok_or(ArithmeticError::Overflow)
             }
@@ -138,6 +141,8 @@ Expressions
             fn mul(a: i32, b: i32) -> Result<i32, ArithmeticError> {
                 a.checked_mul(b).ok_or(ArithmeticError::Overflow)
             }
+            #
+            # fn main() {}
 
     .. compliant_example::
         :id: compl_ex_BgUHiRB4kc4b
@@ -145,7 +150,7 @@ Expressions
 
         Wrapping behavior must be explicitly requested. This compliant example uses wrapping functions.
 
-        .. code-block:: rust
+        .. rust-example::
 
             fn add(a: i32, b: i32) -> i32 {
                 a.wrapping_add(b)
@@ -158,6 +163,8 @@ Expressions
             fn mul(a: i32, b: i32) -> i32 {
                 a.wrapping_mul(b)
             }
+            #
+            # fn main() {}
 
     .. compliant_example::
         :id: compl_ex_BhUHiRB4kc4b
@@ -169,7 +176,7 @@ Expressions
         The ``Wrapping<T>`` type provides a consistent way to force wrapping behavior in all build modes,
         which is useful in specific scenarios like implementing cryptography or hash functions where wrapping arithmetic is the intended behavior.
 
-        .. code-block:: rust
+        .. rust-example::
 
             use std::num::Wrapping;
 
@@ -204,7 +211,7 @@ Expressions
         Saturation semantics always conform to this rule because they ensure that integer operations do not result in arithmetic overflow. 
         This compliant solution shows how to use saturating functions to provide saturation semantics for some basic arithmetic operations.
 
-        .. code-block:: rust
+        .. rust-example::
 
             fn add(a: i32, b: i32) -> i32 {
                 a.saturating_add(b)
@@ -217,16 +224,18 @@ Expressions
             fn mul(a: i32, b: i32) -> i32 {
                 a.saturating_mul(b)
             }
+            #
+            # fn main() {}
 
     .. compliant_example::
         :id: compl_ex_BgUHiSB4kd4b
         :status: draft
 
-        ``Saturating<T>`` is a wrapper type in Rust’s ``core`` library (``core::num::Saturating<T>``) that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
+        ``Saturating<T>`` is a wrapper type in Rust's ``core`` library (``core::num::Saturating<T>``) that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
         ``Saturating<T>`` is useful when you have a section of code or a data type where all arithmetic must be saturating.
         This compliant solution uses the ``Saturating<T>`` type to define several functions that perform basic integer operations using saturation semantics.
 
-        .. code-block:: rust
+        .. rust-example::
 
             use std::num::Saturating;
 
@@ -254,8 +263,10 @@ Expressions
 
         This noncompliant code example example prevents divide-by-zero errors, but does not prevent arithmetic overflow.
 
-        .. code-block:: rust
+        .. rust-example::
 
+            # #[derive(Debug)]
+            # enum DivError { DivisionByZero, Overflow }
             fn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {
                 if s_b == 0 {
                     Err(DivError::DivisionByZero)
@@ -263,6 +274,8 @@ Expressions
                     Ok(s_a / s_b)
                 }
             }
+            #
+            # fn main() {}
 
     .. compliant_example::
         :id: compl_ex_BgUHiRB4kc4d
@@ -270,18 +283,21 @@ Expressions
 
         This compliant solution eliminates the possibility of both divide-by-zero errors and arithmetic overflow:
 
-        .. code-block:: rust
+        .. rust-example::
 
-
+            # #[derive(Debug)]
+            # enum DivError { DivisionByZero, Overflow }
             fn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {
                 if s_b == 0 {
-                    Err("division by zero")
+                    Err(DivError::DivisionByZero)
                 } else if s_a == i64::MIN && s_b == -1 {
-                    Err("arithmetic overflow")
+                    Err(DivError::Overflow)
                 } else {
                     Ok(s_a / s_b)
                 }
             }
+            #
+            # fn main() {}
 
 .. guideline:: Avoid as underscore pointer casts
    :id: gui_HDnAZ7EZ4z6G
@@ -312,7 +328,7 @@ Expressions
 
       The following code leaves it up to type inference to figure out the concrete types of the raw pointer casts, allowing changes to ``with_base``'s function signature to affect the types the function body of ``non_compliant_example`` without incurring a compiler error.
 
-      .. code-block:: rust
+      .. rust-example::
 
          #[repr(C)]
          struct Base {
@@ -330,7 +346,9 @@ Expressions
             with_base(unsafe { &*(extended as *const _) })
          }
 
-         fn with_base(_: &Base) { ... }
+         fn with_base(_: &Base) {}
+         #
+         # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_W08ckDrkOhkt
@@ -338,7 +356,7 @@ Expressions
 
       We specify the concrete target types for our pointer casts resulting in a compilation error if the function signature of ``with_base`` is changed.
 
-      .. code-block:: rust
+      .. rust-example::
 
          #[repr(C)]
          struct Base {
@@ -351,12 +369,14 @@ Expressions
             scale: f32
          }
 
-         fn non_compliant_example(extended: &Extended) {
+         fn compliant_example(extended: &Extended) {
             let extended = extended as *const Extended;
             with_base(unsafe { &*(extended as *const Base) })
          }
 
-         fn with_base(_: &Base) { ... }
+         fn with_base(_: &Base) {}
+         #
+         # fn main() {}
 
 .. guideline:: Do not use an integer type as a divisor during integer division
    :id: gui_7y0GAMmtMhch
@@ -402,11 +422,14 @@ Expressions
 
       Both the division and remainder operations in this non-compliant example will panic if evaluated because the right operand is zero.
 
-      .. code-block:: rust
+      .. rust-example::
+          :compile_fail:
 
-         let x = 0;
-         let y = 5 / x; // This line will panic.
-         let z = 5 % x; // This line would also panic.
+          fn main() {
+              let x = 0;
+              let _y = 5 / x; // This line will panic.
+              let _z = 5 % x; // This line would also panic.
+          }
 
    .. compliant_example::
       :id: compl_ex_k1CD6xoZxhXb
@@ -417,19 +440,21 @@ Expressions
       Using checked division and remainder is particularly important in the signed integer case,
       where arithmetic overflow can also occur when dividing the minimum representable value by -1.
 
-      .. code-block:: rust
+      .. rust-example::
 
-         // Using the checked division API
-         let y = match 5i32.checked_div(0) {
-             None => 0
-             Some(r) => r
-         };
+         fn main() {
+             // Using the checked division API
+             let _y = match 5i32.checked_div(0) {
+                 None => 0,
+                 Some(r) => r,
+             };
 
-         // Using the checked remainder API
-         let z = match 5i32.checked_rem(0) {
-             None => 0
-             Some(r) => r
-         };
+             // Using the checked remainder API
+             let _z = match 5i32.checked_rem(0) {
+                 None => 0,
+                 Some(r) => r,
+             };
+         }
 
    .. compliant_example::
       :id: compl_ex_k1CD6xoZxhXc
@@ -443,11 +468,16 @@ Expressions
       Note that the test for arithmetic overflow that occurs when dividing the minimum representable value by -1 is unnecessary
       in this compliant example because the result of the division expression is an unsigned integer type.
 
-      .. code-block:: rust
+      .. rust-example::
+          :version: 1.79
 
-         let x = 0u32;
-         if let Some(divisor) = match NonZero::<u32>::new(x) {
-            let result = 5u32 / divisor;
+         use std::num::NonZero;
+
+         fn main() {
+             let x = 0u32;
+             if let Some(divisor) = NonZero::<u32>::new(x) {
+                 let _result = 5u32 / divisor;
+             }
          }
 
 .. guideline:: Do not divide by 0
@@ -501,11 +531,14 @@ Expressions
 
       This non-compliant example panics when the right operand is zero for either the division or remainder operations.
 
-      .. code-block:: rust
+      .. rust-example::
+          :compile_fail:
 
-         let x = 0;
-         let y = 5 / x; // Results in a panic.
-         let z = 5 % x; // Also results in a panic.
+          fn main() {
+              let x = 0;
+              let _y = 5 / x; // Results in a panic.
+              let _z = 5 % x; // Also results in a panic.
+          }
 
    .. compliant_example::
       :id: compl_ex_Ri9pP5Ch3kcc
@@ -518,21 +551,23 @@ Expressions
 
       Note that the test for arithmetic overflow is not necessary for unsigned integers.
 
-      .. code-block:: rust
+      .. rust-example::
 
-         // Checking for zero by hand
-         let x = 0u32;
-         let y = if x != 0u32 {
-             5u32 / x
-         } else {
-             0u32
-         };
+         fn main() {
+             // Checking for zero by hand
+             let x = 0u32;
+             let _y = if x != 0u32 {
+                 5u32 / x
+             } else {
+                 0u32
+             };
 
-         let z = if x != 0u32 {
-             5u32 % x
-         } else {
-             0u32
-         };
+             let _z = if x != 0u32 {
+                 5u32 % x
+             } else {
+                 0u32
+             };
+         }
 
 .. guideline:: The 'as' operator should not be used with numeric operands
    :id: gui_ADHABsmK9FXz
@@ -585,27 +620,32 @@ Expressions
       Even when it doesn't, nothing enforces the correct behaviour or communicates whether
       we intend to allow lossy conversions, or only expect valid conversions.
 
-      .. code-block:: rust
+      .. rust-example::
 
          fn f1(x: u16, y: i32, z: u64, w: u8) {
-           let a = w as char;           // non-compliant
-           let b = y as u32;            // non-compliant - changes value range, converting negative values
-           let c = x as i64;            // non-compliant - could use .into()
+           let _a = w as char;           // non-compliant
+           let _b = y as u32;            // non-compliant - changes value range, converting negative values
+           let _c = x as i64;            // non-compliant - could use .into()
 
            let d = y as f32;            // non-compliant - lossy
            let e = d as f64;            // non-compliant - could use .into()
-           let f = e as f32;            // non-compliant - lossy
+           let _f = e as f32;            // non-compliant - lossy
 
-           let g = e as i64;            // non-compliant - lossy despite object size
+           let _g = e as i64;            // non-compliant - lossy despite object size
 
+           let b: u32 = 0;
            let p1: * const u32 = &b;
-           let a1 = p1 as usize;        // compliant by exception
-           let a2 = p1 as u16;          // non-compliant - may lose address range
-           let a3 = p1 as u64;          // non-compliant - use usize to indicate intent
+           let _a1 = p1 as usize;        // compliant by exception
+           let _a2 = p1 as u16;          // non-compliant - may lose address range
+           let _a3 = p1 as u64;          // non-compliant - use usize to indicate intent
 
-           let p2 = a1 as * const u32;  // non-compliant - prefer transmute
-           let p3 = a2 as * const u32;  // non-compliant (and most likely not in a valid address range)
+           let a1 = p1 as usize;
+           let _p2 = a1 as * const u32;  // non-compliant - prefer transmute
+           let a2 = p1 as u16;
+           let _p3 = a2 as * const u32;  // non-compliant (and most likely not in a valid address range)
          }
+         #
+         # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_uilHTIOgxD37
@@ -617,15 +657,17 @@ Expressions
       communicate this and include an error check, with ``try_into`` or ``try_from``.
       Other forms of conversion may find ``transmute`` better communicates their intent.
 
-      .. code-block:: rust
+      .. rust-example::
 
-         fn f2(x: u16, y: i32, z: u64, w: u8) {
-           let a: char            = w.into();
-           let b: Result <u32, _> = y.try_into(); // produce an error on range clip
-           let c: i64             = x.into();
+         use std::convert::TryInto;
+
+         fn f2(x: u16, y: i32, _z: u64, w: u8) {
+           let _a: char            = w.into();
+           let _b: Result <u32, _> = y.try_into(); // produce an error on range clip
+           let _c: i64             = x.into();
 
            let d = f32::from(x);  // u16 is within range, u32 is not
-           let e = f64::from(d);
+           let _e = f64::from(d);
            // let f = f32::from(e); // no From exists
 
            // let g = ...            // no From exists
@@ -635,21 +677,23 @@ Expressions
            let a1 = p1 as usize;     // (compliant)
 
            unsafe {
-             let a2: usize = std::mem::transmute(p1);  // OK
-             let a3: u64   = std::mem::transmute(p1);  // OK, size is checked
+             let _a2: usize = std::mem::transmute(p1);  // OK
+             let _a3: u64   = std::mem::transmute(p1);  // OK, size is checked
              // let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes
 
-             let p2: * const u32 = std::mem::transmute(a1); // OK
-             let p3: * const u32 = std::mem::transmute(a1); // OK
+             let _p2: * const u32 = std::mem::transmute(a1); // OK
+             let _p3: * const u32 = std::mem::transmute(a1); // OK
            }
 
            unsafe {
              // does something entirely different,
              // reinterpreting the bits of z as the IEEE bit pattern of a double
              // precision object, rather than converting the integer value
-             let f1: f64 = std::mem::transmute(z);
+             let _f1: f64 = std::mem::transmute(_z);
            }
          }
+         #
+         # fn main() {}
 
 
 .. guideline:: An integer shall not be converted to a pointer
@@ -691,34 +735,35 @@ Expressions
       Any use of ``as`` or ``transmute`` to create a pointer from an arithmetic address value
       is non-compliant:
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn f1(x: u16, y: i32, z: u64, w: usize) {
-          let p1 = x as * const u32;  // not compliant
-          let p2 = y as * const u32;  // not compliant
-          let p3 = z as * const u32;  // not compliant
-          let p4 = w as * const u32;  // not compliant despite being the right size
+          let _p1 = x as * const u32;  // not compliant
+          let _p2 = y as * const u32;  // not compliant
+          let _p3 = z as * const u32;  // not compliant
+          let _p4 = w as * const u32;  // not compliant despite being the right size
 
-          let f: f64 = 10.0;
+          let _f: f64 = 10.0;
           // let p5 = f as * const u32;  // not valid
 
           unsafe {
             // let p5: * const u32 = std::mem::transmute(x);  // not valid
             // let p6: * const u32 = std::mem::transmute(y);  // not valid
 
-            let p7: * const u32 = std::mem::transmute(z); // not compliant
-            let p8: * const u32 = std::mem::transmute(w); // not compliant
+            let _p7: * const u32 = std::mem::transmute(z); // not compliant
+            let _p8: * const u32 = std::mem::transmute(w); // not compliant
 
-            let p9: * const u32 = std::mem::transmute(f); // not compliant, and very strange
+            let _p9: * const u32 = std::mem::transmute(_f); // not compliant, and very strange
           }
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_oneKuF52yzrx
       :status: draft
 
       There is no compliant example of this operation.
-
 
 .. guideline:: An integer shall not be converted to an invalid pointer
    :id: gui_iv9yCMHRgpE0
@@ -749,14 +794,16 @@ Expressions
       silently interfere with the address value. On platforms where pointers are 64-bits this may have
       particularly unexpected results.
 
-      .. code-block:: rust
+      .. rust-example::
 
         fn f1(flag: u32, ptr: * const u32) {
           /* ... */
           let mut rep = ptr as usize;
           rep = (rep & 0x7fffff) | ((flag as usize) << 23);
-          let p2 = rep as * const u32;
+          let _p2 = rep as * const u32;
         }
+        #
+        # fn main() {}
 
    .. compliant_example::
       :id: compl_ex_oBoluiKSvREu
@@ -766,7 +813,7 @@ Expressions
       This solution is portable to machines of different word sizes, both smaller and larger than 32 bits,
       working even when pointers cannot be represented in any integer type.
 
-      .. code-block:: rust
+      .. rust-example::
 
         struct PtrFlag {
           pointer: * const u32,
@@ -774,27 +821,52 @@ Expressions
         }
 
         fn f2(flag: u32, ptr: * const u32) {
-          let ptrflag = PtrFlag {
+          let _ptrflag = PtrFlag {
             pointer: ptr,
             flag: flag
           };
           /* ... */
         }
+        #
+        # fn main() {}
 
-.. guideline:: Integer shift shall only be performed through `checked_` APIs
+.. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand
     :id: gui_RHvQj8BHlz9b 
-    :category: required
+    :category: advisory
     :status: draft
     :release: 1.7.0-latest
     :fls: fls_sru4wi5jomoe
     :decidability: decidable
     :scope: module
-    :tags: numerics, reduce-human-error, maintainability, portability, surprising-behavior, subset
+    :tags: numerics, reduce-human-error, maintainability, surprising-behavior, subset
 
-    In particular, the user should only perform left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_ function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function. Both of these functions exist in `core <https://doc.rust-lang.org/core/index.html>`_.
+    Shifting negative positions or a value greater than or equal to the width of the left operand
+    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    are defined by this guideline to be *out-of-range shifts*.
+    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`__.
+    
+    If the types of both operands are integer types,
+    the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
+    shifted left by the number of positions specified by the right operand ``rhs``.
+    Vacated bits are filled with zeros. 
+    The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
+    cast to the type of the left operand.
+    If the value of the right operand is negative or greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
+
+    If the types of both operands are integer types,
+    the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
+    whose bits are shifted right by the number of positions specified by the right operand ``rhs``.
+    If the type of the left operand is any signed integer type and is negative,
+    the vacated bits are filled with ones.
+    Otherwise, vacated bits are filled with zeros.
+    The expression ``lhs >> rhs`` evaluates to :math:`\mathrm{lhs} / 2^{\mathrm{rhs}}`,
+    cast to the type of the left operand.
+    If the value of the right operand is negative,
+    greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
     This rule applies to the following primitive types:
-
 
     * ``i8``
     * ``i16``
@@ -809,131 +881,171 @@ Expressions
     * ``usize``
     * ``isize``
 
+    Any type can support ``<<`` or ``>>`` if you implement the trait:
+
+    .. rust-example::
+
+       use core::ops::Shl;
+       # struct MyType;
+
+       impl Shl<u32> for MyType {
+           type Output = MyType;
+           fn shl(self, _rhs: u32) -> Self::Output { MyType }
+       }
+       #
+       # fn main() {}
+
+    You may choose any type for the right operand (not just integers), because you control the implementation.
+
+    This rule is based on The CERT C Coding Standard Rule
+    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+
     .. rationale:: 
         :id: rat_3MpR8QfHodGT 
         :status: draft
 
-        This is a Subset rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
-
-        In Rust these out-of-range shifts don't give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.
-
-
-        * 
-          **Reason 1: inconsistent behavior**
-
-          The behavior of shift operations depends on the compilation mode. Say for example, that we have a number ``x`` of type ``uN``\ , and we perform the operation
-
-          ``x << M`` 
-
-          Then, it will behave like this:
-          
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
-          +==================+=================+=======================+=======================+
-          | Debug            | Shifts normally | Panics                | Panics                |
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts normally | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
-          +------------------+-----------------+-----------------------+-----------------------+
-
-          ..
-
-             Note: the behavior is exactly the same for the ``>>`` operator.
-
-
-          Panicking in ``Debug`` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of ``Release``. Such inconsistencies aren't acceptable in Safety Critical scenarios.
-
-          Therefore, a consistently-behaved operation should be required for performing shifts.
-
-        * 
-          **Reason 2: programmer intent**
-
-          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
-
-          Therefore, an API that restricts the length of the shift to the range ``[0, N - 1]`` should be used instead of the ``<<`` and ``>>`` operators.
-
-        * 
-          **The Solution**
-
-          The ideal solution for this exists in ``core``\ : ``checked_shl`` and ``checked_shr``.
-
-          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``\ , in the following way:
-
-
-          * If ``M < 0``\ , the output is ``None``
-          * If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
-          * If ``N <= M``\ , the output is ``None``
-
-          This API has consistent behavior across ``Debug`` and ``Release``\ , and makes the programmer intent explicit, which effectively solves this issue.
+        Avoid out-of-range shifts in shift left and shift right expressions.
+        Shifting by a negative value, or by a value greater than or equal to the width of the left operand
+        are non-sensical expressions which typically indicate a logic error has occurred.
 
     .. non_compliant_example::
         :id: non_compl_ex_O9FZuazu3Lcn 
         :status: draft
 
-        As seen in the example below:
+        This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
+        .. rust-example::
 
-        * A ``Debug`` build **panics**\ , 
-        * 
-          Whereas a ``Release`` build prints the values:
+            fn main() {
+                let bits : u32 = 61;
+                let shifts = vec![-1, 4, 40];
 
-          .. code-block::
-
-             61 << -1 = 2147483648
-             61 << 4 = 976
-             61 << 40 = 15616
-
-        This shows **Reason 1** prominently.
-
-        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (N being the bit-length of the value being shifted) are both meaningless.
-
-        .. code-block:: rust
-
-            fn bad_shl(bits: u32, shift: i32) -> u32 {
-               bits << shift
+                for sh in shifts {
+                    println!("{bits} << {sh} = {:?}", bits << sh);
+                }
             }
 
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
+    .. non_compliant_example::
+        :id: non_compl_ex_mvkgTL3kulZ5 
+        :status: draft
 
-            for sh in shifts {
-               println!("{bits} << {sh} = {}", bad_shl(bits, sh));
+        This noncompliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
+        than or equal to the width of the left operand.
+
+        .. rust-example::
+
+            fn main() {
+                let bits: u32 = 61;
+                let shifts = vec![-1, 0, 4, 40];
+
+                for sh in shifts {
+                    if sh >= 0 && sh < 32 {
+                        println!("{bits} << {sh} = {}", bits << sh);
+                    }
+                 }
             }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcm
+        :status: draft
+
+        The call to ``bits.wrapping_shl(sh)`` in this noncompliant example yields ``bits << mask(sh)``,
+        where ``mask`` removes any high-order bits of ``sh`` that would cause the shift to exceed  the bitwidth of ``bits``.
+        Note that this is not the same as a rotate-left.
+        The ``wrapping_shl`` has the same behavior as the ``<<`` operator in release mode.
+
+          .. rust-example::
+
+             fn main() {
+                 let bits : u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.wrapping_shl(sh));
+                 }
+             }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcx
+        :status: draft
+
+        This noncompliant example uses ``bits.unbounded_shr(sh)``.
+        If ``sh`` is larger or equal to the width of ``bits``,
+        the entire value is shifted out,
+        which yields 0 for a positive number,
+        and -1 for a negative number.
+        The use of this function is noncompliant because it does not detect out-of-range shifts.
+
+          .. rust-example::
+              :version: 1.87
+
+             fn main() {
+                 let bits : u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.unbounded_shr(sh));
+                 }
+             }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_O9FZuazu3Lcp
+        :status: draft
+
+        The call to ``bits.overflowing_shl(sh)`` in this noncompliant shifts ``bits`` left by ``sh`` bits.
+        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
+        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
+
+          .. rust-example::
+
+             fn main() {
+                 let bits: u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     let (result, overflowed) = bits.overflowing_shl(sh);
+                     if overflowed {
+                         println!("{bits} << {sh} shift too large");
+                     } else {
+                         println!("{bits} << {sh} = {result}");
+                     }
+                 }
+             }
 
     .. compliant_example::
         :id: compl_ex_xpPQqYeEPGIo 
         :status: draft
 
-        As seen in the example below:
+        This compliant example performs left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_
+        function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function.
+        Both of these functions are defined in `core <https://doc.rust-lang.org/core/index.html>`_.
 
+          ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``:
 
-        * Both ``Debug`` and ``Release`` give the same exact output, which addresses **Reason 1**.
-        * Shifting by negative values is impossible due to the fact that ``checked_shl`` only accepts unsigned integers as shift lengths.
-        * Shifting by more than ``N - 1`` (N being the bit-length of the value being shifted) returns a ``None`` value:
-          .. code-block::
+          * If ``M < 0``\ , the output is ``None``
+          * If ``0 <= M < N`` for ``T`` of size ``N`` bits, then the output is ``Some(T)``
+          * If ``N <= M``\ , the output is ``None``
 
-             61 << 4 = Some(976)
-             61 << 40 = None
+          Checked shift operations make programmer intent explicit and eliminates out-of-range shifts.
+          Shifting by:
 
-        The last 2 observations show how this addresses **Reason 2**.
+          * negative values is impossible because ``checked_shl`` only accepts unsigned integers as shift lengths, and
+          * greater than or equal to the number of bits that exist in the left operand returns a ``None`` value.
 
-        .. code-block:: rust
+          .. rust-example::
 
-            fn good_shl(bits: u32, shift: u32) -> Option<u32> {
-               bits.checked_shl(shift)
-            }
+             fn main() {
+                 let bits : u32 = 61;
+                 // let shifts = vec![-1, 4, 40];
+                 //                    ^--- Compiler rejects negative shifts
+                 let shifts = vec![4, 40];
 
-            let bits : u32 = 61;
-            // let shifts = vec![-1, 4, 40];
-            //                    ^--- Would not typecheck, as checked_shl
-            //                         only accepts positive shift amounts
-            let shifts = vec![4, 40];
+                 for sh in shifts {
+                     println!("{bits} << {sh} = {:?}", bits.checked_shl(sh));
+                 }
+             }
 
-            for sh in shifts {
-               println!("{bits} << {sh} = {:?}", good_shl(bits, sh));
-            }
-
-
-.. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand
+.. guideline:: Avoid out-or-range shifts
     :id: gui_LvmzGKdsAgI5 
     :category: mandatory
     :status: draft
@@ -943,127 +1055,140 @@ Expressions
     :scope: module
     :tags: numerics, surprising-behavior, defect
 
-    In particular, the user should limit the Right Hand Side (RHS) parameter used for left shifts and right shifts (i.e. the ``<<`` and ``>>`` binary operators) to only the range ``0..=N-1``\ , where ``N`` is the number of bits of the Left Hand Side (LHS) parameter. For example, in ``a << b``\ , if ``a`` is of type ``u32``\ , then ``b`` **must belong to** the range ``0..=31``.
+    Shifting negative positions or a value greater than or equal to the width of the left operand
+    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    are defined by this guideline to be *out-of-range shifts*.
+    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`_.
 
-    This rule applies to all types which implement the ``core::ops::Shl`` and / or ``core::ops::Shr`` traits, for Rust Version greater than or equal to ``1.6.0``.
+    If the types of both operands are integer types,
+    the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
+    shifted left by the number of positions specified by the right operand ``rhs``.
+    Vacated bits are filled with zeros. 
+    The expression ``lhs << rhs`` evaluates to :math:`\mathrm{lhs} \times 2^{\mathrm{rhs}}`, 
+    cast to the type of the left operand.
+    If the value of the right operand is negative or greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
-    For versions prior to ``1.6.0``\ , this rule applies to all types for which the ``<<`` and ``>>`` operators are valid. That is, it applies to the following primitive types:
+    If the types of both operands are integer types,
+    the shift right expression ``lhs >> rhs`` evaluates to the value of the left operand ``lhs`` 
+    whose bits are shifted right by the number of positions specified by the right operand ``rhs``.
+    If the type of the left operand is any signed integer type and is negative,
+    the vacated bits are filled with ones.
+    Otherwise, vacated bits are filled with zeros.
+    The expression ``lhs >> rhs`` evaluates to :math:`\mathrm{lhs} / 2^{\mathrm{rhs}}`,
+    cast to the type of the left operand.
+    If the value of the right operand is negative,
+    greater than or equal to the width of the left operand,
+    then the operation results in an out-of-range shift.
 
+    This rule applies to the following primitive types:
 
     * ``i8``
     * ``i16``
     * ``i32``
     * ``i64``
     * ``i128``
-    * ``isize``
     * ``u8``
     * ``u16``
     * ``u32``
     * ``u64``
     * ``u128``
     * ``usize``
+    * ``isize``
+
+    Any type can support ``<<`` or ``>>`` if you implement the trait:
+
+    .. rust-example::
+
+       use core::ops::Shl;
+       # struct MyType;
+
+       impl Shl<u32> for MyType {
+           type Output = MyType;
+           fn shl(self, _rhs: u32) -> Self::Output { MyType }
+       }
+       #
+       # fn main() {}
+
+    You may choose any type for the right operand (not just integers), because you control the implementation.
+
+    This rule is a less strict but undecidable version of 
+    `Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand`.
+    All code that complies with that rule also complies with this rule.
+
+    This rule is based on The CERT C Coding Standard Rule
+    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
 
     .. rationale:: 
         :id: rat_tVkDl6gOqz25 
         :status: draft
 
-        This is a Defect Avoidance rule, directly inspired by `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
-
-        In Rust these out-of-range shifts don't give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.
-
-
-        * 
-          **Reason 1: inconsistent behavior**
-
-          The behavior of shift operations depends on the compilation mode. Say for example, that we have a number ``x`` of type ``uN``\ , and we perform the operation
-
-          ``x << M`` 
-
-          Then, it will behave like this:
-         
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Compilation Mode | ``0 <= M < N``  | ``M < 0``             | ``N <= M``            |
-          +==================+=================+=======================+=======================+
-          | Debug            | Shifts normally | Panics                | Panics                |
-          +------------------+-----------------+-----------------------+-----------------------+
-          | Release          | Shifts normally | Shifts by ``M mod N`` | Shifts by ``M mod N`` |
-          +------------------+-----------------+-----------------------+-----------------------+
-         
-
-          ..
-
-             Note: the behavior is exactly the same for the ``>>`` operator.
-
-
-          Panicking in ``Debug`` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of ``Release``. Such inconsistencies aren't acceptable in Safety Critical scenarios.
-
-        * 
-          **Reason 2: programmer intent**
-
-          There is no scenario in which it makes sense to perform a shift of negative length, or of more than ``N - 1`` bits. The operation itself becomes meaningless.
-
-        For both of these reasons, the programmer must ensure the RHS operator stays in the range ``0..=N-1``.
+        Avoid out-of-range shifts in shift left and shift right expressions.
+        Shifting by a negative value, or by a value greater than or equal to the width of the left operand
+        are non-sensical expressions which typically indicate a logic error has occurred.
 
     .. non_compliant_example::
-        :id: non_compl_ex_aTtUjdIuDdbv 
+        :id: non_compl_ex_KLiDMsCesLx7 
         :status: draft
 
-        As seen in the example below:
+        This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
+        .. rust-example::
 
-        * A ``Debug`` build **panics**\ , 
-        * 
-          Whereas a ``Release`` build prints the values:
+            fn main() {
+                let bits : u32 = 61;
+                let shifts = vec![-1, 4, 40];
 
-          .. code-block::
-
-             61 << -1 = 2147483648
-             61 << 4 = 976
-             61 << 40 = 15616
-
-        This shows **Reason 1** prominently.
-
-        **Reason 2** is not seen in the code, because it is a reason of programmer intent: shifts by less than 0 or by more than ``N - 1`` (\ ``N`` being the bit-length of the value being shifted) are both meaningless.
-
-        .. code-block:: rust
-
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
-
-            for sh in shifts {
-               println!("{bits} << {sh} = {}", bits << sh);
+                for sh in shifts {
+                    println!("{bits} << {sh} = {:?}", bits << sh);
+                }
             }
 
     .. compliant_example::
         :id: compl_ex_Ux1WqHbGKV73 
         :status: draft
 
-        As seen in the example below:
+        This compliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
+        than or equal to the width of the left operand.
 
+        .. rust-example::
 
-        * Both ``Debug`` and ``Release`` give the same exact output, which addresses **Reason 1**.
-        * Out-of-range shifts are caught and avoided before they happen.
-        * 
-          The output shows what's happening:
+            fn main() {
+                let bits: u32 = 61;
+                let shifts = vec![-1, 0, 4, 40];
 
-          .. code-block::
-
-             Performing 61 << -1 would be meaningless and crash-prone; we avoided it!
-             61 << 4 = 976
-             Performing 61 << 40 would be meaningless and crash-prone; we avoided it!
-
-        The output shows how this addresses **Reason 2**.
-
-        .. code-block:: rust
-
-            let bits : u32 = 61;
-            let shifts = vec![-1, 4, 40];
-
-            for sh in shifts {
-               if 0 <= sh && sh < 32 {
-                     println!("{bits} << {sh} = {}", bits << sh);
-               } else {
-                     println!("Performing {bits} << {sh} would be meaningless and crash-prone; we avoided it!");
-               }
+                for sh in shifts {
+                    if sh >= 0 && sh < 32 {
+                        println!("{bits} << {sh} = {}", bits << sh);
+                    }
+                 }
             }
 
+    .. compliant_example::
+        :id: compl_ex_Ux1WqHbGKV74
+        :status: draft
+
+        The call to ``bits.overflowing_shl(sh)`` in this noncompliant shifts ``bits`` left by ``sh`` bits.
+        Returns a tuple of the shifted version of self along with a boolean indicating whether the shift value was larger than or equal to the number of bits.
+        If the shift value is too large, then value is masked (N-1) where N is the number of bits, and this value is used to perform the shift.
+
+          .. rust-example::
+
+             fn safe_shl(bits: u32, shift: u32) -> u32 {
+                 let (result, overflowed) = bits.overflowing_shl(shift);
+                 if overflowed {
+                     0
+                 } else {
+                     result
+                 }
+             }
+
+             fn main() {
+                 let bits: u32 = 61;
+                 let shifts = vec![4, 40];
+
+                 for sh in shifts {
+                     let result = safe_shl(bits, sh);
+                     println!("{bits} << {sh} = {result}");
+                 }
+             }

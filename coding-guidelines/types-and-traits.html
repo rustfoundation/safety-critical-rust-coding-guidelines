@@ -116,7 +116,7 @@
              
   <section id="types-and-traits">
 <h1>Types and Traits<a class="headerlink" href="#types-and-traits" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-b71631fb">
+<div class="need_container docutils container" id="SNCB-d74f77b8">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_xztNdXA2oFNC">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -147,7 +147,7 @@
 <li><p>You need to enable trait-based behavior</p></li>
 <li><p>You need to establish new invariants</p></li>
 </ul>
-<div class="need_container docutils container" id="SNCB-de6b1f88">
+<div class="need_container docutils container" id="SNCB-f61f8641">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_kYiIiW8R2qD2">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -187,7 +187,7 @@ Statically distinct types act as strong API contracts that can evolve independen
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-2f16d216">
+<div class="need_container docutils container" id="SNCB-4b983018">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWw">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -208,16 +208,18 @@ Nothing prevents the caller from passing <code class="docutils literal notransla
 The units of each type are not clear from the function signature alone.
 Mistakes compile cleanly and silently produce wrong results.</p>
 <blockquote>
-<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">travel</span><span class="p">(</span><span class="n">distance</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
+<div><div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">travel</span><span class="p">(</span><span class="n">distance</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
 <span class="w">   </span><span class="n">distance</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">time</span>
 <span class="p">}</span>
 
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
-<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
 <span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">travel</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">);</span><span class="w">  </span><span class="c1">// Compiles, but semantically incorrect</span>
 <span class="p">}</span>
 </pre></div>
+</div>
 </div>
 </div></blockquote>
 </td>
@@ -225,7 +227,7 @@ Mistakes compile cleanly and silently produce wrong results.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-030fba9d">
+<div class="need_container docutils container" id="SNCB-b22de0b8">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWv">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -249,7 +251,8 @@ Nothing prevents the caller from passing <code class="docutils literal notransla
 The units of each type are not clear from the function signature alone.
 Mistakes compile cleanly and silently produce wrong results.</p>
 <blockquote>
-<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">type</span><span class="w"> </span><span class="nc">Meters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+<div><div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">type</span><span class="w"> </span><span class="nc">Meters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
 <span class="k">type</span><span class="w"> </span><span class="nc">Seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
 <span class="k">type</span><span class="w"> </span><span class="nc">MetersPerSecond</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
 
@@ -264,13 +267,14 @@ Mistakes compile cleanly and silently produce wrong results.</p>
 <span class="p">}</span>
 </pre></div>
 </div>
+</div>
 </div></blockquote>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-39e3a6b3">
+<div class="need_container docutils container" id="SNCB-926bd47e">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_WTe7GoPu5Ez1">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -290,7 +294,8 @@ Mistakes compile cleanly and silently produce wrong results.</p>
 The compiler enforces correct usage, preventing accidental swapping of parameters.
 The function signature clearly conveys the intended semantics of each parameter and return value.</p>
 <blockquote>
-<div><div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">ops</span><span class="p">::</span><span class="n">Div</span><span class="p">;</span>
+<div><div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">ops</span><span class="p">::</span><span class="n">Div</span><span class="p">;</span>
 
 <span class="cp">#[derive(Debug, Clone, Copy)]</span>
 <span class="k">struct</span><span class="w"> </span><span class="nc">Meters</span><span class="p">(</span><span class="kt">u32</span><span class="p">);</span>
@@ -316,6 +321,7 @@ The function signature clearly conveys the intended semantics of each parameter 
 <span class="w">     </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">);</span><span class="w">  </span><span class="c1">// MetersPerSecond(10)</span>
 <span class="w"> </span><span class="p">}</span>
 </pre></div>
+</div>
 </div>
 </div></blockquote>
 </td>
