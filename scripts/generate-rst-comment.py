@@ -28,6 +28,13 @@ from guideline_utils import (
     normalize_md,
 )
 
+# SPDX header to prepend to guideline files
+GUIDELINE_FILE_HEADER = """\
+.. SPDX-License-Identifier: MIT OR Apache-2.0
+   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
+
+"""
+
 
 def extract_guideline_id(rst_content: str) -> str:
     """
@@ -56,6 +63,9 @@ def generate_comment(rst_content: str, chapter: str) -> str:
     """
     chapter_slug = chapter_to_filename(chapter)
     guideline_id = extract_guideline_id(rst_content)
+    
+    # Prepend the SPDX header to the RST content for display
+    full_rst_content = GUIDELINE_FILE_HEADER + rst_content.strip()
     
     # Determine target path based on whether we have a guideline ID
     if guideline_id:
@@ -122,7 +132,7 @@ Once this issue is approved, a maintainer will add the `sign-off: create pr from
 <summary><strong>📄 Click to expand RST content</strong></summary>
 
 ```rst
-{rst_content}
+{full_rst_content}
 ```
 
 </details>
