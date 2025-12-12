@@ -26,6 +26,12 @@ extensions = [
     "coding_guidelines",
 ]
 
+# Show hidden lines in all examples (default: False)
+rust_examples_show_hidden = False
+
+# Path to shared prelude (default: None)
+rust_examples_prelude_file = "src/examples_prelude.rs"
+
 # Basic needs configuration
 needs_id_regex = "^[A-Za-z0-9_]+"
 needs_title_optional = True

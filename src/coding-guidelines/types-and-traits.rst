@@ -58,7 +58,7 @@ Types and Traits
       The units of each type are not clear from the function signature alone.
       Mistakes compile cleanly and silently produce wrong results.
 
-       .. code-block:: rust
+       .. rust-example::
 
          fn travel(distance: u32, time: u32) -> u32 {
             distance / time
@@ -66,7 +66,7 @@ Types and Traits
 
          fn main() {
             let d = 100;
-            let t = = 10;
+            let t = 10;
             let _result = travel(t, d);  // Compiles, but semantically incorrect
          }
 
@@ -83,7 +83,7 @@ Types and Traits
       The units of each type are not clear from the function signature alone.
       Mistakes compile cleanly and silently produce wrong results.
 
-       .. code-block:: rust
+       .. rust-example::
 
          type Meters = u32;
          type Seconds = u32;
@@ -107,7 +107,7 @@ Types and Traits
       The compiler enforces correct usage, preventing accidental swapping of parameters.
       The function signature clearly conveys the intended semantics of each parameter and return value.  
 
-       .. code-block:: rust
+       .. rust-example::
 
          use std::ops::Div;
 

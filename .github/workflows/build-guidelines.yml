@@ -12,18 +12,18 @@ on:
       - "main"
   # workflow_call trigger to make this workflow reusable
   workflow_call:
-    # You can add inputs here if needed in the future
-    # inputs:
-    #   example_input:
-    #     required: false
-    #     type: string
-    #     default: 'default value'
+
 jobs:
+  # Check Rust examples compile before building docs
+  check_rust_examples:
+    uses: ./.github/workflows/check-rust-examples.yml
+
   build:
+    needs: check_rust_examples
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Build documentation
@@ -78,9 +78,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install typos
         run: cargo install typos-cli
       - name: Check for typos
         run: typos
-  
