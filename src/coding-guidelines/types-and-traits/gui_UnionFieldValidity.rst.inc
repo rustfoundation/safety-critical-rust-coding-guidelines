@@ -29,10 +29,10 @@
       Unions allow multiple fields to occupy the same memory, similar to C unions.
       Unlike enumeration types, unions do not track which field is currently active.
       You must ensure that when a field is read,
-      the underlying bytes are valid for that field's type [UNION]_.
+      the underlying bytes are valid for that field's type [RUST-REF-UNION]_.
 
       Every type has a *validity invariant* — a set of constraints that all values of
-      that type must satisfy [VALID]_.
+      that type must satisfy [UCG-VALIDITY]_.
       Reading a union field performs a *typed read*,
       which asserts that the bytes are valid for the target type.
 
@@ -280,11 +280,17 @@
 
       .. list-table::
          :header-rows: 0
-         :widths: 5 60
+         :widths: 10 90
+         :class: bibliography-table
 
-         * - .. [UNION]
-           - The Rust Project Developers. "Rust Reference: Unions." *The Rust Reference*, n.d. https://doc.rust-lang.org/reference/items/unions.html.
-         * - .. [VALID]
-           - Rust Unsafe Code Guidelines Working Group. "Validity and Safety Invariant." *Rust Unsafe Code Guidelines*, n.d. https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
+         * - .. [RUST-REF-UNION]
+           - The Rust Project Developers. "Rust Reference: Unions." 
+             *The Rust Reference*, n.d. 
+             https://doc.rust-lang.org/reference/items/unions.html.
+
+         * - .. [UCG-VALIDITY]
+           - Rust Unsafe Code Guidelines Working Group. "Validity and Safety 
+             Invariant." *Rust Unsafe Code Guidelines*, n.d. 
+             https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
 
 >>>>>>> c93b2cb (Update types-and-traits.rst):src/coding-guidelines/types-and-traits.rst
