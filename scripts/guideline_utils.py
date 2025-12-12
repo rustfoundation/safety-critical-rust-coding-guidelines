@@ -451,6 +451,9 @@ def save_guideline_file(content: str, chapter: str, base_dir: str = DEFAULT_GUID
     3. Writes to chapter_name/guideline_id.rst.inc
     4. Updates the chapter index to include the new guideline
     
+    If the new structure doesn't exist (migration hasn't been run), falls back
+    to legacy behavior (appending to monolithic chapter file).
+    
     Note: We use .rst.inc extension so Sphinx doesn't auto-discover these files.
     They are only processed when included by the chapter index.rst.
     
@@ -462,28 +465,41 @@ def save_guideline_file(content: str, chapter: str, base_dir: str = DEFAULT_GUID
     Returns:
         Path to the created guideline file
     """
-    # Get guideline ID
-    guideline_id = extract_guideline_id(content)
-    
     # Determine paths
     chapter_dirname = chapter_to_dirname(chapter)
     chapter_dir = Path(base_dir) / chapter_dirname
-    guideline_file = chapter_dir / f"{guideline_id}.rst.inc"
+    index_file = chapter_dir / "index.rst"
     
-    # Ensure chapter directory exists
-    chapter_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Prepare full content with header
-    full_content = GUIDELINE_FILE_HEADER + content.strip() + "\n"
-    
-    # Write the guideline file
-    guideline_file.write_text(full_content)
-    print(f"Saved guideline to {guideline_file}")
-    
-    # Update chapter index
-    add_include_to_chapter_index(chapter_dir, guideline_id)
-    
-    return guideline_file
+    # Check if the new structure exists (chapter directory with index.rst)
+    if chapter_dir.exists() and index_file.exists():
+        # New per-guideline file structure
+        try:
+            guideline_id = extract_guideline_id(content)
+        except ValueError as e:
+            print(f"Warning: {e}")
+            print("Falling back to legacy save behavior")
+            return save_guideline_file_legacy(content, chapter)
+        
+        guideline_file = chapter_dir / f"{guideline_id}.rst.inc"
+        
+        # Prepare full content with header
+        full_content = GUIDELINE_FILE_HEADER + content.strip() + "\n"
+        
+        # Write the guideline file
+        guideline_file.write_text(full_content)
+        print(f"Saved guideline to {guideline_file}")
+        
+        # Update chapter index
+        add_include_to_chapter_index(chapter_dir, guideline_id)
+        
+        return guideline_file
+    else:
+        # Legacy structure - chapter directory doesn't exist or no index.rst
+        # Fall back to appending to monolithic file
+        print(f"Note: Chapter directory structure not found for '{chapter}'")
+        print("Using legacy save behavior (append to chapter file)")
+        print("Run 'split_guidelines.py --all' to migrate to per-guideline files")
+        return save_guideline_file_legacy(content, chapter)
 
 
 def save_guideline_file_legacy(content: str, chapter: str):
@@ -496,11 +512,15 @@ def save_guideline_file_legacy(content: str, chapter: str):
     Args:
         content: The RST content to append
         chapter: The chapter name
+        
+    Returns:
+        Path to the chapter file
     """
-    filename = f"src/coding-guidelines/{chapter_to_filename(chapter)}.rst"
+    filename = Path(f"src/coding-guidelines/{chapter_to_filename(chapter)}.rst")
     with open(filename, "a", encoding="utf-8") as f:
         f.write(content)
     print(f"Saved guideline to {filename}")
+    return filename
 
 
 def list_guidelines_in_chapter(
