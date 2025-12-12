@@ -292,7 +292,6 @@ Types and Traits
       :id: bib_UnionFieldValidity
       :status: draft
 
-      ```rst
       .. list-table::
          :header-rows: 0
          :widths: 5 85
