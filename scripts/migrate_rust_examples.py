@@ -11,6 +11,8 @@ This script:
 2. Converts them to rust-example:: directives
 3. Optionally runs a compilation check to suggest appropriate attributes
 
+Supports both monolithic chapter files (*.rst) and per-guideline files (*.rst.inc).
+
 Usage:
     # Preview changes (dry run)
     uv run python scripts/migrate_rust_examples.py --dry-run
@@ -56,8 +58,22 @@ GUIDELINE_PATTERN = re.compile(
 
 
 def find_rst_files(src_dir: Path) -> List[Path]:
-    """Find all RST files in the source directory."""
-    return list(src_dir.glob("**/*.rst"))
+    """
+    Find all RST files in the source directory.
+    
+    Searches for both:
+    - *.rst files (chapter index files, monolithic chapter files)
+    - *.rst.inc files (per-guideline include files)
+    
+    Args:
+        src_dir: Directory to search
+        
+    Returns:
+        List of Path objects for all RST files found
+    """
+    rst_files = list(src_dir.glob("**/*.rst"))
+    rst_inc_files = list(src_dir.glob("**/*.rst.inc"))
+    return rst_files + rst_inc_files
 
 
 def extract_code_block_content(content: str, start_pos: int, base_indent: str) -> Tuple[str, int]:
@@ -303,7 +319,7 @@ def process_file(
     Process a single RST file.
     
     Args:
-        file_path: Path to the RST file
+        file_path: Path to the RST file (supports .rst and .rst.inc)
         dry_run: If True, don't write changes
         detect_failures: Whether to detect compilation failures
         prelude: Optional prelude code
@@ -383,9 +399,9 @@ def main():
         else:
             print(f"⚠️  Prelude file not found: {prelude_path}")
     
-    # Find and process RST files
-    rst_files = find_rst_files(src_dir)
-    print(f"🔍 Found {len(rst_files)} RST files in {src_dir}")
+    # Find and process RST files (both .rst and .rst.inc)
+    all_files = find_rst_files(src_dir)
+    print(f"🔍 Found {len(all_files)} RST files in {src_dir}")
     
     if args.dry_run:
         print("📋 DRY RUN - no files will be modified")
@@ -393,7 +409,7 @@ def main():
     total_changes = 0
     files_changed = 0
     
-    for file_path in rst_files:
+    for file_path in all_files:
         changes = process_file(
             file_path,
             dry_run=args.dry_run,
