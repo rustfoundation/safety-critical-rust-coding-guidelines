@@ -3,5 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-Statements
-==========
+Exceptions And Errors
+=====================
+

@@ -3,5 +3,7 @@
 
 .. default-domain:: coding-guidelines
 
-Entities and Resolution
-=======================
+Types and Traits
+================
+
+.. include:: gui_xztNdXA2oFNC.rst.inc

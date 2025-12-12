@@ -3,5 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-Concurrency
-===========
+Entities And Resolution
+=======================
+

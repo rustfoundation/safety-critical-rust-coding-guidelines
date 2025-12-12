@@ -3,6 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-FFI
-===
+Inline Assembly
+===============
 

@@ -3,5 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-Ownership and Destruction
+Ownership And Destruction
 =========================
+
