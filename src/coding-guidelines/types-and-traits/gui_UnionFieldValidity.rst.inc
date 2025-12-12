@@ -275,16 +275,13 @@
 
    .. bibliography::
 
-      .. [RUST-REF-UNION] The Rust Project Developers. "Rust Reference - Unions."
-         https://doc.rust-lang.org/reference/items/unions.html
+.. [RUST-REF-UNION] The Rust Project Developers. “Rust Reference: Unions.” *The Rust Reference*, n.d. https://doc.rust-lang.org/reference/items/unions.html.
 
-      .. [RUST-REF-UB] The Rust Project Developers. "Rust Reference - Behavior considered undefined."
-         https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+.. [RUST-REF-UB] The Rust Project Developers. “Rust Reference: Behavior Considered Undefined.” *The Rust Reference*, n.d. https://doc.rust-lang.org/reference/behavior-considered-undefined.html.
 
-      .. [UCG-VALIDITY] Rust Unsafe Code Guidelines Working Group. "Validity and Safety Invariant."
-         https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant
+.. [UCG-VALIDITY] Rust Unsafe Code Guidelines Working Group. “Validity and Safety Invariant.” *Rust Unsafe Code Guidelines*, n.d. https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
 
-      .. [RUST-NOMICON-UNION] The Rust Project Developers. "The Rustonomicon - Unions."
-         https://doc.rust-lang.org/nomicon/unions.html
+.. [RUST-NOMICON-UNION] The Rust Project Developers. “Unions.” *The Rustonomicon*, n.d. https://doc.rust-lang.org/nomicon/unions.html.
+
 
 >>>>>>> c93b2cb (Update types-and-traits.rst):src/coding-guidelines/types-and-traits.rst
