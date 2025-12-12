@@ -11,6 +11,8 @@ This script:
 3. Generates a test crate with all examples as doc tests
 4. Runs the tests and reports results
 
+Supports both monolithic chapter files (*.rst) and per-guideline files (*.rst.inc).
+
 Usage:
     # Extract examples and generate test crate
     uv run python scripts/extract_rust_examples.py --extract
@@ -220,7 +222,7 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
     - Legacy code-block:: rust directives (for backwards compatibility during migration)
     
     Args:
-        file_path: Path to the RST file
+        file_path: Path to the RST file (supports .rst and .rst.inc)
         
     Returns:
         List of RustExample objects
@@ -326,6 +328,25 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
     return examples
 
 
+def find_rst_files(src_dir: Path) -> List[Path]:
+    """
+    Find all RST files in the source directory.
+    
+    Searches for both:
+    - *.rst files (chapter index files, monolithic chapter files)
+    - *.rst.inc files (per-guideline include files)
+    
+    Args:
+        src_dir: Directory to search
+        
+    Returns:
+        List of Path objects for all RST files found
+    """
+    rst_files = list(src_dir.glob("**/*.rst"))
+    rst_inc_files = list(src_dir.glob("**/*.rst.inc"))
+    return rst_files + rst_inc_files
+
+
 def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[RustExample]:
     """
     Extract all Rust examples from all RST files in the given directories.
@@ -340,17 +361,47 @@ def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[Rust
     examples = []
     
     for src_dir in src_dirs:
-        rst_files = list(src_dir.glob("**/*.rst"))
+        all_files = find_rst_files(src_dir)
         
         if not quiet:
-            print(f"🔍 Scanning {len(rst_files)} RST files in {src_dir}", file=sys.stderr)
+            print(f"🔍 Scanning {len(all_files)} RST files in {src_dir}", file=sys.stderr)
         
-        for file_path in rst_files:
-            file_examples = extract_rust_examples_from_file(file_path)
-            if file_examples:
-                if not quiet:
-                    print(f"   📄 {file_path.name}: {len(file_examples)} examples", file=sys.stderr)
-                examples.extend(file_examples)
+        # Group files by parent directory (chapter)
+        files_by_chapter: Dict[str, List[Path]] = {}
+        for file_path in all_files:
+            # Get chapter name (parent directory relative to src_dir)
+            try:
+                rel_path = file_path.relative_to(src_dir)
+                if len(rel_path.parts) > 1:
+                    chapter = rel_path.parts[0]
+                else:
+                    chapter = "(root)"
+            except ValueError:
+                chapter = "(other)"
+            
+            if chapter not in files_by_chapter:
+                files_by_chapter[chapter] = []
+            files_by_chapter[chapter].append(file_path)
+        
+        # Process files grouped by chapter
+        for chapter in sorted(files_by_chapter.keys()):
+            chapter_files = files_by_chapter[chapter]
+            chapter_has_examples = False
+            file_results: List[Tuple[Path, List[RustExample]]] = []
+            
+            # Extract examples from each file
+            for file_path in sorted(chapter_files):
+                file_examples = extract_rust_examples_from_file(file_path)
+                if file_examples:
+                    file_results.append((file_path, file_examples))
+                    examples.extend(file_examples)
+                    chapter_has_examples = True
+            
+            # Print chapter heading and files with examples
+            if chapter_has_examples and not quiet:
+                print(f"\n   {chapter}/", file=sys.stderr)
+                for file_path, file_examples in file_results:
+                    print(f"      {file_path.name}: {len(file_examples)} examples", file=sys.stderr)
     
     if not quiet:
         print(f"\n📊 Total: {len(examples)} examples found", file=sys.stderr)
@@ -683,14 +734,15 @@ def main():
                 filter_min_version=args.filter_min_version,
                 filter_default=args.filter_default,
             )
-            if args.verbose:
-                print(f"🔍 Filtered {original_count} -> {len(examples)} examples")
+            filtered_count = original_count - len(examples)
+            if filtered_count > 0:
+                print(f"\n🔍 Filtered: {len(examples)} examples to test ({filtered_count} excluded)")
                 if args.filter_channel:
                     print(f"   Filter: channel={args.filter_channel}")
                 if args.filter_min_version:
-                    print(f"   Filter: min_version={args.filter_min_version}")
+                    print(f"   Filter: min_version>={args.filter_min_version}")
                 if args.filter_default:
-                    print("   Filter: default (no special requirements)")
+                    print(f"   Filter: default toolchain only (excluded {filtered_count} requiring nightly/beta or specific version)")
         
         if args.extract or args.test:
             # Generate test crate
