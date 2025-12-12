@@ -160,12 +160,14 @@ body:
         **Hidden lines:** If your code needs `use` statements, a `fn main()` wrapper, or other boilerplate to compile, but you don't want them shown in the documentation, prefix those lines with `# ` (hash + space). These lines will be compiled but hidden in the rendered docs.
 
         Example with hidden lines:
+        ````
         ```rust
         # use std::mem::MaybeUninit;
         # fn main() {
         let x: u32 = unsafe { MaybeUninit::uninit().assume_init() }; // UB
         # }
         ```
+        ````
       placeholder: |
         ```rust
         # use std::collections::HashMap;
@@ -193,6 +195,7 @@ body:
         **Hidden lines:** If your code needs `use` statements, a `fn main()` wrapper, or other boilerplate to compile, but you don't want them shown in the documentation, prefix those lines with `# ` (hash + space). These lines will be compiled but hidden in the rendered docs.
 
         Example with hidden lines:
+        ````
         ```rust
         # use std::collections::HashMap;
         # fn main() {
@@ -200,6 +203,7 @@ body:
         map.insert("key", "value"); // Compliant usage
         # }
         ```
+        ````
       placeholder: |
         ```rust
         # fn main() {
