@@ -1,0 +1,372 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Types and Traits &mdash; Safety-Critical Rust Coding Guidelines 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/modern.css?v=803738c0" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview.bundle.js?v=18cd53c5"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview_loader.js?v=f7ff7e7d"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables.min.js?v=8a4aee21"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables_loader.js?v=a2cae175"></script>
+      <script src="../../_static/sphinx-needs/libs/html/sphinx_needs_collapse.js?v=dca66431"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Patterns" href="../patterns/index.html" />
+    <link rel="prev" title="Coding Guidelines" href="../index.html" /> 
+<link rel="stylesheet" href="../../_static/fls_links.css" type="text/css" />
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Safety-Critical Rust Coding Guidelines
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/index.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Coding Guidelines</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Types and Traits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../patterns/index.html">Patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../expressions/index.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../values/index.html">Values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../statements/index.html">Statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/index.html">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../associated-items/index.html">Associated Items</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../implementations/index.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../generics/index.html">Generics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../attributes/index.html">Attributes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../entities-and-resolution/index.html">Entities And Resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ownership-and-destruction/index.html">Ownership And Destruction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../exceptions-and-errors/index.html">Exceptions And Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../program-structure-and-compilation/index.html">Program Structure And Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../unsafety/index.html">Unsafety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../macros/index.html">Macros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ffi/index.html">Ffi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../inline-assembly/index.html">Inline Assembly</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../compliance/index.html">Compliance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../process/index.html">Process</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../appendices/index.html">Appendices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../retired-guidelines/index.html">Retired Guidelines</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Safety-Critical Rust Coding Guidelines</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Coding Guidelines</a></li>
+      <li class="breadcrumb-item active">Types and Traits</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/coding-guidelines/types-and-traits/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="types-and-traits">
+<h1>Types and Traits<a class="headerlink" href="#types-and-traits" title="Link to this heading"></a></h1>
+<div class="need_container docutils container" id="SNCB-1ad5bb7b">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_xztNdXA2oFNC">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">Use strong types to differentiate between logically distinct values</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_xztNdXA2oFNC" title="gui_xztNdXA2oFNC">gui_xztNdXA2oFNC</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">types</span><span class="needs_spacer">, </span><span class="needs_data">safety</span><span class="needs_spacer">, </span><span class="needs_data">understandability</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">advisory</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/types-and-traits.html#fls_cokwseo3nnr" class="fls-id">fls_cokwseo3nnr</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">undecidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.85.0;1.85.1</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_kYiIiW8R2qD2" title="gui_xztNdXA2oFNC">rat_kYiIiW8R2qD2</a>, <a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWw" title="gui_xztNdXA2oFNC">non_compl_ex_PO5TyFsRTlWw</a>, <a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWv" title="gui_xztNdXA2oFNC">non_compl_ex_PO5TyFsRTlWv</a>, <a class="reference internal" href="#compl_ex_WTe7GoPu5Ez1" title="gui_xztNdXA2oFNC">compl_ex_WTe7GoPu5Ez1</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Parameters and variables with logically distinct types must be statically distinguishable by the type system.</p>
+<p>Use a newtype (e.g., <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">Meters(u32);</span></code>) when:</p>
+<ul class="simple">
+<li><p>Two or more quantities share the same underlying primitive representation but are logically distinct</p></li>
+<li><p>Confusing them would constitute a semantic error</p></li>
+<li><p>You need to improve type safety and encapsulation</p></li>
+<li><p>You need to enable trait-based behavior</p></li>
+<li><p>You need to establish new invariants</p></li>
+</ul>
+<div class="need_container docutils container" id="SNCB-dd017c54">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_kYiIiW8R2qD2">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_kYiIiW8R2qD2" title="rat_kYiIiW8R2qD2">rat_kYiIiW8R2qD2</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="rat_kYiIiW8R2qD2">gui_xztNdXA2oFNC</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This rule ensures that parameters and variables convey intent directly through the type system to avoid accidental misuse of values with identical primitives but different semantics.
+In particular:</p>
+<ul class="simple">
+<li><p>Prevents mixing logically distinct values.
+Primitive types like <code class="docutils literal notranslate"><span class="pre">u32</span></code> or <code class="docutils literal notranslate"><span class="pre">u64</span></code> can represent lengths, counters, timestamps, durations, IDs, or other values.
+Different semantic domains can be confused, leading to incorrect computations.
+The Rust type system prevents such mistakes when semantics are encoded into distinct types.</p></li>
+<li><p>Improves static safety.
+Statically distinct types allow the compiler to enforce domain distinctions.
+Accidental swapping of parameters or returning the wrong quantity becomes a compile-time error.</p></li>
+<li><p>Improves readability and discoverability.
+Intent-revealing names (<code class="docutils literal notranslate"><span class="pre">Meters</span></code>, <code class="docutils literal notranslate"><span class="pre">Seconds</span></code>, <code class="docutils literal notranslate"><span class="pre">UserId</span></code>) make code self-documenting.
+Type signatures become easier to read and understand.</p></li>
+<li><p>Enables domain-specific trait implementations.
+Statically distinct types allow you to implement <code class="docutils literal notranslate"><span class="pre">Add</span></code>, <code class="docutils literal notranslate"><span class="pre">Mul</span></code>, or custom traits in ways that match the domain logic.
+Aliases cannot do this, because they are not distinct types.</p></li>
+<li><p>Supports API evolution.
+Statically distinct types act as strong API contracts that can evolve independently from their underlying representations.</p></li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-055b3d5a">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWw">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWw" title="non_compl_ex_PO5TyFsRTlWw">non_compl_ex_PO5TyFsRTlWw</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="non_compl_ex_PO5TyFsRTlWw">gui_xztNdXA2oFNC</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example uses primitive types directly, leading to potential confusion between <code class="docutils literal notranslate"><span class="pre">distance</span></code> and <code class="docutils literal notranslate"><span class="pre">time</span></code>.
+Nothing prevents the caller from passing <code class="docutils literal notranslate"><span class="pre">time</span></code> as <code class="docutils literal notranslate"><span class="pre">distance</span></code> or vice-versa.
+The units of each type are not clear from the function signature alone.
+Mistakes compile cleanly and silently produce wrong results.</p>
+<blockquote>
+<div><div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">travel</span><span class="p">(</span><span class="n">distance</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="n">distance</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">time</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">travel</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">);</span><span class="w">  </span><span class="c1">// Compiles, but semantically incorrect</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-66ad760b">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWv">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_PO5TyFsRTlWv" title="non_compl_ex_PO5TyFsRTlWv">non_compl_ex_PO5TyFsRTlWv</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="non_compl_ex_PO5TyFsRTlWv">gui_xztNdXA2oFNC</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example uses aliases instead of distinct types.
+Aliases do not create new types, so the compiler cannot enforce distinctions between <code class="docutils literal notranslate"><span class="pre">Meters</span></code> and <code class="docutils literal notranslate"><span class="pre">Seconds</span></code>.</p>
+<p>Aliases cannot do this, because they are not distinct types.
+This noncompliant example uses primitive types directly, leading to potential confusion between <code class="docutils literal notranslate"><span class="pre">distance</span></code> and <code class="docutils literal notranslate"><span class="pre">time</span></code>.
+Nothing prevents the caller from passing <code class="docutils literal notranslate"><span class="pre">time</span></code> as <code class="docutils literal notranslate"><span class="pre">distance</span></code> or vice-versa.
+The units of each type are not clear from the function signature alone.
+Mistakes compile cleanly and silently produce wrong results.</p>
+<blockquote>
+<div><div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">type</span><span class="w"> </span><span class="nc">Meters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+<span class="k">type</span><span class="w"> </span><span class="nc">Seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+<span class="k">type</span><span class="w"> </span><span class="nc">MetersPerSecond</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">travel</span><span class="p">(</span><span class="n">distance</span><span class="p">:</span><span class="w"> </span><span class="nc">Meters</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">:</span><span class="w"> </span><span class="nc">Seconds</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">MetersPerSecond</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="n">distance</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">time</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="p">:</span><span class="w"> </span><span class="nc">Meters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="p">:</span><span class="w"> </span><span class="nc">Seconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">   </span><span class="kd">let</span><span class="w"> </span><span class="n">_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">travel</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">);</span><span class="w">  </span><span class="c1">// Compiles, but semantically incorrect</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-dd21695b">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_WTe7GoPu5Ez1">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_WTe7GoPu5Ez1" title="compl_ex_WTe7GoPu5Ez1">compl_ex_WTe7GoPu5Ez1</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_xztNdXA2oFNC" title="compl_ex_WTe7GoPu5Ez1">gui_xztNdXA2oFNC</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example uses newtypes to create distinct types for <code class="docutils literal notranslate"><span class="pre">Meters</span></code>, <code class="docutils literal notranslate"><span class="pre">Seconds</span></code>, and <code class="docutils literal notranslate"><span class="pre">MetersPerSecond</span></code>.
+The compiler enforces correct usage, preventing accidental swapping of parameters.
+The function signature clearly conveys the intended semantics of each parameter and return value.</p>
+<blockquote>
+<div><div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">ops</span><span class="p">::</span><span class="n">Div</span><span class="p">;</span>
+
+<span class="cp">#[derive(Debug, Clone, Copy)]</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Meters</span><span class="p">(</span><span class="kt">u32</span><span class="p">);</span>
+
+<span class="cp">#[derive(Debug, Clone, Copy)]</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Seconds</span><span class="p">(</span><span class="kt">u32</span><span class="p">);</span>
+
+<span class="cp">#[derive(Debug, Clone, Copy)]</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">MetersPerSecond</span><span class="p">(</span><span class="kt">u32</span><span class="p">);</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="n">Div</span><span class="o">&lt;</span><span class="n">Seconds</span><span class="o">&gt;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">Meters</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">type</span><span class="w"> </span><span class="nc">Output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MetersPerSecond</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">div</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">rhs</span><span class="p">:</span><span class="w"> </span><span class="nc">Seconds</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="p">::</span><span class="n">Output</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="n">MetersPerSecond</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">rhs</span><span class="p">.</span><span class="mi">0</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w"> </span><span class="p">}</span>
+
+<span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Meters</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Seconds</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">t</span><span class="p">;</span><span class="w">  </span><span class="c1">// Clean and type-safe!</span>
+<span class="w">     </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">);</span><span class="w">  </span><span class="c1">// MetersPerSecond(10)</span>
+<span class="w"> </span><span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div></blockquote>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="Coding Guidelines" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../patterns/index.html" class="btn btn-neutral float-right" title="Patterns" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Contributors to Coding Guidelines Subcommittee.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+        This site is powered through <a href="https://www.netlify.com">Netlify</a>.
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
