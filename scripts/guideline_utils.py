@@ -7,7 +7,6 @@ Shared utilities for parsing GitHub issues and generating RST guideline content.
 This module contains common functions used by:
 - auto-pr-helper.py (for automated PR generation)
 - generate-rst-comment.py (for generating preview comments)
-- split_guidelines.py (for migrating to per-guideline files)
 """
 
 import os
@@ -27,26 +26,23 @@ from generate_guideline_templates import (
     issue_header_map,
 )
 
-
 # =============================================================================
 # Constants for per-guideline file structure
 # =============================================================================
 
-# SPDX header prepended to each guideline file
+# Header comment for individual guideline files
 GUIDELINE_FILE_HEADER = """\
 .. SPDX-License-Identifier: MIT OR Apache-2.0
    SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
-.. default-domain:: coding-guidelines
-
 """
 
-# Default base directory for coding guidelines
-DEFAULT_GUIDELINES_DIR = "src/coding-guidelines"
+# Default guidelines directory
+DEFAULT_GUIDELINES_DIR = Path("src/coding-guidelines")
 
 
 # =============================================================================
-# Markdown to RST Conversion
+# Markdown to RST conversion utilities
 # =============================================================================
 
 def md_to_rst(markdown: str) -> str:
@@ -115,7 +111,7 @@ def normalize_md(issue_body: str) -> str:
 
 
 # =============================================================================
-# Issue Parsing
+# Issue parsing utilities
 # =============================================================================
 
 def extract_form_fields(issue_body: str) -> dict:
@@ -161,7 +157,7 @@ def extract_form_fields(issue_body: str) -> dict:
 
 
 # =============================================================================
-# RST Formatting
+# RST generation utilities
 # =============================================================================
 
 def format_code_block(code: str, lang: str = "rust") -> str:
@@ -244,12 +240,70 @@ def guideline_template(fields: dict) -> str:
 
 
 # =============================================================================
-# Chapter/File Name Conversion
+# ID extraction utilities
+# =============================================================================
+
+def extract_guideline_id(content: str) -> str:
+    """
+    Extract the guideline ID from RST content.
+    
+    Args:
+        content: RST content containing a guideline directive
+        
+    Returns:
+        The guideline ID (e.g., "gui_abc123XYZ") or empty string if not found
+    """
+    match = re.search(r':id:\s*(gui_[a-zA-Z0-9]+)', content)
+    return match.group(1) if match else ""
+
+
+def extract_all_ids(content: str) -> dict:
+    """
+    Extract all IDs from RST content.
+    
+    Args:
+        content: RST content
+        
+    Returns:
+        Dictionary with keys 'guideline', 'rationale', 'compliant', 'non_compliant'
+    """
+    ids = {
+        'guideline': '',
+        'rationale': '',
+        'compliant': '',
+        'non_compliant': ''
+    }
+    
+    # Guideline ID
+    match = re.search(r':id:\s*(gui_[a-zA-Z0-9]+)', content)
+    if match:
+        ids['guideline'] = match.group(1)
+    
+    # Rationale ID
+    match = re.search(r':id:\s*(rat_[a-zA-Z0-9]+)', content)
+    if match:
+        ids['rationale'] = match.group(1)
+    
+    # Compliant example ID
+    match = re.search(r':id:\s*(compl_ex_[a-zA-Z0-9]+)', content)
+    if match:
+        ids['compliant'] = match.group(1)
+    
+    # Non-compliant example ID
+    match = re.search(r':id:\s*(non_compl_ex_[a-zA-Z0-9]+)', content)
+    if match:
+        ids['non_compliant'] = match.group(1)
+    
+    return ids
+
+
+# =============================================================================
+# Chapter/directory name utilities
 # =============================================================================
 
 def chapter_to_filename(chapter: str) -> str:
     """
-    Convert chapter name to filename slug (without extension).
+    Convert chapter name to filename slug.
     
     Args:
         chapter: Chapter name (e.g., "Associated Items", "Concurrency")
@@ -260,293 +314,232 @@ def chapter_to_filename(chapter: str) -> str:
     return chapter.lower().replace(" ", "-")
 
 
-# Alias for consistency with new naming
-chapter_to_dirname = chapter_to_filename
+def chapter_to_dirname(chapter: str) -> str:
+    """
+    Convert chapter name to directory name (same as filename slug).
+    
+    Args:
+        chapter: Chapter name (e.g., "Associated Items", "Concurrency")
+        
+    Returns:
+        Directory name (e.g., "associated-items", "concurrency")
+    """
+    return chapter_to_filename(chapter)
 
 
 def dirname_to_chapter(dirname: str) -> str:
     """
-    Convert directory name back to chapter display name.
+    Convert directory name back to chapter name.
     
     Args:
-        dirname: Directory name (e.g., "associated-items", "ffi")
+        dirname: Directory name (e.g., "associated-items")
         
     Returns:
-        Chapter display name (e.g., "Associated Items", "FFI")
+        Chapter name (e.g., "Associated Items")
     """
-    # Special cases
-    special_cases = {
-        "ffi": "FFI",
-    }
-    if dirname in special_cases:
-        return special_cases[dirname]
-    
-    # General case: title case
     return dirname.replace("-", " ").title()
 
 
 # =============================================================================
-# Guideline ID Extraction
+# Index management for per-guideline structure
 # =============================================================================
 
-def extract_guideline_id(rst_content: str) -> str:
+def add_include_to_chapter_index(
+    chapter_dir: Path,
+    guideline_filename: str,
+) -> bool:
     """
-    Extract the guideline ID from RST content.
-    
-    Args:
-        rst_content: The RST content containing a guideline directive
-        
-    Returns:
-        The guideline ID (e.g., "gui_dCquvqE1csI3")
-        
-    Raises:
-        ValueError: If no guideline ID found
-    """
-    match = re.search(r':id:\s*(gui_[A-Za-z0-9_]+)', rst_content)
-    if match:
-        return match.group(1)
-    raise ValueError("Could not find guideline ID in content")
-
-
-def extract_all_ids(rst_content: str) -> dict:
-    """
-    Extract all IDs from RST content (guideline, rationale, examples).
-    
-    Args:
-        rst_content: The RST content
-        
-    Returns:
-        Dict with keys: 'guideline', 'rationale', 'compliant_examples', 
-        'non_compliant_examples'
-    """
-    result = {
-        'guideline': None,
-        'rationale': None,
-        'compliant_examples': [],
-        'non_compliant_examples': [],
-    }
-    
-    # Guideline ID
-    gui_match = re.search(r':id:\s*(gui_[A-Za-z0-9_]+)', rst_content)
-    if gui_match:
-        result['guideline'] = gui_match.group(1)
-    
-    # Rationale ID
-    rat_match = re.search(r':id:\s*(rat_[A-Za-z0-9_]+)', rst_content)
-    if rat_match:
-        result['rationale'] = rat_match.group(1)
-    
-    # Compliant example IDs
-    for match in re.finditer(r':id:\s*(compl_ex_[A-Za-z0-9_]+)', rst_content):
-        result['compliant_examples'].append(match.group(1))
-    
-    # Non-compliant example IDs
-    for match in re.finditer(r':id:\s*(non_compl_ex_[A-Za-z0-9_]+)', rst_content):
-        result['non_compliant_examples'].append(match.group(1))
-    
-    return result
-
-
-# =============================================================================
-# Chapter Index Management (for per-guideline file structure)
-# =============================================================================
-
-def add_include_to_chapter_index(chapter_dir: Path, guideline_id: str) -> None:
-    """
-    Add an include directive for a new guideline to the chapter index.
-    
-    Maintains alphabetical ordering by guideline ID to minimize merge conflicts.
+    Add an include directive to a chapter's index.rst, maintaining alphabetical order.
     
     Args:
         chapter_dir: Path to the chapter directory
-        guideline_id: The guideline ID to add
+        guideline_filename: Filename of the guideline (e.g., "gui_abc123.rst.inc")
         
-    Raises:
-        FileNotFoundError: If chapter index doesn't exist
+    Returns:
+        True if successful, False otherwise
     """
-    index_file = chapter_dir / "index.rst"
+    index_path = chapter_dir / "index.rst"
     
-    if not index_file.exists():
-        raise FileNotFoundError(f"Chapter index not found: {index_file}")
+    if not index_path.exists():
+        print(f"Warning: Index file not found: {index_path}")
+        return False
     
-    content = index_file.read_text()
+    content = index_path.read_text()
     
-    # Check if already included (with .rst.inc extension)
-    include_line = f".. include:: {guideline_id}.rst.inc"
-    if include_line in content:
-        print(f"  Guideline {guideline_id} already in index")
-        return
+    # Check if already included
+    if guideline_filename in content:
+        print(f"Note: {guideline_filename} already in index")
+        return True
     
-    # Find all existing includes and their positions
-    include_pattern = re.compile(
-        r'^(\.\. include:: (gui_[A-Za-z0-9_]+)\.rst\.inc)$', 
-        re.MULTILINE
-    )
-    includes = list(include_pattern.finditer(content))
+    # Find existing include directives and their position
+    include_pattern = re.compile(r'^(\s*)\.\.\ include::\s+(gui_[a-zA-Z0-9]+\.rst\.inc)\s*$', re.MULTILINE)
+    matches = list(include_pattern.finditer(content))
     
-    if not includes:
-        # No existing includes - append after any content
-        content = content.rstrip() + "\n\n" + include_line + "\n"
-    else:
-        # Find the right position to insert (alphabetical order)
-        existing_ids = [(m.group(2), m.start(), m.end()) for m in includes]
+    new_include = f".. include:: {guideline_filename}"
+    
+    if matches:
+        # Get the indentation from existing includes
+        indent_str = matches[0].group(1)
+        new_include = f"{indent_str}.. include:: {guideline_filename}"
+        
+        # Find where to insert alphabetically
+        existing_files = [(m.group(2), m.start(), m.end()) for m in matches]
         
         insert_pos = None
-        for existing_id, start, end in existing_ids:
-            if guideline_id < existing_id:
+        for filename, start, end in existing_files:
+            if guideline_filename < filename:
                 insert_pos = start
                 break
         
         if insert_pos is None:
-            # Insert at end (after last include)
-            last_end = existing_ids[-1][2]
-            content = content[:last_end] + "\n" + include_line + content[last_end:]
+            # Add at end (after last include)
+            last_end = existing_files[-1][2]
+            content = content[:last_end] + "\n" + new_include + content[last_end:]
         else:
             # Insert before the found position
-            content = content[:insert_pos] + include_line + "\n" + content[insert_pos:]
+            content = content[:insert_pos] + new_include + "\n" + content[insert_pos:]
+    else:
+        # No existing includes - add at end of file
+        content = content.rstrip() + "\n\n" + new_include + "\n"
     
-    index_file.write_text(content)
-    print(f"  Added {guideline_id} to {index_file}")
+    index_path.write_text(content)
+    return True
 
 
-def remove_include_from_chapter_index(chapter_dir: Path, guideline_id: str) -> bool:
+def remove_include_from_chapter_index(
+    chapter_dir: Path,
+    guideline_filename: str,
+) -> bool:
     """
-    Remove an include directive from the chapter index.
+    Remove an include directive from a chapter's index.rst.
     
     Args:
         chapter_dir: Path to the chapter directory
-        guideline_id: The guideline ID to remove
+        guideline_filename: Filename of the guideline to remove
         
     Returns:
-        True if removed, False if not found
+        True if successful, False otherwise
     """
-    index_file = chapter_dir / "index.rst"
+    index_path = chapter_dir / "index.rst"
     
-    if not index_file.exists():
+    if not index_path.exists():
         return False
     
-    content = index_file.read_text()
-    include_line = f".. include:: {guideline_id}.rst.inc\n"
+    content = index_path.read_text()
     
-    if include_line in content:
-        content = content.replace(include_line, "")
-        index_file.write_text(content)
-        print(f"  Removed {guideline_id} from {index_file}")
+    # Remove the include line
+    pattern = re.compile(rf'^\s*\.\.\ include::\s+{re.escape(guideline_filename)}\s*\n?', re.MULTILINE)
+    new_content = pattern.sub('', content)
+    
+    if new_content != content:
+        index_path.write_text(new_content)
         return True
     
     return False
 
 
 # =============================================================================
-# Guideline File Operations
+# File operations
 # =============================================================================
 
-def save_guideline_file(content: str, chapter: str, base_dir: str = DEFAULT_GUIDELINES_DIR):
+def save_guideline_file(
+    content: str,
+    chapter: str,
+    guidelines_dir: Path = None,
+) -> Path:
     """
-    Save a guideline to its own file in the chapter directory.
+    Save a guideline to a per-guideline file in the chapter directory.
     
-    For the new per-guideline file structure, this:
-    1. Extracts the guideline ID from the content
-    2. Adds the SPDX header and default-domain
-    3. Writes to chapter_name/guideline_id.rst.inc
-    4. Updates the chapter index to include the new guideline
-    
-    If the new structure doesn't exist (migration hasn't been run), falls back
-    to legacy behavior (appending to monolithic chapter file).
-    
-    Note: We use .rst.inc extension so Sphinx doesn't auto-discover these files.
-    They are only processed when included by the chapter index.rst.
+    This creates:
+    1. The chapter directory if it doesn't exist
+    2. A new file named {guideline_id}.rst.inc
+    3. Updates the chapter's index.rst with an include directive
     
     Args:
-        content: The RST content for the guideline (without SPDX header)
+        content: The RST content for the guideline
         chapter: The chapter name (e.g., "Expressions")
-        base_dir: Base directory for coding guidelines
+        guidelines_dir: Base guidelines directory (default: src/coding-guidelines)
         
     Returns:
-        Path to the created guideline file
+        Path to the created file
     """
-    # Determine paths
-    chapter_dirname = chapter_to_dirname(chapter)
-    chapter_dir = Path(base_dir) / chapter_dirname
-    index_file = chapter_dir / "index.rst"
+    if guidelines_dir is None:
+        guidelines_dir = DEFAULT_GUIDELINES_DIR
     
-    # Check if the new structure exists (chapter directory with index.rst)
-    if chapter_dir.exists() and index_file.exists():
-        # New per-guideline file structure
-        try:
-            guideline_id = extract_guideline_id(content)
-        except ValueError as e:
-            print(f"Warning: {e}")
-            print("Falling back to legacy save behavior")
-            return save_guideline_file_legacy(content, chapter)
-        
-        guideline_file = chapter_dir / f"{guideline_id}.rst.inc"
-        
-        # Prepare full content with header
-        full_content = GUIDELINE_FILE_HEADER + content.strip() + "\n"
-        
-        # Write the guideline file
-        guideline_file.write_text(full_content)
-        print(f"Saved guideline to {guideline_file}")
-        
-        # Update chapter index
-        add_include_to_chapter_index(chapter_dir, guideline_id)
-        
-        return guideline_file
-    else:
-        # Legacy structure - chapter directory doesn't exist or no index.rst
-        # Fall back to appending to monolithic file
-        print(f"Note: Chapter directory structure not found for '{chapter}'")
-        print("Using legacy save behavior (append to chapter file)")
-        print("Run 'split_guidelines.py --all' to migrate to per-guideline files")
-        return save_guideline_file_legacy(content, chapter)
+    chapter_slug = chapter_to_dirname(chapter)
+    chapter_dir = guidelines_dir / chapter_slug
+    
+    # Check if per-guideline structure exists (chapter is a directory)
+    if not chapter_dir.is_dir():
+        # Fall back to legacy monolithic file structure
+        print(f"Note: Chapter directory {chapter_dir} not found.")
+        print(f"      Using legacy file structure. Run split_guidelines.py to migrate.")
+        return save_guideline_file_legacy(content, chapter, guidelines_dir)
+    
+    # Extract guideline ID
+    guideline_id = extract_guideline_id(content)
+    if not guideline_id:
+        raise ValueError("Could not extract guideline ID from content")
+    
+    # Create the guideline file
+    guideline_filename = f"{guideline_id}.rst.inc"
+    guideline_path = chapter_dir / guideline_filename
+    
+    # Add header and write content
+    full_content = GUIDELINE_FILE_HEADER + content.strip() + "\n"
+    guideline_path.write_text(full_content)
+    print(f"Created guideline file: {guideline_path}")
+    
+    # Update the chapter index
+    if add_include_to_chapter_index(chapter_dir, guideline_filename):
+        print(f"Updated index: {chapter_dir / 'index.rst'}")
+    
+    return guideline_path
 
 
-def save_guideline_file_legacy(content: str, chapter: str):
+def save_guideline_file_legacy(
+    content: str,
+    chapter: str,
+    guidelines_dir: Path = None,
+) -> Path:
     """
-    Append a guideline to a monolithic chapter file.
-    
-    This is the legacy behavior - appends to chapter.rst.
-    Use save_guideline_file() for the new per-guideline structure.
+    Append a guideline to a monolithic chapter file (legacy structure).
     
     Args:
-        content: The RST content to append
-        chapter: The chapter name
+        content: The RST content for the guideline
+        chapter: The chapter name (e.g., "Expressions")
+        guidelines_dir: Base guidelines directory (default: src/coding-guidelines)
         
     Returns:
         Path to the chapter file
     """
-    filename = Path(f"src/coding-guidelines/{chapter_to_filename(chapter)}.rst")
-    with open(filename, "a", encoding="utf-8") as f:
+    if guidelines_dir is None:
+        guidelines_dir = DEFAULT_GUIDELINES_DIR
+    
+    chapter_slug = chapter_to_filename(chapter)
+    chapter_file = guidelines_dir / f"{chapter_slug}.rst"
+    
+    with open(chapter_file, "a", encoding="utf-8") as f:
         f.write(content)
-    print(f"Saved guideline to {filename}")
-    return filename
+    
+    print(f"Appended guideline to: {chapter_file}")
+    return chapter_file
 
 
-def list_guidelines_in_chapter(
-    chapter: str,
-    base_dir: str = DEFAULT_GUIDELINES_DIR
-) -> list:
+def list_guidelines_in_chapter(chapter_dir: Path) -> list:
     """
-    List all guideline IDs in a chapter.
+    List all guideline files in a chapter directory.
     
     Args:
-        chapter: The chapter name
-        base_dir: Base directory for coding guidelines
+        chapter_dir: Path to the chapter directory
         
     Returns:
-        List of guideline IDs
+        List of guideline IDs found
     """
-    chapter_dirname = chapter_to_dirname(chapter)
-    chapter_dir = Path(base_dir) / chapter_dirname
+    guidelines = []
     
-    if not chapter_dir.exists():
-        return []
+    for file_path in chapter_dir.glob("gui_*.rst.inc"):
+        guideline_id = file_path.stem  # Remove .rst.inc extension
+        guidelines.append(guideline_id)
     
-    guideline_ids = []
-    for file in chapter_dir.glob("gui_*.rst.inc"):
-        # Extract ID from filename (remove .rst.inc)
-        guideline_id = file.stem  # gui_xxx (without .rst.inc)
-        guideline_ids.append(guideline_id)
-    
-    return sorted(guideline_ids)
+    return sorted(guidelines)
