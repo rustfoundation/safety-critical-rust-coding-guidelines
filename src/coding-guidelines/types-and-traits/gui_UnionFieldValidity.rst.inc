@@ -106,6 +106,7 @@
       .. code-block:: rust
 
          #[repr(u8)]
+         #[derive(Copy, Clone)]
          enum Color {
              Red = 0,
              Green = 1,
