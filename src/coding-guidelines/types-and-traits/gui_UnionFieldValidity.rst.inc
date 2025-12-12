@@ -35,7 +35,6 @@
       that type must satisfy [VALID]_.
       Reading a union field performs a *typed read*,
       which asserts that the bytes are valid for the target type.
-      Violating this invariant is undefined behavior.
 
       Examples of validity requirements for common types:
 
@@ -46,19 +45,14 @@
       * **Floating point**: All bit patterns are valid for the ``f32`` or ``f64``.type
       * **Integers**: All bit patterns are valid for integer types.
 
-      Consequences of reading invalid values include:
-
-      * Immediate undefined behavior, even if the value is not used
-      * Miscompilation due to compiler assumptions about valid values
-      * Security vulnerabilities from unexpected program behavior
-      * Non-deterministic behavior that varies across optimization levels or platforms
+      Reading an invalid value is undefined behavior.
 
    .. non_compliant_example::
       :id: non_compl_ex_UnionBool
       :status: draft
 
-      This example reads a boolean from a union field containing an invalid bit pattern.
-      The value ``3`` is not a valid boolean (only ``0`` and ``1`` are valid).
+      This noncompliant example reads a Boolean from a union field containing an invalid bit pattern.
+      The value ``3`` is not a valid Boolean (only ``0`` and ``1`` are valid).
 
       .. code-block:: rust
 
@@ -70,15 +64,15 @@
          fn main() {
              let u = IntOrBool { i: 3 };
              
-             // Noncompliant: reading bool field with invalid value (3)
-             let invalid_bool = unsafe { u.b };  // UB: 3 is not a valid bool
+             // Undefined behavior reading an invalid value from a union field of type 'bool'
+             unsafe { u.b };  // Noncompliant
          }
 
    .. non_compliant_example::
       :id: non_compl_ex_UnionChar
       :status: draft
 
-      This example reads a ``char`` from a union containing an invalid Unicode value.
+      This noncompliant example reads a ``char`` from a ``union`` containing an invalid Unicode value.
 
       .. code-block:: rust
 
@@ -88,18 +82,18 @@
          }
 
          fn main() {
-             // 0xD800 is a surrogate, not a valid Unicode scalar value
+             // 0xD800 is a surrogate and not a valid Unicode scalar value
              let u = IntOrChar { i: 0xD800 };
              
-             // Non-compliant: reading char field with invalid Unicode value
-             let invalid_char = unsafe { u.c };  // UB: surrogates are not valid chars
+             // Noncompliant: reading an invalid Unicode value from a union field of type 'char'
+             unsafe { u.c };  // Noncompliant
          }
 
    .. non_compliant_example::
       :id: non_compl_ex_UnionEnum
       :status: draft
 
-      This example reads an enum from a ``union`` containing an invalid discriminant.
+      This noncompliant example reads an invalid discriminant from a ``union`` field of 'Color' enumeration type.
 
       .. code-block:: rust
 
@@ -119,15 +113,15 @@
          fn main() {
              let u = IntOrColor { i: 42 };
              
-             // Noncompliant: 42 is not a valid Color discriminant
-             let invalid_color = unsafe { u.c };  // UB: no Color variant for 42
+             // Undefined behavior reading an invalid discriminant from the 'Color' enumeration type
+             unsafe { u.c };  // Noncompliant
          }
 
    .. non_compliant_example::
       :id: non_compl_ex_UnionRef
       :status: draft
 
-      This example reads a reference from a ``union`` containing a null or misaligned pointer.
+      This noncompliant example reads a reference from a ``union`` containing a null or misaligned pointer.
 
       .. code-block:: rust
 
@@ -147,7 +141,7 @@
       :id: compl_ex_UnionTrackField
       :status: draft
 
-      Track the active field explicitly to ensure valid reads.
+      This compliant example tracks the active field explicitly to ensure valid reads.
 
       .. code-block:: rust
 
@@ -202,7 +196,7 @@
       :id: compl_ex_UnionSameField
       :status: draft
 
-      Read from the same field that was written.
+      This compliant solution read from the same field that was written.
 
       .. code-block:: rust
 
@@ -223,7 +217,7 @@
       :id: compl_ex_UnionValidReinterpret
       :status: draft
 
-      Reinterpret between types where all bit patterns are valid.
+      This compliant example reinterprets the value as a different types where all bit patterns are valid.
 
       .. code-block:: rust
 
@@ -250,7 +244,7 @@
       :id: compl_ex_UnionValidateBool
       :status: draft
 
-      Validate bytes before reading as a constrained type.
+      This compliant solution validates bytes before reading as a constrained type.
 
       .. code-block:: rust
 
@@ -286,7 +280,7 @@
 
       .. list-table::
          :header-rows: 0
-         :widths: 5 85
+         :widths: 5 60
 
          * - .. [UNION]
            - The Rust Project Developers. "Rust Reference: Unions." *The Rust Reference*, n.d. https://doc.rust-lang.org/reference/items/unions.html.
