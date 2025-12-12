@@ -154,8 +154,23 @@ body:
     id: non-compliant-example-code
     attributes:
       label: Non-Compliant Example - Code
-      description: Here we write a code example showcasing the unintended or consequential behavior. Non-normative.
-      placeholder: fn non_compliant_example() { /* ... */ }
+      description: |
+        Code example showcasing the unintended or consequential behavior. Non-normative.
+
+        **Hidden lines:** If your code needs `use` statements, a `fn main()` wrapper, or other boilerplate to compile, but you don't want them shown in the documentation, prefix those lines with `# ` (hash + space). These lines will be compiled but hidden in the rendered docs.
+
+        Example with hidden lines:
+        ```
+        # use std::mem::MaybeUninit;
+        # fn main() {
+        let x: u32 = unsafe { MaybeUninit::uninit().assume_init() }; // UB
+        # }
+        ```
+      placeholder: |
+        # use std::collections::HashMap;
+        # fn main() {
+        let map = HashMap::new();
+        # }
     validations:
       required: true
   - type: textarea
@@ -170,7 +185,22 @@ body:
     id: compliant-example-code
     attributes:
       label: Compliant Example - Code
-      description: Here we write a code example showcasing we avoid unintended or consequential behavior by following the Coding Guideline.
-      placeholder: fn compliant_example() { /* ... */ }
+      description: |
+        Code example showcasing we avoid unintended or consequential behavior by following the Coding Guideline.
+
+        **Hidden lines:** If your code needs `use` statements, a `fn main()` wrapper, or other boilerplate to compile, but you don't want them shown in the documentation, prefix those lines with `# ` (hash + space). These lines will be compiled but hidden in the rendered docs.
+
+        Example with hidden lines:
+        ```
+        # use std::collections::HashMap;
+        # fn main() {
+        let mut map = HashMap::new();
+        map.insert("key", "value"); // Compliant usage
+        # }
+        ```
+      placeholder: |
+        # fn main() {
+        let safe_value = 42u32; // Properly initialized
+        # }
     validations:
       required: true
