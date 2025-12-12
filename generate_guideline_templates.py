@@ -105,7 +105,7 @@ def guideline_rst_template(
 
                 {non_compliant_ex_prose.strip()}
             
-                .. code-block:: rust
+                .. rust-example::
                 
                     {indented_non_compliant_ex.strip()}
 
@@ -115,7 +115,7 @@ def guideline_rst_template(
 
                 {compliant_example_prose.strip()}
             
-                .. code-block:: rust
+                .. rust-example::
                 
                     {indented_compliant_ex.strip()}
     """)
