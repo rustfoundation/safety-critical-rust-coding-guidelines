@@ -473,7 +473,7 @@ def save_guideline_file(
     if not chapter_dir.is_dir():
         # Fall back to legacy monolithic file structure
         print(f"Note: Chapter directory {chapter_dir} not found.")
-        print(f"      Using legacy file structure. Run split_guidelines.py to migrate.")
+        print("      Using legacy file structure. Run split_guidelines.py to migrate.")
         return save_guideline_file_legacy(content, chapter, guidelines_dir)
     
     # Extract guideline ID

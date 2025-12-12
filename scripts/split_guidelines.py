@@ -36,8 +36,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
-
+from typing import List, Tuple
 
 # SPDX header to prepend to each generated file
 SPDX_HEADER = """\
@@ -230,7 +229,7 @@ def split_chapter(
     chapter_title, header_content, guidelines = parse_chapter_file(src_file)
     
     if not guidelines:
-        print(f"  No guidelines found - creating empty chapter structure")
+        print("  No guidelines found - creating empty chapter structure")
     else:
         print(f"  Found {len(guidelines)} guidelines")
     
@@ -243,7 +242,7 @@ def split_chapter(
     if dry_run:
         print(f"  Would create directory: {chapter_dir}")
         print(f"  Would create {len(guidelines)} guideline files (.rst.inc)")
-        print(f"  Would create index.rst")
+        print("  Would create index.rst")
         return len(guidelines), [g[0] for g in guidelines]
     
     # Create chapter directory
@@ -313,7 +312,7 @@ def update_main_index(
             print(f"\nUpdated main index at {index_file}")
             print(f"  Updated chapters: {', '.join(updated_chapters)}")
     else:
-        print(f"\nMain index already up to date (or no matching chapters found)")
+        print("\nMain index already up to date (or no matching chapters found)")
 
 
 def get_chapter_files(src_dir: Path) -> List[Path]:
@@ -484,7 +483,7 @@ def main():
     else:
         print("\n=== To apply changes ===")
         print("Run without --dry-run:")
-        print(f"  uv run python scripts/split_guidelines.py --all --update-index --cleanup")
+        print("  uv run python scripts/split_guidelines.py --all --update-index --cleanup")
 
 
 if __name__ == "__main__":
