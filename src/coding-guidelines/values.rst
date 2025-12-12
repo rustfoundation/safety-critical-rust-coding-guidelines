@@ -35,7 +35,7 @@ Values
       :id: rat_kjFRrhpS8Wu6
       :status: draft
 
-      Rust’s memory model treats all types except unions as having an invariant that all bytes must be initialized before a value may be constructed.
+      Rust's memory model treats all types except unions as having an invariant that all bytes must be initialized before a value may be constructed.
       Reading uninitialized memory:
 
       - creates undefined behavior for most types,
@@ -44,7 +44,7 @@ Values
       - may produce values that violate type invariants.
       
       The sole exception is that unions work like C unions: any union field may be read, even if it was never written.
-      The resulting bytes must, however, form a valid representation for the field’s type,
+      The resulting bytes must, however, form a valid representation for the field's type,
       which is not guaranteed if the union contains arbitrary data.
 
    .. non_compliant_example::
@@ -54,7 +54,7 @@ Values
       This noncompliant example creates a value of type ``u32`` from uninitialized memory via 
       `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_:
 
-      .. code-block:: rust
+      .. rust-example::
 
          use std::mem::MaybeUninit;
 
@@ -67,15 +67,15 @@ Values
       Types such as ``u8``, ``u16``, ``u32``, and ``i128`` allow all possible bit patterns.
       Provided the memory is initialized, there is no undefined behavior.
 
-      .. code-block:: rust
+      .. rust-example::
 
          union U {
              n: u32,
              bytes: [u8; 4],
          }
 
-        let u = U { bytes: [0xFF, 0xEE, 0xDD, 0xCC] };
-        let n = unsafe { u.n };   // OK — all bit patterns valid for u32
+         let u = U { bytes: [0xFF, 0xEE, 0xDD, 0xCC] };
+         let n = unsafe { u.n };   // OK — all bit patterns valid for u32
 
    .. compliant_example::
       :id: compl_ex_Ke869nSXuShV
@@ -83,7 +83,7 @@ Values
 
       This compliant example calles the ``write`` function to fully initialize low-level memory.
 
-      .. code-block:: rust
+      .. rust-example::
 
          use std::mem::MaybeUninit;
 
@@ -99,7 +99,7 @@ Values
       References must be valid, aligned, properly dereferenceable, and non-null.
       Uninitialized memory cannot satisfy these invariants.
 
-      .. code-block:: rust
+      .. rust-example::
 
          use std::mem::MaybeUninit;
 
@@ -113,7 +113,7 @@ Values
       You cannot create a pointer from unspecified bytes.
       Even a raw pointer type (e.g., ``*const T``) has validity rules.
 
-      .. code-block:: rust
+      .. rust-example::
 
          use std::mem::MaybeUninit;
 
@@ -125,7 +125,7 @@ Values
 
       Array elements must individually be valid values.
 
-      .. code-block:: rust
+      .. rust-example::
 
          use std::mem::MaybeUninit;
 
@@ -138,7 +138,7 @@ Values
 
       The following code reads a union field:
 
-      .. code-block:: rust
+      .. rust-example::
 
          union U {
             x: u32,
@@ -157,7 +157,7 @@ Values
       Only the read itself is allowed;
       the resulting bytes must still be a valid bool.
 
-      .. code-block:: rust
+      .. rust-example::
 
          union U {
              b: bool,
@@ -168,12 +168,12 @@ Values
          let b = unsafe { u.b };      // UB — invalid bool
 
    .. compliant_example::
-      :id: compl_ex_Ke869nSXuShT
+      :id: compl_ex_Ke869nSXuShW
       :status: draft
 
       Accessing padding bytes is allowed if not interpreted as typed data:
 
-      .. code-block:: rust
+      .. rust-example::
 
          #[repr(C)]
          struct S {
@@ -181,9 +181,11 @@ Values
              b: u32,
          }
 
+         # fn main() {
          let mut buf = [0u8; std::mem::size_of::<S>()];
          buf[0] = 10;
          buf[1] = 20; // writing padding is fine
 
          let p = buf.as_ptr() as *const S;
-         let s = unsafe { p.read_unaligned() }; // OK — all *fields* are initialized (padding doesn’t matter)
+         let s = unsafe { p.read_unaligned() }; // OK — all *fields* are initialized (padding doesn't matter)
+         # }
