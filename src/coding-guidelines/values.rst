@@ -58,7 +58,9 @@ Values
 
          use std::mem::MaybeUninit;
 
+         # fn main() {
          let x: u32 = unsafe { MaybeUninit::uninit().assume_init() }; // UB
+         # }
 
    .. compliant_example::
       :id: compl_ex_Ke869nSXuShU
@@ -74,22 +76,26 @@ Values
              bytes: [u8; 4],
          }
 
+         # fn main() {
          let u = U { bytes: [0xFF, 0xEE, 0xDD, 0xCC] };
          let n = unsafe { u.n };   // OK — all bit patterns valid for u32
+         # }
 
    .. compliant_example::
       :id: compl_ex_Ke869nSXuShV
       :status: draft
 
-      This compliant example calls the ``write`` function to fully initialize low-level memory.
+      This compliant example calles the ``write`` function to fully initialize low-level memory.
 
       .. rust-example::
 
          use std::mem::MaybeUninit;
 
+         # fn main() {
          let mut x = MaybeUninit::<u64>::uninit();
          x.write(42);
          let val = unsafe { x.assume_init() }; // OK — value was fully initialized
+         # }
 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db2
@@ -103,7 +109,9 @@ Values
 
          use std::mem::MaybeUninit;
 
+         # fn main() {
          let r: &u32 = unsafe { MaybeUninit::uninit().assume_init() }; // UB — invalid reference
+         # }
 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db4
@@ -117,7 +125,9 @@ Values
 
          use std::mem::MaybeUninit;
 
+         # fn main() {
          let p: *const u32 = unsafe { MaybeUninit::uninit().assume_init() }; // UB
+         # }
 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db5
@@ -129,8 +139,10 @@ Values
 
          use std::mem::MaybeUninit;
 
+         # fn main() {
          let mut arr: [MaybeUninit<u8>; 4] = unsafe { MaybeUninit::uninit().assume_init() };
          let a = unsafe { std::mem::transmute::<_, [u8; 4]>(arr) }; // UB — not all elements initialized
+         # }
 
    .. compliant_example::
       :id: compl_ex_Ke869nSXuShT
@@ -145,8 +157,10 @@ Values
             y: f32,
          }
 
+         # fn main() {
          let u = U { x: 123 }; // write to one field
          let f = unsafe { u.y }; // reading the other field is allowed
+         # }
 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db3
@@ -164,8 +178,10 @@ Values
              x: u8,
          }
 
+         # fn main() {
          let u = U { x: 255 };        // 255 is not a valid bool representation
          let b = unsafe { u.b };      // UB — invalid bool
+         # }
 
    .. compliant_example::
       :id: compl_ex_Ke869nSXuShW
