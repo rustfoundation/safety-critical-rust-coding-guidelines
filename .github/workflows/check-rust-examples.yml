@@ -424,7 +424,8 @@ jobs:
           LEGACY_COUNT=0
           LEGACY_FILES=""
           
-          for file in $(find src/coding-guidelines -name "*.rst" 2>/dev/null); do
+          # Check both .rst and .rst.inc files (per-guideline structure uses .rst.inc)
+          for file in $(find src/coding-guidelines \( -name "*.rst" -o -name "*.rst.inc" \) 2>/dev/null); do
             COUNT=$(grep -c "^\s*\.\. code-block:: rust" "$file" 2>/dev/null || echo 0)
             if [ "$COUNT" -gt 0 ]; then
               LEGACY_FILES="$LEGACY_FILES\n- $file: $COUNT occurrences"

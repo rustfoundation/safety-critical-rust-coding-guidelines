@@ -3,9 +3,6 @@
 
 .. default-domain:: coding-guidelines
 
-Associated Items
-================
-
 .. guideline:: Recursive function are not allowed
     :id: gui_ot2Zt3dd6of1 
     :category: required

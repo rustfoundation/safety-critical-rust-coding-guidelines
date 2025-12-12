@@ -3,5 +3,7 @@
 
 .. default-domain:: coding-guidelines
 
-Inline Assembly
-===============
+Associated Items
+================
+
+.. include:: gui_ot2Zt3dd6of1.rst.inc
