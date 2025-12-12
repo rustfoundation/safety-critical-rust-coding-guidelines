@@ -85,7 +85,7 @@ Values
       :id: compl_ex_Ke869nSXuShV
       :status: draft
 
-      This compliant example calles the ``write`` function to fully initialize low-level memory.
+      This compliant example calls the ``write`` function to fully initialize low-level memory.
 
       .. rust-example::
 
