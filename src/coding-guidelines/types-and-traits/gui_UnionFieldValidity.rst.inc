@@ -51,8 +51,8 @@
       :id: non_compl_ex_UnionBool
       :status: draft
 
-      This noncompliant example reads a Boolean from a union field containing an invalid bit pattern.
-      The value ``3`` is not a valid Boolean (only ``0`` and ``1`` are valid).
+      This noncompliant example reads an invalid bit pattern from a Boolean union field.
+      The value ``3`` is not a valid value of type ``bool`` (only ``0`` and ``1`` are valid).
 
       .. code-block:: rust
 
@@ -72,7 +72,7 @@
       :id: non_compl_ex_UnionChar
       :status: draft
 
-      This noncompliant example reads a ``char`` from a ``union`` containing an invalid Unicode value.
+      This noncompliant example reads an invalid Unicode value from a ``union`` field of type ``char`` .
 
       .. code-block:: rust
 
@@ -121,7 +121,8 @@
       :id: non_compl_ex_UnionRef
       :status: draft
 
-      This noncompliant example reads a reference from a ``union`` containing a null or misaligned pointer.
+      This noncompliant example reads a reference from a ``union`` containing a null pointer.
+      A similar problem occurs when reading a misaligned pointer.
 
       .. code-block:: rust
 
@@ -133,8 +134,8 @@
          fn main() {
              let u = PtrOrRef { p: std::ptr::null() };
              
-             // Non-compliant: null is not a valid reference
-             let invalid_ref = unsafe { u.r };  // UB: references cannot be null
+             //  Undefined behavior reading a null value from a reference field of a union
+             unsafe { u.r };  // Noncompliant
          }
 
    .. compliant_example::
@@ -196,7 +197,7 @@
       :id: compl_ex_UnionSameField
       :status: draft
 
-      This compliant solution read from the same field that was written.
+      This compliant solution reads from the same field that was written.
 
       .. code-block:: rust
 
