@@ -13,10 +13,8 @@
    :scope: system
    :tags: defect, safety, undefined-behavior
 
-   When reading from a union field, ensure that the underlying bytes constitute a valid value 
-   for that field's type.
-   Reading a union field whose bytes do not represent a valid value 
-   for the field's type is undefined behavior.
+   When reading from a union field, ensure that the underlying bytes constitute a valid value for that field's type.
+   Reading a union field whose bytes do not represent a valid value for the field's type is undefined behavior.
 
    Before accessing a union field:
    
@@ -29,12 +27,12 @@
       :status: draft
 
       Unions allow multiple fields to occupy the same memory, similar to C unions.
-      Unlike enums, unions do not track which field is currently active. It is the programmer's
-      responsibility to ensure that when a field is read, the underlying bytes are valid for
-      that field's type [RUST-REF-UNION]_.
+      Unlike enumeration types, unions do not track which field is currently active.
+      You must ensure that when a field is read,
+      the underlying bytes are valid for that field's type [1]_.
 
       Every type has a *validity invariant* — a set of constraints that all values of
-      that type must satisfy [UCG-VALIDITY]_.
+      that type must satisfy [2]_.
       Reading a union field performs a *typed read*,
       which asserts that the bytes are valid for the target type.
       Violating this invariant is undefined behavior.
@@ -286,13 +284,14 @@
       :id: bib_UnionFieldValidity
       :status: draft
 
+      ```rst
       .. list-table::
          :header-rows: 0
-         :widths: 10 80
+         :widths: 5 85
 
-         * - .. [RUST-REF-UNION]
+         * - .. [1]
            - The Rust Project Developers. "Rust Reference: Unions." *The Rust Reference*, n.d. https://doc.rust-lang.org/reference/items/unions.html.
-         * - .. [UCG-VALIDITY]
+         * - .. [2]
            - Rust Unsafe Code Guidelines Working Group. "Validity and Safety Invariant." *Rust Unsafe Code Guidelines*, n.d. https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
 
 >>>>>>> c93b2cb (Update types-and-traits.rst):src/coding-guidelines/types-and-traits.rst
