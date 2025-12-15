@@ -106,9 +106,13 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 
 As soon as these prerequisites are fulfilled, the issue shall be converted into a PR by a subcommittee member by marking the issue with the label `sign-off: create pr` to denote that you should create a Pull Request. Further discussion about the amount and correctness of the content shall then be done on the Pull Request.
 
-The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment).
+The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment) as the exact file content you'll need.
 
-Inside the comment, under the heading `Target File`, you'll see the name of the file you should add the content to.
+Inside the comment, you'll see a portion noting which file you should copy the content into, like this:
+
+> Copy the RST content below into a new file named gui_ICcoW8nEn0dk.rst.inc
+
+Where the alphanumeric identifier following `gui_` will be unique to your guideline.
 
 Make sure to include this command in the body of your PR, where `xyz` is the number of the issue you opened in [Step 1](#1-submit-coding-guideline-issue):
 
