@@ -6,7 +6,7 @@
   - [Table of Contents](#table-of-contents)
   - [Contribution Workflow](#contribution-workflow)
     - [Note on Chapter Layout](#note-on-chapter-layout)
-    - [0) Bring up the idea for discussion](#0-bring-up-the-idea-for-discussion)
+    - [0) Bring up the idea for discussion](#0-optional-bring-the-idea-up-for-discussion)
     - [1) Submit coding guideline issue](#1-submit-coding-guideline-issue)
       - [1.1) Finding the FLS ID](#11-finding-the-fls-id)
     - [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment)
