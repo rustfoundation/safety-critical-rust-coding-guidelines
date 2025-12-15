@@ -20,7 +20,7 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 # Add the scripts directory to Python path so we can import guideline_utils
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -270,7 +270,6 @@ def format_test_results(results: List[CodeTestResult]) -> str:
     if not results:
         return ""
 
-    passed = sum(1 for r in results if r.passed)
     failed = sum(1 for r in results if not r.passed)
     total = len(results)
 
