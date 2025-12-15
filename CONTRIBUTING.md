@@ -105,9 +105,6 @@ The contents of the PR should be based on the bot comment containing the generat
 
 Inside the comment, under the heading `Target File`, you'll see the name of the file you should add the content to.
 
-the comment with the guideline on which
-chapter to place the coding guideline.
-
 Make sure to include this command in the body of your PR, where `xyz` is the number of the issue you opened in [Step 1](#1-submit-coding-guideline-issue):
 
 > `closes #xyz`
