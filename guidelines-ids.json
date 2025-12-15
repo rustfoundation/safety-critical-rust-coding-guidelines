@@ -244,33 +244,6 @@
       ]
     },
     {
-      "title": "Associated Items",
-      "link": "coding-guidelines/associated-items/index.html",
-      "guidelines": [
-        {
-          "id": "gui_ot2Zt3dd6of1",
-          "title": "Recursive function are not allowed",
-          "link": "coding-guidelines/associated-items/index.html#gui_ot2Zt3dd6of1",
-          "checksum": "52714e1513af9c67bb6ae6cae3d00de09bf06b42f08215a60065ecceaf248d38",
-          "rationale": {
-            "id": "rat_gvoKeVSKK8fD",
-            "link": "coding-guidelines/associated-items/index.html#rat_gvoKeVSKK8fD",
-            "checksum": "89286a649fdbe770618bf6bc59cb806a175bf86f4bd4b8af17a6662b0ef4e4c6"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_MxqhjfkStJJy",
-            "link": "coding-guidelines/associated-items/index.html#non_compl_ex_MxqhjfkStJJy",
-            "checksum": "b0fb48b305a394f2dbccb5d8a928030110363f98c76f2db5575cd014aaafaa7e"
-          },
-          "compliant_example": {
-            "id": "compl_ex_9pK3h65rfceO",
-            "link": "coding-guidelines/associated-items/index.html#compl_ex_9pK3h65rfceO",
-            "checksum": "80e8d9dc471507e68cd45bf50105b96f1f2558bede9facf9f64dbb07a1ad4545"
-          }
-        }
-      ]
-    },
-    {
       "title": "Expressions",
       "link": "coding-guidelines/expressions/index.html",
       "guidelines": [
@@ -461,6 +434,33 @@
             "id": "compl_ex_Ri9pP5Ch3kcc",
             "link": "coding-guidelines/expressions/index.html#compl_ex_Ri9pP5Ch3kcc",
             "checksum": "11c559969903d2387d632439611bdc9e727f9ce6384c4da4dc20d9019839131e"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Associated Items",
+      "link": "coding-guidelines/associated-items/index.html",
+      "guidelines": [
+        {
+          "id": "gui_ot2Zt3dd6of1",
+          "title": "Recursive function are not allowed",
+          "link": "coding-guidelines/associated-items/index.html#gui_ot2Zt3dd6of1",
+          "checksum": "52714e1513af9c67bb6ae6cae3d00de09bf06b42f08215a60065ecceaf248d38",
+          "rationale": {
+            "id": "rat_gvoKeVSKK8fD",
+            "link": "coding-guidelines/associated-items/index.html#rat_gvoKeVSKK8fD",
+            "checksum": "89286a649fdbe770618bf6bc59cb806a175bf86f4bd4b8af17a6662b0ef4e4c6"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_MxqhjfkStJJy",
+            "link": "coding-guidelines/associated-items/index.html#non_compl_ex_MxqhjfkStJJy",
+            "checksum": "b0fb48b305a394f2dbccb5d8a928030110363f98c76f2db5575cd014aaafaa7e"
+          },
+          "compliant_example": {
+            "id": "compl_ex_9pK3h65rfceO",
+            "link": "coding-guidelines/associated-items/index.html#compl_ex_9pK3h65rfceO",
+            "checksum": "80e8d9dc471507e68cd45bf50105b96f1f2558bede9facf9f64dbb07a1ad4545"
           }
         }
       ]
