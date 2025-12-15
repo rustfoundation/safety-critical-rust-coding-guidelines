@@ -103,18 +103,15 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 > * The new rule isn't already covered by another rule or, in case there is already another rule, the rules need to be linked and categorized
 > * All sections contain some content
 > * Content written may be *incomplete*, but must not be *incorrect*
+> * `🧪 Code Example Test Results` section shows all example code compiles
 
 As soon as these prerequisites are fulfilled, the draft shall be marked as PR-ready by a subcommittee member, by labeling the issue with `sign-off: create pr`. This denotes that you should create a Pull Request with your Guideline. Further discussion about the amount and correctness of its content shall then be done on the Pull Request itself.
 
 The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment). The comment has the exact file content you'll need.
 
-Inside the comment, you'll see a portion noting which file and folder you should copy the content into, like this:
-
-> Copy the RST content below into a new file named gui_ICcoW8nEn0dk.rst.inc
-
-Where the alphanumeric identifier following `gui_` will be unique to your guideline. Note that you're creating a new file for each guideline.
-
-You'll also update the chapter's `index.rst` in order to include the content. See the `index.rst` for examples on how to do this.
+Reference the generated comment from [Step 2](#2-guideline-generated-as-a-comment),
+in particular headings `📁 Target Location` and `🗂️ Update Chapter Index` for necessary
+steps to ensure that your guideline appears when rendering the guidelines.
 
 Make sure to include this command in the body of your PR, where `xyz` is the number of the issue you opened in [Step 1](#1-submit-coding-guideline-issue):
 
