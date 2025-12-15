@@ -108,11 +108,13 @@ As soon as these prerequisites are fulfilled, the issue shall be converted into 
 
 The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment) as the exact file content you'll need.
 
-Inside the comment, you'll see a portion noting which file you should copy the content into, like this:
+Inside the comment, you'll see a portion noting which file and folder you should copy the content into, like this:
 
 > Copy the RST content below into a new file named gui_ICcoW8nEn0dk.rst.inc
 
-Where the alphanumeric identifier following `gui_` will be unique to your guideline.
+Where the alphanumeric identifier following `gui_` will be unique to your guideline. Note that you're creating a new file for each guideline.
+
+You'll also update the chapter's `index.rst` in order to include the content. See the `index.rst` for examples on how to do this.
 
 Make sure to include this command in the body of your PR, where `xyz` is the number of the issue you opened in [Step 1](#1-submit-coding-guideline-issue):
 
