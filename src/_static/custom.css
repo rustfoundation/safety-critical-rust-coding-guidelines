@@ -152,7 +152,43 @@ code.literal {
 }
 
 /* --------------------------------------------------------------------------
-   5. Table fixes for sphinx-needs (uses tables internally)
+   5. Paragraph spacing inside sphinx-needs content
+   
+   Ensure proper visual separation between paragraphs in guideline content.
+   -------------------------------------------------------------------------- */
+
+/* Add margin between paragraphs in needs content */
+/* The actual class is "need content" (two classes), not "needs_content" */
+.need.content p,
+td.need.content p,
+.needs_content p,
+td.needs_content p,
+.need_content p {
+    margin-bottom: 1em !important;
+}
+
+/* But not on the last paragraph */
+.need.content p:last-child,
+td.need.content p:last-child,
+.needs_content p:last-child,
+td.needs_content p:last-child,
+.need_content p:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Also ensure lists have proper spacing */
+.need.content ul,
+.need.content ol,
+td.need.content ul,
+td.need.content ol,
+.needs_content ul,
+.needs_content ol {
+    margin-top: 0.5em !important;
+    margin-bottom: 1em !important;
+}
+
+/* --------------------------------------------------------------------------
+   6. Table fixes for sphinx-needs (uses tables internally)
    -------------------------------------------------------------------------- */
 
 table.need,
