@@ -108,10 +108,11 @@ Inside the comment, under the heading `Target File`, you'll see the name of the 
 the comment with the guideline on which
 chapter to place the coding guideline.
 
-Make sure to include the following in the body of your PR so that the
-corresponding issue will be closed upon the PR being closed. Note that
-`#xyz` corresponds to the number of the issue opened by
-[1) Submit coding guideline issue](#1-submit-coding-guideline-issue).
+Make sure to include this command in the body of your PR, where `xyz` is the number of the issue you opened in [Step 1](#1-submit-coding-guideline-issue):
+
+> `closes #xyz`
+
+This will ensure issue `#xyz` is closed when your Pull Request gets merged.
 
 
 `closes #xyz`
