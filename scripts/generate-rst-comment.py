@@ -347,7 +347,7 @@ def generate_comment(rst_content: str, chapter: str, test_results: List[CodeTest
     if guideline_id:
         target_dir = f"src/coding-guidelines/{chapter_slug}/"
         target_file = f"{target_dir}{guideline_id}.rst.inc"
-        chapter_index_file = f"{target_dir}/index.rst"
+        chapter_index_file = f"{target_dir}index.rst"
         file_instructions = f"""
 ### 📁 Target Location
 
