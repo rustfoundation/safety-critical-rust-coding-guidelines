@@ -117,10 +117,10 @@ def normalize_md(issue_body: str) -> str:
 def extract_form_fields(issue_body: str) -> dict:
     """
     Parse issue body (from GitHub issue template) into a dict of field values.
-    
+
     Args:
         issue_body: The raw body text from a GitHub issue
-        
+
     Returns:
         Dictionary with field names as keys and their values
     """
@@ -163,11 +163,11 @@ def extract_form_fields(issue_body: str) -> dict:
 def format_code_block(code: str, lang: str = "rust") -> str:
     """
     Format a code block for RST output, stripping markdown fences if present.
-    
+
     Args:
         code: The code content, possibly wrapped in markdown fences
         lang: The language for syntax highlighting (default: rust)
-        
+
     Returns:
         Formatted code block string with proper indentation
     """
@@ -189,13 +189,49 @@ def format_code_block(code: str, lang: str = "rust") -> str:
     return f"\n\n{indented_code}\n"
 
 
+def collect_examples(fields: dict, example_type: str) -> list:
+    """
+    Collect all examples of a given type from fields.
+
+    Args:
+        fields: Dictionary of form fields
+        example_type: Either "non_compliant" or "compliant"
+
+    Returns:
+        List of (prose, code) tuples for non-empty examples
+    """
+    examples = []
+
+    # Map the example type to field prefixes
+    if example_type == "non_compliant":
+        prose_prefix = "non_compliant_ex_prose_"
+        code_prefix = "non_compliant_ex_"
+    else:  # compliant
+        prose_prefix = "compliant_ex_prose_"
+        code_prefix = "compliant_ex_"
+
+    # Check for examples 1-4
+    for i in range(1, 5):
+        prose_key = f"{prose_prefix}{i}"
+        code_key = f"{code_prefix}{i}"
+
+        prose = fields.get(prose_key, "").strip()
+        code = fields.get(code_key, "").strip()
+
+        # Only include if both prose and code are non-empty
+        if prose and code:
+            examples.append((prose, code))
+
+    return examples
+
+
 def guideline_template(fields: dict) -> str:
     """
     Convert a dictionary of guideline fields into proper RST format.
-    
+
     Args:
         fields: Dictionary containing all guideline fields
-        
+
     Returns:
         Formatted RST string for the guideline
     """
@@ -204,18 +240,26 @@ def guideline_template(fields: dict) -> str:
 
     amplification_text = indent(md_to_rst(get("amplification")), " " * 12)
     rationale_text = indent(md_to_rst(get("rationale")), " " * 16)
-    non_compliant_ex_prose_text = indent(
-        md_to_rst(get("non_compliant_ex_prose")), " " * 16
-    )
-    compliant_example_prose_text = indent(
-        md_to_rst(get("compliant_example_prose")), " " * 16
-    )
 
     # Process exceptions field - convert MD to RST and pre-indent for multi-line support
     exceptions_raw = get("exceptions")
     exceptions_text = ""
     if exceptions_raw:
         exceptions_text = indent(md_to_rst(exceptions_raw), " " * 12)
+
+    # Collect non-compliant examples
+    non_compliant_examples = []
+    for prose, code in collect_examples(fields, "non_compliant"):
+        prose_rst = indent(md_to_rst(prose), " " * 16)
+        code_formatted = format_code_block(code)
+        non_compliant_examples.append((prose_rst, code_formatted))
+
+    # Collect compliant examples
+    compliant_examples = []
+    for prose, code in collect_examples(fields, "compliant"):
+        prose_rst = indent(md_to_rst(prose), " " * 16)
+        code_formatted = format_code_block(code)
+        compliant_examples.append((prose_rst, code_formatted))
 
     guideline_text = guideline_rst_template(
         guideline_title=get("guideline_title"),
@@ -230,10 +274,8 @@ def guideline_template(fields: dict) -> str:
         amplification=amplification_text,
         exceptions=exceptions_text,
         rationale=rationale_text,
-        non_compliant_ex_prose=non_compliant_ex_prose_text,
-        non_compliant_ex=format_code_block(get("non_compliant_ex")),
-        compliant_example_prose=compliant_example_prose_text,
-        compliant_example=format_code_block(get("compliant_example")),
+        non_compliant_examples=non_compliant_examples,
+        compliant_examples=compliant_examples,
     )
 
     return guideline_text
@@ -246,10 +288,10 @@ def guideline_template(fields: dict) -> str:
 def extract_guideline_id(content: str) -> str:
     """
     Extract the guideline ID from RST content.
-    
+
     Args:
         content: RST content containing a guideline directive
-        
+
     Returns:
         The guideline ID (e.g., "gui_abc123XYZ") or empty string if not found
     """
@@ -260,40 +302,38 @@ def extract_guideline_id(content: str) -> str:
 def extract_all_ids(content: str) -> dict:
     """
     Extract all IDs from RST content.
-    
+
     Args:
         content: RST content
-        
+
     Returns:
         Dictionary with keys 'guideline', 'rationale', 'compliant', 'non_compliant'
     """
     ids = {
         'guideline': '',
         'rationale': '',
-        'compliant': '',
-        'non_compliant': ''
+        'compliant': [],
+        'non_compliant': []
     }
-    
+
     # Guideline ID
     match = re.search(r':id:\s*(gui_[a-zA-Z0-9]+)', content)
     if match:
         ids['guideline'] = match.group(1)
-    
+
     # Rationale ID
     match = re.search(r':id:\s*(rat_[a-zA-Z0-9]+)', content)
     if match:
         ids['rationale'] = match.group(1)
-    
-    # Compliant example ID
-    match = re.search(r':id:\s*(compl_ex_[a-zA-Z0-9]+)', content)
-    if match:
-        ids['compliant'] = match.group(1)
-    
-    # Non-compliant example ID
-    match = re.search(r':id:\s*(non_compl_ex_[a-zA-Z0-9]+)', content)
-    if match:
-        ids['non_compliant'] = match.group(1)
-    
+
+    # Compliant example IDs (multiple)
+    for match in re.finditer(r':id:\s*(compl_ex_[a-zA-Z0-9]+)', content):
+        ids['compliant'].append(match.group(1))
+
+    # Non-compliant example IDs (multiple)
+    for match in re.finditer(r':id:\s*(non_compl_ex_[a-zA-Z0-9]+)', content):
+        ids['non_compliant'].append(match.group(1))
+
     return ids
 
 
@@ -304,10 +344,10 @@ def extract_all_ids(content: str) -> dict:
 def chapter_to_filename(chapter: str) -> str:
     """
     Convert chapter name to filename slug.
-    
+
     Args:
         chapter: Chapter name (e.g., "Associated Items", "Concurrency")
-        
+
     Returns:
         Filename slug (e.g., "associated-items", "concurrency")
     """
@@ -317,10 +357,10 @@ def chapter_to_filename(chapter: str) -> str:
 def chapter_to_dirname(chapter: str) -> str:
     """
     Convert chapter name to directory name (same as filename slug).
-    
+
     Args:
         chapter: Chapter name (e.g., "Associated Items", "Concurrency")
-        
+
     Returns:
         Directory name (e.g., "associated-items", "concurrency")
     """
@@ -330,10 +370,10 @@ def chapter_to_dirname(chapter: str) -> str:
 def dirname_to_chapter(dirname: str) -> str:
     """
     Convert directory name back to chapter name.
-    
+
     Args:
         dirname: Directory name (e.g., "associated-items")
-        
+
     Returns:
         Chapter name (e.g., "Associated Items")
     """
@@ -350,47 +390,47 @@ def add_include_to_chapter_index(
 ) -> bool:
     """
     Add an include directive to a chapter's index.rst, maintaining alphabetical order.
-    
+
     Args:
         chapter_dir: Path to the chapter directory
         guideline_filename: Filename of the guideline (e.g., "gui_abc123.rst.inc")
-        
+
     Returns:
         True if successful, False otherwise
     """
     index_path = chapter_dir / "index.rst"
-    
+
     if not index_path.exists():
         print(f"Warning: Index file not found: {index_path}")
         return False
-    
+
     content = index_path.read_text()
-    
+
     # Check if already included
     if guideline_filename in content:
         print(f"Note: {guideline_filename} already in index")
         return True
-    
+
     # Find existing include directives and their position
     include_pattern = re.compile(r'^(\s*)\.\.\ include::\s+(gui_[a-zA-Z0-9]+\.rst\.inc)\s*$', re.MULTILINE)
     matches = list(include_pattern.finditer(content))
-    
+
     new_include = f".. include:: {guideline_filename}"
-    
+
     if matches:
         # Get the indentation from existing includes
         indent_str = matches[0].group(1)
         new_include = f"{indent_str}.. include:: {guideline_filename}"
-        
+
         # Find where to insert alphabetically
         existing_files = [(m.group(2), m.start(), m.end()) for m in matches]
-        
+
         insert_pos = None
         for filename, start, end in existing_files:
             if guideline_filename < filename:
                 insert_pos = start
                 break
-        
+
         if insert_pos is None:
             # Add at end (after last include)
             last_end = existing_files[-1][2]
@@ -401,7 +441,7 @@ def add_include_to_chapter_index(
     else:
         # No existing includes - add at end of file
         content = content.rstrip() + "\n\n" + new_include + "\n"
-    
+
     index_path.write_text(content)
     return True
 
@@ -412,29 +452,29 @@ def remove_include_from_chapter_index(
 ) -> bool:
     """
     Remove an include directive from a chapter's index.rst.
-    
+
     Args:
         chapter_dir: Path to the chapter directory
         guideline_filename: Filename of the guideline to remove
-        
+
     Returns:
         True if successful, False otherwise
     """
     index_path = chapter_dir / "index.rst"
-    
+
     if not index_path.exists():
         return False
-    
+
     content = index_path.read_text()
-    
+
     # Remove the include line
     pattern = re.compile(rf'^\s*\.\.\ include::\s+{re.escape(guideline_filename)}\s*\n?', re.MULTILINE)
     new_content = pattern.sub('', content)
-    
+
     if new_content != content:
         index_path.write_text(new_content)
         return True
-    
+
     return False
 
 
@@ -449,51 +489,51 @@ def save_guideline_file(
 ) -> Path:
     """
     Save a guideline to a per-guideline file in the chapter directory.
-    
+
     This creates:
     1. The chapter directory if it doesn't exist
     2. A new file named {guideline_id}.rst.inc
     3. Updates the chapter's index.rst with an include directive
-    
+
     Args:
         content: The RST content for the guideline
         chapter: The chapter name (e.g., "Expressions")
         guidelines_dir: Base guidelines directory (default: src/coding-guidelines)
-        
+
     Returns:
         Path to the created file
     """
     if guidelines_dir is None:
         guidelines_dir = DEFAULT_GUIDELINES_DIR
-    
+
     chapter_slug = chapter_to_dirname(chapter)
     chapter_dir = guidelines_dir / chapter_slug
-    
+
     # Check if per-guideline structure exists (chapter is a directory)
     if not chapter_dir.is_dir():
         # Fall back to legacy monolithic file structure
         print(f"Note: Chapter directory {chapter_dir} not found.")
         print("      Using legacy file structure. Run split_guidelines.py to migrate.")
         return save_guideline_file_legacy(content, chapter, guidelines_dir)
-    
+
     # Extract guideline ID
     guideline_id = extract_guideline_id(content)
     if not guideline_id:
         raise ValueError("Could not extract guideline ID from content")
-    
+
     # Create the guideline file
     guideline_filename = f"{guideline_id}.rst.inc"
     guideline_path = chapter_dir / guideline_filename
-    
+
     # Add header and write content
     full_content = GUIDELINE_FILE_HEADER + content.strip() + "\n"
     guideline_path.write_text(full_content)
     print(f"Created guideline file: {guideline_path}")
-    
+
     # Update the chapter index
     if add_include_to_chapter_index(chapter_dir, guideline_filename):
         print(f"Updated index: {chapter_dir / 'index.rst'}")
-    
+
     return guideline_path
 
 
@@ -504,24 +544,24 @@ def save_guideline_file_legacy(
 ) -> Path:
     """
     Append a guideline to a monolithic chapter file (legacy structure).
-    
+
     Args:
         content: The RST content for the guideline
         chapter: The chapter name (e.g., "Expressions")
         guidelines_dir: Base guidelines directory (default: src/coding-guidelines)
-        
+
     Returns:
         Path to the chapter file
     """
     if guidelines_dir is None:
         guidelines_dir = DEFAULT_GUIDELINES_DIR
-    
+
     chapter_slug = chapter_to_filename(chapter)
     chapter_file = guidelines_dir / f"{chapter_slug}.rst"
-    
+
     with open(chapter_file, "a", encoding="utf-8") as f:
         f.write(content)
-    
+
     print(f"Appended guideline to: {chapter_file}")
     return chapter_file
 
@@ -529,17 +569,17 @@ def save_guideline_file_legacy(
 def list_guidelines_in_chapter(chapter_dir: Path) -> list:
     """
     List all guideline files in a chapter directory.
-    
+
     Args:
         chapter_dir: Path to the chapter directory
-        
+
     Returns:
         List of guideline IDs found
     """
     guidelines = []
-    
+
     for file_path in chapter_dir.glob("gui_*.rst.inc"):
         guideline_id = file_path.stem  # Remove .rst.inc extension
         guidelines.append(guideline_id)
-    
+
     return sorted(guidelines)

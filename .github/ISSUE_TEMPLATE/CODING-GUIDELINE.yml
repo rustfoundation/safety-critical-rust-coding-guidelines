@@ -142,18 +142,29 @@ body:
       placeholder: As documented in the below reference, we see that under conditions `baz` if we `foo` when `bar`-ing we encounter suprising behavior `biz`. ...
     validations:
       required: true
-  - type: textarea
-    id: non-compliant-example-prose
+
+  # ==========================================================================
+  # Non-Compliant Example 1 (Required)
+  # ==========================================================================
+  - type: markdown
     attributes:
-      label: Non-Compliant Example - Prose
+      value: |
+        ---
+        ## Non-Compliant Examples
+
+        Provide at least one non-compliant example. You may add up to 4 total.
+  - type: textarea
+    id: non-compliant-example-prose-1
+    attributes:
+      label: Non-Compliant Example 1 - Prose
       description: Here we write a textual description of why the Non-Compliant Example - Code exhibits unintended or consequential behavior. Non-normative.
       placeholder: As seen below in the `non_compliant_example()` function, when `baz` and `bar` are both active and we `foo`, later during refactoring it's possible to get `biz` instead of `boz` behavior. ...
     validations:
       required: true
   - type: textarea
-    id: non-compliant-example-code
+    id: non-compliant-example-code-1
     attributes:
-      label: Non-Compliant Example - Code
+      label: Non-Compliant Example 1 - Code
       description: |
         Code example showcasing the unintended or consequential behavior. Non-normative. Please wrap your code in a fenced code block with the `rust` language specifier.
 
@@ -177,18 +188,104 @@ body:
         ```
     validations:
       required: true
+
+  # ==========================================================================
+  # Non-Compliant Example 2 (Optional)
+  # ==========================================================================
   - type: textarea
-    id: compliant-example-prose
+    id: non-compliant-example-prose-2
     attributes:
-      label: Compliant Example - Prose
+      label: Non-Compliant Example 2 - Prose (Optional)
+      description: Additional non-compliant example prose. Leave empty if not needed.
+      placeholder: Another scenario where this guideline is violated...
+    validations:
+      required: false
+  - type: textarea
+    id: non-compliant-example-code-2
+    attributes:
+      label: Non-Compliant Example 2 - Code (Optional)
+      description: Additional non-compliant code example. Leave empty if not needed.
+      placeholder: |
+        ```rust
+        # fn main() {
+        // Another non-compliant example
+        # }
+        ```
+    validations:
+      required: false
+
+  # ==========================================================================
+  # Non-Compliant Example 3 (Optional)
+  # ==========================================================================
+  - type: textarea
+    id: non-compliant-example-prose-3
+    attributes:
+      label: Non-Compliant Example 3 - Prose (Optional)
+      description: Additional non-compliant example prose. Leave empty if not needed.
+      placeholder: Yet another scenario where this guideline is violated...
+    validations:
+      required: false
+  - type: textarea
+    id: non-compliant-example-code-3
+    attributes:
+      label: Non-Compliant Example 3 - Code (Optional)
+      description: Additional non-compliant code example. Leave empty if not needed.
+      placeholder: |
+        ```rust
+        # fn main() {
+        // Another non-compliant example
+        # }
+        ```
+    validations:
+      required: false
+
+  # ==========================================================================
+  # Non-Compliant Example 4 (Optional)
+  # ==========================================================================
+  - type: textarea
+    id: non-compliant-example-prose-4
+    attributes:
+      label: Non-Compliant Example 4 - Prose (Optional)
+      description: Additional non-compliant example prose. Leave empty if not needed.
+      placeholder: A fourth scenario where this guideline is violated...
+    validations:
+      required: false
+  - type: textarea
+    id: non-compliant-example-code-4
+    attributes:
+      label: Non-Compliant Example 4 - Code (Optional)
+      description: Additional non-compliant code example. Leave empty if not needed.
+      placeholder: |
+        ```rust
+        # fn main() {
+        // Another non-compliant example
+        # }
+        ```
+    validations:
+      required: false
+
+  # ==========================================================================
+  # Compliant Example 1 (Required)
+  # ==========================================================================
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## Compliant Examples
+
+        Provide at least one compliant example. You may add up to 4 total.
+  - type: textarea
+    id: compliant-example-prose-1
+    attributes:
+      label: Compliant Example 1 - Prose
       description: Here we write a textual description of why the Compliant Example - Code avoids unintended or consequential behavior by following the Coding Guideline.
       placeholder: As seen below in the `compliant_example()` function, when `baz` and `bar` are both active and we avoid doing `foo`, later during refactoring we've prevented an error by construction. ...
     validations:
       required: true
   - type: textarea
-    id: compliant-example-code
+    id: compliant-example-code-1
     attributes:
-      label: Compliant Example - Code
+      label: Compliant Example 1 - Code
       description: |
         Code example showcasing we avoid unintended or consequential behavior by following the Coding Guideline. Please wrap your code in a fenced code block with the `rust` language specifier.
 
@@ -212,3 +309,78 @@ body:
         ```
     validations:
       required: true
+
+  # ==========================================================================
+  # Compliant Example 2 (Optional)
+  # ==========================================================================
+  - type: textarea
+    id: compliant-example-prose-2
+    attributes:
+      label: Compliant Example 2 - Prose (Optional)
+      description: Additional compliant example prose. Leave empty if not needed.
+      placeholder: Another way to comply with this guideline...
+    validations:
+      required: false
+  - type: textarea
+    id: compliant-example-code-2
+    attributes:
+      label: Compliant Example 2 - Code (Optional)
+      description: Additional compliant code example. Leave empty if not needed.
+      placeholder: |
+        ```rust
+        # fn main() {
+        // Another compliant example
+        # }
+        ```
+    validations:
+      required: false
+
+  # ==========================================================================
+  # Compliant Example 3 (Optional)
+  # ==========================================================================
+  - type: textarea
+    id: compliant-example-prose-3
+    attributes:
+      label: Compliant Example 3 - Prose (Optional)
+      description: Additional compliant example prose. Leave empty if not needed.
+      placeholder: Yet another way to comply with this guideline...
+    validations:
+      required: false
+  - type: textarea
+    id: compliant-example-code-3
+    attributes:
+      label: Compliant Example 3 - Code (Optional)
+      description: Additional compliant code example. Leave empty if not needed.
+      placeholder: |
+        ```rust
+        # fn main() {
+        // Another compliant example
+        # }
+        ```
+    validations:
+      required: false
+
+  # ==========================================================================
+  # Compliant Example 4 (Optional)
+  # ==========================================================================
+  - type: textarea
+    id: compliant-example-prose-4
+    attributes:
+      label: Compliant Example 4 - Prose (Optional)
+      description: Additional compliant example prose. Leave empty if not needed.
+      placeholder: A fourth way to comply with this guideline...
+    validations:
+      required: false
+  - type: textarea
+    id: compliant-example-code-4
+    attributes:
+      label: Compliant Example 4 - Code (Optional)
+      description: Additional compliant code example. Leave empty if not needed.
+      placeholder: |
+        ```rust
+        # fn main() {
+        // Another compliant example
+        # }
+        ```
+    validations:
+      required: false
