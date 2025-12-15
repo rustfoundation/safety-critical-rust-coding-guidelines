@@ -3,7 +3,7 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Do not create values from uninitialized memory except for union fields
+.. guideline:: Do not create values from uninitialized memory
    :id: gui_uyp3mCj77FS8
    :category: mandatory
    :status: draft
@@ -13,21 +13,11 @@
    :scope: system
    :tags: undefined-behavior, unsafe
 
-   A program shall not create a value of any type from uninitialized memory,
-   except when accessing a field of a union type,
-   where such reads are explicitly defined to be permitted even if the bytes of that field are uninitialized.
+   A program shall not create a value of any non-``union`` type from uninitialized memory.
+   Reading from a union is covered by a separate rule, "Do not read from union fields that may contain uninitialized bytes".
    It is prohibited to interpret uninitialized memory as a value of any Rust type such as a
    primitive, aggregate, reference, pointer, struct, enum, array, or tuple.
-
-   **Exception:** You can access a field of a union even when the backing bytes of that field are uninitialized provided that:
-
-   - The resulting value has an unspecified but well-defined bit pattern.
-   - Interpreting that value must still comply with the requirements of the accessed type
-     (e.g., no invalid enum discriminants, no invalid pointer values, etc.).
-
-   For example, reading an uninitialized u32 field of a union is allowed;
-   reading an uninitialized bool field is disallowed because not all bit patterns are valid.
-
+ 
    .. rationale::
       :id: rat_kjFRrhpS8Wu6
       :status: draft
@@ -39,11 +29,7 @@
       - may violate niche or discriminant validity,
       - may create invalid pointer values, or
       - may produce values that violate type invariants.
-
-      The sole exception is that unions work like C unions: any union field may be read, even if it was never written.
-      The resulting bytes must, however, form a valid representation for the field's type,
-      which is not guaranteed if the union contains arbitrary data.
-
+      
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db1
       :status: draft
@@ -57,25 +43,6 @@
 
          # fn main() {
          let x: u32 = unsafe { MaybeUninit::uninit().assume_init() }; // UB
-         # }
-
-   .. compliant_example::
-      :id: compl_ex_Ke869nSXuShU
-      :status: draft
-
-      Types such as ``u8``, ``u16``, ``u32``, and ``i128`` allow all possible bit patterns.
-      Provided the memory is initialized, there is no undefined behavior.
-
-      .. rust-example::
-
-         union U {
-             n: u32,
-             bytes: [u8; 4],
-         }
-
-         # fn main() {
-         let u = U { bytes: [0xFF, 0xEE, 0xDD, 0xCC] };
-         let n = unsafe { u.n };   // OK — all bit patterns valid for u32
          # }
 
    .. compliant_example::
@@ -138,45 +105,6 @@
          # fn main() {
          let mut arr: [MaybeUninit<u8>; 4] = unsafe { MaybeUninit::uninit().assume_init() };
          let a = unsafe { std::mem::transmute::<_, [u8; 4]>(arr) }; // UB — not all elements initialized
-         # }
-
-   .. compliant_example::
-      :id: compl_ex_Ke869nSXuShT
-      :status: draft
-
-      The following code reads a union field:
-
-      .. rust-example::
-
-         union U {
-            x: u32,
-            y: f32,
-         }
-
-         # fn main() {
-         let u = U { x: 123 }; // write to one field
-         let f = unsafe { u.y }; // reading the other field is allowed
-         # }
-
-   .. non_compliant_example::
-      :id: non_compl_ex_Qb5GqYTP6db3
-      :status: draft
-
-      Even though unions allow reads of any field, not all bit patterns are valid for a ``bool``.
-      Unions do not relax type validity requirements.
-      Only the read itself is allowed;
-      the resulting bytes must still be a valid bool.
-
-      .. rust-example::
-
-         union U {
-             b: bool,
-             x: u8,
-         }
-
-         # fn main() {
-         let u = U { x: 255 };        // 255 is not a valid bool representation
-         let b = unsafe { u.b };      // UB — invalid bool
          # }
 
    .. compliant_example::
