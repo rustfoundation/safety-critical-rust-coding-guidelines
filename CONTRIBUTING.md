@@ -104,7 +104,7 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 > * All sections contain some content
 > * Content written may be *incomplete*, but must not be *incorrect*
 
-As soon as these prerequisites are fulfilled, the issue shall be converted into a PR by a subcommittee member by marking the issue with the label `sign-off: create pr` to denote that you should create a Pull Request. Further discussion about the amount and correctness of the content shall then be done on the Pull Request.
+As soon as these prerequisites are fulfilled, the draft shall be marked as PR-ready by a subcommittee member, by labeling the issue with `sign-off: create pr`. This denotes that you should create a Pull Request with your Guideline. Further discussion about the amount and correctness of its content shall then be done on the Pull Request itself.
 
 The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment) as the exact file content you'll need.
 
