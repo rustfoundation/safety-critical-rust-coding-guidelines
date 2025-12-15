@@ -1,0 +1,173 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0
+   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors */
+
+/* ==========================================================================
+   Custom styles for Safety-Critical Rust Coding Guidelines
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Fix parent containers that clip content
+   
+   RTD theme and sphinx-needs may have overflow:hidden on containers.
+   We need to allow content to either wrap (text) or scroll (code).
+   -------------------------------------------------------------------------- */
+
+/* Remove any hidden overflow from content containers */
+.wy-nav-content,
+.rst-content,
+.document,
+article,
+section,
+.section {
+    overflow: visible !important;
+}
+
+/* Sphinx-needs containers - these are the gray boxes */
+.need,
+.needs_container,
+div[class*="need_"],
+table.need,
+.needs_table_container {
+    overflow: visible !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* The content wrapper inside needs */
+.needs_content,
+.need_content,
+td.needs_content,
+.needs_body {
+    overflow: visible !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. Force text wrapping everywhere
+   -------------------------------------------------------------------------- */
+
+/* Apply aggressive word wrapping to all text containers */
+.rst-content p,
+.rst-content li,
+.rst-content dd,
+.rst-content td,
+.rst-content th,
+.rst-content div,
+.needs_content,
+.needs_content p,
+.need_content,
+.need_content p,
+td.needs_content,
+td.needs_content p {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Sphinx-needs metadata fields */
+.needs_meta,
+.needs_meta span,
+[class*="needs_"] {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+}
+
+/* Keep individual links together but allow wrapping between them */
+.needs_data a {
+    white-space: nowrap;
+    display: inline;
+}
+
+/* --------------------------------------------------------------------------
+   3. Code blocks - must scroll, never wrap or clip
+   -------------------------------------------------------------------------- */
+
+/* The wrapper div needs to scroll */
+div.highlight,
+.rst-content div.highlight,
+.highlight,
+.rust-example-container {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Code blocks need to scroll, not wrap */
+pre,
+div.highlight pre,
+.rst-content div.highlight pre,
+.highlight pre,
+.rust-example-container pre,
+.rust-example-code {
+    white-space: pre !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    word-wrap: normal !important;
+    overflow-wrap: normal !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Code inside needs containers specifically */
+.need pre,
+.needs_container pre,
+.needs_content pre,
+td.needs_content pre,
+.need div.highlight,
+.needs_container div.highlight,
+.needs_content div.highlight,
+td.needs_content div.highlight {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.need div.highlight pre,
+.needs_container div.highlight pre,
+.needs_content div.highlight pre,
+td.needs_content div.highlight pre {
+    white-space: pre !important;
+    overflow-x: auto !important;
+    word-wrap: normal !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Inline code
+   -------------------------------------------------------------------------- */
+
+/* Allow inline code to break in flowing text */
+p code,
+li code,
+td code,
+.rst-content p code,
+.rst-content li code,
+code.literal {
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. Table fixes for sphinx-needs (uses tables internally)
+   -------------------------------------------------------------------------- */
+
+table.need,
+.needs_table,
+table[class*="need"] {
+    table-layout: fixed !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+table.need td,
+table.need th,
+.needs_table td,
+.needs_table th {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
+}
