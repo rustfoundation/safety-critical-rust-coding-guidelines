@@ -286,7 +286,7 @@ def format_test_results(results: List[CodeTestResult]) -> str:
         lines.append("|---------|--------|---------|")
 
         for r in results:
-            example_name = f"{'Non-Compliant' if r.example_type == 'non_compliant' else 'Compliant'} #{r.example_number}"
+            example_name = f"{'Non-Compliant' if r.example_type == 'non_compliant' else 'Compliant'} \#{r.example_number}"
             if r.passed:
                 lines.append(f"| {example_name} | ✅ Pass | - |")
             else:
@@ -305,7 +305,7 @@ def format_test_results(results: List[CodeTestResult]) -> str:
             lines.append("")
 
             for r in failures:
-                example_name = f"{'Non-Compliant' if r.example_type == 'non_compliant' else 'Compliant'} Example #{r.example_number}"
+                example_name = f"{'Non-Compliant' if r.example_type == 'non_compliant' else 'Compliant'} Example \#{r.example_number}"
                 lines.append(f"**{example_name}:**")
                 lines.append("```")
                 lines.append(r.error_message)
