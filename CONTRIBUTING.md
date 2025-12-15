@@ -97,9 +97,14 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 
 ### 4) Create the PR
 
-Once an issue has been well-developed enough, a subcommittee member will mark
-the issue with the label `sign-off: create pr` to denote that you
-should create a Pull Request.
+> [!NOTE]
+> Here's a list of recommended prerequisites that shall be fulfilled before turning an issue into a PR:
+>
+> * The new rule isn't already covered by another rule or, in case there is already another rule, the rules need to be linked and categorized
+> * All sections contain some content
+> * Content written may be *incomplete*, but must not be *incorrect*
+
+As soon as these prerequisites are fulfilled, the issue shall be converted into a PR by a subcommittee member by marking the issue with the label `sign-off: create pr` to denote that you should create a Pull Request. Further discussion about the amount and correctness of the content shall then be done on the Pull Request.
 
 The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment).
 
