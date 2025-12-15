@@ -360,15 +360,18 @@ We add it to this path, to allow the newly added guideline to appear in the corr
 
 ### 🗂️ Update Chapter Index
 
-Update `{chapter_index_file}` to include {guideline_id}.rst.inc, like so:
+Update `{chapter_index_file}` to include `{guideline_id}.rst.inc`, like so:
 
 ```
-Expressions <- this should match {chapter_slug}
-===========
+Chapter Name Here <- chapter heading inside of `{chapter_index_file}`
+=================
 
 .. include:: gui_7y0GAMmtMhch.rst.inc -| existing guidelines
 .. include:: gui_ADHABsmK9FXz.rst.inc  |
-.. include:: gui_HDnAZ7EZ4z6G.rst.inc -|
+...                                    |
+...                                    |
+.. include:: gui_RHvQj8BHlz9b.rst.inc  |
+.. include:: gui_dCquvqE1csI3.rst.inc -|
 .. include:: {guideline_id}.rst.inc <- your new guideline to add
 ```"""
     else:
