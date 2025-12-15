@@ -347,20 +347,32 @@ def generate_comment(rst_content: str, chapter: str, test_results: List[CodeTest
     if guideline_id:
         target_dir = f"src/coding-guidelines/{chapter_slug}/"
         target_file = f"{target_dir}{guideline_id}.rst.inc"
+        chapter_index_file = f"{target_dir}/index.rst"
         file_instructions = f"""
 ### 📁 Target Location
 
 Create a new file: `{target_file}`
 
 > **Note:** The `.rst.inc` extension prevents Sphinx from auto-discovering the file.
-> It will be included via the chapter's `index.rst`."""
-    else:
-        # Fallback for legacy structure (shouldn't happen with new template)
-        target_file = f"src/coding-guidelines/{chapter_slug}.rst"
-        file_instructions = f"""
-### 📁 Target File
+> It will be included via the chapter's `index.rst`.
 
-Add this guideline to: `{target_file}`"""
+We add it to this path, to allow the newly added guideline to appear in the correct chapter.
+
+### 🗂️ Update Chapter Index
+
+Update `{chapter_index_file}` to include {guideline_id}.rst.inc, like so:
+
+```
+Expressions <- this should match {chapter_slug}
+===========
+
+.. include:: gui_7y0GAMmtMhch.rst.inc -| existing guidelines
+.. include:: gui_ADHABsmK9FXz.rst.inc  |
+.. include:: gui_HDnAZ7EZ4z6G.rst.inc -|
+.. include:: {guideline_id}.rst.inc <- your new guideline to add
+```"""
+    else:
+        return "No guideline ID generated, failing!"
 
     comment = f"""## 📋 RST Preview for Coding Guideline
 
