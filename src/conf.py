@@ -213,3 +213,8 @@ required_guideline_fields = [
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
 templates_path = ['_templates']
+
+# Custom CSS files to include
+html_css_files = [
+    'custom.css',
+]
