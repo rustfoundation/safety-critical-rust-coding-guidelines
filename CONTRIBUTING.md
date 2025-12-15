@@ -115,8 +115,6 @@ Make sure to include this command in the body of your PR, where `xyz` is the num
 This will ensure issue `#xyz` is closed when your Pull Request gets merged.
 
 
-`closes #xyz`
-
 ### 5) Iterate on Feedback
 
 #### 5.1) Member Begins Review
