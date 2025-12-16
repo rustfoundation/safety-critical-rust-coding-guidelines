@@ -281,17 +281,17 @@
 
       .. list-table::
          :header-rows: 0
-         :widths: 10 90
+         :widths: auto
          :class: bibliography-table
 
          * - .. [RUST-REF-UNION]
-           - The Rust Project Developers. "Rust Reference: Unions." 
-             *The Rust Reference*, n.d. 
-             https://doc.rust-lang.org/reference/items/unions.html.
+           - | The Rust Project Developers. "Rust Reference: Unions."
+             | *The Rust Reference*, n.d. 
+             | https://doc.rust-lang.org/reference/items/unions.html.
 
          * - .. [UCG-VALIDITY]
-           - Rust Unsafe Code Guidelines Working Group. "Validity and Safety 
-             Invariant." *Rust Unsafe Code Guidelines*, n.d. 
-             https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
+           - | Rust Unsafe Code Guidelines Working Group. "Validity and Safety Invariant."
+             | *Rust Unsafe Code Guidelines*, n.d. 
+             | https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
 
 >>>>>>> c93b2cb (Update types-and-traits.rst):src/coding-guidelines/types-and-traits.rst
