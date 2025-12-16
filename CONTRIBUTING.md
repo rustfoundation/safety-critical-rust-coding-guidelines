@@ -100,7 +100,10 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 > [!NOTE]
 > Here's a list of recommended prerequisites that shall be fulfilled before turning an issue into a PR:
 >
-> * The new rule isn't already covered by another rule or, in case there is already another rule, the rules need to be linked and categorized
+> * The new rule isn't already covered by another rule
+>     * OR, in case there is(are) already another rule(s),
+>     * The existing rule(s) need(s) to be linked to the new rule,
+>     * AND the new rule needs to link to the existing rule(s).
 > * All sections contain some content
 > * Content written may be *incomplete*, but must not be *incorrect*
 > * `🧪 Code Example Test Results` section shows all example code compiles
