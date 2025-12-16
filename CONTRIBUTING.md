@@ -112,9 +112,7 @@ As soon as these prerequisites are fulfilled, the draft shall be marked as PR-re
 
 The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment). The comment has the exact file content you'll need.
 
-Reference the generated comment from [Step 2](#2-guideline-generated-as-a-comment),
-in particular headings `📁 Target Location` and `🗂️ Update Chapter Index` for necessary
-steps to ensure that your guideline appears when rendering the guidelines.
+In order to ensure your guideline appears when rendering the document, reference the generated comment from [Step 2](#2-guideline-generated-as-a-comment). All the steps necessary should appear below the headings `📁 Target Location` and `🗂️ Update Chapter Index`.
 
 Make sure to include this command in the body of your PR, where `xyz` is the number of the issue you opened in [Step 1](#1-submit-coding-guideline-issue):
 
