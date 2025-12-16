@@ -8,3 +8,4 @@ Types and Traits
 
 .. include:: gui_xztNdXA2oFNC.rst.inc
 .. include:: gui_0cuTYG8RVYjg.rst.inc
+.. include:: gui_UnionPartialInit
