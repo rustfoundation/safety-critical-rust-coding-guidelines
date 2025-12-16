@@ -13,22 +13,23 @@
    :scope: system
    :tags: defect, safety, undefined-behavior
 
-   When reading from a union field, ensure that the underlying bytes constitute a valid value for that field's type.
+   Ensure that the underlying bytes constitute a valid value for that field's type when reading from a union field.
    Reading a union field whose bytes do not represent a valid value for the field's type is undefined behavior.
 
-   Before accessing a union field:
+   Before accessing a union field, verify that that the union was either:
    
-   * Verify that the union was last written through that field, or
-   * Verify that the union was written through a field whose bytes are valid when reinterpreted as the target field's type, or
-   * Use explicit validity checks when the active field is uncertain
+   * last written through that field, or
+   * written through a field whose bytes are valid when reinterpreted as the target field's type
+
+   If the active field is uncertain, use explicit validity checks.
 
    .. rationale::
       :id: rat_UnionFieldValidityReason
       :status: draft
 
-      Unions allow multiple fields to occupy the same memory, similar to C unions.
+      Similar to C, unions allow multiple fields to occupy the same memory.
       Unlike enumeration types, unions do not track which field is currently active.
-      You must ensure that when a field is read,
+      You must ensure that when a field is read that
       the underlying bytes are valid for that field's type [RUST-REF-UNION]_.
 
       Every type has a *validity invariant* — a set of constraints that all values of
@@ -39,7 +40,7 @@
       Examples of validity requirements for common types:
 
       * **bool**: Must be ``0`` (false) or ``1`` (true). Any other value (e.g., ``3``) is invalid.
-      * **char**: Must be a valid Unicode scalar value (0x0 to 0xD7FF or 0xE000 to 0x10FFFF).
+      * **char**: Must be a valid Unicode scalar value (``0x0`` to ``0xD7FF`` or ``0xE000`` to ``0x10FFFF``).
       * **References**: Must be non-null and properly aligned.
       * **Enums**: Must hold a valid discriminant value.
       * **Floating point**: All bit patterns are valid for the ``f32`` or ``f64``.type
@@ -82,10 +83,10 @@
          }
 
          fn main() {
-             // 0xD800 is a surrogate and not a valid Unicode scalar value
+             // '0xD800' is a surrogate and not a valid Unicode scalar value
              let u = IntOrChar { i: 0xD800 };
              
-             // Noncompliant: reading an invalid Unicode value from a union field of type 'char'
+             // Reading an invalid Unicode value from a union field of type 'char'
              unsafe { u.c };  // Noncompliant
          }
 
@@ -93,7 +94,7 @@
       :id: non_compl_ex_UnionEnum
       :status: draft
 
-      This noncompliant example reads an invalid discriminant from a ``union`` field of 'Color' enumeration type.
+      This noncompliant example reads an invalid discriminant from a union field of 'Color' enumeration type.
 
       .. code-block:: rust
 
@@ -121,7 +122,7 @@
       :id: non_compl_ex_UnionRef
       :status: draft
 
-      This noncompliant example reads a reference from a ``union`` containing a null pointer.
+      This noncompliant example reads a reference from a union containing a null pointer.
       A similar problem occurs when reading a misaligned pointer.
 
       .. code-block:: rust
@@ -209,9 +210,8 @@
          fn main() {
              let u = IntOrBool { b: true };
              
-             // Compliant: reading the same field that was written
-             let valid_bool = unsafe { u.b };
-             println!("bool value: {}", valid_bool);
+             // Read the same field that was written
+             println!("bool value: {}", unsafe { u.b }); // compliant
          }
 
    .. compliant_example::
@@ -230,22 +230,20 @@
          fn main() {
              let u = IntBytes { i: 0x12345678 };
              
-             // Compliant: all bit patterns are valid for [u8; 4]
-             let bytes = unsafe { u.bytes };
-             println!("bytes: {:?}", bytes);
+             // All bit patterns are valid for [u8; 4]
+             println!("bytes: {:?}", unsafe { u.bytes }); // compliant
              
              let u2 = IntBytes { bytes: [0x11, 0x22, 0x33, 0x44] };
              
-             // Compliant: all bit patterns are valid for u32
-             let int_value = unsafe { u2.i };
-             println!("integer: 0x{:08X}", int_value);
+             // All bit patterns are valid for 'u32'
+             println!("integer: 0x{:08X}", unsafe { u2.i }); // compliant
          }
 
    .. compliant_example::
       :id: compl_ex_UnionValidateBool
       :status: draft
 
-      This compliant solution validates bytes before reading as a constrained type.
+      This compliant example validates bytes before reading as a constrained type.
 
       .. code-block:: rust
 
@@ -255,14 +253,14 @@
          }
 
          fn try_read_bool(u: &IntOrBool) -> Option<bool> {
-             // Read as integer first (always valid for u8)
+             // Read as integer (always valid for 'u8')
              let raw = unsafe { u.i };
              
-             // Validate before interpreting as bool
+             // Validate before interpreting as a value of type 'bool'
              match raw {
                  0 => Some(false),
                  1 => Some(true),
-                 _ => None,  // Invalid bool value
+                 _ => None,  // Invalid Boolean value
              }
          }
 
@@ -270,7 +268,7 @@
              let u1 = IntOrBool { i: 1 };
              let u2 = IntOrBool { i: 3 };
              
-             // Compliant: validates before reading as bool
+             // Validates before reading as value of type 'bool'
              println!("u1 as bool: {:?}", try_read_bool(&u1));  // Some(true)
              println!("u2 as bool: {:?}", try_read_bool(&u2));  // None
          }
