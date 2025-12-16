@@ -43,7 +43,7 @@
       * **char**: Must be a valid Unicode scalar value (``0x0`` to ``0xD7FF`` or ``0xE000`` to ``0x10FFFF``).
       * **References**: Must be non-null and properly aligned.
       * **Enums**: Must hold a valid discriminant value.
-      * **Floating point**: All bit patterns are valid for the ``f32`` or ``f64``.type
+      * **Floating point**: All bit patterns are valid for the ``f32`` or ``f64`` types.
       * **Integers**: All bit patterns are valid for integer types.
 
       Reading an invalid value is undefined behavior.
