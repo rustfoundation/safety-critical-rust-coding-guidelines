@@ -19,6 +19,14 @@
    
    Reading from a union is covered by a separate rule, `Do not read from union fields that may contain uninitialized bytes
    <https://coding-guidelines.arewesafetycriticalyet.org/coding-guidelines/types-and-traits/index.html#gui_UnionPartialInit>`_.
+
+   Calling `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_,
+   or related functions, is treated in the same manner as a typed read.
+   Calling these function when on memory that is not yet fully initialized causes immediate undefined behavior.
+   The memory must be properly initialized according to the requirements of the variable’s type.
+   For example, a variable of reference type must be aligned and non-null.
+   Similarly, entirely uninitialized memory may have any content, while a ``bool`` must always be ``true`` or ``false``.
+   Consequently, reading an uninitialized ``bool`` is undefined behavior.
  
    .. rationale::
       :id: rat_kjFRrhpS8Wu6
@@ -31,8 +39,8 @@
       :id: non_compl_ex_Qb5GqYTP6db1
       :status: draft
 
-      This noncompliant example attempts to create a value of type ``u32`` from uninitialized memory by calling  
-      `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_:
+      This noncompliant example extracts a value of type ``u32`` from uninitialized memory within a ``MaybeUninit<T>`` container,
+      which is undefined behavior.
 
       .. rust-example::
 
