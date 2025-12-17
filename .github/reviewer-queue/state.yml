@@ -1,0 +1,42 @@
+# Reviewer Queue State
+# =====================
+# This file is automatically maintained by the reviewer-bot workflow.
+# It tracks the round-robin assignment of reviewers for coding guidelines.
+#
+# You can view this file to see:
+# - Who is next up to review
+# - Who is currently on a pass-until (vacation/away)
+# - Recent assignment history
+#
+# DO NOT EDIT MANUALLY - changes will be overwritten by the bot.
+# Use bot commands instead (see CONTRIBUTING.md for details).
+
+# Last updated timestamp (ISO 8601)
+last_updated: null
+
+# Current position in round-robin queue (0-indexed)
+# The reviewer at this index will be assigned next
+current_index: 0
+
+# Queue of active producers in rotation order
+# This list is automatically synced from members.md
+# Only members with Role="Producer" are included
+queue: []
+
+# Members temporarily excluded from rotation
+# They will be automatically re-added to the queue after their return_date
+pass_until:
+  # Example:
+  # - github: username
+  #   return_date: 2025-02-01
+  #   reason: "Optional reason for being away"
+  #   original_queue_position: 5
+
+# Recent assignments for visibility and debugging
+# Keeps the last 20 assignments
+recent_assignments:
+  # Example:
+  # - github: username
+  #   issue_number: 123
+  #   type: issue  # or "pr"
+  #   assigned_at: 2025-01-15T10:30:00Z

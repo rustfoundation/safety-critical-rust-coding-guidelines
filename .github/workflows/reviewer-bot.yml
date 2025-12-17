@@ -1,0 +1,94 @@
+name: Reviewer Bot
+
+on:
+  # Trigger when issues are opened or labeled
+  issues:
+    types: [opened, labeled]
+
+  # Trigger when PRs are opened or labeled
+  # Using pull_request_target to handle PRs from forks with write permissions
+  pull_request_target:
+    types: [opened, labeled]
+
+  # Trigger on comments for bot commands
+  issue_comment:
+    types: [created]
+
+  # Allow manual triggering (useful for testing/debugging)
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'sync-members'
+        type: choice
+        options:
+          - sync-members
+          - show-state
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: write
+
+jobs:
+  reviewer-bot:
+    runs-on: ubuntu-latest
+
+    # Skip if the comment is from a bot (prevent infinite loops)
+    if: >
+      github.event_name != 'issue_comment' || 
+      github.event.comment.user.type != 'Bot'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Need to fetch the full repo to update state file
+          fetch-depth: 0
+          # Use a token that can push (default GITHUB_TOKEN works for same-repo)
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Git for commits
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Run reviewer bot
+        id: bot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pass event context to the script
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          # Issue/PR context
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title || github.event.pull_request.title }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login || github.event.pull_request.user.login }}
+          ISSUE_HTML_URL: ${{ github.event.issue.html_url || github.event.pull_request.html_url }}
+          IS_PULL_REQUEST: ${{ github.event.pull_request != null || (github.event.issue.pull_request != null) }}
+          # Label context (for labeled events)
+          LABEL_NAME: ${{ github.event.label.name }}
+          # Comment context (for issue_comment events)
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          # For manual dispatch
+          MANUAL_ACTION: ${{ github.event.inputs.action }}
+          # Repository info
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          # Labels on the issue/PR (as JSON)
+          ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name || github.event.pull_request.labels.*.name) }}
+        run: |
+          uv run python scripts/reviewer_bot.py
+
+      - name: Commit state changes
+        if: steps.bot.outputs.state_changed == 'true'
+        run: |
+          git add .github/reviewer-queue/state.yml
+          git commit -m "chore: update reviewer queue state [skip ci]" || echo "No changes to commit"
+          git push || echo "No changes to push"
