@@ -301,6 +301,7 @@ def load_state() -> dict:
         "queue": [],
         "pass_until": [],
         "recent_assignments": [],
+        "issue_skips": {},  # Tracks who has passed on each issue: {issue_num: [usernames]}
     }
     
     issue = get_state_issue()
@@ -322,6 +323,8 @@ def load_state() -> dict:
         state["pass_until"] = []
     if not isinstance(state.get("recent_assignments"), list):
         state["recent_assignments"] = []
+    if not isinstance(state.get("issue_skips"), dict):
+        state["issue_skips"] = {}
 
     return state
 
@@ -356,6 +359,7 @@ This issue tracks the round-robin assignment of reviewers for coding guidelines.
 - **current_index**: Position in queue (who's next)
 - **pass_until**: Reviewers temporarily away with return dates
 - **recent_assignments**: Last {MAX_RECENT_ASSIGNMENTS} assignments for visibility
+- **issue_skips**: Who has passed on each open issue (prevents re-assignment to someone who already passed)
 """
 
     result = github_api("PATCH", f"issues/{STATE_ISSUE_NUMBER}", {"body": body})
@@ -674,9 +678,10 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     """
     Handle the pass! command - skip current reviewer for this issue only.
 
-    The passed reviewer is moved to right after the substitute in the queue,
-    so they're next up for future issues but the substitute doesn't have to
-    go twice.
+    Tracks who has passed on each issue to prevent re-assignment.
+    Only the first passer gets moved to "next in queue" position.
+    Subsequent passers just pass without queue reordering, and the
+    original passer remains "next" for future issues.
 
     Returns (response_message, success).
     """
@@ -689,7 +694,19 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     # The person being passed is the current assignee
     passed_reviewer = current_assignees[0]
 
-    # Find the passed reviewer's entry and position in the queue
+    # Get or create the skip list for this issue
+    issue_key = str(issue_number)  # YAML keys are strings
+    if issue_key not in state.get("issue_skips", {}):
+        state.setdefault("issue_skips", {})[issue_key] = []
+    
+    # Check if this is the first pass on this issue
+    is_first_pass = len(state["issue_skips"][issue_key]) == 0
+    
+    # Record this reviewer as having passed on this issue
+    if passed_reviewer not in state["issue_skips"][issue_key]:
+        state["issue_skips"][issue_key].append(passed_reviewer)
+
+    # Find the passed reviewer's entry and position in the queue (for first pass reordering)
     passed_entry = None
     passed_index = None
     for i, member in enumerate(state["queue"]):
@@ -698,57 +715,52 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
             passed_index = i
             break
 
-    if passed_entry is None:
-        # Passed reviewer not in queue (maybe external assignment?)
-        # Just find a substitute without queue manipulation
-        issue_author = os.environ.get("ISSUE_AUTHOR", "")
-        skip_set = {passed_reviewer, issue_author} if issue_author else {passed_reviewer}
-        next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-
-        if not next_reviewer:
-            return "❌ No other reviewers available in the queue.", False
-
-        is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-        if not assign_reviewer(issue_number, next_reviewer):
-            return f"❌ Failed to assign @{next_reviewer} as reviewer.", False
-
-        record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
-
-        reason_text = f" Reason: {reason}" if reason else ""
-        return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
-                f"@{next_reviewer} is now assigned as the reviewer."), True
-
     # Get the issue author to skip them
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
 
-    # Get next reviewer (substitute), skipping the passed one and the author
-    skip_set = {passed_reviewer, issue_author} if issue_author else {passed_reviewer}
+    # Build skip set: everyone who has passed on this issue + issue author
+    skip_set = set(state["issue_skips"][issue_key])
+    if issue_author:
+        skip_set.add(issue_author)
+
+    # Save current index - we'll restore it for non-first passes
+    saved_index = state["current_index"]
+
+    # Find next reviewer, skipping all who have passed
     next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
 
     if not next_reviewer:
-        return "❌ No other reviewers available in the queue.", False
+        # Restore index since we're failing
+        state["current_index"] = saved_index
+        return ("❌ No other reviewers available. Everyone in the queue has either "
+                "passed on this issue or is the author."), False
 
-    # Find the substitute's current position
-    substitute_index = None
-    for i, member in enumerate(state["queue"]):
-        if member["github"].lower() == next_reviewer.lower():
-            substitute_index = i
-            break
+    # Only reorder queue on the FIRST pass for this issue
+    if is_first_pass and passed_entry is not None:
+        # Find the substitute's current position
+        substitute_index = None
+        for i, member in enumerate(state["queue"]):
+            if member["github"].lower() == next_reviewer.lower():
+                substitute_index = i
+                break
 
-    # Reorder the queue: move passed reviewer to right after substitute
-    # Remove passed reviewer from current position
-    state["queue"].pop(passed_index)
+        if substitute_index is not None:
+            # Reorder: move passed reviewer to right after substitute
+            state["queue"].pop(passed_index)
 
-    # Adjust substitute_index if it was after the removed position
-    if substitute_index > passed_index:
-        substitute_index -= 1
+            # Adjust substitute_index if it was after the removed position
+            if substitute_index > passed_index:
+                substitute_index -= 1
 
-    # Insert passed reviewer right after substitute
-    insert_position = substitute_index + 1
-    state["queue"].insert(insert_position, passed_entry)
+            # Insert passed reviewer right after substitute
+            insert_position = substitute_index + 1
+            state["queue"].insert(insert_position, passed_entry)
 
-    # Set index to point at passed reviewer (they're next for future issues)
-    state["current_index"] = insert_position
+            # Set index to point at passed reviewer (they're next for future issues)
+            state["current_index"] = insert_position
+    else:
+        # NOT first pass - restore the index so original passer stays "next"
+        state["current_index"] = saved_index
 
     # Assign the substitute to this issue
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
@@ -759,9 +771,16 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
 
     reason_text = f" Reason: {reason}" if reason else ""
-    return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
-            f"@{next_reviewer} is now assigned as the reviewer.\n\n"
-            f"_@{passed_reviewer} is next in queue for future issues._"), True
+    if is_first_pass:
+        return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
+                f"@{next_reviewer} is now assigned as the reviewer.\n\n"
+                f"_@{passed_reviewer} is next in queue for future issues._"), True
+    else:
+        # Get the original passer (first in the skip list)
+        original_passer = state["issue_skips"][issue_key][0]
+        return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
+                f"@{next_reviewer} is now assigned as the reviewer.\n\n"
+                f"_@{original_passer} remains next in queue for future issues._"), True
 
 
 def handle_pass_until_command(state: dict, issue_number: int, comment_author: str,
