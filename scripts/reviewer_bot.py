@@ -52,7 +52,6 @@ import os
 import re
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import yaml
 
@@ -71,7 +70,8 @@ except ImportError:
 BOT_NAME = "guidelines-bot"
 BOT_MENTION = f"@{BOT_NAME}"
 CODING_GUIDELINE_LABEL = "coding guideline"
-STATE_FILE = Path(".github/reviewer-queue/state.yml")
+# State is stored in a dedicated GitHub issue body (set via environment variable)
+STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
 # Members file is in the consortium repo, not this repo
 MEMBERS_URL = "https://raw.githubusercontent.com/rustfoundation/safety-critical-rust-consortium/main/subcommittee/coding-guidelines/members.md"
 MAX_RECENT_ASSIGNMENTS = 20
@@ -128,7 +128,7 @@ def add_label(issue_number: int, label: str) -> bool:
 
 def remove_label(issue_number: int, label: str) -> bool:
     """Remove a label from an issue or PR."""
-    # result = github_api("DELETE", f"issues/{issue_number}/labels/{label}")
+    result = github_api("DELETE", f"issues/{issue_number}/labels/{label}")
     # 404 is ok - label might not exist
     return True
 
@@ -263,20 +263,53 @@ def fetch_members() -> list[dict]:
 # ==============================================================================
 
 
+def get_state_issue() -> dict | None:
+    """Fetch the state issue from GitHub."""
+    if not STATE_ISSUE_NUMBER:
+        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
+        return None
+    
+    return github_api("GET", f"issues/{STATE_ISSUE_NUMBER}")
+
+
+def parse_state_from_issue(issue: dict) -> dict:
+    """Parse YAML state from issue body."""
+    body = issue.get("body", "") or ""
+    
+    # Extract YAML from code block if present
+    yaml_match = re.search(r"```ya?ml\n(.*?)\n```", body, re.DOTALL)
+    if yaml_match:
+        yaml_content = yaml_match.group(1)
+    else:
+        # Try to parse the whole body as YAML
+        yaml_content = body
+    
+    try:
+        state = yaml.safe_load(yaml_content) or {}
+    except yaml.YAMLError as e:
+        print(f"WARNING: Failed to parse state YAML: {e}", file=sys.stderr)
+        state = {}
+    
+    return state
+
+
 def load_state() -> dict:
-    """Load the current state from the state file."""
-    if not STATE_FILE.exists():
-        return {
-            "last_updated": None,
-            "current_index": 0,
-            "queue": [],
-            "pass_until": [],
-            "recent_assignments": [],
-        }
-
-    content = STATE_FILE.read_text()
-    state = yaml.safe_load(content) or {}
-
+    """Load the current state from the state issue."""
+    default_state = {
+        "last_updated": None,
+        "current_index": 0,
+        "queue": [],
+        "pass_until": [],
+        "recent_assignments": [],
+    }
+    
+    issue = get_state_issue()
+    if not issue:
+        print("WARNING: Could not fetch state issue, using defaults", file=sys.stderr)
+        return default_state
+    
+    state = parse_state_from_issue(issue)
+    
     # Ensure all required keys exist AND are not None
     # (YAML parses empty values as None, not as empty lists)
     if state.get("last_updated") is None:
@@ -293,33 +326,45 @@ def load_state() -> dict:
     return state
 
 
-def save_state(state: dict) -> None:
-    """Save the state to the state file."""
+def save_state(state: dict) -> bool:
+    """Save the state to the state issue. Returns True on success."""
+    if not STATE_ISSUE_NUMBER:
+        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
+        return False
+    
     state["last_updated"] = datetime.now(timezone.utc).isoformat()
 
-    # Ensure directory exists
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    # Custom YAML formatting for readability
-    header = """# Reviewer Queue State
-# =====================
-# This file is automatically maintained by the reviewer-bot workflow.
-# It tracks the round-robin assignment of reviewers for coding guidelines.
-#
-# You can view this file to see:
-# - Who is next up to review
-# - Who is currently on a pass-until (vacation/away)
-# - Recent assignment history
-#
-# DO NOT EDIT MANUALLY - changes will be overwritten by the bot.
-# Use bot commands instead (see CONTRIBUTING.md for details).
-
-"""
-
+    # Format the issue body with YAML in a code block
     yaml_content = yaml.dump(state, default_flow_style=False, sort_keys=False,
                             allow_unicode=True)
+    
+    body = f"""## 📊 Reviewer Bot State
 
-    STATE_FILE.write_text(header + yaml_content)
+> ⚠️ **DO NOT EDIT MANUALLY** - This issue is automatically maintained by the reviewer bot.
+> Use bot commands instead (see [CONTRIBUTING.md](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/blob/main/CONTRIBUTING.md) for details).
+
+This issue tracks the round-robin assignment of reviewers for coding guidelines.
+
+### Current State
+
+```yaml
+{yaml_content}```
+
+### What This Tracks
+
+- **queue**: Active reviewers in rotation order
+- **current_index**: Position in queue (who's next)
+- **pass_until**: Reviewers temporarily away with return dates
+- **recent_assignments**: Last {MAX_RECENT_ASSIGNMENTS} assignments for visibility
+"""
+
+    result = github_api("PATCH", f"issues/{STATE_ISSUE_NUMBER}", {"body": body})
+    if result:
+        print(f"State saved to issue #{STATE_ISSUE_NUMBER}")
+        return True
+    else:
+        print(f"ERROR: Failed to save state to issue #{STATE_ISSUE_NUMBER}", file=sys.stderr)
+        return False
 
 
 def sync_members_with_queue(state: dict) -> tuple[dict, list[str]]:
@@ -725,7 +770,7 @@ def handle_pass_until_command(state: dict, issue_number: int, comment_author: st
                                 "pr" if is_pr else "issue")
                 reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
             else:
-                reassigned_msg = "\n\n⚠️ Could not assign a new reviewer."
+                reassigned_msg = f"\n\n⚠️ Could not assign a new reviewer."
         else:
             reassigned_msg = "\n\n⚠️ No other reviewers available to assign."
 
@@ -752,7 +797,7 @@ def handle_label_command(issue_number: int, action: str, label: str) -> tuple[st
         else:
             return f"❌ Failed to remove label `{label}`.", False
     else:
-        return "❌ Unknown label action. Use `+label-name` to add or `-label-name` to remove.", False
+        return f"❌ Unknown label action. Use `+label-name` to add or `-label-name` to remove.", False
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:

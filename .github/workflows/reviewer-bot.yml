@@ -35,38 +35,35 @@ concurrency:
 permissions:
   issues: write
   pull-requests: write
-  contents: write
+
+env:
+  # Issue number where bot state is stored (create this issue first!)
+  # The issue should be pinned and titled something like "📊 Reviewer Bot State"
+  STATE_ISSUE_NUMBER: "314"
 
 jobs:
   reviewer-bot:
     runs-on: ubuntu-latest
 
-    # Skip if the comment is from a bot (prevent infinite loops)
+    # Skip if:
+    # - Comment is from a bot (prevent infinite loops)
+    # - The issue being acted on is the state issue itself
     if: >
-      github.event_name != 'issue_comment' || 
-      github.event.comment.user.type != 'Bot'
+      (github.event_name != 'issue_comment' || github.event.comment.user.type != 'Bot') &&
+      (github.event.issue.number != 314)
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          # Need to fetch the full repo to update state file
-          fetch-depth: 0
-          # Use a token that can push (default GITHUB_TOKEN works for same-repo)
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-
-      - name: Set up Git for commits
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
 
       - name: Run reviewer bot
         id: bot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_ISSUE_NUMBER: ${{ env.STATE_ISSUE_NUMBER }}
           # Pass event context to the script
           EVENT_NAME: ${{ github.event_name }}
           EVENT_ACTION: ${{ github.event.action }}
@@ -91,10 +88,3 @@ jobs:
           ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name || github.event.pull_request.labels.*.name) }}
         run: |
           uv run python scripts/reviewer_bot.py
-
-      - name: Commit state changes
-        if: steps.bot.outputs.state_changed == 'true'
-        run: |
-          git add .github/reviewer-queue/state.yml
-          git commit -m "chore: update reviewer queue state [skip ci]" || echo "No changes to commit"
-          git push || echo "No changes to push"
