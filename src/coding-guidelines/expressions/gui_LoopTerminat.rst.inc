@@ -146,12 +146,12 @@
                  i = i.wrapping_add(1);
              }
          }
-
-        fn main() {
-            // This will loop forever because when i == u32::MAX,
-            // i.wrapping_add(1) becomes 0, which is still <= u32::MAX
-            count_up(u32::MAX);
-        }
+         
+         fn main() {
+             // This will loop forever because when i == u32::MAX,
+             // i.wrapping_add(1) becomes 0, which is still <= u32::MAX
+             count_up(u32::MAX);
+         }
 
    .. non_compliant_example::
       :id: non_compl_ex_InfLoop4
