@@ -151,9 +151,26 @@ def assign_reviewer(issue_number: int, username: str) -> bool:
 
 def get_issue_assignees(issue_number: int) -> list[str]:
     """Get current assignees/reviewers for an issue/PR."""
-    result = github_api("GET", f"issues/{issue_number}")
-    if result and "assignees" in result:
-        return [a["login"] for a in result["assignees"]]
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    
+    if is_pr:
+        # For PRs, check both assignees and requested_reviewers
+        result = github_api("GET", f"pulls/{issue_number}")
+        if result:
+            reviewers = []
+            # Get requested reviewers
+            if "requested_reviewers" in result:
+                reviewers.extend([r["login"] for r in result["requested_reviewers"]])
+            # Also check assignees as fallback
+            if "assignees" in result:
+                reviewers.extend([a["login"] for a in result["assignees"]])
+            return list(dict.fromkeys(reviewers))  # Dedupe while preserving order
+    else:
+        # For issues, just check assignees
+        result = github_api("GET", f"issues/{issue_number}")
+        if result and "assignees" in result:
+            return [a["login"] for a in result["assignees"]]
+    
     return []
 
 
@@ -301,7 +318,7 @@ def load_state() -> dict:
         "queue": [],
         "pass_until": [],
         "recent_assignments": [],
-        "issue_skips": {},  # Tracks who has passed on each issue: {issue_num: [usernames]}
+        "active_reviews": {},  # Tracks review state per issue/PR: {number: {skipped: [], current_reviewer: str}}
     }
     
     issue = get_state_issue()
@@ -323,8 +340,8 @@ def load_state() -> dict:
         state["pass_until"] = []
     if not isinstance(state.get("recent_assignments"), list):
         state["recent_assignments"] = []
-    if not isinstance(state.get("issue_skips"), dict):
-        state["issue_skips"] = {}
+    if not isinstance(state.get("active_reviews"), dict):
+        state["active_reviews"] = {}
 
     return state
 
@@ -359,7 +376,7 @@ This issue tracks the round-robin assignment of reviewers for coding guidelines.
 - **current_index**: Position in queue (who's next)
 - **pass_until**: Reviewers temporarily away with return dates
 - **recent_assignments**: Last {MAX_RECENT_ASSIGNMENTS} assignments for visibility
-- **issue_skips**: Who has passed on each open issue (prevents re-assignment to someone who already passed)
+- **active_reviews**: Per-issue/PR tracking of who passed and the current designated reviewer
 """
 
     result = github_api("PATCH", f"issues/{STATE_ISSUE_NUMBER}", {"body": body})
@@ -685,26 +702,39 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
 
     Returns (response_message, success).
     """
-    # Get current assignees
-    current_assignees = get_issue_assignees(issue_number)
-
-    if not current_assignees:
+    # Get or create the tracking entry for this issue
+    issue_key = str(issue_number)  # YAML keys are strings
+    if "active_reviews" not in state:
+        state["active_reviews"] = {}
+    if issue_key not in state["active_reviews"]:
+        state["active_reviews"][issue_key] = {"skipped": [], "current_reviewer": None}
+    
+    # Handle old format (just a list) - migrate to new format
+    if isinstance(state["active_reviews"][issue_key], list):
+        state["active_reviews"][issue_key] = {
+            "skipped": state["active_reviews"][issue_key],
+            "current_reviewer": None
+        }
+    
+    issue_data = state["active_reviews"][issue_key]
+    
+    # Determine who the current reviewer is:
+    # 1. First check our tracked state
+    # 2. Fall back to GitHub assignees
+    passed_reviewer = issue_data.get("current_reviewer")
+    if not passed_reviewer:
+        current_assignees = get_issue_assignees(issue_number)
+        passed_reviewer = current_assignees[0] if current_assignees else None
+    
+    if not passed_reviewer:
         return "❌ No reviewer is currently assigned to pass.", False
 
-    # The person being passed is the current assignee
-    passed_reviewer = current_assignees[0]
-
-    # Get or create the skip list for this issue
-    issue_key = str(issue_number)  # YAML keys are strings
-    if issue_key not in state.get("issue_skips", {}):
-        state.setdefault("issue_skips", {})[issue_key] = []
-    
     # Check if this is the first pass on this issue
-    is_first_pass = len(state["issue_skips"][issue_key]) == 0
+    is_first_pass = len(issue_data["skipped"]) == 0
     
     # Record this reviewer as having passed on this issue
-    if passed_reviewer not in state["issue_skips"][issue_key]:
-        state["issue_skips"][issue_key].append(passed_reviewer)
+    if passed_reviewer not in issue_data["skipped"]:
+        issue_data["skipped"].append(passed_reviewer)
 
     # Find the passed reviewer's entry and position in the queue (for first pass reordering)
     passed_entry = None
@@ -719,7 +749,7 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
 
     # Build skip set: everyone who has passed on this issue + issue author
-    skip_set = set(state["issue_skips"][issue_key])
+    skip_set = set(issue_data["skipped"])
     if issue_author:
         skip_set.add(issue_author)
 
@@ -762,13 +792,15 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
         # NOT first pass - restore the index so original passer stays "next"
         state["current_index"] = saved_index
 
-    # Unassign the passed reviewer first
+    # Unassign the passed reviewer first (best effort - may fail if no permissions)
     unassign_reviewer(issue_number, passed_reviewer)
 
-    # Assign the substitute to this issue
+    # Assign the substitute to this issue (best effort)
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    if not assign_reviewer(issue_number, next_reviewer):
-        return f"❌ Failed to assign @{next_reviewer} as reviewer.", False
+    assign_reviewer(issue_number, next_reviewer)  # Don't fail if this doesn't work
+    
+    # Track the new reviewer in our state (this is the source of truth)
+    set_current_reviewer(state, issue_number, next_reviewer)
 
     # Record the assignment
     record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
@@ -780,7 +812,7 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
                 f"_@{passed_reviewer} is next in queue for future issues._"), True
     else:
         # Get the original passer (first in the skip list)
-        original_passer = state["issue_skips"][issue_key][0]
+        original_passer = issue_data["skipped"][0]
         return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
                 f"@{next_reviewer} is now assigned as the reviewer.\n\n"
                 f"_@{original_passer} remains next in queue for future issues._"), True
@@ -850,24 +882,42 @@ def handle_pass_until_command(state: dict, issue_number: int, comment_author: st
         state["current_index"] = 0
 
     # Check if this user was assigned to the current issue
+    # Check both our tracked state and GitHub assignees
+    issue_key = str(issue_number)
+    tracked_reviewer = None
+    if "active_reviews" in state and issue_key in state["active_reviews"]:
+        issue_data = state["active_reviews"][issue_key]
+        if isinstance(issue_data, dict):
+            tracked_reviewer = issue_data.get("current_reviewer")
+    
     current_assignees = get_issue_assignees(issue_number)
+    is_current_reviewer = (
+        (tracked_reviewer and tracked_reviewer.lower() == comment_author.lower()) or
+        comment_author.lower() in [a.lower() for a in current_assignees]
+    )
+    
     reassigned_msg = ""
 
-    if comment_author.lower() in [a.lower() for a in current_assignees]:
+    if is_current_reviewer:
         # Need to reassign
+        unassign_reviewer(issue_number, comment_author)
+        
         issue_author = os.environ.get("ISSUE_AUTHOR", "")
         skip_set = {issue_author} if issue_author else set()
         next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
 
         if next_reviewer:
             is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-            if assign_reviewer(issue_number, next_reviewer):
-                record_assignment(state, next_reviewer, issue_number,
-                                "pr" if is_pr else "issue")
-                reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
-            else:
-                reassigned_msg = "\n\n⚠️ Could not assign a new reviewer."
+            assign_reviewer(issue_number, next_reviewer)
+            set_current_reviewer(state, issue_number, next_reviewer)
+            record_assignment(state, next_reviewer, issue_number,
+                            "pr" if is_pr else "issue")
+            reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
         else:
+            # Clear the current reviewer
+            if "active_reviews" in state and issue_key in state["active_reviews"]:
+                if isinstance(state["active_reviews"][issue_key], dict):
+                    state["active_reviews"][issue_key]["current_reviewer"] = None
             reassigned_msg = "\n\n⚠️ No other reviewers available to assign."
 
     reason_text = f" ({reason})" if reason else ""
@@ -983,10 +1033,12 @@ def handle_claim_command(state: dict, issue_number: int,
     for assignee in current_assignees:
         unassign_reviewer(issue_number, assignee)
 
-    # Assign the claimer
+    # Assign the claimer (best effort)
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    if not assign_reviewer(issue_number, comment_author):
-        return f"❌ Failed to assign @{comment_author} as reviewer.", False
+    assign_reviewer(issue_number, comment_author)
+    
+    # Track the reviewer in our state
+    set_current_reviewer(state, issue_number, comment_author)
 
     # Record the assignment
     record_assignment(state, comment_author, issue_number, "pr" if is_pr else "issue")
@@ -1006,22 +1058,33 @@ def handle_release_command(state: dict, issue_number: int,
 
     Returns (response_message, success).
     """
-    # Get current assignees
+    # Check who the current reviewer is (from our state first, then GitHub)
+    issue_key = str(issue_number)
+    tracked_reviewer = None
+    if "active_reviews" in state and issue_key in state["active_reviews"]:
+        issue_data = state["active_reviews"][issue_key]
+        if isinstance(issue_data, dict):
+            tracked_reviewer = issue_data.get("current_reviewer")
+    
+    # Also check GitHub assignees
     current_assignees = get_issue_assignees(issue_number)
 
-    if not current_assignees:
-        return "❌ No reviewer is currently assigned to release.", False
-
-    # Check if the comment author is assigned
+    # Determine if the comment author is the current reviewer
+    is_tracked = tracked_reviewer and tracked_reviewer.lower() == comment_author.lower()
     is_assigned = comment_author.lower() in [a.lower() for a in current_assignees]
 
-    if not is_assigned:
-        return (f"❌ @{comment_author} is not assigned to this issue/PR. "
-                f"Current assignee(s): @{', @'.join(current_assignees)}"), False
+    if not is_tracked and not is_assigned:
+        if tracked_reviewer:
+            return (f"❌ @{comment_author} is not the current reviewer. "
+                    f"Current reviewer: @{tracked_reviewer}"), False
+        elif current_assignees:
+            return (f"❌ @{comment_author} is not assigned to this issue/PR. "
+                    f"Current assignee(s): @{', @'.join(current_assignees)}"), False
+        else:
+            return "❌ No reviewer is currently assigned to release.", False
 
-    # Remove the assignment
-    if not unassign_reviewer(issue_number, comment_author):
-        return f"❌ Failed to remove @{comment_author} from assignees.", False
+    # Remove the assignment (best effort)
+    unassign_reviewer(issue_number, comment_author)
 
     # Get the issue author to skip them when assigning next reviewer
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
@@ -1032,15 +1095,17 @@ def handle_release_command(state: dict, issue_number: int,
 
     if next_reviewer:
         is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-        if assign_reviewer(issue_number, next_reviewer):
-            record_assignment(state, next_reviewer, issue_number,
-                            "pr" if is_pr else "issue")
-            return (f"✅ @{comment_author} has released this review.\n\n"
-                    f"@{next_reviewer} is now assigned as the reviewer."), True
-        else:
-            return (f"✅ @{comment_author} has released this review.\n\n"
-                    f"⚠️ Could not assign the next reviewer."), True
+        assign_reviewer(issue_number, next_reviewer)
+        set_current_reviewer(state, issue_number, next_reviewer)
+        record_assignment(state, next_reviewer, issue_number,
+                        "pr" if is_pr else "issue")
+        return (f"✅ @{comment_author} has released this review.\n\n"
+                f"@{next_reviewer} is now assigned as the reviewer."), True
     else:
+        # Clear the current reviewer since no one is assigned
+        if "active_reviews" in state and issue_key in state["active_reviews"]:
+            if isinstance(state["active_reviews"][issue_key], dict):
+                state["active_reviews"][issue_key]["current_reviewer"] = None
         return (f"✅ @{comment_author} has released this review.\n\n"
                 f"⚠️ No other reviewers available in the queue."), True
 
@@ -1088,10 +1153,12 @@ def handle_assign_command(state: dict, issue_number: int,
     for assignee in current_assignees:
         unassign_reviewer(issue_number, assignee)
 
-    # Assign the specified user
+    # Assign the specified user (best effort)
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    if not assign_reviewer(issue_number, username):
-        return f"❌ Failed to assign @{username} as reviewer.", False
+    assign_reviewer(issue_number, username)
+    
+    # Track the reviewer in our state
+    set_current_reviewer(state, issue_number, username)
 
     # Record the assignment (but don't advance queue - this is manual assignment)
     record_assignment(state, username, issue_number, "pr" if is_pr else "issue")
@@ -1128,10 +1195,12 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
         return ("❌ No reviewers available in the queue. "
                 f"Please use `{BOT_MENTION} sync-members` to update the queue."), False
 
-    # Assign the reviewer
+    # Assign the reviewer (best effort - may fail if no permissions)
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    if not assign_reviewer(issue_number, next_reviewer):
-        return f"❌ Failed to assign @{next_reviewer} as reviewer.", False
+    assign_reviewer(issue_number, next_reviewer)
+
+    # Track the reviewer in our state (source of truth for pass command)
+    set_current_reviewer(state, issue_number, next_reviewer)
 
     # Record the assignment
     record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
@@ -1155,6 +1224,22 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 # ==============================================================================
 # Event Handlers
 # ==============================================================================
+
+
+def set_current_reviewer(state: dict, issue_number: int, reviewer: str) -> None:
+    """Track the designated reviewer for an issue/PR in our state."""
+    issue_key = str(issue_number)
+    if "active_reviews" not in state:
+        state["active_reviews"] = {}
+    if issue_key not in state["active_reviews"]:
+        state["active_reviews"][issue_key] = {"skipped": [], "current_reviewer": None}
+    elif isinstance(state["active_reviews"][issue_key], list):
+        # Migrate old format
+        state["active_reviews"][issue_key] = {
+            "skipped": state["active_reviews"][issue_key],
+            "current_reviewer": None
+        }
+    state["active_reviews"][issue_key]["current_reviewer"] = reviewer
 
 
 def handle_issue_or_pr_opened(state: dict) -> bool:
@@ -1197,12 +1282,12 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
                     f"Please use `{BOT_MENTION} sync-members` to update the queue.")
         return False
 
-    # Assign the reviewer
+    # Assign the reviewer (best effort - may fail if no permissions)
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    if not assign_reviewer(issue_number, reviewer):
-        post_comment(issue_number,
-                    f"⚠️ Failed to assign @{reviewer} as reviewer.")
-        return False
+    assign_reviewer(issue_number, reviewer)
+    
+    # Track the reviewer in our state (source of truth for pass command)
+    set_current_reviewer(state, issue_number, reviewer)
 
     # Record the assignment
     record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
