@@ -43,7 +43,7 @@ All commands must be prefixed with @guidelines-bot:
   @guidelines-bot sync-members
     - Manually trigger sync of the queue with members.md
 
-  @guidelines-bot status
+  @guidelines-bot queue-status
     - Show current queue status and who's next up
 """
 
@@ -575,7 +575,7 @@ Other commands:
 - `{BOT_MENTION} claim` - Claim this review for yourself
 - `{BOT_MENTION} label +label-name` - Add a label
 - `{BOT_MENTION} label -label-name` - Remove a label
-- `{BOT_MENTION} status` - Show current queue status
+- `{BOT_MENTION} queue-status` - Show current queue status
 """
 
 
@@ -617,7 +617,7 @@ Other commands:
 - `{BOT_MENTION} claim` - Claim this review for yourself
 - `{BOT_MENTION} label +label-name` - Add a label
 - `{BOT_MENTION} label -label-name` - Remove a label
-- `{BOT_MENTION} status` - Show current queue status
+- `{BOT_MENTION} queue-status` - Show current queue status
 """
 
 
@@ -923,24 +923,50 @@ def handle_pass_until_command(state: dict, issue_number: int, comment_author: st
             f"{reassigned_msg}"), True
 
 
-def handle_label_command(issue_number: int, action: str, label: str) -> tuple[str, bool]:
+def handle_label_command(issue_number: int, label_string: str) -> tuple[str, bool]:
     """
     Handle the label command - add or remove labels.
+    
+    Parses a string like "+chapter: expressions -chapter: values +decidability: decidable"
+    and applies each label operation.
 
     Returns (response_message, success).
     """
-    if action == "+":
-        if add_label(issue_number, label):
-            return f"✅ Added label `{label}`.", True
-        else:
-            return f"❌ Failed to add label `{label}`.", False
-    elif action == "-":
-        if remove_label(issue_number, label):
-            return f"✅ Removed label `{label}`.", True
-        else:
-            return f"❌ Failed to remove label `{label}`.", False
-    else:
-        return "❌ Unknown label action. Use `+label-name` to add or `-label-name` to remove.", False
+    import re
+    
+    # Find all +label and -label patterns
+    # Labels can contain spaces, colons, etc. - they end at the next +/- or end of string
+    pattern = r'([+-])([^+-]+)'
+    matches = re.findall(pattern, label_string)
+    
+    if not matches:
+        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
+    
+    results = []
+    all_success = True
+    
+    for action, label in matches:
+        label = label.strip()
+        if not label:
+            continue
+            
+        if action == "+":
+            if add_label(issue_number, label):
+                results.append(f"✅ Added label `{label}`")
+            else:
+                results.append(f"❌ Failed to add label `{label}`")
+                all_success = False
+        elif action == "-":
+            if remove_label(issue_number, label):
+                results.append(f"✅ Removed label `{label}`")
+            else:
+                results.append(f"❌ Failed to remove label `{label}`")
+                all_success = False
+    
+    if not results:
+        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
+    
+    return "\n".join(results), all_success
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
@@ -1388,6 +1414,30 @@ def handle_labeled_event(state: dict) -> bool:
     return True
 
 
+def handle_closed_event(state: dict) -> bool:
+    """
+    Handle when an issue or PR is closed.
+    
+    Cleans up the active_reviews entry to prevent state from growing indefinitely.
+    
+    Returns True if we modified state, False otherwise.
+    """
+    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    if not issue_number:
+        print("No issue number found for closed event")
+        return False
+
+    issue_key = str(issue_number)
+    
+    if "active_reviews" in state and issue_key in state["active_reviews"]:
+        del state["active_reviews"][issue_key]
+        print(f"Cleaned up active_reviews entry for #{issue_number}")
+        return True
+    
+    print(f"No active_reviews entry found for #{issue_number}")
+    return False
+
+
 def handle_comment_event(state: dict) -> bool:
     """
     Handle a comment event - check for bot commands.
@@ -1438,20 +1488,16 @@ def handle_comment_event(state: dict) -> bool:
                        f"`{BOT_MENTION} label -label-name`")
             success = False
         else:
-            label_arg = args[0]
-            if label_arg.startswith("+"):
-                response, success = handle_label_command(issue_number, "+", label_arg[1:])
-            elif label_arg.startswith("-"):
-                response, success = handle_label_command(issue_number, "-", label_arg[1:])
-            else:
-                # Default to adding
-                response, success = handle_label_command(issue_number, "+", label_arg)
+            # Rejoin all args to handle labels with spaces
+            # Then parse for +label and -label patterns
+            full_arg = " ".join(args)
+            response, success = handle_label_command(issue_number, full_arg)
 
     elif command == "sync-members":
         response, success = handle_sync_members_command(state)
         state_changed = success
 
-    elif command == "status":
+    elif command == "queue-status":
         response, success = handle_status_command(state)
 
     elif command == "claim":
@@ -1495,7 +1541,7 @@ def handle_comment_event(state: dict) -> bool:
                    f"- `{BOT_MENTION} r? producers` - Assign next reviewer from queue\n"
                    f"- `{BOT_MENTION} label +/-label-name` - Add/remove labels\n"
                    f"- `{BOT_MENTION} sync-members` - Sync queue with members.md\n"
-                   f"- `{BOT_MENTION} status` - Show queue status")
+                   f"- `{BOT_MENTION} queue-status` - Show queue status")
         success = False
 
     # React to the command comment
@@ -1561,12 +1607,16 @@ def main():
             state_changed = handle_issue_or_pr_opened(state)
         elif event_action == "labeled":
             state_changed = handle_labeled_event(state)
+        elif event_action == "closed":
+            state_changed = handle_closed_event(state)
 
     elif event_name == "pull_request_target":
         if event_action == "opened":
             state_changed = handle_issue_or_pr_opened(state)
         elif event_action == "labeled":
             state_changed = handle_labeled_event(state)
+        elif event_action == "closed":
+            state_changed = handle_closed_event(state)
 
     elif event_name == "issue_comment":
         if event_action == "created":
