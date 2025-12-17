@@ -72,7 +72,8 @@ BOT_NAME = "guidelines-bot"
 BOT_MENTION = f"@{BOT_NAME}"
 CODING_GUIDELINE_LABEL = "coding guideline"
 STATE_FILE = Path(".github/reviewer-queue/state.yml")
-MEMBERS_FILE = Path("subcommittee/coding-guidelines/members.md")
+# Members file is in the consortium repo, not this repo
+MEMBERS_URL = "https://raw.githubusercontent.com/rustfoundation/safety-critical-rust-consortium/main/subcommittee/coding-guidelines/members.md"
 MAX_RECENT_ASSIGNMENTS = 20
 
 
@@ -194,17 +195,20 @@ def unassign_reviewer(issue_number: int, username: str) -> bool:
 # ==============================================================================
 
 
-def parse_members_file() -> list[dict]:
+def fetch_members() -> list[dict]:
     """
-    Parse members.md to extract Producers.
+    Fetch and parse members.md from the consortium repo to extract Producers.
 
     Returns a list of dicts with 'github' and 'name' keys.
     """
-    if not MEMBERS_FILE.exists():
-        print(f"WARNING: Members file not found: {MEMBERS_FILE}", file=sys.stderr)
+    try:
+        response = requests.get(MEMBERS_URL, timeout=10)
+        response.raise_for_status()
+        content = response.text
+    except requests.RequestException as e:
+        print(f"WARNING: Failed to fetch members file from {MEMBERS_URL}: {e}", file=sys.stderr)
         return []
 
-    content = MEMBERS_FILE.read_text()
     producers = []
 
     # Find the table in the markdown
@@ -320,11 +324,11 @@ def save_state(state: dict) -> None:
 
 def sync_members_with_queue(state: dict) -> tuple[dict, list[str]]:
     """
-    Sync the queue with the current members.md file.
+    Sync the queue with the current members.md file from the consortium repo.
 
     Returns the updated state and a list of changes made.
     """
-    producers = parse_members_file()
+    producers = fetch_members()
     current_queue = {m["github"]: m for m in state["queue"]}
     pass_until_users = {m["github"] for m in state.get("pass_until", [])}
 
