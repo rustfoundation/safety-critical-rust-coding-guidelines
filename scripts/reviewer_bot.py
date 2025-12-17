@@ -241,9 +241,9 @@ def fetch_members() -> list[dict]:
             if in_table and len(cells) == len(headers):
                 row = dict(zip(headers, cells))
 
-                # Check if this is a Producer
+                # Check if this is a Producer (role contains "Producer" anywhere)
                 role = row.get("role", "").strip()
-                if role == "Producer":
+                if "Producer" in role:
                     github_username = row.get("github_username", "").strip()
                     # Remove @ prefix if present
                     if github_username.startswith("@"):
