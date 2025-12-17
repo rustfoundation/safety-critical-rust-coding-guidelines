@@ -47,10 +47,10 @@ jobs:
 
     # Skip if:
     # - Comment is from a bot (prevent infinite loops)
-    # - The issue being acted on is the state issue itself
+    # - The issue/PR being acted on is the state issue itself (314)
     if: >
       (github.event_name != 'issue_comment' || github.event.comment.user.type != 'Bot') &&
-      (github.event.issue.number != 314)
+      ((github.event.issue.number || github.event.pull_request.number || 0) != 314)
 
     steps:
       - name: Checkout repository

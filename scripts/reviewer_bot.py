@@ -150,23 +150,20 @@ def assign_reviewer(issue_number: int, username: str) -> bool:
 
 
 def get_issue_assignees(issue_number: int) -> list[str]:
-    """Get current assignees/reviewers for an issue/PR."""
+    """Get current reviewers for an issue/PR.
+    
+    For issues: returns assignees
+    For PRs: returns only requested_reviewers (NOT assignees, as those are typically the author)
+    """
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     
     if is_pr:
-        # For PRs, check both assignees and requested_reviewers
+        # For PRs, ONLY check requested_reviewers (assignees are typically the author)
         result = github_api("GET", f"pulls/{issue_number}")
-        if result:
-            reviewers = []
-            # Get requested reviewers
-            if "requested_reviewers" in result:
-                reviewers.extend([r["login"] for r in result["requested_reviewers"]])
-            # Also check assignees as fallback
-            if "assignees" in result:
-                reviewers.extend([a["login"] for a in result["assignees"]])
-            return list(dict.fromkeys(reviewers))  # Dedupe while preserving order
+        if result and "requested_reviewers" in result:
+            return [r["login"] for r in result["requested_reviewers"]]
     else:
-        # For issues, just check assignees
+        # For issues, check assignees
         result = github_api("GET", f"issues/{issue_number}")
         if result and "assignees" in result:
             return [a["login"] for a in result["assignees"]]
@@ -1250,23 +1247,39 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
     """
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
+        print("No issue number found")
         return False
 
-    # Check if already has a reviewer
+    print(f"Processing opened event for #{issue_number}")
+
+    # Check if already has a reviewer (check our tracked state first, then GitHub)
+    issue_key = str(issue_number)
+    tracked_reviewer = None
+    if "active_reviews" in state and issue_key in state["active_reviews"]:
+        review_data = state["active_reviews"][issue_key]
+        if isinstance(review_data, dict):
+            tracked_reviewer = review_data.get("current_reviewer")
+    
+    if tracked_reviewer:
+        print(f"Issue #{issue_number} already has tracked reviewer: {tracked_reviewer}")
+        return False
+    
     current_assignees = get_issue_assignees(issue_number)
     if current_assignees:
-        print(f"Issue #{issue_number} already has assignees: {current_assignees}")
+        print(f"Issue #{issue_number} already has reviewers/assignees: {current_assignees}")
         return False
 
     # Check for coding guideline label
     labels_json = os.environ.get("ISSUE_LABELS", "[]")
+    print(f"ISSUE_LABELS env: {labels_json}")
     try:
         labels = json.loads(labels_json)
     except json.JSONDecodeError:
+        print("Failed to parse ISSUE_LABELS as JSON")
         labels = []
 
     if CODING_GUIDELINE_LABEL not in labels:
-        print(f"Issue #{issue_number} does not have '{CODING_GUIDELINE_LABEL}' label")
+        print(f"Issue #{issue_number} does not have '{CODING_GUIDELINE_LABEL}' label (labels: {labels})")
         return False
 
     # Get issue author to skip them
@@ -1305,18 +1318,74 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
 
 def handle_labeled_event(state: dict) -> bool:
     """
-    Handle when an issue or PR is labeled.
+    Handle when an issue or PR is labeled with the coding guideline label.
 
-    If the coding guideline label was just added and there's no reviewer,
-    assign one.
+    We already know from LABEL_NAME that the correct label was added,
+    so we skip the label check that handle_issue_or_pr_opened does.
     """
     label_name = os.environ.get("LABEL_NAME", "")
 
     if label_name != CODING_GUIDELINE_LABEL:
+        print(f"Label '{label_name}' is not '{CODING_GUIDELINE_LABEL}', skipping")
         return False
 
-    # Treat the same as opened
-    return handle_issue_or_pr_opened(state)
+    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    if not issue_number:
+        print("No issue number found")
+        return False
+
+    # Check if already has a reviewer (check our tracked state first, then GitHub)
+    issue_key = str(issue_number)
+    tracked_reviewer = None
+    if "active_reviews" in state and issue_key in state["active_reviews"]:
+        review_data = state["active_reviews"][issue_key]
+        if isinstance(review_data, dict):
+            tracked_reviewer = review_data.get("current_reviewer")
+    
+    if tracked_reviewer:
+        print(f"Issue #{issue_number} already has tracked reviewer: {tracked_reviewer}")
+        return False
+    
+    current_assignees = get_issue_assignees(issue_number)
+    if current_assignees:
+        print(f"Issue #{issue_number} already has reviewers: {current_assignees}")
+        return False
+
+    print(f"Processing labeled event for #{issue_number}, author: {os.environ.get('ISSUE_AUTHOR', '')}")
+
+    # Get issue author to skip them
+    issue_author = os.environ.get("ISSUE_AUTHOR", "")
+    skip_set = {issue_author} if issue_author else set()
+
+    # Get next reviewer
+    reviewer = get_next_reviewer(state, skip_usernames=skip_set)
+    print(f"Selected reviewer for #{issue_number}: {reviewer}")
+
+    if not reviewer:
+        post_comment(issue_number,
+                    f"⚠️ No reviewers available in the queue. "
+                    f"Please use `{BOT_MENTION} sync-members` to update the queue.")
+        return False
+
+    # Assign the reviewer (best effort - may fail if no permissions)
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    assign_reviewer(issue_number, reviewer)
+    
+    # Track the reviewer in our state
+    set_current_reviewer(state, issue_number, reviewer)
+
+    # Record the assignment
+    record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
+
+    # Post guidance comment
+    if is_pr:
+        guidance = get_pr_guidance(reviewer, issue_author)
+    else:
+        guidance = get_issue_guidance(reviewer, issue_author)
+
+    post_comment(issue_number, guidance)
+
+    return True
 
 
 def handle_comment_event(state: dict) -> bool:
