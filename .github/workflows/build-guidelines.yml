@@ -79,7 +79,5 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install typos
-        run: cargo install typos-cli
       - name: Check for typos
-        run: typos
+        uses: crate-ci/typos@v1.40.0
