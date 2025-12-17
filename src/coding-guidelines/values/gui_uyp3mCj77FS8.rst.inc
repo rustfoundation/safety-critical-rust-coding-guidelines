@@ -3,7 +3,7 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Do not create values from uninitialized memory
+.. guideline:: Do not read uninitialized memory as a typed value
    :id: gui_uyp3mCj77FS8
    :category: mandatory
    :status: draft
@@ -13,22 +13,19 @@
    :scope: system
    :tags: undefined-behavior, unsafe
 
-   A program shall not create a value of any non-union type from uninitialized memory.
+   Do not read uninitialized memory of any non-union type as a typed value.
+   This is sometimes referred to as *transmuting* or *read-at-type*. 
+   Memory can remain uninitialized if it is not read as a type.
+   
    Reading from a union is covered by a separate rule, `Do not read from union fields that may contain uninitialized bytes
    <https://coding-guidelines.arewesafetycriticalyet.org/coding-guidelines/types-and-traits/index.html#gui_UnionPartialInit>`_.
-   It is prohibited to interpret uninitialized memory as a value of any type.
  
    .. rationale::
       :id: rat_kjFRrhpS8Wu6
       :status: draft
 
-      Rust's memory model treats all types except unions as having an invariant that all bytes must be initialized before a value may be constructed.
-      Reading uninitialized memory:
-
-      - creates undefined behavior for most types,
-      - may violate niche or discriminant validity,
-      - may create invalid pointer values, or
-      - may produce values that violate type invariants.
+      Rust's memory model requires that all bytes must be initialized before being read as a typed value.
+      Reading uninitialized memory as a typed value is undefined behavior.
       
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db1
@@ -80,10 +77,10 @@
 
          use std::mem::MaybeUninit;
 
-         # fn main() {
-         // Reading an invalid reference is undefined behavior
-         let r: &u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
-         # }
+         fn main() {
+             // Reading an invalid reference is undefined behavior
+             let r: &u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
+         }
 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db4
