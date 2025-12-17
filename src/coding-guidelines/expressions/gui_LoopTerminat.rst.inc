@@ -417,7 +417,7 @@
          }
 
    .. bibliography::
-      :id: bib_LoopTerminat
+      :id: bib_LoopTerminate
       :status: draft
 
       .. list-table::
