@@ -128,7 +128,7 @@ def add_label(issue_number: int, label: str) -> bool:
 
 def remove_label(issue_number: int, label: str) -> bool:
     """Remove a label from an issue or PR."""
-    result = github_api("DELETE", f"issues/{issue_number}/labels/{label}")
+    _result = github_api("DELETE", f"issues/{issue_number}/labels/{label}")
     # 404 is ok - label might not exist
     return True
 
@@ -770,7 +770,7 @@ def handle_pass_until_command(state: dict, issue_number: int, comment_author: st
                                 "pr" if is_pr else "issue")
                 reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
             else:
-                reassigned_msg = f"\n\n⚠️ Could not assign a new reviewer."
+                reassigned_msg = "\n\n⚠️ Could not assign a new reviewer."
         else:
             reassigned_msg = "\n\n⚠️ No other reviewers available to assign."
 
@@ -797,7 +797,7 @@ def handle_label_command(issue_number: int, action: str, label: str) -> tuple[st
         else:
             return f"❌ Failed to remove label `{label}`.", False
     else:
-        return f"❌ Unknown label action. Use `+label-name` to add or `-label-name` to remove.", False
+        return "❌ Unknown label action. Use `+label-name` to add or `-label-name` to remove.", False
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
