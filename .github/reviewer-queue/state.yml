@@ -25,18 +25,8 @@ queue: []
 
 # Members temporarily excluded from rotation
 # They will be automatically re-added to the queue after their return_date
-pass_until:
-  # Example:
-  # - github: username
-  #   return_date: 2025-02-01
-  #   reason: "Optional reason for being away"
-  #   original_queue_position: 5
+pass_until: []
 
 # Recent assignments for visibility and debugging
 # Keeps the last 20 assignments
-recent_assignments:
-  # Example:
-  # - github: username
-  #   issue_number: 123
-  #   type: issue  # or "pr"
-  #   assigned_at: 2025-01-15T10:30:00Z
+recent_assignments: []
