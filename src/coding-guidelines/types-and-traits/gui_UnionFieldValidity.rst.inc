@@ -292,4 +292,3 @@
              | *Rust Unsafe Code Guidelines*, n.d. 
              | https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
 
->>>>>>> c93b2cb (Update types-and-traits.rst):src/coding-guidelines/types-and-traits.rst
