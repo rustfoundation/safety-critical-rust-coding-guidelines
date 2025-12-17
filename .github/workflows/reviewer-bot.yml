@@ -1,14 +1,14 @@
 name: Reviewer Bot
 
 on:
-  # Trigger when issues are opened or labeled
+  # Trigger when issues are opened, labeled, or closed
   issues:
-    types: [opened, labeled]
+    types: [opened, labeled, closed]
 
-  # Trigger when PRs are opened or labeled
+  # Trigger when PRs are opened, labeled, or closed
   # Using pull_request_target to handle PRs from forks with write permissions
   pull_request_target:
-    types: [opened, labeled]
+    types: [opened, labeled, closed]
 
   # Trigger on comments for bot commands
   issue_comment:
