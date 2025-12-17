@@ -77,11 +77,19 @@
 
       .. code-block:: rust
 
+         fn do_work() {
+             println!("Working...");
+         }
+
          fn process() {
              loop {
                  // Non-compliant: no termination condition
                  do_work();
              }
+         }
+
+         fn main() {
+             process();
          }
 
    .. non_compliant_example::
@@ -93,11 +101,27 @@
 
       .. code-block:: rust
 
+         struct Device {
+             ready: bool,
+         }
+
+         impl Device {
+             fn is_ready(&self) -> bool {
+                 self.ready
+             }
+         }
+
          fn wait_for_ready(device: &Device) {
              // No timeout, could wait forever
              while !device.is_ready() { // noncompliant
                  // spin
              }
+         }
+
+         fn main() {
+             let device = Device { ready: true };
+             wait_for_ready(&device);
+             println!("Device is ready!");
          }
 
    .. non_compliant_example::
@@ -147,6 +171,12 @@
              }
          }
 
+         fn main() {
+             let flag = AtomicBool::new(true);
+             wait_for_signal(&flag);
+             println!("Signal received!");
+         }
+
    .. non_compliant_example::
       :id: non_compl_ex_BoundedLoop4
       :status: draft
@@ -159,6 +189,26 @@
 
          use std::sync::atomic::{AtomicBool, Ordering};
          use std::sync::Arc;
+
+         fn pet_watchdog() {
+             println!("Petting watchdog...");
+         }
+
+         fn read_sensors() {
+             println!("Reading sensors...");
+         }
+
+         fn compute_control_output() {
+             println!("Computing control output...");
+         }
+
+         fn write_actuators() {
+             println!("Writing actuators...");
+         }
+
+         fn safe_shutdown() {
+             println!("Safe shutdown complete.");
+         }
 
          /// Main control loop for the safety controller.
          /// 
@@ -189,11 +239,20 @@
 
       .. code-block:: rust
 
+         fn process_byte(byte: u8) {
+             println!("Processing byte: {}", byte);
+         }
+
          fn process_buffer(buf: &[u8; 256]) {
              // This loop iterates exactly 256 times and is bounded at compile time
              for byte in buf.iter() { // compliant
                  process_byte(*byte);
              }
+         }
+
+         fn main() {
+             let buf = [0u8; 256];
+             process_buffer(&buf);
          }
 
    .. compliant_example::
@@ -206,15 +265,42 @@
 
          const MAX_RETRIES: u32 = 100;
 
+         struct Device {
+             ready: bool,
+         }
+
+         impl Device {
+             fn is_ready(&self) -> bool {
+                 self.ready
+             }
+         }
+
+         #[derive(Debug)]
+         enum TimeoutError {
+             DeviceNotReady,
+         }
+
+         fn delay_microseconds(_us: u32) {
+             // Simulate delay
+         }
+
          fn wait_for_ready(device: &Device) -> Result<(), TimeoutError> {
              // Compliant: bounded by MAX_RETRIES
-             for attempt in 0..MAX_RETRIES { // compliant
+             for _attempt in 0..MAX_RETRIES { // compliant
                  if device.is_ready() {
                      return Ok(());
                  }
                  delay_microseconds(100);
              }
              Err(TimeoutError::DeviceNotReady)
+         }
+
+         fn main() {
+             let device = Device { ready: true };
+             match wait_for_ready(&device) {
+                 Ok(()) => println!("Device is ready!"),
+                 Err(e) => println!("Error: {:?}", e),
+             }
          }
 
    .. compliant_example::
@@ -229,17 +315,40 @@
 
          const TIMEOUT: Duration = Duration::from_millis(100);
 
+         struct Device {
+             ready: bool,
+         }
+
+         impl Device {
+             fn is_ready(&self) -> bool {
+                 self.ready
+             }
+         }
+
+         #[derive(Debug)]
+         enum TimeoutError {
+             Timeout,
+         }
+
          fn wait_for_ready(device: &Device) -> Result<(), TimeoutError> {
              let deadline = Instant::now() + TIMEOUT;
              
              // Compliant: bounded by wall-clock time
-             while Instant::now() < deadline { v// compliant
+             while Instant::now() < deadline { // compliant
                  if device.is_ready() {
                      return Ok(());
                  }
                  std::hint::spin_loop();
              }
              Err(TimeoutError::Timeout)
+         }
+
+         fn main() {
+             let device = Device { ready: true };
+             match wait_for_ready(&device) {
+                 Ok(()) => println!("Device is ready!"),
+                 Err(e) => println!("Error: {:?}", e),
+             }
          }
 
    .. compliant_example::
@@ -269,6 +378,20 @@
              None
          }
 
+         fn main() {
+             let data = [1, 3, 5, 7, 9, 11, 13, 15];
+             
+             match binary_search(&data, 7) {
+                 Some(idx) => println!("Found 7 at index {}", idx),
+                 None => println!("7 not found"),
+             }
+
+             match binary_search(&data, 6) {
+                 Some(idx) => println!("Found 6 at index {}", idx),
+                 None => println!("6 not found"),
+             }
+         }
+
    .. compliant_example::
       :id: compl_ex_BoundedLoop6
       :status: draft
@@ -285,6 +408,12 @@
                  total = total.saturating_add(value as i64);
              }
              total
+         }
+
+         fn main() {
+             let data = [10, 20, 30, 40, 50];
+             let sum = sum_values(&data);
+             println!("Sum: {}", sum);
          }
 
    .. bibliography::
