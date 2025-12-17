@@ -420,6 +420,9 @@ def process_pass_until_expirations(state: dict) -> tuple[dict, list[str]]:
     """
     Check for expired pass-until entries and restore them to the queue.
 
+    Returning members are inserted right after the current index,
+    so they're next up in rotation.
+
     Returns the updated state and a list of users restored.
     """
     now = datetime.now(timezone.utc).date()
@@ -430,16 +433,32 @@ def process_pass_until_expirations(state: dict) -> tuple[dict, list[str]]:
         return_date = entry.get("return_date")
         if return_date:
             if isinstance(return_date, str):
-                return_date = datetime.fromisoformat(return_date).date()
+                try:
+                    return_date = datetime.strptime(return_date, "%Y-%m-%d").date()
+                except ValueError:
+                    return_date = datetime.fromisoformat(return_date).date()
             elif isinstance(return_date, datetime):
                 return_date = return_date.date()
 
             if return_date <= now:
-                # Restore to queue
-                state["queue"].append({
+                # Restore to queue - insert right after current index
+                restored_member = {
                     "github": entry["github"],
                     "name": entry.get("name", entry["github"]),
-                })
+                }
+                
+                if state["queue"]:
+                    # Insert right after current index
+                    insert_position = (state["current_index"] + 1) % (len(state["queue"]) + 1)
+                    state["queue"].insert(insert_position, restored_member)
+                    
+                    # Adjust current_index if we inserted before or at it
+                    if insert_position <= state["current_index"]:
+                        state["current_index"] += 1
+                else:
+                    # Queue is empty, just add them
+                    state["queue"].append(restored_member)
+                
                 restored.append(entry["github"])
             else:
                 still_away.append(entry)
@@ -655,6 +674,10 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     """
     Handle the pass! command - skip current reviewer for this issue only.
 
+    The passed reviewer is moved to right after the substitute in the queue,
+    so they're next up for future issues but the substitute doesn't have to
+    go twice.
+
     Returns (response_message, success).
     """
     # Get current assignees
@@ -663,21 +686,71 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     if not current_assignees:
         return "❌ No reviewer is currently assigned to pass.", False
 
-    # The person passing should be the current assignee (or we allow anyone?)
-    # For now, let's allow the assigned reviewer or anyone to pass
+    # The person being passed is the current assignee
     passed_reviewer = current_assignees[0]
+
+    # Find the passed reviewer's entry and position in the queue
+    passed_entry = None
+    passed_index = None
+    for i, member in enumerate(state["queue"]):
+        if member["github"].lower() == passed_reviewer.lower():
+            passed_entry = member
+            passed_index = i
+            break
+
+    if passed_entry is None:
+        # Passed reviewer not in queue (maybe external assignment?)
+        # Just find a substitute without queue manipulation
+        issue_author = os.environ.get("ISSUE_AUTHOR", "")
+        skip_set = {passed_reviewer, issue_author} if issue_author else {passed_reviewer}
+        next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
+
+        if not next_reviewer:
+            return "❌ No other reviewers available in the queue.", False
+
+        is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+        if not assign_reviewer(issue_number, next_reviewer):
+            return f"❌ Failed to assign @{next_reviewer} as reviewer.", False
+
+        record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
+
+        reason_text = f" Reason: {reason}" if reason else ""
+        return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
+                f"@{next_reviewer} is now assigned as the reviewer."), True
 
     # Get the issue author to skip them
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
 
-    # Get next reviewer, skipping the passed one and the author
+    # Get next reviewer (substitute), skipping the passed one and the author
     skip_set = {passed_reviewer, issue_author} if issue_author else {passed_reviewer}
     next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
 
     if not next_reviewer:
         return "❌ No other reviewers available in the queue.", False
 
-    # Assign the new reviewer
+    # Find the substitute's current position
+    substitute_index = None
+    for i, member in enumerate(state["queue"]):
+        if member["github"].lower() == next_reviewer.lower():
+            substitute_index = i
+            break
+
+    # Reorder the queue: move passed reviewer to right after substitute
+    # Remove passed reviewer from current position
+    state["queue"].pop(passed_index)
+
+    # Adjust substitute_index if it was after the removed position
+    if substitute_index > passed_index:
+        substitute_index -= 1
+
+    # Insert passed reviewer right after substitute
+    insert_position = substitute_index + 1
+    state["queue"].insert(insert_position, passed_entry)
+
+    # Set index to point at passed reviewer (they're next for future issues)
+    state["current_index"] = insert_position
+
+    # Assign the substitute to this issue
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     if not assign_reviewer(issue_number, next_reviewer):
         return f"❌ Failed to assign @{next_reviewer} as reviewer.", False
@@ -687,7 +760,8 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
 
     reason_text = f" Reason: {reason}" if reason else ""
     return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
-            f"@{next_reviewer} is now assigned as the reviewer."), True
+            f"@{next_reviewer} is now assigned as the reviewer.\n\n"
+            f"_@{passed_reviewer} is next in queue for future issues._"), True
 
 
 def handle_pass_until_command(state: dict, issue_number: int, comment_author: str,
