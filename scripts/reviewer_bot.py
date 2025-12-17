@@ -6,7 +6,8 @@ This bot manages round-robin assignment of reviewers for coding guideline
 issues and PRs. It supports commands for passing reviews, vacations, and
 label management.
 
-Commands (invoke with @guidelines-bot prefix):
+All commands must be prefixed with @guidelines-bot:
+
   @guidelines-bot pass! [reason]
     - Skip the assigned reviewer for this issue/PR and assign the next person
     - The skipped reviewer stays in queue position for future assignments
@@ -25,12 +26,11 @@ Commands (invoke with @guidelines-bot prefix):
 
   @guidelines-bot assign @username
     - Assign a specific person as the reviewer
-    - Also supports: r? @username
 
-  r? @username
-    - Shorthand to assign a specific reviewer (Rust-style)
+  @guidelines-bot r? @username
+    - Shorthand to assign a specific reviewer
 
-  r? producers
+  @guidelines-bot r? producers
     - Assign the next reviewer from the round-robin queue
     - Useful for requesting a reviewer on an already-open issue/PR
 
@@ -482,8 +482,8 @@ If you need to pass this review:
 - `{BOT_MENTION} release` - Release your assignment (next in queue will be assigned)
 
 To assign someone else:
-- `{BOT_MENTION} assign @username` or `r? @username` - Assign a specific reviewer
-- `r? producers` - Request the next reviewer from the queue
+- `{BOT_MENTION} assign @username` - Assign a specific reviewer
+- `{BOT_MENTION} r? producers` - Request the next reviewer from the queue
 
 Other commands:
 - `{BOT_MENTION} claim` - Claim this review for yourself
@@ -524,8 +524,8 @@ If you need to pass this review:
 - `{BOT_MENTION} release` - Release your assignment (next in queue will be assigned)
 
 To assign someone else:
-- `{BOT_MENTION} assign @username` or `r? @username` - Assign a specific reviewer
-- `r? producers` - Request the next reviewer from the queue
+- `{BOT_MENTION} assign @username` - Assign a specific reviewer
+- `{BOT_MENTION} r? producers` - Request the next reviewer from the queue
 
 Other commands:
 - `{BOT_MENTION} claim` - Claim this review for yourself
@@ -546,24 +546,11 @@ def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
 
     Returns (command, args) or None if no command found.
     
-    Supports:
+    All commands must be prefixed with @guidelines-bot:
     - @guidelines-bot <command> [args]
-    - r? @username (shorthand for assign specific user)
-    - r? producers (shorthand for assign next from queue)
+    - @guidelines-bot r? @username (assign specific user)
+    - @guidelines-bot r? producers (assign next from queue)
     """
-    # First, check for r? pattern (Rust-style reviewer request)
-    # Match either "r? producers" or "r? @username"
-    r_pattern = r"^r\?\s+(\S+)"
-    r_match = re.search(r_pattern, comment_body, re.MULTILINE)
-    if r_match:
-        target = r_match.group(1)
-        # Check if it's the special "producers" keyword for queue assignment
-        if target.lower() == "producers":
-            return "assign-from-queue", []
-        # Otherwise treat as username assignment
-        username = target.lstrip("@")
-        return "assign", [f"@{username}"]
-    
     # Look for @guidelines-bot <command> pattern
     pattern = rf"{re.escape(BOT_MENTION)}\s+(\S+)(.*)$"
     match = re.search(pattern, comment_body, re.IGNORECASE | re.MULTILINE)
@@ -573,6 +560,18 @@ def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
 
     command = match.group(1).lower().rstrip("!")
     args_str = match.group(2).strip()
+
+    # Special handling for "@guidelines-bot r? <target>" syntax
+    if command == "r?":
+        target = args_str.split()[0] if args_str else ""
+        if target.lower() == "producers":
+            return "assign-from-queue", []
+        elif target:
+            username = target.lstrip("@")
+            return "assign", [f"@{username}"]
+        else:
+            # No target specified, return as-is to show error
+            return "r?", []
 
     # Parse arguments (handle quoted strings)
     args = []
@@ -1179,28 +1178,12 @@ def handle_comment_event(state: dict) -> bool:
         response, success = handle_assign_from_queue_command(state, issue_number)
         state_changed = success
 
-    elif command == "r":
-        # Handle "r?" being parsed as command "r" with "?" in args
-        # This shouldn't normally happen due to parse_command, but handle it anyway
-        if args and args[0].startswith("?"):
-            # Extract username from "?@username" or "? @username"
-            remaining = args[0].lstrip("?").strip()
-            if remaining:
-                username = remaining
-            elif len(args) > 1:
-                username = args[1]
-            else:
-                username = ""
-            
-            if username:
-                response, success = handle_assign_command(state, issue_number, username)
-                state_changed = success
-            else:
-                response = "❌ Missing username. Usage: `r? @username`"
-                success = False
-        else:
-            response = "❌ Unknown command. Did you mean `r? @username`?"
-            success = False
+    elif command == "r?":
+        # Handle "r?" with no target - show usage error
+        response = (f"❌ Missing target. Usage:\n"
+                   f"- `{BOT_MENTION} r? @username` - Assign a specific reviewer\n"
+                   f"- `{BOT_MENTION} r? producers` - Assign next reviewer from queue")
+        success = False
 
     else:
         response = (f"❌ Unknown command: `{command}`\n\n"
@@ -1209,8 +1192,8 @@ def handle_comment_event(state: dict) -> bool:
                    f"- `{BOT_MENTION} pass-until! YYYY-MM-DD [reason]` - Step away from queue\n"
                    f"- `{BOT_MENTION} claim` - Claim this review for yourself\n"
                    f"- `{BOT_MENTION} release` - Release your assignment\n"
-                   f"- `{BOT_MENTION} assign @username` or `r? @username` - Assign specific reviewer\n"
-                   f"- `r? producers` - Assign next reviewer from queue\n"
+                   f"- `{BOT_MENTION} assign @username` - Assign specific reviewer\n"
+                   f"- `{BOT_MENTION} r? producers` - Assign next reviewer from queue\n"
                    f"- `{BOT_MENTION} label +/-label-name` - Add/remove labels\n"
                    f"- `{BOT_MENTION} sync-members` - Sync queue with members.md\n"
                    f"- `{BOT_MENTION} status` - Show queue status")
