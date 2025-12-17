@@ -762,6 +762,9 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
         # NOT first pass - restore the index so original passer stays "next"
         state["current_index"] = saved_index
 
+    # Unassign the passed reviewer first
+    unassign_reviewer(issue_number, passed_reviewer)
+
     # Assign the substitute to this issue
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     if not assign_reviewer(issue_number, next_reviewer):
