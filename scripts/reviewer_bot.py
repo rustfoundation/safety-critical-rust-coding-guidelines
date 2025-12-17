@@ -30,6 +30,10 @@ Commands (invoke with @guidelines-bot prefix):
   r? @username
     - Shorthand to assign a specific reviewer (Rust-style)
 
+  r? producers
+    - Assign the next reviewer from the round-robin queue
+    - Useful for requesting a reviewer on an already-open issue/PR
+
   @guidelines-bot label +label-name
     - Add a label to the issue/PR
 
@@ -473,6 +477,7 @@ If you need to pass this review:
 
 To assign someone else:
 - `{BOT_MENTION} assign @username` or `r? @username` - Assign a specific reviewer
+- `r? producers` - Request the next reviewer from the queue
 
 Other commands:
 - `{BOT_MENTION} claim` - Claim this review for yourself
@@ -514,6 +519,7 @@ If you need to pass this review:
 
 To assign someone else:
 - `{BOT_MENTION} assign @username` or `r? @username` - Assign a specific reviewer
+- `r? producers` - Request the next reviewer from the queue
 
 Other commands:
 - `{BOT_MENTION} claim` - Claim this review for yourself
@@ -534,15 +540,22 @@ def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
 
     Returns (command, args) or None if no command found.
     
-    Supports both:
+    Supports:
     - @guidelines-bot <command> [args]
-    - r? @username (shorthand for assign)
+    - r? @username (shorthand for assign specific user)
+    - r? producers (shorthand for assign next from queue)
     """
-    # First, check for r? @username pattern (Rust-style reviewer request)
-    r_pattern = r"^r\?\s+@(\S+)"
+    # First, check for r? pattern (Rust-style reviewer request)
+    # Match either "r? producers" or "r? @username"
+    r_pattern = r"^r\?\s+(\S+)"
     r_match = re.search(r_pattern, comment_body, re.MULTILINE)
     if r_match:
-        username = r_match.group(1)
+        target = r_match.group(1)
+        # Check if it's the special "producers" keyword for queue assignment
+        if target.lower() == "producers":
+            return "assign-from-queue", []
+        # Otherwise treat as username assignment
+        username = target.lstrip("@")
         return "assign", [f"@{username}"]
     
     # Look for @guidelines-bot <command> pattern
@@ -941,6 +954,54 @@ def handle_assign_command(state: dict, issue_number: int,
     return f"✅ @{username} has been assigned as reviewer{prev_text}.", True
 
 
+def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[str, bool]:
+    """
+    Handle the assign-from-queue command (r? producers) - assign next from queue.
+
+    This advances the round-robin queue, unlike manual assignment.
+
+    Returns (response_message, success).
+    """
+    # Get current assignees and remove them
+    current_assignees = get_issue_assignees(issue_number)
+    for assignee in current_assignees:
+        unassign_reviewer(issue_number, assignee)
+
+    # Get the issue author to skip them
+    issue_author = os.environ.get("ISSUE_AUTHOR", "")
+    skip_set = {issue_author} if issue_author else set()
+
+    # Get next reviewer from the queue (this advances the queue)
+    next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
+
+    if not next_reviewer:
+        return ("❌ No reviewers available in the queue. "
+                f"Please use `{BOT_MENTION} sync-members` to update the queue."), False
+
+    # Assign the reviewer
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    if not assign_reviewer(issue_number, next_reviewer):
+        return f"❌ Failed to assign @{next_reviewer} as reviewer.", False
+
+    # Record the assignment
+    record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
+
+    if current_assignees:
+        prev_text = f" (previously: @{', @'.join(current_assignees)})"
+    else:
+        prev_text = ""
+
+    # Post the appropriate guidance
+    if is_pr:
+        guidance = get_pr_guidance(next_reviewer, issue_author)
+    else:
+        guidance = get_issue_guidance(next_reviewer, issue_author)
+
+    post_comment(issue_number, guidance)
+
+    return f"✅ @{next_reviewer} (next in queue) has been assigned as reviewer{prev_text}.", True
+
+
 # ==============================================================================
 # Event Handlers
 # ==============================================================================
@@ -1107,6 +1168,11 @@ def handle_comment_event(state: dict) -> bool:
             response, success = handle_assign_command(state, issue_number, username)
             state_changed = success
 
+    elif command == "assign-from-queue":
+        # Handle "r? producers" - assign next from round-robin queue
+        response, success = handle_assign_from_queue_command(state, issue_number)
+        state_changed = success
+
     elif command == "r":
         # Handle "r?" being parsed as command "r" with "?" in args
         # This shouldn't normally happen due to parse_command, but handle it anyway
@@ -1138,6 +1204,7 @@ def handle_comment_event(state: dict) -> bool:
                    f"- `{BOT_MENTION} claim` - Claim this review for yourself\n"
                    f"- `{BOT_MENTION} release` - Release your assignment\n"
                    f"- `{BOT_MENTION} assign @username` or `r? @username` - Assign specific reviewer\n"
+                   f"- `r? producers` - Assign next reviewer from queue\n"
                    f"- `{BOT_MENTION} label +/-label-name` - Add/remove labels\n"
                    f"- `{BOT_MENTION} sync-members` - Sync queue with members.md\n"
                    f"- `{BOT_MENTION} status` - Show queue status")
