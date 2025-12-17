@@ -231,6 +231,11 @@
              safe_shutdown();
          }
 
+         fn main() {
+             let shutdown = Arc::new(AtomicBool::new(true));
+             main_control_loop(shutdown);
+         }
+
    .. compliant_example::
       :id: compl_ex_BoundedLoop1
       :status: draft
