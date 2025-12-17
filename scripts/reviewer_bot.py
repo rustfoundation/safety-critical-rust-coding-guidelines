@@ -273,12 +273,18 @@ def load_state() -> dict:
     content = STATE_FILE.read_text()
     state = yaml.safe_load(content) or {}
 
-    # Ensure all required keys exist
-    state.setdefault("last_updated", None)
-    state.setdefault("current_index", 0)
-    state.setdefault("queue", [])
-    state.setdefault("pass_until", [])
-    state.setdefault("recent_assignments", [])
+    # Ensure all required keys exist AND are not None
+    # (YAML parses empty values as None, not as empty lists)
+    if state.get("last_updated") is None:
+        state["last_updated"] = None  # This one can be None
+    if not isinstance(state.get("current_index"), int):
+        state["current_index"] = 0
+    if not isinstance(state.get("queue"), list):
+        state["queue"] = []
+    if not isinstance(state.get("pass_until"), list):
+        state["pass_until"] = []
+    if not isinstance(state.get("recent_assignments"), list):
+        state["recent_assignments"] = []
 
     return state
 

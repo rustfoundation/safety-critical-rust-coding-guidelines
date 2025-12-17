@@ -26,6 +26,12 @@ on:
           - sync-members
           - show-state
 
+# Ensure only one instance runs at a time per issue/PR
+# This prevents race conditions when both 'opened' and 'labeled' fire together
+concurrency:
+  group: reviewer-bot-${{ github.event.issue.number || github.event.pull_request.number || 'manual' }}
+  cancel-in-progress: false
+
 permissions:
   issues: write
   pull-requests: write
