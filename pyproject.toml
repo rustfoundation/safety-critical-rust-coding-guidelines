@@ -12,6 +12,8 @@ dependencies = [
     "sphinx-autobuild>=2024.10.3",
     "sphinx-needs>=5.1.0",
     "sphinx-rtd-theme>=3.0.2",
+    "requests>=2.31.0",
+    "pyyaml>=6.0.1",
 ]
 
 [tool.uv.workspace]
@@ -46,4 +48,3 @@ allow-dict-calls-with-keyword-arguments = true
 dev = [
     "ruff>=0.12.3",
 ]
-
