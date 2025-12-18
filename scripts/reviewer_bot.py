@@ -6,44 +6,41 @@ This bot manages round-robin assignment of reviewers for coding guideline
 issues and PRs. It supports commands for passing reviews, vacations, and
 label management.
 
-All commands must be prefixed with @guidelines-bot:
+All commands must be prefixed with @guidelines-bot /<command>:
 
-  @guidelines-bot pass! [reason]
+  @guidelines-bot /pass [reason]
     - Skip the assigned reviewer for this issue/PR and assign the next person
     - The skipped reviewer stays in queue position for future assignments
 
-  @guidelines-bot pass-until! YYYY-MM-DD [reason]
+  @guidelines-bot /away YYYY-MM-DD [reason]
     - Remove yourself from the queue until the specified date
     - Automatically assigns the next available reviewer
 
-  @guidelines-bot claim
+  @guidelines-bot /claim
     - Assign yourself as the reviewer for this issue/PR
     - Removes any existing reviewer assignment
 
-  @guidelines-bot release
+  @guidelines-bot /release [reason]
     - Release your assignment from this issue/PR
-    - The next person in the queue will be assigned
+    - Does NOT auto-assign the next reviewer (use /pass for that)
 
-  @guidelines-bot assign @username
-    - Assign a specific person as the reviewer
+  @guidelines-bot /r? @username
+    - Assign a specific reviewer
 
-  @guidelines-bot r? @username
-    - Shorthand to assign a specific reviewer
-
-  @guidelines-bot r? producers
+  @guidelines-bot /r? producers
     - Assign the next reviewer from the round-robin queue
     - Useful for requesting a reviewer on an already-open issue/PR
 
-  @guidelines-bot label +label-name
+  @guidelines-bot /label +label-name
     - Add a label to the issue/PR
 
-  @guidelines-bot label -label-name
+  @guidelines-bot /label -label-name
     - Remove a label from the issue/PR
 
-  @guidelines-bot sync-members
+  @guidelines-bot /sync-members
     - Manually trigger sync of the queue with members.md
 
-  @guidelines-bot queue-status
+  @guidelines-bot /status
     - Show current queue status and who's next up
 """
 
@@ -75,6 +72,27 @@ STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
 # Members file is in the consortium repo, not this repo
 MEMBERS_URL = "https://raw.githubusercontent.com/rustfoundation/safety-critical-rust-consortium/main/subcommittee/coding-guidelines/members.md"
 MAX_RECENT_ASSIGNMENTS = 20
+
+# Command definitions - single source of truth for command names and descriptions
+# Format: "command": "description"
+COMMANDS = {
+    "pass": "Pass this review to next in queue",
+    "away": "Step away from queue until date (YYYY-MM-DD)",
+    "release": "Release your assignment (no auto-reassign)",
+    "claim": "Claim this review for yourself",
+    "r?": "Assign a reviewer (@username or 'producers')",
+    "label": "Add/remove labels (+label-name or -label-name)",
+    "sync-members": "Sync queue with members.md",
+    "status": "Show queue status",
+}
+
+
+def get_commands_help() -> str:
+    """Generate help text from COMMANDS dict."""
+    lines = []
+    for cmd, desc in COMMANDS.items():
+        lines.append(f"- `{BOT_MENTION} /{cmd}` - {desc}")
+    return "\n".join(lines)
 
 
 # ==============================================================================
@@ -118,6 +136,14 @@ def post_comment(issue_number: int, body: str) -> bool:
     """Post a comment on an issue or PR."""
     result = github_api("POST", f"issues/{issue_number}/comments", {"body": body})
     return result is not None
+
+
+def get_repo_labels() -> set[str]:
+    """Get all labels that exist in the repository."""
+    result = github_api("GET", "labels?per_page=100")
+    if result and isinstance(result, list):
+        return {label["name"] for label in result}
+    return set()
 
 
 def add_label(issue_number: int, label: str) -> bool:
@@ -563,19 +589,19 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
 ## Bot Commands
 
 If you need to pass this review:
-- `{BOT_MENTION} pass! [reason]` - Pass just this issue to the next reviewer
-- `{BOT_MENTION} pass-until! YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} release` - Release your assignment (next in queue will be assigned)
+- `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
+- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
+- `{BOT_MENTION} /release [reason]` - Release your assignment (leaves issue unassigned)
 
 To assign someone else:
-- `{BOT_MENTION} assign @username` - Assign a specific reviewer
-- `{BOT_MENTION} r? producers` - Request the next reviewer from the queue
+- `{BOT_MENTION} /r? @username` - Assign a specific reviewer
+- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue
 
 Other commands:
-- `{BOT_MENTION} claim` - Claim this review for yourself
-- `{BOT_MENTION} label +label-name` - Add a label
-- `{BOT_MENTION} label -label-name` - Remove a label
-- `{BOT_MENTION} queue-status` - Show current queue status
+- `{BOT_MENTION} /claim` - Claim this review for yourself
+- `{BOT_MENTION} /label +label-name` - Add a label
+- `{BOT_MENTION} /label -label-name` - Remove a label
+- `{BOT_MENTION} /status` - Show current queue status
 """
 
 
@@ -605,19 +631,19 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
 ## Bot Commands
 
 If you need to pass this review:
-- `{BOT_MENTION} pass! [reason]` - Pass just this PR to the next reviewer
-- `{BOT_MENTION} pass-until! YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} release` - Release your assignment (next in queue will be assigned)
+- `{BOT_MENTION} /pass [reason]` - Pass just this PR to the next reviewer
+- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
+- `{BOT_MENTION} /release [reason]` - Release your assignment (leaves PR unassigned)
 
 To assign someone else:
-- `{BOT_MENTION} assign @username` - Assign a specific reviewer
-- `{BOT_MENTION} r? producers` - Request the next reviewer from the queue
+- `{BOT_MENTION} /r? @username` - Assign a specific reviewer
+- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue
 
 Other commands:
-- `{BOT_MENTION} claim` - Claim this review for yourself
-- `{BOT_MENTION} label +label-name` - Add a label
-- `{BOT_MENTION} label -label-name` - Remove a label
-- `{BOT_MENTION} queue-status` - Show current queue status
+- `{BOT_MENTION} /claim` - Claim this review for yourself
+- `{BOT_MENTION} /label +label-name` - Add a label
+- `{BOT_MENTION} /label -label-name` - Remove a label
+- `{BOT_MENTION} /status` - Show current queue status
 """
 
 
@@ -632,29 +658,52 @@ def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
 
     Returns (command, args) or None if no command found.
     
-    All commands must be prefixed with @guidelines-bot:
-    - @guidelines-bot <command> [args]
-    - @guidelines-bot r? @username (assign specific user)
-    - @guidelines-bot r? producers (assign next from queue)
+    Special return values:
+    - ("_malformed_known", [attempted_cmd]) - Missing / prefix on known command
+    - ("_malformed_unknown", [attempted_word]) - Missing / prefix on unknown word
+    
+    All commands must be prefixed with @guidelines-bot /<command>:
+    - @guidelines-bot /pass [reason]
+    - @guidelines-bot /r? @username (assign specific user)
+    - @guidelines-bot /r? producers (assign next from queue)
     """
-    # Look for @guidelines-bot <command> pattern
-    pattern = rf"{re.escape(BOT_MENTION)}\s+(\S+)(.*)$"
+    # Look for @guidelines-bot /<command> pattern (correct syntax)
+    pattern = rf"{re.escape(BOT_MENTION)}\s+/(\S+)(.*)$"
     match = re.search(pattern, comment_body, re.IGNORECASE | re.MULTILINE)
 
     if not match:
+        # Check for malformed command (missing / prefix)
+        malformed_pattern = rf"{re.escape(BOT_MENTION)}\s+(\S+)"
+        malformed_match = re.search(malformed_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
+        
+        if malformed_match:
+            attempted = malformed_match.group(1).lower()
+            # Check if it looks like a command (not just random text after mention)
+            # Ignore if it starts with common conversational words
+            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could", 
+                            "would", "should", "please", "thanks", "thank", "hi", "hello", "hey"}
+            if attempted in conversational:
+                return None
+            
+            # Check if it's a known command without the /
+            if attempted in COMMANDS or attempted in {"r?-user", "assign-from-queue"}:
+                return "_malformed_known", [attempted]
+            else:
+                return "_malformed_unknown", [attempted]
+        
         return None
 
-    command = match.group(1).lower().rstrip("!")
+    command = match.group(1).lower()
     args_str = match.group(2).strip()
 
-    # Special handling for "@guidelines-bot r? <target>" syntax
+    # Special handling for "/r? <target>" syntax
     if command == "r?":
         target = args_str.split()[0] if args_str else ""
         if target.lower() == "producers":
             return "assign-from-queue", []
         elif target:
             username = target.lstrip("@")
-            return "assign", [f"@{username}"]
+            return "r?-user", [f"@{username}"]
         else:
             # No target specified, return as-is to show error
             return "r?", []
@@ -942,6 +991,9 @@ def handle_label_command(issue_number: int, label_string: str) -> tuple[str, boo
     if not matches:
         return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
     
+    # Get existing repo labels to validate additions
+    existing_labels = get_repo_labels()
+    
     results = []
     all_success = True
     
@@ -951,7 +1003,11 @@ def handle_label_command(issue_number: int, label_string: str) -> tuple[str, boo
             continue
             
         if action == "+":
-            if add_label(issue_number, label):
+            # Check if label exists in repo before adding
+            if label not in existing_labels:
+                results.append(f"⚠️ Label `{label}` does not exist in this repository")
+                all_success = False
+            elif add_label(issue_number, label):
                 results.append(f"✅ Added label `{label}`")
             else:
                 results.append(f"❌ Failed to add label `{label}`")
@@ -991,9 +1047,16 @@ def handle_status_command(state: dict) -> tuple[str, bool]:
     Returns (response_message, success).
     """
     queue_size = len(state["queue"])
+    
+    # Build link to state issue
+    repo_owner = os.environ.get("REPO_OWNER", "")
+    repo_name = os.environ.get("REPO_NAME", "")
+    state_issue_link = ""
+    if repo_owner and repo_name and STATE_ISSUE_NUMBER:
+        state_issue_link = f"\n\n[View full state details](https://github.com/{repo_owner}/{repo_name}/issues/{STATE_ISSUE_NUMBER})"
 
     if queue_size == 0:
-        return "📊 **Queue Status**: No reviewers in queue.", True
+        return f"📊 **Queue Status**: No reviewers in queue.{state_issue_link}", True
 
     current_index = state["current_index"]
     next_up = state["queue"][current_index]["github"]
@@ -1020,7 +1083,7 @@ def handle_status_command(state: dict) -> tuple[str, bool]:
     return (f"📊 **Queue Status**\n\n"
             f"**Next up:** @{next_up}\n\n"
             f"**Queue ({queue_size} reviewers):**\n```\n{queue_text}\n```"
-            f"{away_text}"), True
+            f"{away_text}{state_issue_link}"), True
 
 
 def handle_claim_command(state: dict, issue_number: int,
@@ -1046,7 +1109,7 @@ def handle_claim_command(state: dict, issue_number: int,
 
     if is_away:
         return (f"❌ @{comment_author} is currently marked as away. "
-                f"Please use `{BOT_MENTION} pass-until!` to update your return date first, "
+                f"Please use `{BOT_MENTION} /away YYYY-MM-DD` to update your return date first, "
                 f"or wait until your scheduled return."), False
 
     # Get current assignees
@@ -1075,9 +1138,12 @@ def handle_claim_command(state: dict, issue_number: int,
 
 
 def handle_release_command(state: dict, issue_number: int,
-                          comment_author: str) -> tuple[str, bool]:
+                          comment_author: str, reason: str | None = None) -> tuple[str, bool]:
     """
-    Handle the release command - release your assignment.
+    Handle the release! command - release your assignment without auto-reassigning.
+
+    Unlike pass!, this does NOT automatically assign the next reviewer.
+    Use this when you want to unassign yourself but leave it open for someone to claim.
 
     Returns (response_message, success).
     """
@@ -1109,36 +1175,23 @@ def handle_release_command(state: dict, issue_number: int,
     # Remove the assignment (best effort)
     unassign_reviewer(issue_number, comment_author)
 
-    # Get the issue author to skip them when assigning next reviewer
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
-    skip_set = {issue_author, comment_author} if issue_author else {comment_author}
+    # Clear the current reviewer in our state
+    if "active_reviews" in state and issue_key in state["active_reviews"]:
+        if isinstance(state["active_reviews"][issue_key], dict):
+            state["active_reviews"][issue_key]["current_reviewer"] = None
 
-    # Assign the next person in the queue
-    next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-
-    if next_reviewer:
-        is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-        assign_reviewer(issue_number, next_reviewer)
-        set_current_reviewer(state, issue_number, next_reviewer)
-        record_assignment(state, next_reviewer, issue_number,
-                        "pr" if is_pr else "issue")
-        return (f"✅ @{comment_author} has released this review.\n\n"
-                f"@{next_reviewer} is now assigned as the reviewer."), True
-    else:
-        # Clear the current reviewer since no one is assigned
-        if "active_reviews" in state and issue_key in state["active_reviews"]:
-            if isinstance(state["active_reviews"][issue_key], dict):
-                state["active_reviews"][issue_key]["current_reviewer"] = None
-        return (f"✅ @{comment_author} has released this review.\n\n"
-                f"⚠️ No other reviewers available in the queue."), True
+    reason_text = f" Reason: {reason}" if reason else ""
+    return (f"✅ @{comment_author} has released this review.{reason_text}\n\n"
+            f"_This issue/PR is now unassigned. Use `{BOT_MENTION} /r? producers` to assign "
+            f"the next reviewer from the queue, or `{BOT_MENTION} /claim` to claim it._"), True
 
 
 def handle_assign_command(state: dict, issue_number: int,
                          username: str) -> tuple[str, bool]:
     """
-    Handle the assign command - assign a specific person as reviewer.
+    Handle assigning a specific person as reviewer.
 
-    Also handles r? @username syntax.
+    Used by /r? @username command.
 
     Returns (response_message, success).
     """
@@ -1146,8 +1199,7 @@ def handle_assign_command(state: dict, issue_number: int,
     username = username.lstrip("@")
 
     if not username:
-        return (f"❌ Missing username. Usage: `{BOT_MENTION} assign @username` "
-                f"or `r? @username`"), False
+        return (f"❌ Missing username. Usage: `{BOT_MENTION} /r? @username`"), False
 
     # Check if user is in the queue (is a Producer)
     is_producer = any(
@@ -1216,7 +1268,7 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 
     if not next_reviewer:
         return ("❌ No reviewers available in the queue. "
-                f"Please use `{BOT_MENTION} sync-members` to update the queue."), False
+                f"Please use `{BOT_MENTION} /sync-members` to update the queue."), False
 
     # Assign the reviewer (best effort - may fail if no permissions)
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
@@ -1318,7 +1370,7 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
     if not reviewer:
         post_comment(issue_number,
                     f"⚠️ No reviewers available in the queue. "
-                    f"Please use `{BOT_MENTION} sync-members` to update the queue.")
+                    f"Please use `{BOT_MENTION} /sync-members` to update the queue.")
         return False
 
     # Assign the reviewer (best effort - may fail if no permissions)
@@ -1390,7 +1442,7 @@ def handle_labeled_event(state: dict) -> bool:
     if not reviewer:
         post_comment(issue_number,
                     f"⚠️ No reviewers available in the queue. "
-                    f"Please use `{BOT_MENTION} sync-members` to update the queue.")
+                    f"Please use `{BOT_MENTION} /sync-members` to update the queue.")
         return False
 
     # Assign the reviewer (best effort - may fail if no permissions)
@@ -1470,9 +1522,9 @@ def handle_comment_event(state: dict) -> bool:
         response, success = handle_pass_command(state, issue_number, comment_author, reason)
         state_changed = success
 
-    elif command == "pass-until":
+    elif command == "away":
         if not args:
-            response = (f"❌ Missing date. Usage: `{BOT_MENTION} pass-until! YYYY-MM-DD [reason]`")
+            response = (f"❌ Missing date. Usage: `{BOT_MENTION} /away YYYY-MM-DD [reason]`")
             success = False
         else:
             return_date = args[0]
@@ -1484,8 +1536,8 @@ def handle_comment_event(state: dict) -> bool:
 
     elif command == "label":
         if not args:
-            response = (f"❌ Missing label. Usage: `{BOT_MENTION} label +label-name` or "
-                       f"`{BOT_MENTION} label -label-name`")
+            response = (f"❌ Missing label. Usage: `{BOT_MENTION} /label +label-name` or "
+                       f"`{BOT_MENTION} /label -label-name`")
             success = False
         else:
             # Rejoin all args to handle labels with spaces
@@ -1497,7 +1549,7 @@ def handle_comment_event(state: dict) -> bool:
         response, success = handle_sync_members_command(state)
         state_changed = success
 
-    elif command == "queue-status":
+    elif command == "status":
         response, success = handle_status_command(state)
 
     elif command == "claim":
@@ -1505,43 +1557,46 @@ def handle_comment_event(state: dict) -> bool:
         state_changed = success
 
     elif command == "release":
-        response, success = handle_release_command(state, issue_number, comment_author)
+        # Args are the optional reason
+        reason = " ".join(args) if args else None
+        response, success = handle_release_command(state, issue_number, comment_author, reason)
         state_changed = success
 
-    elif command == "assign":
-        if not args:
-            response = (f"❌ Missing username. Usage: `{BOT_MENTION} assign @username` "
-                       f"or `r? @username`")
-            success = False
-        else:
-            username = args[0]
-            response, success = handle_assign_command(state, issue_number, username)
-            state_changed = success
+    elif command == "r?-user":
+        # Handle "/r? @username" - assign specific user
+        username = args[0] if args else ""
+        response, success = handle_assign_command(state, issue_number, username)
+        state_changed = success
 
     elif command == "assign-from-queue":
-        # Handle "r? producers" - assign next from round-robin queue
+        # Handle "/r? producers" - assign next from round-robin queue
         response, success = handle_assign_from_queue_command(state, issue_number)
         state_changed = success
 
     elif command == "r?":
-        # Handle "r?" with no target - show usage error
+        # Handle "/r?" with no target - show usage error
         response = (f"❌ Missing target. Usage:\n"
-                   f"- `{BOT_MENTION} r? @username` - Assign a specific reviewer\n"
-                   f"- `{BOT_MENTION} r? producers` - Assign next reviewer from queue")
+                   f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
+                   f"- `{BOT_MENTION} /r? producers` - Assign next reviewer from queue")
+        success = False
+
+    elif command == "_malformed_known":
+        # User typed a known command but forgot the / prefix
+        attempted = args[0] if args else "command"
+        response = (f"⚠️ Did you mean `{BOT_MENTION} /{attempted}`?\n\n"
+                   f"Commands require a `/` prefix.")
+        success = False
+
+    elif command == "_malformed_unknown":
+        # User typed something after @guidelines-bot but it's not a known command
+        attempted = args[0] if args else ""
+        response = (f"⚠️ Unknown command `{attempted}`. Commands require a `/` prefix.\n\n"
+                   f"Try `{BOT_MENTION} /status` to see available commands.")
         success = False
 
     else:
-        response = (f"❌ Unknown command: `{command}`\n\n"
-                   f"Available commands:\n"
-                   f"- `{BOT_MENTION} pass! [reason]` - Pass this review to next in queue\n"
-                   f"- `{BOT_MENTION} pass-until! YYYY-MM-DD [reason]` - Step away from queue\n"
-                   f"- `{BOT_MENTION} claim` - Claim this review for yourself\n"
-                   f"- `{BOT_MENTION} release` - Release your assignment\n"
-                   f"- `{BOT_MENTION} assign @username` - Assign specific reviewer\n"
-                   f"- `{BOT_MENTION} r? producers` - Assign next reviewer from queue\n"
-                   f"- `{BOT_MENTION} label +/-label-name` - Add/remove labels\n"
-                   f"- `{BOT_MENTION} sync-members` - Sync queue with members.md\n"
-                   f"- `{BOT_MENTION} queue-status` - Show queue status")
+        response = (f"❌ Unknown command: `/{command}`\n\n"
+                   f"Available commands:\n{get_commands_help()}")
         success = False
 
     # React to the command comment
