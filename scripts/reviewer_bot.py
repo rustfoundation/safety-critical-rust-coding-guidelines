@@ -40,8 +40,11 @@ All commands must be prefixed with @guidelines-bot /<command>:
   @guidelines-bot /sync-members
     - Manually trigger sync of the queue with members.md
 
-  @guidelines-bot /status
+  @guidelines-bot /queue
     - Show current queue status and who's next up
+
+  @guidelines-bot /commands
+    - Show all available commands
 """
 
 import json
@@ -73,6 +76,10 @@ STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
 MEMBERS_URL = "https://raw.githubusercontent.com/rustfoundation/safety-critical-rust-consortium/main/subcommittee/coding-guidelines/members.md"
 MAX_RECENT_ASSIGNMENTS = 20
 
+# Review deadline configuration
+REVIEW_DEADLINE_DAYS = 14  # Days before first warning
+TRANSITION_PERIOD_DAYS = 14  # Days after warning before transition to Observer
+
 # Command definitions - single source of truth for command names and descriptions
 # Format: "command": "description"
 COMMANDS = {
@@ -83,7 +90,8 @@ COMMANDS = {
     "r?": "Assign a reviewer (@username or 'producers')",
     "label": "Add/remove labels (+label-name or -label-name)",
     "sync-members": "Sync queue with members.md",
-    "status": "Show queue status",
+    "queue": "Show reviewer queue and who's next",
+    "commands": "Show all available commands",
 }
 
 
@@ -154,7 +162,7 @@ def add_label(issue_number: int, label: str) -> bool:
 
 def remove_label(issue_number: int, label: str) -> bool:
     """Remove a label from an issue or PR."""
-    _result = github_api("DELETE", f"issues/{issue_number}/labels/{label}")
+    github_api("DELETE", f"issues/{issue_number}/labels/{label}")
     # 404 is ok - label might not exist
     return True
 
@@ -601,7 +609,8 @@ Other commands:
 - `{BOT_MENTION} /claim` - Claim this review for yourself
 - `{BOT_MENTION} /label +label-name` - Add a label
 - `{BOT_MENTION} /label -label-name` - Remove a label
-- `{BOT_MENTION} /status` - Show current queue status
+- `{BOT_MENTION} /queue` - Show reviewer queue
+- `{BOT_MENTION} /commands` - Show all available commands
 """
 
 
@@ -643,7 +652,8 @@ Other commands:
 - `{BOT_MENTION} /claim` - Claim this review for yourself
 - `{BOT_MENTION} /label +label-name` - Add a label
 - `{BOT_MENTION} /label -label-name` - Remove a label
-- `{BOT_MENTION} /status` - Show current queue status
+- `{BOT_MENTION} /queue` - Show reviewer queue
+- `{BOT_MENTION} /commands` - Show all available commands
 """
 
 
@@ -1040,9 +1050,9 @@ def handle_sync_members_command(state: dict) -> tuple[str, bool]:
         return "✅ Queue is already in sync with members.md.", True
 
 
-def handle_status_command(state: dict) -> tuple[str, bool]:
+def handle_queue_command(state: dict) -> tuple[str, bool]:
     """
-    Handle the status command - show current queue status.
+    Handle the queue command - show current queue status.
 
     Returns (response_message, success).
     """
@@ -1084,6 +1094,28 @@ def handle_status_command(state: dict) -> tuple[str, bool]:
             f"**Next up:** @{next_up}\n\n"
             f"**Queue ({queue_size} reviewers):**\n```\n{queue_text}\n```"
             f"{away_text}{state_issue_link}"), True
+
+
+def handle_commands_command() -> tuple[str, bool]:
+    """
+    Handle the status command - show all available commands.
+
+    Returns (response_message, success).
+    """
+    return (f"ℹ️ **Available Commands**\n\n"
+            f"**Pass or step away:**\n"
+            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue\n"
+            f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n"
+            f"- `{BOT_MENTION} /release [reason]` - Release your assignment (leaves issue/PR unassigned)\n\n"
+            f"**Assign reviewers:**\n"
+            f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
+            f"- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n"
+            f"- `{BOT_MENTION} /claim` - Claim this review for yourself\n\n"
+            f"**Other:**\n"
+            f"- `{BOT_MENTION} /label +label-name` - Add a label\n"
+            f"- `{BOT_MENTION} /label -label-name` - Remove a label\n"
+            f"- `{BOT_MENTION} /queue` - Show current queue status\n"
+            f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md"), True
 
 
 def handle_claim_command(state: dict, issue_number: int,
@@ -1304,17 +1336,216 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 def set_current_reviewer(state: dict, issue_number: int, reviewer: str) -> None:
     """Track the designated reviewer for an issue/PR in our state."""
     issue_key = str(issue_number)
+    now = datetime.now(timezone.utc).isoformat()
+    
     if "active_reviews" not in state:
         state["active_reviews"] = {}
     if issue_key not in state["active_reviews"]:
-        state["active_reviews"][issue_key] = {"skipped": [], "current_reviewer": None}
+        state["active_reviews"][issue_key] = {
+            "skipped": [],
+            "current_reviewer": None,
+            "assigned_at": None,
+            "last_reviewer_activity": None,
+            "transition_warning_sent": None,
+        }
     elif isinstance(state["active_reviews"][issue_key], list):
         # Migrate old format
         state["active_reviews"][issue_key] = {
             "skipped": state["active_reviews"][issue_key],
-            "current_reviewer": None
+            "current_reviewer": None,
+            "assigned_at": None,
+            "last_reviewer_activity": None,
+            "transition_warning_sent": None,
         }
-    state["active_reviews"][issue_key]["current_reviewer"] = reviewer
+    
+    # Ensure new fields exist (migration for existing entries)
+    review_data = state["active_reviews"][issue_key]
+    if "assigned_at" not in review_data:
+        review_data["assigned_at"] = None
+    if "last_reviewer_activity" not in review_data:
+        review_data["last_reviewer_activity"] = None
+    if "transition_warning_sent" not in review_data:
+        review_data["transition_warning_sent"] = None
+    
+    # Set the reviewer and timestamps
+    review_data["current_reviewer"] = reviewer
+    review_data["assigned_at"] = now
+    review_data["last_reviewer_activity"] = now
+    review_data["transition_warning_sent"] = None  # Clear any previous warning
+
+
+def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
+    """
+    Update the last activity timestamp when the current reviewer comments.
+    
+    Returns True if activity was recorded (reviewer matched), False otherwise.
+    """
+    issue_key = str(issue_number)
+    
+    if "active_reviews" not in state or issue_key not in state["active_reviews"]:
+        return False
+    
+    review_data = state["active_reviews"][issue_key]
+    if not isinstance(review_data, dict):
+        return False
+    
+    current_reviewer = review_data.get("current_reviewer")
+    if not current_reviewer or current_reviewer.lower() != reviewer.lower():
+        return False
+    
+    # Update activity timestamp and clear any transition warning
+    now = datetime.now(timezone.utc).isoformat()
+    review_data["last_reviewer_activity"] = now
+    review_data["transition_warning_sent"] = None
+    
+    print(f"Updated reviewer activity for #{issue_number} by @{reviewer}")
+    return True
+
+
+def check_overdue_reviews(state: dict) -> list[dict]:
+    """
+    Check all active reviews for overdue ones.
+    
+    Returns a list of overdue reviews with their status:
+    [
+        {
+            "issue_number": 123,
+            "reviewer": "username",
+            "days_overdue": 5,
+            "needs_warning": True,  # First warning needed
+            "needs_transition": False,  # 28 days passed, transition needed
+        },
+        ...
+    ]
+    """
+    if "active_reviews" not in state:
+        return []
+    
+    now = datetime.now(timezone.utc)
+    overdue = []
+    
+    for issue_key, review_data in state["active_reviews"].items():
+        if not isinstance(review_data, dict):
+            continue
+        
+        current_reviewer = review_data.get("current_reviewer")
+        if not current_reviewer:
+            continue
+        
+        last_activity = review_data.get("last_reviewer_activity")
+        if not last_activity:
+            # No activity recorded, use assigned_at
+            last_activity = review_data.get("assigned_at")
+        if not last_activity:
+            continue
+        
+        # Parse the timestamp
+        try:
+            last_activity_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        
+        days_since_activity = (now - last_activity_dt).days
+        
+        if days_since_activity < REVIEW_DEADLINE_DAYS:
+            continue  # Not overdue yet
+        
+        # Check if we've already sent a warning
+        transition_warning_sent = review_data.get("transition_warning_sent")
+        
+        if transition_warning_sent:
+            # Warning already sent - check if transition period has passed
+            try:
+                warning_dt = datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
+                days_since_warning = (now - warning_dt).days
+                
+                if days_since_warning >= TRANSITION_PERIOD_DAYS:
+                    overdue.append({
+                        "issue_number": int(issue_key),
+                        "reviewer": current_reviewer,
+                        "days_overdue": days_since_activity,
+                        "days_since_warning": days_since_warning,
+                        "needs_warning": False,
+                        "needs_transition": True,
+                    })
+            except (ValueError, AttributeError):
+                pass
+        else:
+            # First warning needed
+            overdue.append({
+                "issue_number": int(issue_key),
+                "reviewer": current_reviewer,
+                "days_overdue": days_since_activity - REVIEW_DEADLINE_DAYS,
+                "days_since_warning": 0,
+                "needs_warning": True,
+                "needs_transition": False,
+            })
+    
+    return overdue
+
+
+def handle_overdue_review_warning(state: dict, issue_number: int, reviewer: str) -> bool:
+    """
+    Post a warning comment and record that we've warned the reviewer.
+    
+    Returns True if warning was posted, False otherwise.
+    """
+    issue_key = str(issue_number)
+    
+    if "active_reviews" not in state or issue_key not in state["active_reviews"]:
+        return False
+    
+    review_data = state["active_reviews"][issue_key]
+    if not isinstance(review_data, dict):
+        return False
+    
+    # Post warning comment
+    warning_message = f"""⚠️ **Review Reminder**
+
+Hey @{reviewer}, it's been more than {REVIEW_DEADLINE_DAYS} days since you were assigned to review this.
+
+**Please take one of the following actions:**
+
+1. **Begin your review** - Post a comment with your feedback
+2. **Pass the review** - Use `{BOT_MENTION} /pass [reason]` to assign the next reviewer
+3. **Step away temporarily** - Use `{BOT_MENTION} /away YYYY-MM-DD [reason]` if you need time off
+
+If no action is taken within {TRANSITION_PERIOD_DAYS} days, you may be transitioned from Producer to Observer status per our [contribution guidelines](CONTRIBUTING.md#review-deadlines).
+
+_Life happens! If you're dealing with something, just let us know._"""
+    
+    post_comment(issue_number, warning_message)
+    
+    # Record that we've sent the warning
+    now = datetime.now(timezone.utc).isoformat()
+    review_data["transition_warning_sent"] = now
+    
+    print(f"Posted overdue warning for #{issue_number} to @{reviewer}")
+    return True
+
+
+def handle_transition_notice(state: dict, issue_number: int, reviewer: str) -> bool:
+    """
+    Post a notice that the transition period has ended.
+    
+    This does NOT automatically change their status - that requires manual intervention.
+    Returns True if notice was posted, False otherwise.
+    """
+    # Post transition notice
+    notice_message = f"""🔔 **Transition Period Ended**
+
+@{reviewer}, the {TRANSITION_PERIOD_DAYS}-day transition period has passed without activity on this review.
+
+Per our [contribution guidelines](CONTRIBUTING.md#review-deadlines), this may result in a transition from Producer to Observer status.
+
+**The review will now be reassigned to the next person in the queue.**
+
+_If you believe this is in error or have extenuating circumstances, please reach out to the subcommittee._"""
+    
+    post_comment(issue_number, notice_message)
+    
+    print(f"Posted transition notice for #{issue_number} to @{reviewer}")
+    return True
 
 
 def handle_issue_or_pr_opened(state: dict) -> bool:
@@ -1492,7 +1723,7 @@ def handle_closed_event(state: dict) -> bool:
 
 def handle_comment_event(state: dict) -> bool:
     """
-    Handle a comment event - check for bot commands.
+    Handle a comment event - check for bot commands and track reviewer activity.
 
     Returns True if we took action, False otherwise.
     """
@@ -1504,10 +1735,15 @@ def handle_comment_event(state: dict) -> bool:
     if not comment_body or not issue_number:
         return False
 
+    # Check if comment author is the current reviewer - if so, update their activity
+    # This resets the 14-day deadline clock
+    activity_updated = update_reviewer_activity(state, issue_number, comment_author)
+    
     # Parse for bot command
     parsed = parse_command(comment_body)
     if not parsed:
-        return False
+        # No bot command, but we may have updated activity
+        return activity_updated
 
     command, args = parsed
     print(f"Parsed command: {command}, args: {args}")
@@ -1549,8 +1785,11 @@ def handle_comment_event(state: dict) -> bool:
         response, success = handle_sync_members_command(state)
         state_changed = success
 
-    elif command == "status":
-        response, success = handle_status_command(state)
+    elif command == "queue":
+        response, success = handle_queue_command(state)
+
+    elif command == "commands":
+        response, success = handle_commands_command()
 
     elif command == "claim":
         response, success = handle_claim_command(state, issue_number, comment_author)
@@ -1591,7 +1830,7 @@ def handle_comment_event(state: dict) -> bool:
         # User typed something after @guidelines-bot but it's not a known command
         attempted = args[0] if args else ""
         response = (f"⚠️ Unknown command `{attempted}`. Commands require a `/` prefix.\n\n"
-                   f"Try `{BOT_MENTION} /status` to see available commands.")
+                   f"Try `{BOT_MENTION} /commands` to see available commands.")
         success = False
 
     else:
@@ -1626,7 +1865,93 @@ def handle_manual_dispatch(state: dict) -> bool:
         print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
         return False
 
+    elif action == "check-overdue":
+        # Manually trigger the overdue review check
+        return handle_scheduled_check(state)
+
     return False
+
+
+def handle_scheduled_check(state: dict) -> bool:
+    """
+    Handle the scheduled (nightly) check for overdue reviews.
+    
+    This function:
+    1. Checks all active reviews for overdue ones
+    2. Posts warnings for reviews that are 14+ days overdue
+    3. Posts transition notices and reassigns for 28+ days overdue
+    
+    Returns True if any action was taken, False otherwise.
+    """
+    print("Running scheduled check for overdue reviews...")
+    
+    overdue_reviews = check_overdue_reviews(state)
+    
+    if not overdue_reviews:
+        print("No overdue reviews found.")
+        return False
+    
+    print(f"Found {len(overdue_reviews)} overdue review(s)")
+    
+    state_changed = False
+    
+    for review in overdue_reviews:
+        issue_number = review["issue_number"]
+        reviewer = review["reviewer"]
+        
+        if review["needs_warning"]:
+            # First warning - 14 days overdue
+            print(f"Sending warning for #{issue_number} to @{reviewer} "
+                  f"({review['days_overdue']} days overdue)")
+            if handle_overdue_review_warning(state, issue_number, reviewer):
+                state_changed = True
+        
+        elif review["needs_transition"]:
+            # Transition period ended - 28 days total
+            print(f"Transition period ended for #{issue_number}, @{reviewer} "
+                  f"({review['days_since_warning']} days since warning)")
+            
+            # Post the transition notice
+            handle_transition_notice(state, issue_number, reviewer)
+            
+            # Reassign to next in queue
+            issue_key = str(issue_number)
+            review_data = state["active_reviews"].get(issue_key, {})
+            skipped = review_data.get("skipped", [])
+            
+            # Get issue author to skip
+            # Note: We don't have easy access to issue author here, so we'll skip the current reviewer
+            skip_set = set(skipped) | {reviewer}
+            
+            next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
+            
+            if next_reviewer:
+                # Unassign old reviewer
+                unassign_reviewer(issue_number, reviewer)
+                
+                # Assign new reviewer
+                assign_reviewer(issue_number, next_reviewer)
+                set_current_reviewer(state, issue_number, next_reviewer)
+                
+                # Track the skip
+                if issue_key in state["active_reviews"]:
+                    if reviewer not in state["active_reviews"][issue_key].get("skipped", []):
+                        state["active_reviews"][issue_key]["skipped"].append(reviewer)
+                
+                # Post assignment comment (assume issue since we don't track type here)
+                guidance = get_issue_guidance(next_reviewer, "the contributor")
+                post_comment(issue_number, guidance)
+                
+                # Record assignment
+                record_assignment(state, next_reviewer, issue_number, "issue")
+                
+                print(f"Reassigned #{issue_number} from @{reviewer} to @{next_reviewer}")
+            else:
+                print(f"No available reviewers to reassign #{issue_number}")
+            
+            state_changed = True
+    
+    return state_changed
 
 
 # ==============================================================================
@@ -1679,6 +2004,10 @@ def main():
 
     elif event_name == "workflow_dispatch":
         state_changed = handle_manual_dispatch(state)
+
+    elif event_name == "schedule":
+        # Nightly check for overdue reviews
+        state_changed = handle_scheduled_check(state)
 
     # Save state if changed (or if we synced members/pass-until)
     if state_changed or sync_changes or restored:

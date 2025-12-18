@@ -386,12 +386,6 @@ This is an automatically generated preview of your coding guideline in reStructu
 
 ### 📝 How to Use This
 
-**Option A: Automatic (Recommended)**
-
-Once this issue is approved, a maintainer will add the `sign-off: create pr from issue` label, which automatically creates a PR with the guideline file.
-
-**Option B: Manual**
-
 1. **Fork the repository** (if you haven't already) and clone it locally
 2. **Create a new branch** from `main`:
    ```bash
