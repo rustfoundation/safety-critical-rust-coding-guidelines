@@ -14,6 +14,10 @@ on:
   issue_comment:
     types: [created]
 
+  # Nightly check for overdue reviews (runs at 9 AM UTC daily)
+  schedule:
+    - cron: '0 9 * * *'
+
   # Allow manual triggering (useful for testing/debugging)
   workflow_dispatch:
     inputs:
@@ -25,6 +29,7 @@ on:
         options:
           - sync-members
           - show-state
+          - check-overdue
 
 # Ensure only one instance runs at a time per issue/PR
 # This prevents race conditions when both 'opened' and 'labeled' fire together
@@ -48,9 +53,12 @@ jobs:
     # Skip if:
     # - Comment is from a bot (prevent infinite loops)
     # - The issue/PR being acted on is the state issue itself (314)
+    # Always run for schedule events
     if: >
-      (github.event_name != 'issue_comment' || github.event.comment.user.type != 'Bot') &&
-      ((github.event.issue.number || github.event.pull_request.number || 0) != 314)
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      ((github.event_name != 'issue_comment' || github.event.comment.user.type != 'Bot') &&
+      ((github.event.issue.number || github.event.pull_request.number || 0) != 314))
 
     steps:
       - name: Checkout repository
