@@ -24,7 +24,7 @@
    or related functions, is treated in the same manner as a typed read.
    Calling these function when on memory that is not yet fully initialized causes immediate undefined behavior.
    The memory must be properly initialized according to the requirements of the variable’s type.
-   For example, a variable of reference type must be aligned and non-null.
+   For example, a variable of reference type must be aligned, non-null, and point to valid memory.
    Similarly, entirely uninitialized memory may have any content, while a ``bool`` must always be ``true`` or ``false``.
    Consequently, reading an uninitialized ``bool`` is undefined behavior.
  
@@ -71,25 +71,7 @@
              // x is fully initialized
              let val = unsafe { x.assume_init() }; // compliant
          }
-
-   .. non_compliant_example::
-      :id: non_compl_ex_Qb5GqYTP6db2
-      :status: draft
-
-      This noncompliant example creates a reference from uninitialized memory.
-      Creating a reference from arbitrary or uninitialized bytes is undefined behavior.
-      References must be valid, aligned, properly dereferenceable, and non-null.
-      Uninitialized memory cannot satisfy these invariants.
-
-      .. rust-example::
-
-         use std::mem::MaybeUninit;
-
-         fn main() {
-             // Reading an invalid reference is undefined behavior
-             let r: &u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
-         }
-
+ 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db4
       :status: draft
@@ -105,6 +87,62 @@
 
          fn main() {
              let p: *const u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
+         }
+
+   .. non_compliant_example::
+      :id: non_compl_ex_Qb5GqYTP6db2
+      :status: draft
+
+      This noncompliant example creates a reference from uninitialized memory.
+      Creating a reference from arbitrary or uninitialized bytes is undefined behavior.
+      References must be valid, aligned, dereferenceable, and non-null.
+      Uninitialized memory cannot satisfy these invariants.
+
+      .. rust-example::
+
+         use std::mem::MaybeUninit;
+
+         fn main() {
+             // Reading an invalid reference is undefined behavior
+             let r: &u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
+         }
+
+   .. non_compliant_example::
+      :id: non_compl_ex_Qb5GqYTP6db3
+      :status: draft
+
+      This noncompliant example creates a reference from uninitialized memory.
+      The ``create_ref`` function has undefined behavior when creating a reference from a dangling pointer.
+      It creates uninitialized memory sized for a reference (``&u8``).
+      A reference is essentially a pointer (8 bytes on 64-bit systems).
+      ``&raw mut uninit`` retreives a raw mutable pointer to the ``MaybeUninit``.
+      The ``.cast::<*const u8>()`` reinterprets it as a pointer to a raw pointer.
+      The call to ``.write(ptr::dangling())`` writes a dangling pointer value.
+      This creates a pointer which is non-null, aligned, but does not point to valid, initialized value.
+      The call to ``assume_init`` asserts the ``MaybeUninit<&u8>`` is a valid ``&u8`` reference
+      A reference (``&T``) has stricter requirements than a raw pointer.
+      Even though the bit pattern looks like a valid pointer,
+      the semantic requirements for a reference are violated.
+      The compiler is allowed to assume references always point to valid data,
+      so this can cause miscompilation.
+
+      .. rust-example::
+
+         use std::mem::MaybeUninit;
+         use std::ptr;
+
+         fn create_ref() {
+             let mut uninit: MaybeUninit<&u8> = MaybeUninit::uninit();
+             unsafe {
+                 // write non-null and aligned address.
+                 (&raw mut uninit).cast::<*const u8>().write(ptr::dangling());
+                 // Undefined behavior occurs when asseting 'uninit' is a valid reference.
+                 let _init = uninit.assume_init(); // noncompliant
+             }
+         }
+
+         fn main() {
+             create_ref();
          }
 
    .. non_compliant_example::
