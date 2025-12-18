@@ -73,6 +73,27 @@ STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
 MEMBERS_URL = "https://raw.githubusercontent.com/rustfoundation/safety-critical-rust-consortium/main/subcommittee/coding-guidelines/members.md"
 MAX_RECENT_ASSIGNMENTS = 20
 
+# Command definitions - single source of truth for command names and descriptions
+# Format: "command": "description"
+COMMANDS = {
+    "pass": "Pass this review to next in queue",
+    "away": "Step away from queue until date (YYYY-MM-DD)",
+    "release": "Release your assignment (no auto-reassign)",
+    "claim": "Claim this review for yourself",
+    "r?": "Assign a reviewer (@username or 'producers')",
+    "label": "Add/remove labels (+label-name or -label-name)",
+    "sync-members": "Sync queue with members.md",
+    "status": "Show queue status",
+}
+
+
+def get_commands_help() -> str:
+    """Generate help text from COMMANDS dict."""
+    lines = []
+    for cmd, desc in COMMANDS.items():
+        lines.append(f"- `{BOT_MENTION} /{cmd}` - {desc}")
+    return "\n".join(lines)
+
 
 # ==============================================================================
 # GitHub API Helpers
@@ -637,16 +658,39 @@ def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
 
     Returns (command, args) or None if no command found.
     
+    Special return values:
+    - ("_malformed_known", [attempted_cmd]) - Missing / prefix on known command
+    - ("_malformed_unknown", [attempted_word]) - Missing / prefix on unknown word
+    
     All commands must be prefixed with @guidelines-bot /<command>:
     - @guidelines-bot /pass [reason]
     - @guidelines-bot /r? @username (assign specific user)
     - @guidelines-bot /r? producers (assign next from queue)
     """
-    # Look for @guidelines-bot /<command> pattern
+    # Look for @guidelines-bot /<command> pattern (correct syntax)
     pattern = rf"{re.escape(BOT_MENTION)}\s+/(\S+)(.*)$"
     match = re.search(pattern, comment_body, re.IGNORECASE | re.MULTILINE)
 
     if not match:
+        # Check for malformed command (missing / prefix)
+        malformed_pattern = rf"{re.escape(BOT_MENTION)}\s+(\S+)"
+        malformed_match = re.search(malformed_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
+        
+        if malformed_match:
+            attempted = malformed_match.group(1).lower()
+            # Check if it looks like a command (not just random text after mention)
+            # Ignore if it starts with common conversational words
+            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could", 
+                            "would", "should", "please", "thanks", "thank", "hi", "hello", "hey"}
+            if attempted in conversational:
+                return None
+            
+            # Check if it's a known command without the /
+            if attempted in COMMANDS or attempted in {"r?-user", "assign-from-queue"}:
+                return "_malformed_known", [attempted]
+            else:
+                return "_malformed_unknown", [attempted]
+        
         return None
 
     command = match.group(1).lower()
@@ -1536,18 +1580,23 @@ def handle_comment_event(state: dict) -> bool:
                    f"- `{BOT_MENTION} /r? producers` - Assign next reviewer from queue")
         success = False
 
+    elif command == "_malformed_known":
+        # User typed a known command but forgot the / prefix
+        attempted = args[0] if args else "command"
+        response = (f"⚠️ Did you mean `{BOT_MENTION} /{attempted}`?\n\n"
+                   f"Commands require a `/` prefix.")
+        success = False
+
+    elif command == "_malformed_unknown":
+        # User typed something after @guidelines-bot but it's not a known command
+        attempted = args[0] if args else ""
+        response = (f"⚠️ Unknown command `{attempted}`. Commands require a `/` prefix.\n\n"
+                   f"Try `{BOT_MENTION} /status` to see available commands.")
+        success = False
+
     else:
         response = (f"❌ Unknown command: `/{command}`\n\n"
-                   f"Available commands:\n"
-                   f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue\n"
-                   f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue\n"
-                   f"- `{BOT_MENTION} /claim` - Claim this review for yourself\n"
-                   f"- `{BOT_MENTION} /release [reason]` - Release your assignment (no auto-reassign)\n"
-                   f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
-                   f"- `{BOT_MENTION} /r? producers` - Assign next reviewer from queue\n"
-                   f"- `{BOT_MENTION} /label +/-label-name` - Add/remove labels\n"
-                   f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md\n"
-                   f"- `{BOT_MENTION} /status` - Show queue status")
+                   f"Available commands:\n{get_commands_help()}")
         success = False
 
     # React to the command comment
