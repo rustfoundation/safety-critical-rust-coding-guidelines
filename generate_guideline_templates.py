@@ -45,6 +45,8 @@ issue_header_map = {
     "Compliant Example 3 - Code (Optional)": "compliant_ex_3",
     "Compliant Example 4 - Prose (Optional)": "compliant_ex_prose_4",
     "Compliant Example 4 - Code (Optional)": "compliant_ex_4",
+    # Bibliography (Optional)
+    "Bibliography": "bibliography",
     # Legacy field names (for backwards compatibility with old issues)
     "Non-Compliant Example - Prose": "non_compliant_ex_prose_1",
     "Non-Compliant Example - Code": "non_compliant_ex_1",
@@ -94,6 +96,143 @@ def generate_example_block(
     """)
 
 
+def generate_bibliography_block(
+    bibliography_id: str,
+    status: str,
+    entries: list,  # List of (citation_key, author, title, url) tuples
+) -> str:
+    """
+    Generate a bibliography block.
+
+    Args:
+        bibliography_id: The unique ID for this bibliography
+        status: The status (e.g., "draft")
+        entries: List of (citation_key, author, title, url) tuples
+
+    Returns:
+        Formatted RST string for the bibliography
+    """
+    if not entries:
+        return ""
+    
+    # Build the list-table content
+    table_rows = []
+    for citation_key, author, title, url in entries:
+        # Format: .. [CITATION-KEY] Author. "Title." URL
+        row = f"      * - .. [{citation_key}]\n        - | {author}. \"{title}.\" {url}"
+        table_rows.append(row)
+    
+    table_content = "\n".join(table_rows)
+    
+    return dedent(f"""
+            .. bibliography::
+                :id: {bibliography_id}
+                :status: {status}
+
+                .. list-table::
+                   :header-rows: 0
+                   :widths: auto
+                   :class: bibliography-table
+
+{table_content}
+    """)
+
+
+def parse_bibliography_entries(bibliography_text: str) -> list:
+    """
+    Parse bibliography entries from text input.
+    
+    Expected format (one entry per line or block):
+    [CITATION-KEY] Author. "Title." URL
+    
+    Or multi-line format:
+    [CITATION-KEY]
+    Author: Author Name
+    Title: The Title
+    URL: https://example.com
+    
+    Args:
+        bibliography_text: Raw bibliography text from issue
+        
+    Returns:
+        List of (citation_key, author, title, url) tuples
+    """
+    import re
+    
+    entries = []
+    
+    if not bibliography_text or not bibliography_text.strip():
+        return entries
+    
+    # Try to parse single-line format first
+    # Pattern: [KEY] Author. "Title." URL
+    single_line_pattern = re.compile(
+        r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]\s+'  # Citation key
+        r'([^"]+?)\.\s+'                      # Author (ends with .)
+        r'"([^"]+)"\.\s*'                     # Title in quotes
+        r'(https?://\S+)',                    # URL
+        re.MULTILINE
+    )
+    
+    for match in single_line_pattern.finditer(bibliography_text):
+        key, author, title, url = match.groups()
+        entries.append((key.strip(), author.strip(), title.strip(), url.strip()))
+    
+    if entries:
+        return entries
+    
+    # Try multi-line format
+    # Split by citation keys
+    blocks = re.split(r'(?=\[[A-Z][A-Z0-9-]*[A-Z0-9]\])', bibliography_text)
+    
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        
+        # Extract citation key
+        key_match = re.match(r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]', block)
+        if not key_match:
+            continue
+        
+        key = key_match.group(1)
+        rest = block[key_match.end():].strip()
+        
+        # Try to extract author, title, url from rest
+        author = ""
+        title = ""
+        url = ""
+        
+        # Look for labeled format
+        author_match = re.search(r'Author:\s*(.+?)(?:\n|$)', rest, re.IGNORECASE)
+        title_match = re.search(r'Title:\s*(.+?)(?:\n|$)', rest, re.IGNORECASE)
+        url_match = re.search(r'URL:\s*(https?://\S+)', rest, re.IGNORECASE)
+        
+        if author_match:
+            author = author_match.group(1).strip()
+        if title_match:
+            title = title_match.group(1).strip()
+        if url_match:
+            url = url_match.group(1).strip()
+        
+        # If we didn't find labeled format, try simple line format
+        if not (author and title and url):
+            lines = rest.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('http'):
+                    url = line
+                elif not author:
+                    author = line
+                elif not title:
+                    title = line
+        
+        if key and (author or title or url):
+            entries.append((key, author or "Unknown", title or "Untitled", url or ""))
+    
+    return entries
+
+
 def guideline_rst_template(
     guideline_title: str,
     category: str,
@@ -109,6 +248,7 @@ def guideline_rst_template(
     rationale: str,
     non_compliant_examples: list,  # List of (prose, code) tuples
     compliant_examples: list,      # List of (prose, code) tuples
+    bibliography_entries: list = None,  # List of (key, author, title, url) tuples
 ) -> str:
     """
     Generate a .rst guideline entry from field values.
@@ -116,6 +256,7 @@ def guideline_rst_template(
     Args:
         non_compliant_examples: List of (prose, code) tuples for non-compliant examples
         compliant_examples: List of (prose, code) tuples for compliant examples
+        bibliography_entries: Optional list of (key, author, title, url) tuples
     """
 
     # Generate unique IDs
@@ -163,8 +304,22 @@ def guideline_rst_template(
             )
             compliant_blocks.append(block)
 
+    # Generate bibliography block if entries provided
+    bibliography_block = ""
+    if bibliography_entries:
+        bibliography_id = generate_id("bib")
+        bibliography_block = generate_bibliography_block(
+            bibliography_id,
+            norm(status),
+            bibliography_entries,
+        )
+
     # Combine all example blocks
     all_examples = "\n".join(non_compliant_blocks + compliant_blocks)
+    
+    # Add bibliography if present
+    if bibliography_block:
+        all_examples += "\n" + bibliography_block
 
     guideline_text = dedent(f"""
         .. guideline:: {guideline_title.strip()}
@@ -192,17 +347,25 @@ def guideline_rst_template(
     return guideline_text
 
 
-def generate_guideline_template(num_non_compliant: int = 1, num_compliant: int = 1):
+def generate_guideline_template(
+    num_non_compliant: int = 1,
+    num_compliant: int = 1,
+    include_bibliography: bool = False,
+    num_bib_entries: int = 1,
+):
     """
     Generate a complete guideline template with all required sections.
 
     Args:
         num_non_compliant: Number of non-compliant examples to include (1-4)
         num_compliant: Number of compliant examples to include (1-4)
+        include_bibliography: Whether to include a bibliography section
+        num_bib_entries: Number of bibliography entries to include (1-5)
     """
     # Clamp to valid range
     num_non_compliant = max(1, min(4, num_non_compliant))
     num_compliant = max(1, min(4, num_compliant))
+    num_bib_entries = max(1, min(5, num_bib_entries))
 
     # Generate non-compliant examples
     non_compliant_examples = []
@@ -220,6 +383,18 @@ def generate_guideline_template(num_non_compliant: int = 1, num_compliant: int =
             f"fn compliant_example_{i}() {{\n    // Compliant implementation {i}\n}}"
         ))
 
+    # Generate bibliography entries if requested
+    bibliography_entries = None
+    if include_bibliography:
+        bibliography_entries = []
+        for i in range(1, num_bib_entries + 1):
+            bibliography_entries.append((
+                f"REF-KEY-{i}",
+                f"Author {i}",
+                f"Reference Title {i}",
+                f"https://example.com/ref{i}"
+            ))
+
     template = guideline_rst_template(
         guideline_title="Title Here",
         category="",
@@ -235,6 +410,7 @@ def generate_guideline_template(num_non_compliant: int = 1, num_compliant: int =
         rationale="Explanation of why this guideline is important.",
         non_compliant_examples=non_compliant_examples,
         compliant_examples=compliant_examples,
+        bibliography_entries=bibliography_entries,
     )
     return template
 
@@ -265,6 +441,18 @@ def parse_args():
         choices=[1, 2, 3, 4],
         help="Number of compliant examples to include (default: 1, max: 4)",
     )
+    parser.add_argument(
+        "--bibliography",
+        action="store_true",
+        help="Include a bibliography section in the template",
+    )
+    parser.add_argument(
+        "--bib-entries",
+        type=int,
+        default=1,
+        choices=[1, 2, 3, 4, 5],
+        help="Number of bibliography entries to include (default: 1, max: 5)",
+    )
     return parser.parse_args()
 
 
@@ -280,6 +468,8 @@ def main():
         template = generate_guideline_template(
             num_non_compliant=args.non_compliant,
             num_compliant=args.compliant,
+            include_bibliography=args.bibliography,
+            num_bib_entries=args.bib_entries,
         )
         print(template)
 

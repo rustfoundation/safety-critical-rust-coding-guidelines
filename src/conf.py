@@ -68,6 +68,13 @@ needs_types = [
         "color": "#729FCF",
         "style": "node",
     },
+    {
+        "directive": "bibliography",
+        "title": "Bibliography",
+        "prefix": "bib_",
+        "color": "#A8D8EA",
+        "style": "node",
+    },
 ]
 
 # Define custom sections for needs
@@ -78,6 +85,7 @@ needs_layouts = {
             "rationale",
             "non_compliant_example",
             "compliant_example",
+            "bibliography",
         ]
     }
 }
@@ -90,12 +98,13 @@ needs_render_contexts = {
             "rationale",
             "non_compliant_example",
             "non_compliant_example",
+            "bibliography",
         ],
     }
 }
 
 # Make sure these sections are included in the JSON
-needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example"]
+needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example", "bibliography"]
 
 needs_statuses = [
     dict(name="draft", description="This guideline is in draft stage", color="#999999"),
@@ -206,6 +215,20 @@ required_guideline_fields = [
     "scope",
     "tags",
 ]  # Id is automatically generated
+
+# -- Bibliography validation configuration -----------------------------------
+
+# Enable URL validation (typically only in CI)
+bibliography_check_urls = False  # Set via --define or environment
+
+# Timeout for URL checks in seconds
+bibliography_url_timeout = 10
+
+# Whether broken URLs should fail the build (True) or just warn (False)
+bibliography_fail_on_broken = True
+
+# Whether duplicate URLs should fail the build
+bibliography_fail_on_duplicates = True
 
 # -- Options for HTML output -------------------------------------------------
 

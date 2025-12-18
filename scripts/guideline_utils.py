@@ -24,6 +24,7 @@ sys.path.append(parent_dir)
 from generate_guideline_templates import (
     guideline_rst_template,
     issue_header_map,
+    parse_bibliography_entries,
 )
 
 # =============================================================================
@@ -157,6 +158,78 @@ def extract_form_fields(issue_body: str) -> dict:
 
 
 # =============================================================================
+# Bibliography utilities
+# =============================================================================
+
+def validate_bibliography_entry(entry: tuple) -> tuple:
+    """
+    Validate a single bibliography entry.
+    
+    Args:
+        entry: Tuple of (citation_key, author, title, url)
+        
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    key, author, title, url = entry
+    
+    # Validate citation key format
+    key_pattern = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
+    if not key_pattern.match(key):
+        return False, f"Invalid citation key format: '{key}'. Expected UPPERCASE-WITH-HYPHENS"
+    
+    if len(key) > 50:
+        return False, f"Citation key '{key}' exceeds 50 character limit"
+    
+    # Validate URL format (basic check)
+    if url and not url.startswith(('http://', 'https://')):
+        return False, f"Invalid URL format: '{url}'. Must start with http:// or https://"
+    
+    return True, ""
+
+
+def format_bibliography_rst(entries: list, bibliography_id: str, status: str = "draft") -> str:
+    """
+    Format bibliography entries as RST.
+    
+    Args:
+        entries: List of (citation_key, author, title, url) tuples
+        bibliography_id: The unique ID for this bibliography
+        status: The status (e.g., "draft")
+        
+    Returns:
+        Formatted RST string for the bibliography
+    """
+    if not entries:
+        return ""
+    
+    # Build the list-table content
+    table_rows = []
+    for citation_key, author, title, url in entries:
+        # Format: .. [CITATION-KEY] Author. "Title." URL
+        if url:
+            row = f"      * - .. [{citation_key}]\n        - | {author}. \"{title}.\" `{url} <{url}>`_"
+        else:
+            row = f"      * - .. [{citation_key}]\n        - | {author}. \"{title}.\""
+        table_rows.append(row)
+    
+    table_content = "\n".join(table_rows)
+    
+    return dedent(f"""
+            .. bibliography::
+                :id: {bibliography_id}
+                :status: {status}
+
+                .. list-table::
+                   :header-rows: 0
+                   :widths: auto
+                   :class: bibliography-table
+
+{table_content}
+    """)
+
+
+# =============================================================================
 # RST generation utilities
 # =============================================================================
 
@@ -261,6 +334,18 @@ def guideline_template(fields: dict) -> str:
         code_formatted = format_code_block(code)
         compliant_examples.append((prose_rst, code_formatted))
 
+    # Parse bibliography entries if present
+    bibliography_raw = get("bibliography")
+    bibliography_entries = None
+    if bibliography_raw:
+        bibliography_entries = parse_bibliography_entries(bibliography_raw)
+        # Validate entries
+        for entry in bibliography_entries:
+            is_valid, error_msg = validate_bibliography_entry(entry)
+            if not is_valid:
+                # Log warning but continue - the preview will show the issue
+                print(f"Warning: {error_msg}")
+
     guideline_text = guideline_rst_template(
         guideline_title=get("guideline_title"),
         category=get("category"),
@@ -276,6 +361,7 @@ def guideline_template(fields: dict) -> str:
         rationale=rationale_text,
         non_compliant_examples=non_compliant_examples,
         compliant_examples=compliant_examples,
+        bibliography_entries=bibliography_entries,
     )
 
     return guideline_text
@@ -307,13 +393,14 @@ def extract_all_ids(content: str) -> dict:
         content: RST content
 
     Returns:
-        Dictionary with keys 'guideline', 'rationale', 'compliant', 'non_compliant'
+        Dictionary with keys 'guideline', 'rationale', 'compliant', 'non_compliant', 'bibliography'
     """
     ids = {
         'guideline': '',
         'rationale': '',
         'compliant': [],
-        'non_compliant': []
+        'non_compliant': [],
+        'bibliography': '',
     }
 
     # Guideline ID
@@ -325,6 +412,11 @@ def extract_all_ids(content: str) -> dict:
     match = re.search(r':id:\s*(rat_[a-zA-Z0-9]+)', content)
     if match:
         ids['rationale'] = match.group(1)
+
+    # Bibliography ID
+    match = re.search(r':id:\s*(bib_[a-zA-Z0-9]+)', content)
+    if match:
+        ids['bibliography'] = match.group(1)
 
     # Compliant example IDs (multiple)
     for match in re.finditer(r':id:\s*(compl_ex_[a-zA-Z0-9]+)', content):

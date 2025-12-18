@@ -4,6 +4,7 @@
 from sphinx.domains import Domain
 
 from . import (
+    bibliography_validator,
     common,
     fls_checks,
     fls_linking,
@@ -77,6 +78,9 @@ def setup(app):
 
     # Set up rust_examples extension
     rust_examples.setup(app)
+    
+    # Set up bibliography validator extension
+    bibliography_validator.setup(app)
 
     app.connect("env-check-consistency", guidelines_checks.validate_required_fields)
     app.connect("env-check-consistency", fls_checks.check_fls)

@@ -29,9 +29,11 @@ def write_guidelines_ids(app):
     Write guideline IDs and checksums to JSON file with guidelines as the primary structure.
 
     This collects all guidelines and their directly associated rationale, good example,
-    and bad example, computes checksums for their content, and writes a structured JSON file.
+    bad example, and bibliography, computes checksums for their content, and writes a 
+    structured JSON file.
 
     Fails the build if any guideline is missing a rationale, good example, or bad example.
+    Bibliography is optional.
     """
     env = app.env
 
@@ -74,6 +76,7 @@ def write_guidelines_ids(app):
                 "rationale": None,
                 "non_compliant_example": None,
                 "compliant_example": None,
+                "bibliography": None,  # Optional - no error if missing
             }
 
             # Look for associated elements using parent_needs_back
@@ -113,8 +116,10 @@ def write_guidelines_ids(app):
                         guideline_data["non_compliant_example"] = related_data
                     elif related_type == "compliant_example":
                         guideline_data["compliant_example"] = related_data
+                    elif related_type == "bibliography":
+                        guideline_data["bibliography"] = related_data
 
-            # Check for missing elements
+            # Check for missing required elements (bibliography is optional)
             if guideline_data["rationale"] is None:
                 missing_elements.append("rationale")
             if guideline_data["non_compliant_example"] is None:
@@ -160,6 +165,7 @@ def write_guidelines_ids(app):
             error_message += f"Missing: {', '.join(incomplete['missing'])}\n\n"
 
         error_message += "Each guideline must have an associated rationale, good example, and bad example."
+        error_message += "\nNote: Bibliography is optional and will not cause build failures if missing."
         logger.error(error_message)
         raise Exception(error_message)
 

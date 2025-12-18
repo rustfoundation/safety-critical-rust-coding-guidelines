@@ -35,6 +35,11 @@ from guideline_utils import (
     normalize_md,
 )
 
+# Import bibliography parser
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+sys.path.insert(0, parent_dir)
+from generate_guideline_templates import parse_bibliography_entries
+
 # SPDX header to prepend to guideline files
 GUIDELINE_FILE_HEADER = """\
 .. SPDX-License-Identifier: MIT OR Apache-2.0
@@ -51,6 +56,15 @@ class CodeTestResult:
     passed: bool
     error_message: str = ""
     compiler_output: str = ""
+
+
+@dataclass
+class BibliographyValidationResult:
+    """Result of validating bibliography entries."""
+    is_valid: bool
+    errors: List[str]
+    warnings: List[str]
+    entries: List[Tuple[str, str, str, str]]  # (key, author, title, url)
 
 
 def extract_guideline_id(rst_content: str) -> str:
@@ -257,6 +271,74 @@ def test_all_examples(fields: dict) -> List[CodeTestResult]:
     return results
 
 
+def validate_bibliography(fields: dict) -> BibliographyValidationResult:
+    """
+    Validate bibliography entries from form fields.
+    
+    Args:
+        fields: Dictionary of form fields
+        
+    Returns:
+        BibliographyValidationResult with validation status
+    """
+    bibliography_raw = fields.get("bibliography", "").strip()
+    
+    if not bibliography_raw:
+        return BibliographyValidationResult(
+            is_valid=True,
+            errors=[],
+            warnings=[],
+            entries=[]
+        )
+    
+    errors = []
+    warnings = []
+    entries = []
+    
+    # Parse entries
+    parsed_entries = parse_bibliography_entries(bibliography_raw)
+    
+    if not parsed_entries:
+        warnings.append("Could not parse any bibliography entries. Check the format.")
+        return BibliographyValidationResult(
+            is_valid=True,  # Not an error, just a warning
+            errors=errors,
+            warnings=warnings,
+            entries=[]
+        )
+    
+    # Validate each entry
+    citation_key_pattern = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
+    
+    for key, author, title, url in parsed_entries:
+        # Validate citation key format
+        if not citation_key_pattern.match(key):
+            errors.append(f"Invalid citation key format: `{key}`. Must be UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION)")
+        elif len(key) > 50:
+            errors.append(f"Citation key `{key}` exceeds 50 character limit")
+        
+        # Validate URL format
+        if url and not url.startswith(('http://', 'https://')):
+            errors.append(f"Invalid URL for `{key}`: `{url}`. Must start with http:// or https://")
+        
+        # Warn about missing fields
+        if not author or author == "Unknown":
+            warnings.append(f"Missing author for citation `{key}`")
+        if not title or title == "Untitled":
+            warnings.append(f"Missing title for citation `{key}`")
+        if not url:
+            warnings.append(f"Missing URL for citation `{key}`")
+        
+        entries.append((key, author, title, url))
+    
+    return BibliographyValidationResult(
+        is_valid=len(errors) == 0,
+        errors=errors,
+        warnings=warnings,
+        entries=entries
+    )
+
+
 def format_test_results(results: List[CodeTestResult]) -> str:
     """
     Format test results as a markdown section.
@@ -322,7 +404,56 @@ def format_test_results(results: List[CodeTestResult]) -> str:
     return "\n".join(lines)
 
 
-def generate_comment(rst_content: str, chapter: str, test_results: List[CodeTestResult]) -> str:
+def format_bibliography_validation(result: BibliographyValidationResult) -> str:
+    """
+    Format bibliography validation results as a markdown section.
+    
+    Args:
+        result: Bibliography validation result
+        
+    Returns:
+        Formatted markdown string
+    """
+    if not result.entries and not result.errors and not result.warnings:
+        return ""
+    
+    lines = []
+    lines.append("### 📚 Bibliography Validation")
+    lines.append("")
+    
+    if result.is_valid and not result.warnings:
+        lines.append(f"✅ **{len(result.entries)} bibliography entry/entries validated successfully!**")
+    elif result.is_valid and result.warnings:
+        lines.append(f"⚠️ **{len(result.entries)} bibliography entry/entries parsed with warnings**")
+    else:
+        lines.append("❌ **Bibliography validation failed**")
+    
+    if result.errors:
+        lines.append("")
+        lines.append("**Errors:**")
+        for error in result.errors:
+            lines.append(f"- {error}")
+    
+    if result.warnings:
+        lines.append("")
+        lines.append("**Warnings:**")
+        for warning in result.warnings:
+            lines.append(f"- {warning}")
+    
+    if result.entries:
+        lines.append("")
+        lines.append("**Parsed entries:**")
+        lines.append("")
+        lines.append("| Citation Key | Author | Title | URL |")
+        lines.append("|--------------|--------|-------|-----|")
+        for key, author, title, url in result.entries:
+            url_display = f"[Link]({url})" if url else "-"
+            lines.append(f"| `[{key}]` | {author[:30]}... | {title[:40]}... | {url_display} |")
+    
+    return "\n".join(lines)
+
+
+def generate_comment(rst_content: str, chapter: str, test_results: List[CodeTestResult], bib_result: BibliographyValidationResult) -> str:
     """
     Generate a formatted GitHub comment with instructions and RST content.
 
@@ -330,6 +461,7 @@ def generate_comment(rst_content: str, chapter: str, test_results: List[CodeTest
         rst_content: The generated RST content for the guideline
         chapter: The chapter name (e.g., "Concurrency", "Expressions")
         test_results: Results from testing code examples
+        bib_result: Results from bibliography validation
 
     Returns:
         Formatted Markdown comment string
@@ -342,6 +474,9 @@ def generate_comment(rst_content: str, chapter: str, test_results: List[CodeTest
 
     # Format test results
     test_results_section = format_test_results(test_results)
+    
+    # Format bibliography validation
+    bib_results_section = format_bibliography_validation(bib_result)
 
     # Determine target path based on whether we have a guideline ID
     if guideline_id:
@@ -383,6 +518,8 @@ This is an automatically generated preview of your coding guideline in reStructu
 {file_instructions}
 
 {test_results_section}
+
+{bib_results_section}
 
 ### 📝 How to Use This
 
@@ -449,9 +586,12 @@ def main():
 
     # Test code examples
     test_results = test_all_examples(fields)
+    
+    # Validate bibliography
+    bib_result = validate_bibliography(fields)
 
     # Generate the comment
-    comment = generate_comment(rst_content.strip(), chapter, test_results)
+    comment = generate_comment(rst_content.strip(), chapter, test_results, bib_result)
 
     print(comment)
 
