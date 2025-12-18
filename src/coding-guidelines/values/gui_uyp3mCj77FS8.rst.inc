@@ -20,9 +20,16 @@
    Reading from a union is covered by a separate rule, `Do not read from union fields that may contain uninitialized bytes
    <https://coding-guidelines.arewesafetycriticalyet.org/coding-guidelines/types-and-traits/index.html#gui_UnionPartialInit>`_.
 
-   Calling `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_,
-   or related functions, is treated in the same manner as a typed read.
-   Calling these function when on memory that is not yet fully initialized causes immediate undefined behavior.
+   Calling `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_ or
+   any of the following related functions is treated in the same manner as a typed read:
+
+   * ``assume_init_drop``
+   * ``assume_init_mut``
+   * ``assume_init_read``
+   * ``assume_init_ref``
+   * ``array_assume_init``
+
+   Calling any of these function when on memory that is not yet fully initialized is undefined behavior.
    The memory must be properly initialized according to the requirements of the variable’s type.
    For example, a variable of reference type must be aligned, non-null, and point to valid memory.
    Similarly, entirely uninitialized memory may have any content, while a ``bool`` must always be ``true`` or ``false``.
@@ -166,11 +173,11 @@
 
          use std::mem::MaybeUninit;
 
-         # fn main() {
-         let mut arr: [MaybeUninit<u8>; 4] = unsafe { MaybeUninit::uninit().assume_init() };
-         // Undefined behavior constructing an array of 'u8' from uninitialized memory. 
-         let a = unsafe { std::mem::transmute::<_, [u8; 4]>(arr) }; // noncompliant
-         # }
+         fn main() {
+             let mut arr: [MaybeUninit<u8>; 4] = unsafe { MaybeUninit::uninit().assume_init() };
+             // Undefined behavior constructing an array of 'u8' from uninitialized memory. 
+             let a = unsafe { std::mem::transmute::<_, [u8; 4]>(arr) }; // noncompliant
+         }
 
    .. compliant_example::
       :id: compl_ex_Ke869nSXuShW
