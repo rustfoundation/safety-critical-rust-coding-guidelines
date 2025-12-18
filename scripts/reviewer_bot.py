@@ -43,7 +43,7 @@ All commands must be prefixed with @guidelines-bot /<command>:
   @guidelines-bot /queue
     - Show current queue status and who's next up
 
-  @guidelines-bot /status
+  @guidelines-bot /commands
     - Show all available commands
 """
 
@@ -87,7 +87,7 @@ COMMANDS = {
     "label": "Add/remove labels (+label-name or -label-name)",
     "sync-members": "Sync queue with members.md",
     "queue": "Show reviewer queue and who's next",
-    "status": "Show all available commands",
+    "commands": "Show all available commands",
 }
 
 
@@ -606,7 +606,7 @@ Other commands:
 - `{BOT_MENTION} /label +label-name` - Add a label
 - `{BOT_MENTION} /label -label-name` - Remove a label
 - `{BOT_MENTION} /queue` - Show reviewer queue
-- `{BOT_MENTION} /status` - Show all available commands
+- `{BOT_MENTION} /commands` - Show all available commands
 """
 
 
@@ -649,7 +649,7 @@ Other commands:
 - `{BOT_MENTION} /label +label-name` - Add a label
 - `{BOT_MENTION} /label -label-name` - Remove a label
 - `{BOT_MENTION} /queue` - Show reviewer queue
-- `{BOT_MENTION} /status` - Show all available commands
+- `{BOT_MENTION} /commands` - Show all available commands
 """
 
 
@@ -1092,7 +1092,7 @@ def handle_queue_command(state: dict) -> tuple[str, bool]:
             f"{away_text}{state_issue_link}"), True
 
 
-def handle_status_command() -> tuple[str, bool]:
+def handle_commands_command() -> tuple[str, bool]:
     """
     Handle the status command - show all available commands.
 
@@ -1580,8 +1580,8 @@ def handle_comment_event(state: dict) -> bool:
     elif command == "queue":
         response, success = handle_queue_command(state)
 
-    elif command == "status":
-        response, success = handle_status_command()
+    elif command == "commands":
+        response, success = handle_commands_command()
 
     elif command == "claim":
         response, success = handle_claim_command(state, issue_number, comment_author)
@@ -1622,7 +1622,7 @@ def handle_comment_event(state: dict) -> bool:
         # User typed something after @guidelines-bot but it's not a known command
         attempted = args[0] if args else ""
         response = (f"⚠️ Unknown command `{attempted}`. Commands require a `/` prefix.\n\n"
-                   f"Try `{BOT_MENTION} /status` to see available commands.")
+                   f"Try `{BOT_MENTION} /commands` to see available commands.")
         success = False
 
     else:
