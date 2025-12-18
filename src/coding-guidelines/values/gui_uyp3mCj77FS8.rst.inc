@@ -122,7 +122,7 @@
       The ``create_ref`` function has undefined behavior when creating a reference from a dangling pointer.
       It creates uninitialized memory sized for a reference (``&u8``).
       A reference is essentially a pointer (8 bytes on 64-bit systems).
-      ``&raw mut uninit`` retreives a raw mutable pointer to the ``MaybeUninit``.
+      ``&raw mut uninit`` retrieves a raw mutable pointer to the ``MaybeUninit``.
       The ``.cast::<*const u8>()`` reinterprets it as a pointer to a raw pointer.
       The call to ``.write(ptr::dangling())`` writes a dangling pointer value.
       This creates a pointer which is non-null, aligned, but does not point to valid, initialized value.
@@ -162,7 +162,7 @@
       an array of ``MaybeUninit<u8>`` can contain uninitialized bytes.
       The call to ``std::mem::transmute`` reinterprets the ``[MaybeUninit<u8>; 4]`` as ``[u8; 4]``.
       This is undefined behavior, because the bytes were never initialized. 
-      Even though all bit patterns (0-255) are valid for the ``u8`` type, the values must be initalized. 
+      Even though all bit patterns (0-255) are valid for the ``u8`` type, the values must be initialized. 
 
       ``MaybeUninit<u8>`` can hold uninitialized memory — that's its purpose.
       ``u8`` cannot hold uninitialized memory — all 8 bits must be defined.
