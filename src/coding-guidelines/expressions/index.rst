@@ -15,3 +15,4 @@ Expressions
 .. include:: gui_dCquvqE1csI3.rst.inc
 .. include:: gui_iv9yCMHRgpE0.rst.inc
 .. include:: gui_kMbiWbn8Z6g5.rst.inc
+.. include:: gui_LoopTerminat.rst.inc
