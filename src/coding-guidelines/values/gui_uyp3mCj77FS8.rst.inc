@@ -143,7 +143,7 @@
              unsafe {
                  // write non-null and aligned address.
                  (&raw mut uninit).cast::<*const u8>().write(ptr::dangling());
-                 // Undefined behavior occurs when asseting 'uninit' is a valid reference.
+                 // Undefined behavior occurs when asserting 'uninit' is a valid reference.
                  let _init = uninit.assume_init(); // noncompliant
              }
          }
