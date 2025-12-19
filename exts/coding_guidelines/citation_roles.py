@@ -33,10 +33,11 @@ When using generate_guideline_templates.py, the guideline ID prefix is automatic
 included in the generated RST.
 """
 
+from docutils import nodes
+from docutils.parsers.rst import roles
+from sphinx.util.docutils import SphinxRole
 import re
 
-from docutils import nodes
-from sphinx.util.docutils import SphinxRole
 
 # Pattern for validating citation keys: UPPERCASE-WITH-HYPHENS-AND-NUMBERS
 CITATION_KEY_PATTERN = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
@@ -118,6 +119,10 @@ class BibEntryRole(SphinxRole):
     Usage: :bibentry:`gui_XxxYyyZzz:CITATION-KEY`
     
     Renders as: [CITATION-KEY] ↩ (bold, with an anchor for linking and a back button)
+    
+    The back button has smart behavior:
+    - If clicked after navigating from a :cite: link, returns to that location
+    - If accessed directly (URL, scrolling), jumps to the first :cite: reference
     """
     
     def run(self):
@@ -143,11 +148,12 @@ class BibEntryRole(SphinxRole):
         strong = nodes.strong('', f'[{citation_key}]')
         strong['classes'].append('bibentry-key')
         
-        # Create the back link using raw HTML for the onclick handler
+        # Create the back link using raw HTML
+        # Calls citationGoBack() which handles smart navigation
         back_link = nodes.raw(
             '',
-            '<a href="javascript:void(0)" onclick="history.back()" '
-            'class="bibentry-back" title="Return to citation">↩</a>',
+            f'<a href="javascript:void(0)" onclick="citationGoBack(\'{anchor_id}\')" '
+            f'class="bibentry-back" title="Return to citation">↩</a>',
             format='html'
         )
         
@@ -162,8 +168,9 @@ def setup(app):
     app.add_role('cite', CiteRole())
     app.add_role('bibentry', BibEntryRole())
     
-    # Add CSS for styling
+    # Add CSS and JS for styling and navigation
     app.add_css_file('citation.css')
+    app.add_js_file('citation.js')
     
     return {
         'version': '0.1',

@@ -12,6 +12,19 @@
     color: #004499;
 }
 
+/* Highlight animation when navigating back to a citation */
+.citation-ref.citation-highlight {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+    animation: citation-fade 2s ease-out;
+}
+
+@keyframes citation-fade {
+    0% { background-color: #ffc107; }
+    100% { background-color: #fff3cd; }
+}
+
 /* Bibliography entry keys - bold anchors */
 .bibentry-key {
     color: #333;
