@@ -33,11 +33,10 @@ When using generate_guideline_templates.py, the guideline ID prefix is automatic
 included in the generated RST.
 """
 
-from docutils import nodes
-from docutils.parsers.rst import roles
-from sphinx.util.docutils import SphinxRole
 import re
 
+from docutils import nodes
+from sphinx.util.docutils import SphinxRole
 
 # Pattern for validating citation keys: UPPERCASE-WITH-HYPHENS-AND-NUMBERS
 CITATION_KEY_PATTERN = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
