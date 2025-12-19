@@ -1,222 +1,6 @@
 {
   "documents": [
     {
-      "title": "Macros",
-      "link": "coding-guidelines/macros/index.html",
-      "guidelines": [
-        {
-          "id": "gui_13XWp3mb0g2P",
-          "title": "Attribute macros shall not be used",
-          "link": "coding-guidelines/macros/index.html#gui_13XWp3mb0g2P",
-          "checksum": "0945d5e2dc1eba12e0ca5026b10b889419504cb45a4546ad08d11d7b64c24db7",
-          "rationale": {
-            "id": "rat_X8uCF5yx7Mpo",
-            "link": "coding-guidelines/macros/index.html#rat_X8uCF5yx7Mpo",
-            "checksum": "73b5c7dce2fe65117023505ac9f5075d4fcb7eb682819ee3de75005670f5c0e3"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_eW374waRPbeL",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_eW374waRPbeL",
-            "checksum": "774230f1ac4f727430f784102c8c320fd407eccd9db72a78296f78a1afe979f4"
-          },
-          "compliant_example": {
-            "id": "compl_ex_Mg8ePOgbGJeW",
-            "link": "coding-guidelines/macros/index.html#compl_ex_Mg8ePOgbGJeW",
-            "checksum": "33701d236a97b9c57ab7865a50b72a309af7e8d84b266634e772337c62b98ce1"
-          }
-        },
-        {
-          "id": "gui_2jjWUoF1teOY",
-          "title": "A macro should not be used in place of a function",
-          "link": "coding-guidelines/macros/index.html#gui_2jjWUoF1teOY",
-          "checksum": "b05a4d6ee2f66530c401e3a04a0e4e5623d3df8fa62017675b063f0febc20fd7",
-          "rationale": {
-            "id": "rat_M9bp23ctkzQ7",
-            "link": "coding-guidelines/macros/index.html#rat_M9bp23ctkzQ7",
-            "checksum": "a2a7a890bb82ec1674b234ca8ce408e03ffcc687c3be59c40ac6c245c1e3674f"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_TZgk2vG42t2r",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_TZgk2vG42t2r",
-            "checksum": "b6b8c77185f4ac791be3a84e587fbb5c2c2f12aec61114801230dc7ac40ce6d6"
-          },
-          "compliant_example": {
-            "id": "compl_ex_iPTgzrvO7qr3",
-            "link": "coding-guidelines/macros/index.html#compl_ex_iPTgzrvO7qr3",
-            "checksum": "867cd1b77a1a902f8b75583f9c5ee7b44e0b28ec1cb6515caec3b9f5677b49f5"
-          }
-        },
-        {
-          "id": "gui_66FSqzD55VRZ",
-          "title": "Procedural macros should not be used",
-          "link": "coding-guidelines/macros/index.html#gui_66FSqzD55VRZ",
-          "checksum": "483f73296d15bdd80128ccc3b44e26a44c1fb68ef1204631d5c9d2b591ed0d83",
-          "rationale": {
-            "id": "rat_AmCavSymv3Ev",
-            "link": "coding-guidelines/macros/index.html#rat_AmCavSymv3Ev",
-            "checksum": "29d95b7fe0f41441147a90c962d685398fc1baaf334216676159075e4a0f02f9"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_pJhVZW6a1HP9",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_pJhVZW6a1HP9",
-            "checksum": "602f6dde52bbb4535fc61286334aef21e9a7c885ea59e646e760cf9e25e76dec"
-          },
-          "compliant_example": {
-            "id": "compl_ex_4VFyucETB7C3",
-            "link": "coding-guidelines/macros/index.html#compl_ex_4VFyucETB7C3",
-            "checksum": "13e8088561e4645ed3bdcb12f3b16a56dce8664b199810a00881b65a329a95ef"
-          }
-        },
-        {
-          "id": "gui_8hs33nyp0ipX",
-          "title": "Shall ensure complete hygiene of macros",
-          "link": "coding-guidelines/macros/index.html#gui_8hs33nyp0ipX",
-          "checksum": "94268355b0831befeeca47bd2b5cbc5ad54425b13468a8bdfbe8b15d8c838209",
-          "rationale": {
-            "id": "rat_e9iS187skbHH",
-            "link": "coding-guidelines/macros/index.html#rat_e9iS187skbHH",
-            "checksum": "a515a099e43e133d96bd5e3e22f26bf5bbbb3581ec39bae4e12ec2e125b7902b"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_lRt4LBen6Lkc",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_lRt4LBen6Lkc",
-            "checksum": "cdb6056b9b4937e687c2eba417a63bec6b8b1ed545cd8217c5d589b683c60e66"
-          },
-          "compliant_example": {
-            "id": "compl_ex_GLP05s9c1g8N",
-            "link": "coding-guidelines/macros/index.html#compl_ex_GLP05s9c1g8N",
-            "checksum": "56c19da4e211d221a5aec2807f1e8068f7187e7fb7bc84712e2eb68d21bb30ef"
-          }
-        },
-        {
-          "id": "gui_FRLaMIMb4t3S",
-          "title": "Do not hide unsafe blocks within macro expansions",
-          "link": "coding-guidelines/macros/index.html#gui_FRLaMIMb4t3S",
-          "checksum": "3f56886f02e20ec253bab1b37927e8d100609143b6ee96cede86d94fde5c50bb",
-          "rationale": {
-            "id": "rat_WJubG7KuUDLW",
-            "link": "coding-guidelines/macros/index.html#rat_WJubG7KuUDLW",
-            "checksum": "af9f689aafe5fea65c176ae3cdf483f8082cd5784f613df35849d7a1d5b79734"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_AyFnP0lJLHxi",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_AyFnP0lJLHxi",
-            "checksum": "aeeda128577bed6bed5cfb02480c26227af1cca8f3bc4cb134e146043de44a32"
-          },
-          "compliant_example": {
-            "id": "compl_ex_pO5gP1aj2v4F",
-            "link": "coding-guidelines/macros/index.html#compl_ex_pO5gP1aj2v4F",
-            "checksum": "45e6687438f6bb347c24353e7857d7b8558135fc402031641e212d74c2601cb8"
-          }
-        },
-        {
-          "id": "gui_SJMrWDYZ0dN4",
-          "title": "Names in a macro definition shall use a fully qualified path",
-          "link": "coding-guidelines/macros/index.html#gui_SJMrWDYZ0dN4",
-          "checksum": "66921e8f3b3a3dbc12111026cdc266fdcf606c68e98afc7bc16213a9215cde35",
-          "rationale": {
-            "id": "rat_VRNXaxmW1l2s",
-            "link": "coding-guidelines/macros/index.html#rat_VRNXaxmW1l2s",
-            "checksum": "a7e35af42a1d76eca94475d8ba170cb42726e7d706faaf8107d0dd8495884980"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_m2XR1ihTbCQS",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_m2XR1ihTbCQS",
-            "checksum": "b17a8c7d6a7d82bab03697f2173be27cea82e8ad56afc0e28729f89a7455822b"
-          },
-          "compliant_example": {
-            "id": "compl_ex_xyaShvxL9JAM",
-            "link": "coding-guidelines/macros/index.html#compl_ex_xyaShvxL9JAM",
-            "checksum": "7a58007bbd340c91f477dd3106d72fad652a1c903ec1e5535737e7475e976748"
-          }
-        },
-        {
-          "id": "gui_WJlWqgIxmE8P",
-          "title": "Shall not use Function-like Macros",
-          "link": "coding-guidelines/macros/index.html#gui_WJlWqgIxmE8P",
-          "checksum": "5c05daf9b1a966f19f25fdcb2e55b4ff7db3a33a4a16c55b8de8c89f4a7cad8f",
-          "rationale": {
-            "id": "rat_C8RRidiVzhRj",
-            "link": "coding-guidelines/macros/index.html#rat_C8RRidiVzhRj",
-            "checksum": "f0ab9c538f869155123f9abe6386b8c475ffddfff0414d8adb176e97d7fc87cb"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_TjRiRkmBY6wG",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_TjRiRkmBY6wG",
-            "checksum": "43d049fcf2d2b814860f5e356d5bd11b8bd20eb3876e639352aad2069920c39c"
-          },
-          "compliant_example": {
-            "id": "compl_ex_AEKEOYhBWPMl",
-            "link": "coding-guidelines/macros/index.html#compl_ex_AEKEOYhBWPMl",
-            "checksum": "4dc6e4848f6005a33fa3126c23239477a3956532a1e23b4c6eda6fde72e3acdb"
-          }
-        },
-        {
-          "id": "gui_a1mHfjgKk4Xr",
-          "title": "Shall not invoke macros",
-          "link": "coding-guidelines/macros/index.html#gui_a1mHfjgKk4Xr",
-          "checksum": "7afae6c4eae2f37e12d495a9e7ec7229cbd1e37fd340705946ebd04b0096d1b4",
-          "rationale": {
-            "id": "rat_62mSorNF05kD",
-            "link": "coding-guidelines/macros/index.html#rat_62mSorNF05kD",
-            "checksum": "33178fcbcba8b875b47bd3c47120ba24e3b985245d4dfe2231e723f903221032"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_hP5KLhqQfDcd",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_hP5KLhqQfDcd",
-            "checksum": "c3e95668e9aa03a5967676ab34194cdc19ea49d19e598c56bdb50dc83797d4f8"
-          },
-          "compliant_example": {
-            "id": "compl_ex_ti7GWHCOhUvT",
-            "link": "coding-guidelines/macros/index.html#compl_ex_ti7GWHCOhUvT",
-            "checksum": "24150d0e8a6fb812906f86195c616de5f35c863aeb8aca18b4574f33499e4f49"
-          }
-        },
-        {
-          "id": "gui_h0uG1C9ZjryA",
-          "title": "Shall not use Declarative Macros",
-          "link": "coding-guidelines/macros/index.html#gui_h0uG1C9ZjryA",
-          "checksum": "5191179ac1a72217406a45c2a01d78e7f98e1356011ea5f2e369b86a442b4ae6",
-          "rationale": {
-            "id": "rat_U3AEUPyaUhcb",
-            "link": "coding-guidelines/macros/index.html#rat_U3AEUPyaUhcb",
-            "checksum": "7f9b0c8f85b90fbf69cf43167288f2f7ca8b4daacaeeb4b5f17df1709bcf8199"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_Gb4zimei8cNI",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_Gb4zimei8cNI",
-            "checksum": "40ef3d1bbd33c2948be59ff38991208794bf8e60288f00f30af73107b61bbffd"
-          },
-          "compliant_example": {
-            "id": "compl_ex_Pw7YCh4Iv47Z",
-            "link": "coding-guidelines/macros/index.html#compl_ex_Pw7YCh4Iv47Z",
-            "checksum": "4f396be3c26beed0f897e7b5bf8c3d4a5ff64c35d6bf00490113f1179cf34b8c"
-          }
-        },
-        {
-          "id": "gui_uuDOArzyO3Qw",
-          "title": "Shall not write code that expands macros",
-          "link": "coding-guidelines/macros/index.html#gui_uuDOArzyO3Qw",
-          "checksum": "6f70651bc07bd475602d79067e57509cf31b4f5f3e7b567777814a28f3d9f288",
-          "rationale": {
-            "id": "rat_dNgSvC0SZ3JJ",
-            "link": "coding-guidelines/macros/index.html#rat_dNgSvC0SZ3JJ",
-            "checksum": "2f0caa239732c7a1825aebde1d27d9a0f9fee6cb3e60c0115cce9379bc203c1f"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_g9j8shyGM2Rh",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_g9j8shyGM2Rh",
-            "checksum": "88e705e409f4335d9eea98c3497c28e74fba5b23ccc92091cad2d8ab475af79f"
-          },
-          "compliant_example": {
-            "id": "compl_ex_cFPg6y7upNdl",
-            "link": "coding-guidelines/macros/index.html#compl_ex_cFPg6y7upNdl",
-            "checksum": "ad4e889b094cc679e041ec4783aba29996d03cd618b7c058b2055a3272fd17b6"
-          }
-        }
-      ]
-    },
-    {
       "title": "Types and Traits",
       "link": "coding-guidelines/types-and-traits/index.html",
       "guidelines": [
@@ -239,7 +23,234 @@
             "id": "compl_ex_WTe7GoPu5Ez1",
             "link": "coding-guidelines/types-and-traits/index.html#compl_ex_WTe7GoPu5Ez1",
             "checksum": "419315f6f0e9c2fbcbc620fdd017223ddc7c2bd78a47377508f3bf620ccc719f"
-          }
+          },
+          "bibliography": null
+        }
+      ]
+    },
+    {
+      "title": "Macros",
+      "link": "coding-guidelines/macros/index.html",
+      "guidelines": [
+        {
+          "id": "gui_13XWp3mb0g2P",
+          "title": "Attribute macros shall not be used",
+          "link": "coding-guidelines/macros/index.html#gui_13XWp3mb0g2P",
+          "checksum": "0945d5e2dc1eba12e0ca5026b10b889419504cb45a4546ad08d11d7b64c24db7",
+          "rationale": {
+            "id": "rat_X8uCF5yx7Mpo",
+            "link": "coding-guidelines/macros/index.html#rat_X8uCF5yx7Mpo",
+            "checksum": "73b5c7dce2fe65117023505ac9f5075d4fcb7eb682819ee3de75005670f5c0e3"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_eW374waRPbeL",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_eW374waRPbeL",
+            "checksum": "774230f1ac4f727430f784102c8c320fd407eccd9db72a78296f78a1afe979f4"
+          },
+          "compliant_example": {
+            "id": "compl_ex_Mg8ePOgbGJeW",
+            "link": "coding-guidelines/macros/index.html#compl_ex_Mg8ePOgbGJeW",
+            "checksum": "33701d236a97b9c57ab7865a50b72a309af7e8d84b266634e772337c62b98ce1"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_2jjWUoF1teOY",
+          "title": "A macro should not be used in place of a function",
+          "link": "coding-guidelines/macros/index.html#gui_2jjWUoF1teOY",
+          "checksum": "b05a4d6ee2f66530c401e3a04a0e4e5623d3df8fa62017675b063f0febc20fd7",
+          "rationale": {
+            "id": "rat_M9bp23ctkzQ7",
+            "link": "coding-guidelines/macros/index.html#rat_M9bp23ctkzQ7",
+            "checksum": "a2a7a890bb82ec1674b234ca8ce408e03ffcc687c3be59c40ac6c245c1e3674f"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_TZgk2vG42t2r",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_TZgk2vG42t2r",
+            "checksum": "b6b8c77185f4ac791be3a84e587fbb5c2c2f12aec61114801230dc7ac40ce6d6"
+          },
+          "compliant_example": {
+            "id": "compl_ex_iPTgzrvO7qr3",
+            "link": "coding-guidelines/macros/index.html#compl_ex_iPTgzrvO7qr3",
+            "checksum": "867cd1b77a1a902f8b75583f9c5ee7b44e0b28ec1cb6515caec3b9f5677b49f5"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_66FSqzD55VRZ",
+          "title": "Procedural macros should not be used",
+          "link": "coding-guidelines/macros/index.html#gui_66FSqzD55VRZ",
+          "checksum": "483f73296d15bdd80128ccc3b44e26a44c1fb68ef1204631d5c9d2b591ed0d83",
+          "rationale": {
+            "id": "rat_AmCavSymv3Ev",
+            "link": "coding-guidelines/macros/index.html#rat_AmCavSymv3Ev",
+            "checksum": "29d95b7fe0f41441147a90c962d685398fc1baaf334216676159075e4a0f02f9"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_pJhVZW6a1HP9",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_pJhVZW6a1HP9",
+            "checksum": "602f6dde52bbb4535fc61286334aef21e9a7c885ea59e646e760cf9e25e76dec"
+          },
+          "compliant_example": {
+            "id": "compl_ex_4VFyucETB7C3",
+            "link": "coding-guidelines/macros/index.html#compl_ex_4VFyucETB7C3",
+            "checksum": "13e8088561e4645ed3bdcb12f3b16a56dce8664b199810a00881b65a329a95ef"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_8hs33nyp0ipX",
+          "title": "Shall ensure complete hygiene of macros",
+          "link": "coding-guidelines/macros/index.html#gui_8hs33nyp0ipX",
+          "checksum": "94268355b0831befeeca47bd2b5cbc5ad54425b13468a8bdfbe8b15d8c838209",
+          "rationale": {
+            "id": "rat_e9iS187skbHH",
+            "link": "coding-guidelines/macros/index.html#rat_e9iS187skbHH",
+            "checksum": "a515a099e43e133d96bd5e3e22f26bf5bbbb3581ec39bae4e12ec2e125b7902b"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_lRt4LBen6Lkc",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_lRt4LBen6Lkc",
+            "checksum": "cdb6056b9b4937e687c2eba417a63bec6b8b1ed545cd8217c5d589b683c60e66"
+          },
+          "compliant_example": {
+            "id": "compl_ex_GLP05s9c1g8N",
+            "link": "coding-guidelines/macros/index.html#compl_ex_GLP05s9c1g8N",
+            "checksum": "56c19da4e211d221a5aec2807f1e8068f7187e7fb7bc84712e2eb68d21bb30ef"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_FRLaMIMb4t3S",
+          "title": "Do not hide unsafe blocks within macro expansions",
+          "link": "coding-guidelines/macros/index.html#gui_FRLaMIMb4t3S",
+          "checksum": "3f56886f02e20ec253bab1b37927e8d100609143b6ee96cede86d94fde5c50bb",
+          "rationale": {
+            "id": "rat_WJubG7KuUDLW",
+            "link": "coding-guidelines/macros/index.html#rat_WJubG7KuUDLW",
+            "checksum": "af9f689aafe5fea65c176ae3cdf483f8082cd5784f613df35849d7a1d5b79734"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_AyFnP0lJLHxi",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_AyFnP0lJLHxi",
+            "checksum": "aeeda128577bed6bed5cfb02480c26227af1cca8f3bc4cb134e146043de44a32"
+          },
+          "compliant_example": {
+            "id": "compl_ex_pO5gP1aj2v4F",
+            "link": "coding-guidelines/macros/index.html#compl_ex_pO5gP1aj2v4F",
+            "checksum": "45e6687438f6bb347c24353e7857d7b8558135fc402031641e212d74c2601cb8"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_SJMrWDYZ0dN4",
+          "title": "Names in a macro definition shall use a fully qualified path",
+          "link": "coding-guidelines/macros/index.html#gui_SJMrWDYZ0dN4",
+          "checksum": "66921e8f3b3a3dbc12111026cdc266fdcf606c68e98afc7bc16213a9215cde35",
+          "rationale": {
+            "id": "rat_VRNXaxmW1l2s",
+            "link": "coding-guidelines/macros/index.html#rat_VRNXaxmW1l2s",
+            "checksum": "a7e35af42a1d76eca94475d8ba170cb42726e7d706faaf8107d0dd8495884980"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_m2XR1ihTbCQS",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_m2XR1ihTbCQS",
+            "checksum": "b17a8c7d6a7d82bab03697f2173be27cea82e8ad56afc0e28729f89a7455822b"
+          },
+          "compliant_example": {
+            "id": "compl_ex_xyaShvxL9JAM",
+            "link": "coding-guidelines/macros/index.html#compl_ex_xyaShvxL9JAM",
+            "checksum": "7a58007bbd340c91f477dd3106d72fad652a1c903ec1e5535737e7475e976748"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_WJlWqgIxmE8P",
+          "title": "Shall not use Function-like Macros",
+          "link": "coding-guidelines/macros/index.html#gui_WJlWqgIxmE8P",
+          "checksum": "5c05daf9b1a966f19f25fdcb2e55b4ff7db3a33a4a16c55b8de8c89f4a7cad8f",
+          "rationale": {
+            "id": "rat_C8RRidiVzhRj",
+            "link": "coding-guidelines/macros/index.html#rat_C8RRidiVzhRj",
+            "checksum": "f0ab9c538f869155123f9abe6386b8c475ffddfff0414d8adb176e97d7fc87cb"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_TjRiRkmBY6wG",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_TjRiRkmBY6wG",
+            "checksum": "43d049fcf2d2b814860f5e356d5bd11b8bd20eb3876e639352aad2069920c39c"
+          },
+          "compliant_example": {
+            "id": "compl_ex_AEKEOYhBWPMl",
+            "link": "coding-guidelines/macros/index.html#compl_ex_AEKEOYhBWPMl",
+            "checksum": "4dc6e4848f6005a33fa3126c23239477a3956532a1e23b4c6eda6fde72e3acdb"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_a1mHfjgKk4Xr",
+          "title": "Shall not invoke macros",
+          "link": "coding-guidelines/macros/index.html#gui_a1mHfjgKk4Xr",
+          "checksum": "7afae6c4eae2f37e12d495a9e7ec7229cbd1e37fd340705946ebd04b0096d1b4",
+          "rationale": {
+            "id": "rat_62mSorNF05kD",
+            "link": "coding-guidelines/macros/index.html#rat_62mSorNF05kD",
+            "checksum": "33178fcbcba8b875b47bd3c47120ba24e3b985245d4dfe2231e723f903221032"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_hP5KLhqQfDcd",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_hP5KLhqQfDcd",
+            "checksum": "c3e95668e9aa03a5967676ab34194cdc19ea49d19e598c56bdb50dc83797d4f8"
+          },
+          "compliant_example": {
+            "id": "compl_ex_ti7GWHCOhUvT",
+            "link": "coding-guidelines/macros/index.html#compl_ex_ti7GWHCOhUvT",
+            "checksum": "24150d0e8a6fb812906f86195c616de5f35c863aeb8aca18b4574f33499e4f49"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_h0uG1C9ZjryA",
+          "title": "Shall not use Declarative Macros",
+          "link": "coding-guidelines/macros/index.html#gui_h0uG1C9ZjryA",
+          "checksum": "5191179ac1a72217406a45c2a01d78e7f98e1356011ea5f2e369b86a442b4ae6",
+          "rationale": {
+            "id": "rat_U3AEUPyaUhcb",
+            "link": "coding-guidelines/macros/index.html#rat_U3AEUPyaUhcb",
+            "checksum": "7f9b0c8f85b90fbf69cf43167288f2f7ca8b4daacaeeb4b5f17df1709bcf8199"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_Gb4zimei8cNI",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_Gb4zimei8cNI",
+            "checksum": "40ef3d1bbd33c2948be59ff38991208794bf8e60288f00f30af73107b61bbffd"
+          },
+          "compliant_example": {
+            "id": "compl_ex_Pw7YCh4Iv47Z",
+            "link": "coding-guidelines/macros/index.html#compl_ex_Pw7YCh4Iv47Z",
+            "checksum": "4f396be3c26beed0f897e7b5bf8c3d4a5ff64c35d6bf00490113f1179cf34b8c"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_uuDOArzyO3Qw",
+          "title": "Shall not write code that expands macros",
+          "link": "coding-guidelines/macros/index.html#gui_uuDOArzyO3Qw",
+          "checksum": "6f70651bc07bd475602d79067e57509cf31b4f5f3e7b567777814a28f3d9f288",
+          "rationale": {
+            "id": "rat_dNgSvC0SZ3JJ",
+            "link": "coding-guidelines/macros/index.html#rat_dNgSvC0SZ3JJ",
+            "checksum": "2f0caa239732c7a1825aebde1d27d9a0f9fee6cb3e60c0115cce9379bc203c1f"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_g9j8shyGM2Rh",
+            "link": "coding-guidelines/macros/index.html#non_compl_ex_g9j8shyGM2Rh",
+            "checksum": "88e705e409f4335d9eea98c3497c28e74fba5b23ccc92091cad2d8ab475af79f"
+          },
+          "compliant_example": {
+            "id": "compl_ex_cFPg6y7upNdl",
+            "link": "coding-guidelines/macros/index.html#compl_ex_cFPg6y7upNdl",
+            "checksum": "ad4e889b094cc679e041ec4783aba29996d03cd618b7c058b2055a3272fd17b6"
+          },
+          "bibliography": null
         }
       ]
     },
@@ -266,7 +277,8 @@
             "id": "compl_ex_k1CD6xoZxhXc",
             "link": "coding-guidelines/expressions/index.html#compl_ex_k1CD6xoZxhXc",
             "checksum": "f82b16eaa29059625f71ff1ddd10cd5d85967d612b56a8463409e822860adcfc"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_ADHABsmK9FXz",
@@ -287,7 +299,8 @@
             "id": "compl_ex_uilHTIOgxD37",
             "link": "coding-guidelines/expressions/index.html#compl_ex_uilHTIOgxD37",
             "checksum": "82bf3860518e7b537406f1d645c5a467040afae1a59c052111487c77573ac71f"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_HDnAZ7EZ4z6G",
@@ -308,7 +321,8 @@
             "id": "compl_ex_W08ckDrkOhkt",
             "link": "coding-guidelines/expressions/index.html#compl_ex_W08ckDrkOhkt",
             "checksum": "74dce02db115089bb17ecf0bfbf5b4f29c243482e6cfce91a6f563ae8ac05155"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_LvmzGKdsAgI5",
@@ -329,7 +343,8 @@
             "id": "compl_ex_Ux1WqHbGKV74",
             "link": "coding-guidelines/expressions/index.html#compl_ex_Ux1WqHbGKV74",
             "checksum": "73c12656201c56804e519a2c580095ebdb290c165dabbccafc9a3af82d918c5f"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_PM8Vpf7lZ51U",
@@ -350,7 +365,8 @@
             "id": "compl_ex_oneKuF52yzrx",
             "link": "coding-guidelines/expressions/index.html#compl_ex_oneKuF52yzrx",
             "checksum": "738eda4ff27367a9d3f491be69ae45479ad8115ee2ce4c0940983255453b9fcd"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_RHvQj8BHlz9b",
@@ -371,7 +387,8 @@
             "id": "compl_ex_xpPQqYeEPGIo",
             "link": "coding-guidelines/expressions/index.html#compl_ex_xpPQqYeEPGIo",
             "checksum": "1aa78cc239864fe8e3d3bde4f28f7816245687131ffc19f2f1130c8166afb19a"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_dCquvqE1csI3",
@@ -392,7 +409,8 @@
             "id": "compl_ex_BgUHiRB4kc4d",
             "link": "coding-guidelines/expressions/index.html#compl_ex_BgUHiRB4kc4d",
             "checksum": "6c18b055c11e400119fe60ca850351a97385dc900e937ba9a890d1a532afd929"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_iv9yCMHRgpE0",
@@ -413,7 +431,8 @@
             "id": "compl_ex_oBoluiKSvREu",
             "link": "coding-guidelines/expressions/index.html#compl_ex_oBoluiKSvREu",
             "checksum": "fe3e753c738564641a32488257046bba0df45ac347c34325b6820b5271fc646f"
-          }
+          },
+          "bibliography": null
         },
         {
           "id": "gui_kMbiWbn8Z6g5",
@@ -434,6 +453,33 @@
             "id": "compl_ex_Ri9pP5Ch3kcc",
             "link": "coding-guidelines/expressions/index.html#compl_ex_Ri9pP5Ch3kcc",
             "checksum": "11c559969903d2387d632439611bdc9e727f9ce6384c4da4dc20d9019839131e"
+          },
+          "bibliography": null
+        },
+        {
+          "id": "gui_Bib7x9KmPq2nL",
+          "title": "Example guideline with bibliography",
+          "link": "coding-guidelines/expressions/index.html#gui_Bib7x9KmPq2nL",
+          "checksum": "67891b17301f82128c076b589a17a720d89ed6d862ff2bda9757357bf97e6518",
+          "rationale": {
+            "id": "rat_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/index.html#rat_Bib7x9KmPq2nL",
+            "checksum": "da8dac03d3e0ae0361fec6ecd68e71803371b853d6ad805435094e03e5364735"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/index.html#non_compl_ex_Bib7x9KmPq2nL",
+            "checksum": "598203ecd956558b2ab6083cc1ab097f44708bd8a62bae3b93e2cd7f7381efc2"
+          },
+          "compliant_example": {
+            "id": "compl_ex_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/index.html#compl_ex_Bib7x9KmPq2nL",
+            "checksum": "04f516eee8175f586d16eb02fe0ef7b1b93c149c4aa92d4f251534ad17f39a5b"
+          },
+          "bibliography": {
+            "id": "bib_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/index.html#bib_Bib7x9KmPq2nL",
+            "checksum": "1e386309454608ba5b2be0c6c665a52279b4d9a09c1779d582609293d19d1567"
           }
         }
       ]
@@ -461,7 +507,8 @@
             "id": "compl_ex_9pK3h65rfceO",
             "link": "coding-guidelines/associated-items/index.html#compl_ex_9pK3h65rfceO",
             "checksum": "80e8d9dc471507e68cd45bf50105b96f1f2558bede9facf9f64dbb07a1ad4545"
-          }
+          },
+          "bibliography": null
         }
       ]
     }
