@@ -22,6 +22,8 @@ class CodingGuidelinesDomain(Domain):
     label = "Rust Standard Library"
     roles = {
         "std": std_role.StdRefRole(),
+        "cite": citation_roles.CiteRole(),
+        "bibentry": citation_roles.BibEntryRole(),
     }
     directives = {}
     object_types = {}

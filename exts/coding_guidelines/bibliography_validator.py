@@ -30,18 +30,22 @@ from sphinx_needs.data import SphinxNeedsData
 
 from .common import bar_format, get_tqdm, logger
 
-# Citation key pattern: [UPPERCASE-WITH-HYPHENS] or [UPPERCASE-WITH-HYPHENS-AND-NUMBERS-123]
-CITATION_KEY_PATTERN = re.compile(r'^\[([A-Z][A-Z0-9-]*[A-Z0-9])\]$')
+# Citation key pattern for validation: UPPERCASE-WITH-HYPHENS
+# Used to validate keys after extraction
+VALID_CITATION_KEY_PATTERN = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
 
 # Pattern to find :cite: role references in text
 # Format: :cite:`gui_XxxYyyZzz:CITATION-KEY`
-CITE_ROLE_PATTERN = re.compile(r':cite:`(gui_[a-zA-Z0-9]+):([A-Z][A-Z0-9-]*[A-Z0-9])`')
+# Permissive pattern to capture potentially invalid keys for validation
+CITE_ROLE_PATTERN = re.compile(r':cite:`(gui_[a-zA-Z0-9]+):([^`]+)`')
 
 # Pattern to find :bibentry: role definitions in bibliography
 # Format: :bibentry:`gui_XxxYyyZzz:CITATION-KEY`
-BIBENTRY_ROLE_PATTERN = re.compile(r':bibentry:`(gui_[a-zA-Z0-9]+):([A-Z][A-Z0-9-]*[A-Z0-9])`')
+# Permissive pattern to capture potentially invalid keys for validation
+BIBENTRY_ROLE_PATTERN = re.compile(r':bibentry:`(gui_[a-zA-Z0-9]+):([^`]+)`')
 
 # Legacy pattern for plain text [KEY] format (for backwards compatibility)
+# This one stays strict since we only want to match valid-looking legacy refs
 PLAIN_CITATION_REF_PATTERN = re.compile(r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]')
 
 # URL pattern for extraction from bibliography content
@@ -50,6 +54,53 @@ URL_PATTERN = re.compile(r'https?://[^\s<>"\')\]]+')
 
 class BibliographyValidationError(SphinxError):
     category = "Bibliography Validation Error"
+
+
+def suggest_citation_key(invalid_key: str) -> str:
+    """
+    Suggest a valid citation key based on an invalid one.
+    
+    Transforms the key by:
+    - Converting to uppercase
+    - Replacing spaces and underscores with hyphens
+    - Removing invalid characters
+    - Ensuring it starts with a letter
+    - Ensuring it ends with a letter or number
+    
+    Args:
+        invalid_key: The invalid citation key
+        
+    Returns:
+        A suggested valid citation key
+    """
+    # Start with uppercase
+    suggested = invalid_key.upper()
+    
+    # Replace spaces and underscores with hyphens
+    suggested = re.sub(r'[\s_]+', '-', suggested)
+    
+    # Remove invalid characters (keep only A-Z, 0-9, and hyphens)
+    suggested = re.sub(r'[^A-Z0-9-]', '', suggested)
+    
+    # Remove leading/trailing hyphens
+    suggested = suggested.strip('-')
+    
+    # Collapse multiple hyphens
+    suggested = re.sub(r'-+', '-', suggested)
+    
+    # Ensure it starts with a letter
+    if suggested and not suggested[0].isalpha():
+        suggested = 'REF-' + suggested
+    
+    # Ensure it ends with a letter or number (not a hyphen)
+    if suggested and suggested[-1] == '-':
+        suggested = suggested[:-1]
+    
+    # Handle empty or too short result
+    if len(suggested) < 2:
+        suggested = 'REF-CITATION'
+    
+    return suggested
 
 
 def validate_citation_key_format(key: str) -> Tuple[bool, str]:
@@ -75,15 +126,11 @@ def validate_citation_key_format(key: str) -> Tuple[bool, str]:
     clean_key = key.strip('[]')
     
     if len(clean_key) > 50:
-        return False, f"Citation key '{clean_key}' exceeds maximum length of 50 characters"
+        return False, "Exceeds maximum length of 50 characters"
     
-    # Check format
-    key_format_pattern = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
-    if not key_format_pattern.match(clean_key):
-        return False, (
-            f"Citation key '{clean_key}' does not follow required format. "
-            "Expected: UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION, CERT-C-INT34)"
-        )
+    # Check format using the defined pattern
+    if not VALID_CITATION_KEY_PATTERN.match(clean_key):
+        return False, "Must be UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION)"
     
     return True, ""
 
@@ -127,8 +174,9 @@ def extract_bibliography_entries(content: str) -> List[Dict[str, str]]:
     # 2. The description and URL from the next line
     
     # First, find all :bibentry: roles and their positions
+    # Use permissive pattern to capture potentially invalid keys
     bibentry_pattern = re.compile(
-        r':bibentry:`gui_[a-zA-Z0-9]+:([A-Z][A-Z0-9-]*[A-Z0-9])`'
+        r':bibentry:`gui_[a-zA-Z0-9]+:([^`]+)`'
     )
     
     # Split content into lines for processing
@@ -359,18 +407,15 @@ def validate_bibliography(app: Sphinx, env) -> None:
     This function:
     1. Collects all bibliography entries from guidelines
     2. Validates citation key formats
-    3. Checks for duplicate URLs across guidelines
-    4. Optionally validates URL accessibility
-    5. Checks that citation references match definitions
+    3. Validates guideline ID matches in :cite: and :bibentry: roles
+    4. Checks for URL consistency across guidelines
+    5. Optionally validates URL accessibility
+    6. Checks that citation references match definitions
     
     Args:
         app: The Sphinx application
         env: The Sphinx environment
     """
-    if not app.config.bibliography_check_urls:
-        logger.info("Bibliography URL validation disabled")
-        return
-    
     logger.info("Validating bibliography entries...")
     
     data = SphinxNeedsData(env)
@@ -392,9 +437,13 @@ def validate_bibliography(app: Sphinx, env) -> None:
     # First pass: collect guidelines and their bibliographies
     guidelines = {k: v for k, v in all_needs.items() if v.get("type") == "guideline"}
     
+    if not guidelines:
+        logger.info("No guidelines found, skipping bibliography validation")
+        return
+    
     pbar = get_tqdm(
         iterable=guidelines.items(),
-        desc="Collecting bibliography data",
+        desc="Validating bibliography citations",
         bar_format=bar_format,
         unit="guideline",
     )
@@ -402,6 +451,33 @@ def validate_bibliography(app: Sphinx, env) -> None:
     for guideline_id, guideline in pbar:
         pbar.set_postfix(guideline=guideline_id[:20])
         source_file = guideline.get("docname", "unknown")
+        
+        # Get the full guideline content for :cite: role validation
+        guideline_content = guideline.get("content", "")
+        
+        # Check :cite: roles in guideline content for guideline ID mismatch and key format
+        for match in CITE_ROLE_PATTERN.finditer(guideline_content):
+            role_gid = match.group(1)
+            citation_key = match.group(2)
+            
+            # Check for guideline ID mismatch
+            if role_gid != guideline_id:
+                errors.append(
+                    f"Guideline ID mismatch in :cite: role ({source_file}):\n"
+                    f"  Role uses: {role_gid}\n"
+                    f"  Current guideline: {guideline_id}\n"
+                    f"  Copy-paste fix: :cite:`{guideline_id}:{citation_key}`"
+                )
+            
+            # Check citation key format
+            if not VALID_CITATION_KEY_PATTERN.match(citation_key):
+                suggested_key = suggest_citation_key(citation_key)
+                errors.append(
+                    f"Invalid citation key in :cite: role ({source_file}):\n"
+                    f"  Key: {citation_key}\n"
+                    f"  Must be UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION)\n"
+                    f"  Copy-paste fix: :cite:`{guideline_id}:{suggested_key}`"
+                )
         
         # Check for bibliography children
         parent_needs_back = guideline.get("parent_needs_back", [])
@@ -413,15 +489,32 @@ def validate_bibliography(app: Sphinx, env) -> None:
                 if child.get("type") == "bibliography":
                     bib_content = child.get("content", "")
                     
-                    # Extract and validate citation keys
-                    keys = extract_citation_keys_from_content(bib_content)
-                    for key in keys:
-                        is_valid, error_msg = validate_citation_key_format(key)
-                        if not is_valid:
-                            errors.append(f"{source_file}: {error_msg}")
+                    # Check :bibentry: roles for guideline ID mismatch and key format
+                    for match in BIBENTRY_ROLE_PATTERN.finditer(bib_content):
+                        role_gid = match.group(1)
+                        citation_key = match.group(2)
+                        
+                        # Check for guideline ID mismatch
+                        if role_gid != guideline_id:
+                            errors.append(
+                                f"Guideline ID mismatch in :bibentry: role ({source_file}):\n"
+                                f"  Role uses: {role_gid}\n"
+                                f"  Current guideline: {guideline_id}\n"
+                                f"  Copy-paste fix: :bibentry:`{guideline_id}:{citation_key}`"
+                            )
+                        
+                        # Check citation key format
+                        if not VALID_CITATION_KEY_PATTERN.match(citation_key):
+                            suggested_key = suggest_citation_key(citation_key)
+                            errors.append(
+                                f"Invalid citation key in :bibentry: role ({source_file}):\n"
+                                f"  Key: {citation_key}\n"
+                                f"  Must be UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION)\n"
+                                f"  Copy-paste fix: :bibentry:`{guideline_id}:{suggested_key}`"
+                            )
                         else:
-                            # Track which guidelines define this key
-                            citation_definitions[key].append(guideline_id)
+                            # Only track valid keys
+                            citation_definitions[citation_key].append(guideline_id)
                     
                     # Extract full bibliography entries for consistency checking
                     entries = extract_bibliography_entries(bib_content)
@@ -436,11 +529,11 @@ def validate_bibliography(app: Sphinx, env) -> None:
                                 entry.get('description', '')
                             ))
         
-        # Collect citation references from guideline content and rationale
-        guideline_content = guideline.get("content", "")
+        # Collect citation references from guideline content
         refs = extract_citation_references(guideline_content)
-        for ref in refs:
-            citation_references[guideline_id].add(f"[{ref}]")
+        for ref_tuple in refs:
+            ref_gid, ref_key = ref_tuple
+            citation_references[guideline_id].add(ref_key)
     
     pbar.close()
     
@@ -451,32 +544,32 @@ def validate_bibliography(app: Sphinx, env) -> None:
             # Multiple guidelines use this URL - check for consistency
             first_guideline, first_key, first_desc = entry_list[0]
             
-            inconsistencies = []
+            inconsistent_guidelines = []
             for guideline_id, citation_key, description in entry_list[1:]:
-                if citation_key != first_key:
-                    inconsistencies.append(
-                        f"    - {guideline_id}: uses key [{citation_key}] "
-                        f"(expected [{first_key}] from {first_guideline})"
-                    )
-                if description != first_desc:
-                    # Truncate long descriptions for readability
-                    desc_preview = description[:50] + "..." if len(description) > 50 else description
-                    first_preview = first_desc[:50] + "..." if len(first_desc) > 50 else first_desc
-                    inconsistencies.append(
-                        f"    - {guideline_id}: uses description \"{desc_preview}\"\n"
-                        f"      (expected \"{first_preview}\" from {first_guideline})"
-                    )
+                if citation_key != first_key or description != first_desc:
+                    inconsistent_guidelines.append(guideline_id)
             
-            if inconsistencies:
+            if inconsistent_guidelines:
+                # Build copy-pasteable fixes for each inconsistent guideline
+                fixes = []
+                for gid in inconsistent_guidelines:
+                    fix = (
+                        f"  In {gid}, replace the bibliography entry with:\n"
+                        f"    * - :bibentry:`{gid}:{first_key}`\n"
+                        f"      - {first_desc}{url}"
+                    )
+                    fixes.append(fix)
+                
                 msg = (
                     f"Inconsistent bibliography entry for URL:\n"
                     f"  URL: {url}\n"
-                    f"  First defined in: {first_guideline}\n"
+                    f"  Canonical entry (from {first_guideline}):\n"
                     f"    Citation key: [{first_key}]\n"
-                    f"    Description: \"{first_desc[:80]}{'...' if len(first_desc) > 80 else ''}\"\n"
-                    f"  Inconsistencies found:\n" +
-                    "\n".join(inconsistencies) + "\n"
-                    "  Action: Ensure all uses of this URL have identical citation key and description"
+                    f"    Description: {first_desc}\n"
+                    f"  Guidelines with inconsistent entries: {', '.join(inconsistent_guidelines)}\n"
+                    f"\n"
+                    f"  Copy-paste fixes:\n" +
+                    "\n\n".join(fixes)
                 )
                 if app.config.bibliography_fail_on_inconsistent:
                     errors.append(msg)
@@ -484,7 +577,7 @@ def validate_bibliography(app: Sphinx, env) -> None:
                     warnings.append(msg)
     
     # Validate URLs if enabled
-    if all_urls:
+    if app.config.bibliography_check_urls and all_urls:
         logger.info(f"Validating {len(all_urls)} URLs...")
         
         # Deduplicate URLs for checking
@@ -512,6 +605,8 @@ def validate_bibliography(app: Sphinx, env) -> None:
                     errors.append(msg)
                 else:
                     warnings.append(msg)
+    elif not app.config.bibliography_check_urls:
+        logger.info("URL accessibility validation disabled (set bibliography_check_urls = True to enable)")
     
     # Check for undefined citation references
     logger.info("Checking citation references...")
@@ -528,6 +623,7 @@ def validate_bibliography(app: Sphinx, env) -> None:
                     for child_id in parent_needs_back:
                         if child_id in all_needs and all_needs[child_id].get("type") == "bibliography":
                             bib_content = all_needs[child_id].get("content", "")
+                            # Check for the citation key in the bibliography content
                             if ref in bib_content:
                                 found_in_own_bib = True
                                 break
@@ -536,7 +632,7 @@ def validate_bibliography(app: Sphinx, env) -> None:
                         source_file = guideline.get("docname", "unknown")
                         warnings.append(
                             f"Undefined citation reference in {source_file}:\n"
-                            f"  Reference: {ref}\n"
+                            f"  Reference: [{ref}]\n"
                             f"  Guideline: {guideline_id}\n"
                             f"  Action: Add this citation to the bibliography or remove the reference"
                         )
@@ -559,7 +655,7 @@ def validate_bibliography(app: Sphinx, env) -> None:
     for warning in warnings:
         logger.warning(f"[bibliography_validator] {warning}")
     
-    # Report errors and potentially fail build
+    # Report errors and fail build
     if errors:
         error_message = "Bibliography validation failed:\n\n"
         for error in errors:

@@ -13,12 +13,12 @@ The bibliography feature allows guideline authors to include references to exter
 Contributors can reference citations within guideline text using the `:cite:` role:
 
 ```rst
-As documented in :cite:`gui_Abc123XyzQrs:RUST-REF-UNION`, union types have specific safety requirements.
+As documented in :cite:`gui_Kx9mPq2nL7Yz:RUST-REF-UNION`, union types have specific safety requirements.
 ```
 
 **Format:** `:cite:`{guideline_id}:{CITATION-KEY}``
 
-- `guideline_id` is the parent guideline's ID (e.g., `gui_Abc123XyzQrs`)
+- `guideline_id` is the parent guideline's ID (e.g., `gui_Kx9mPq2nL7Yz`)
 - `CITATION-KEY` is the citation key in UPPERCASE-WITH-HYPHENS format
 
 The `:cite:` role renders as a clickable `[CITATION-KEY]` link that navigates to the bibliography entry.
@@ -29,13 +29,13 @@ Each guideline can include an optional bibliography section with entries defined
 
 ```rst
 .. guideline:: Union Field Validity
-   :id: gui_Abc123XyzQrs
+   :id: gui_Kx9mPq2nL7Yz
    ...
 
-   As documented in :cite:`gui_Abc123XyzQrs:RUST-REF-UNION`, unions have requirements.
+   As documented in :cite:`gui_Kx9mPq2nL7Yz:RUST-REF-UNION`, unions have requirements.
 
    .. bibliography::
-      :id: bib_Abc123XyzQrs
+      :id: bib_Kx9mPq2nL7Yz
       :status: draft
 
       .. list-table::
@@ -43,9 +43,9 @@ Each guideline can include an optional bibliography section with entries defined
          :widths: auto
          :class: bibliography-table
 
-         * - :bibentry:`gui_Abc123XyzQrs:RUST-REF-UNION`
+         * - :bibentry:`gui_Kx9mPq2nL7Yz:RUST-REF-UNION`
            - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
-         * - :bibentry:`gui_Abc123XyzQrs:CERT-C-INT34`
+         * - :bibentry:`gui_Kx9mPq2nL7Yz:CERT-C-INT34`
            - SEI CERT C Coding Standard. "INT34-C." https://wiki.sei.cmu.edu/confluence/x/ItcxBQ
 ```
 
@@ -55,7 +55,7 @@ The `:bibentry:` role creates an anchor that the `:cite:` role links to, and ren
 
 ### 3. Why Namespacing?
 
-The guideline ID prefix (`gui_Abc123XyzQrs:`) is required to avoid conflicts when multiple guidelines use the same citation key (e.g., both guidelines might cite `RUST-REF-UNION`). The prefix ensures each citation anchor is unique across the entire documentation.
+The guideline ID prefix (`gui_Kx9mPq2nL7Yz:`) is required to avoid conflicts when multiple guidelines use the same citation key (e.g., both guidelines might cite `RUST-REF-UNION`). The prefix ensures each citation anchor is unique across the entire documentation.
 
 When using `generate_guideline_templates.py`, the guideline ID is automatically included in all `:cite:` and `:bibentry:` roles.
 
@@ -207,13 +207,21 @@ The `guidelines-ids.json` now includes bibliography data. All IDs follow the sam
 }
 ```
 
-## Error Messages
+## Error Messages and Build Failures
+
+All bibliography validation errors will **fail the build**. This ensures that invalid citations and mismatched guideline IDs are caught during development and CI.
+
+The validation runs in two places:
+1. **During document parsing**: The `:cite:` and `:bibentry:` roles check format and log errors
+2. **During consistency check**: The `bibliography_validator` scans all guidelines and raises `BibliographyValidationError` if any errors are found
+
+All error messages include copy-pasteable fixes to help contributors quickly resolve issues.
 
 ### Broken URL
 ```
-WARNING: [bibliography_validator] Broken URL in src/gui_Foo.rst:
+WARNING: [bibliography_validator] Broken URL in src/gui_Rm4kWp8sN2Qx.rst:
   URL: https://example.com/broken
-  Guideline: gui_Foo
+  Guideline: gui_Rm4kWp8sN2Qx
   Error: HTTP 404
   Action: Update or remove this reference
 ```
@@ -222,26 +230,61 @@ WARNING: [bibliography_validator] Broken URL in src/gui_Foo.rst:
 ```
 ERROR: Inconsistent bibliography entry for URL:
   URL: https://doc.rust-lang.org/reference/items/unions.html
-  First defined in: gui_UnionFieldValidity
+  Canonical entry (from gui_Kx9mPq2nL7Yz):
     Citation key: [RUST-REF-UNION]
-    Description: "The Rust Reference. 'Unions.'"
-  Inconsistencies found:
-    - gui_UnionLayout: uses key [RUST-UNION] (expected [RUST-REF-UNION] from gui_UnionFieldValidity)
-    - gui_UnionLayout: uses description "Rust Reference - Unions"
-      (expected "The Rust Reference. 'Unions.'" from gui_UnionFieldValidity)
-  Action: Ensure all uses of this URL have identical citation key and description
+    Description: The Rust Reference. "Unions."
+  Guidelines with inconsistent entries: gui_Ht5vBn3mJ9Lw, gui_Qp8xZc4kR6Fy
+
+  Copy-paste fixes:
+  In gui_Ht5vBn3mJ9Lw, replace the bibliography entry with:
+    * - :bibentry:`gui_Ht5vBn3mJ9Lw:RUST-REF-UNION`
+      - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
+
+  In gui_Qp8xZc4kR6Fy, replace the bibliography entry with:
+    * - :bibentry:`gui_Qp8xZc4kR6Fy:RUST-REF-UNION`
+      - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
 ```
 
 ### Invalid Citation Key
 ```
-ERROR: Invalid citation key format: 'lowercase-key'. 
-Expected: UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION, CERT-C-INT34)
+ERROR: Invalid citation key in :cite: role (coding-guidelines/expressions/gui_Bob7x9KmPq2nL):
+  Key: CERT-C-int34
+  Must be UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION)
+  Copy-paste fix: :cite:`gui_Bob7x9KmPq2nL:CERT-C-INT34`
 ```
 
 ### Invalid Role Format
+
+The error message automatically detects the guideline ID from context and includes it in the suggested fix:
+
 ```
-ERROR: Invalid :cite: format: "RUST-REF-UNION". 
-Expected format: :cite:`gui_XxxYyyZzz:CITATION-KEY`
+ERROR: Invalid :cite: format: "RUST-REF-UNION".
+  Expected format: :cite:`gui_XxxYyyZzz:CITATION-KEY`
+  Suggested fix: :cite:`gui_Kx9mPq2nL7Yz:RUST-REF-UNION`
+```
+
+```
+ERROR: Invalid :bibentry: format: "[RUST-REF-UNION]".
+  Expected format: :bibentry:`gui_XxxYyyZzz:CITATION-KEY`
+  Suggested fix: :bibentry:`gui_Kx9mPq2nL7Yz:RUST-REF-UNION`
+```
+
+### Guideline ID Mismatch
+
+If the guideline ID in a role doesn't match the current guideline:
+
+```
+ERROR: Guideline ID mismatch in :cite: role.
+  Role uses: gui_Bib7x9KmPq2nL
+  Current guideline: gui_Bob7x9KmPq2nL
+  Copy-paste fix: :cite:`gui_Bob7x9KmPq2nL:RUST-REF-UNION`
+```
+
+```
+ERROR: Guideline ID mismatch in :bibentry: role.
+  Role uses: gui_Bib7x9KmPq2nL
+  Current guideline: gui_Bob7x9KmPq2nL
+  Copy-paste fix: :bibentry:`gui_Bob7x9KmPq2nL:RUST-REF-UNION`
 ```
 
 ## Migration
@@ -262,8 +305,8 @@ As documented in [RUST-REF-UNION], ...
 
 **After:**
 ```rst
-As documented in :cite:`gui_YourGuidelineId:RUST-REF-UNION`, ...
+As documented in :cite:`gui_Kx9mPq2nL7Yz:RUST-REF-UNION`, ...
 
-* - :bibentry:`gui_YourGuidelineId:RUST-REF-UNION`
+* - :bibentry:`gui_Kx9mPq2nL7Yz:RUST-REF-UNION`
   - The Rust Reference...
 ```
