@@ -83,9 +83,15 @@ Citation keys must follow these rules:
 
 The bibliography validator extension checks:
 - URL accessibility (HTTP status)
-- Duplicate URLs across guidelines
+- URL consistency across guidelines (same URL must use identical citation key and description)
 - Citation key format compliance
 - Citation references match definitions
+
+**Duplicate URL Consistency:** When the same URL appears in multiple guidelines, all instances must use:
+- The same citation key (e.g., all use `RUST-REF-UNION`)
+- The same description text (e.g., all use `The Rust Reference. "Unions."`)
+
+This ensures readers see consistent references throughout the documentation.
 
 ## Configuration
 
@@ -101,8 +107,9 @@ bibliography_url_timeout = 10
 # Whether broken URLs should fail the build
 bibliography_fail_on_broken = True
 
-# Whether duplicate URLs should fail the build
-bibliography_fail_on_duplicates = True
+# Whether inconsistent duplicate URLs should fail the build
+# (same URL with different citation keys or descriptions)
+bibliography_fail_on_inconsistent = True
 ```
 
 ### Build Commands
@@ -211,12 +218,18 @@ WARNING: [bibliography_validator] Broken URL in src/gui_Foo.rst:
   Action: Update or remove this reference
 ```
 
-### Duplicate URL
+### Inconsistent Duplicate URL
 ```
-WARNING: [bibliography_validator] Duplicate URL detected:
+ERROR: Inconsistent bibliography entry for URL:
   URL: https://doc.rust-lang.org/reference/items/unions.html
-  Found in: gui_UnionFieldValidity, gui_UnionLayout
-  Action: Consider if both guidelines need this reference
+  First defined in: gui_UnionFieldValidity
+    Citation key: [RUST-REF-UNION]
+    Description: "The Rust Reference. 'Unions.'"
+  Inconsistencies found:
+    - gui_UnionLayout: uses key [RUST-UNION] (expected [RUST-REF-UNION] from gui_UnionFieldValidity)
+    - gui_UnionLayout: uses description "Rust Reference - Unions"
+      (expected "The Rust Reference. 'Unions.'" from gui_UnionFieldValidity)
+  Action: Ensure all uses of this URL have identical citation key and description
 ```
 
 ### Invalid Citation Key

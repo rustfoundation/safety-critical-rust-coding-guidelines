@@ -6,7 +6,7 @@ Sphinx extension for validating bibliography entries in coding guidelines.
 
 This extension provides:
 1. URL validity checking - verifies that all URLs in bibliography entries are accessible
-2. Duplicate URL detection - warns when the same URL appears in multiple guidelines
+2. Duplicate URL consistency - ensures same URLs use identical citation keys and descriptions
 3. Citation key validation - ensures citation keys follow the required format
 4. Citation reference checking - verifies that referenced citations exist
 
@@ -14,7 +14,7 @@ Configuration options (in conf.py):
     bibliography_check_urls = True       # Enable URL validation
     bibliography_url_timeout = 10        # Timeout in seconds for URL checks
     bibliography_fail_on_broken = True   # Error vs warning for broken URLs
-    bibliography_fail_on_duplicates = True  # Error vs warning for duplicate URLs
+    bibliography_fail_on_inconsistent = True  # Error vs warning for inconsistent duplicate URLs
 """
 
 import re
@@ -99,6 +99,92 @@ def extract_urls_from_content(content: str) -> List[str]:
         List of URLs found in the content
     """
     return URL_PATTERN.findall(content)
+
+
+def extract_bibliography_entries(content: str) -> List[Dict[str, str]]:
+    """
+    Extract complete bibliography entries from content.
+    
+    Each entry contains:
+    - citation_key: The citation key (e.g., "RUST-REF-UNION")
+    - description: The description text (author, title, etc.)
+    - url: The URL if present
+    
+    Args:
+        content: The bibliography content text
+        
+    Returns:
+        List of dicts with citation_key, description, and url
+    """
+    entries = []
+    
+    # Pattern to match bibliography table rows:
+    # * - :bibentry:`gui_ID:CITATION-KEY`
+    #   - Description text. https://url.example.com
+    #
+    # We need to match across lines, capturing:
+    # 1. The citation key from :bibentry:
+    # 2. The description and URL from the next line
+    
+    # First, find all :bibentry: roles and their positions
+    bibentry_pattern = re.compile(
+        r':bibentry:`gui_[a-zA-Z0-9]+:([A-Z][A-Z0-9-]*[A-Z0-9])`'
+    )
+    
+    # Split content into lines for processing
+    lines = content.split('\n')
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        match = bibentry_pattern.search(line)
+        
+        if match:
+            citation_key = match.group(1)
+            
+            # Look for the description in the next line(s)
+            description = ""
+            url = ""
+            
+            # The description is typically on the next line starting with "- " or "  -"
+            j = i + 1
+            while j < len(lines):
+                next_line = lines[j].strip()
+                
+                # Check if this is the description line (starts with "- " after stripping)
+                if next_line.startswith('- '):
+                    desc_content = next_line[2:].strip()  # Remove "- " prefix
+                    
+                    # Extract URL from description if present
+                    url_match = URL_PATTERN.search(desc_content)
+                    if url_match:
+                        url = url_match.group(0)
+                        # Description is everything before the URL
+                        description = desc_content[:url_match.start()].strip()
+                    else:
+                        description = desc_content
+                    
+                    break
+                elif next_line.startswith('* -'):
+                    # Next entry started, no description found
+                    break
+                elif next_line == '':
+                    # Empty line, continue looking
+                    j += 1
+                    continue
+                else:
+                    j += 1
+                    continue
+                
+            entries.append({
+                'citation_key': citation_key,
+                'description': description,
+                'url': url
+            })
+        
+        i += 1
+    
+    return entries
 
 
 def extract_citation_keys_from_content(content: str) -> List[Tuple[str, str]]:
@@ -296,6 +382,10 @@ def validate_bibliography(app: Sphinx, env) -> None:
     citation_definitions: Dict[str, List[str]] = defaultdict(list)  # key -> [guideline_ids]
     citation_references: Dict[str, Set[str]] = defaultdict(set)  # guideline_id -> {referenced_keys}
     
+    # Track full bibliography entry data per URL for consistency checking
+    # url -> [(guideline_id, citation_key, description)]
+    url_entry_data: Dict[str, List[Tuple[str, str, str]]] = defaultdict(list)
+    
     errors = []
     warnings = []
     
@@ -333,11 +423,18 @@ def validate_bibliography(app: Sphinx, env) -> None:
                             # Track which guidelines define this key
                             citation_definitions[key].append(guideline_id)
                     
-                    # Extract URLs
-                    urls = extract_urls_from_content(bib_content)
-                    for url in urls:
-                        all_urls.append((url, guideline_id, source_file))
-                        url_to_guidelines[url].append(guideline_id)
+                    # Extract full bibliography entries for consistency checking
+                    entries = extract_bibliography_entries(bib_content)
+                    for entry in entries:
+                        url = entry.get('url', '')
+                        if url:
+                            all_urls.append((url, guideline_id, source_file))
+                            url_to_guidelines[url].append(guideline_id)
+                            url_entry_data[url].append((
+                                guideline_id,
+                                entry.get('citation_key', ''),
+                                entry.get('description', '')
+                            ))
         
         # Collect citation references from guideline content and rationale
         guideline_content = guideline.get("content", "")
@@ -347,20 +444,44 @@ def validate_bibliography(app: Sphinx, env) -> None:
     
     pbar.close()
     
-    # Check for duplicate URLs
-    logger.info("Checking for duplicate URLs...")
-    for url, guideline_ids in url_to_guidelines.items():
-        if len(guideline_ids) > 1:
-            msg = (
-                f"Duplicate URL detected:\n"
-                f"  URL: {url}\n"
-                f"  Found in: {', '.join(guideline_ids)}\n"
-                f"  Action: Consider if both guidelines need this reference"
-            )
-            if app.config.bibliography_fail_on_duplicates:
-                errors.append(msg)
-            else:
-                warnings.append(msg)
+    # Check for URL consistency (same URL must use same citation key and description)
+    logger.info("Checking URL consistency across guidelines...")
+    for url, entry_list in url_entry_data.items():
+        if len(entry_list) > 1:
+            # Multiple guidelines use this URL - check for consistency
+            first_guideline, first_key, first_desc = entry_list[0]
+            
+            inconsistencies = []
+            for guideline_id, citation_key, description in entry_list[1:]:
+                if citation_key != first_key:
+                    inconsistencies.append(
+                        f"    - {guideline_id}: uses key [{citation_key}] "
+                        f"(expected [{first_key}] from {first_guideline})"
+                    )
+                if description != first_desc:
+                    # Truncate long descriptions for readability
+                    desc_preview = description[:50] + "..." if len(description) > 50 else description
+                    first_preview = first_desc[:50] + "..." if len(first_desc) > 50 else first_desc
+                    inconsistencies.append(
+                        f"    - {guideline_id}: uses description \"{desc_preview}\"\n"
+                        f"      (expected \"{first_preview}\" from {first_guideline})"
+                    )
+            
+            if inconsistencies:
+                msg = (
+                    f"Inconsistent bibliography entry for URL:\n"
+                    f"  URL: {url}\n"
+                    f"  First defined in: {first_guideline}\n"
+                    f"    Citation key: [{first_key}]\n"
+                    f"    Description: \"{first_desc[:80]}{'...' if len(first_desc) > 80 else ''}\"\n"
+                    f"  Inconsistencies found:\n" +
+                    "\n".join(inconsistencies) + "\n"
+                    "  Action: Ensure all uses of this URL have identical citation key and description"
+                )
+                if app.config.bibliography_fail_on_inconsistent:
+                    errors.append(msg)
+                else:
+                    warnings.append(msg)
     
     # Validate URLs if enabled
     if all_urls:
@@ -456,7 +577,7 @@ def setup(app: Sphinx):
     app.add_config_value('bibliography_check_urls', False, 'env')
     app.add_config_value('bibliography_url_timeout', 10, 'env')
     app.add_config_value('bibliography_fail_on_broken', True, 'env')
-    app.add_config_value('bibliography_fail_on_duplicates', True, 'env')
+    app.add_config_value('bibliography_fail_on_inconsistent', True, 'env')
     
     # Connect to the consistency check phase
     app.connect("env-check-consistency", validate_bibliography)
