@@ -118,7 +118,7 @@ class BibEntryRole(SphinxRole):
     
     Usage: :bibentry:`gui_XxxYyyZzz:CITATION-KEY`
     
-    Renders as: [CITATION-KEY] (bold, with an anchor for linking)
+    Renders as: [CITATION-KEY] ↩ (bold, with an anchor for linking and a back button)
     """
     
     def run(self):
@@ -144,8 +144,16 @@ class BibEntryRole(SphinxRole):
         strong = nodes.strong('', f'[{citation_key}]')
         strong['classes'].append('bibentry-key')
         
-        # Return both the target (anchor) and the visible text
-        return [target, strong], []
+        # Create the back link using raw HTML for the onclick handler
+        back_link = nodes.raw(
+            '',
+            '<a href="javascript:void(0)" onclick="history.back()" '
+            'class="bibentry-back" title="Return to citation">↩</a>',
+            format='html'
+        )
+        
+        # Return the target (anchor), visible text, and back link
+        return [target, strong, back_link], []
 
 
 def setup(app):

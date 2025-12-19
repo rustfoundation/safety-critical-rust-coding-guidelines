@@ -26,6 +26,65 @@
       This guideline demonstrates how to include bibliographic references in coding guidelines.
       References help users find authoritative sources for the recommendations made.
 
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      This guideline demonstrates how to include bibliographic references in coding guidelines.
+      References help users find authoritative sources for the recommendations made.
+
+      Refer to :cite:`gui_Bib7x9KmPq2nL:RUST-REF-UNION` for more details.
+
    .. non_compliant_example::
       :id: non_compl_ex_Bib7x9KmPq2nL
       :status: draft

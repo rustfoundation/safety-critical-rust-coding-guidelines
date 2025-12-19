@@ -18,11 +18,31 @@
     font-weight: bold;
 }
 
+/* Back link next to bibliography entries */
+.bibentry-back {
+    color: #0066cc;
+    text-decoration: none;
+    margin-left: 0.4em;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.bibentry-back:hover {
+    color: #004499;
+    text-decoration: none;
+}
+
 /* Highlight effect when navigating to a bibliography entry */
-:target .bibentry-key {
+:target .bibentry-key,
+:target > .bibentry-key {
     background-color: #fff3cd;
     padding: 2px 4px;
     border-radius: 3px;
+}
+
+/* Also highlight the parent row when target is the anchor */
+tr:has(:target) {
+    background-color: #fff9e6;
 }
 
 /* Smooth scroll for citation links */
