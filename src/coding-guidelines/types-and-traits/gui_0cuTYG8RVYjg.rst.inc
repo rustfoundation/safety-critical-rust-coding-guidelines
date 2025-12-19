@@ -30,10 +30,10 @@
       Similar to C, unions allow multiple fields to occupy the same memory.
       Unlike enumeration types, unions do not track which field is currently active.
       You must ensure that when a field is read that
-      the underlying bytes are valid for that field's type [RUST-REF-UNION]_.
+      the underlying bytes are valid for that field's type :cite:`gui_0cuTYG8RVYjg:RUST-REF-UNION`.
 
       Every type has a *validity invariant* — a set of constraints that all values of
-      that type must satisfy [UCG-VALIDITY]_.
+      that type must satisfy :cite:`gui_0cuTYG8RVYjg:UCG-VALIDITY`.
       Reading a union field performs a *typed read*,
       which asserts that the bytes are valid for the target type.
 
@@ -274,7 +274,7 @@
          }
 
    .. bibliography::
-      :id: bib_UnionFieldValidity
+      :id: bib_WNCi5njUWLuZ
       :status: draft
 
       .. list-table::
@@ -282,13 +282,9 @@
          :widths: auto
          :class: bibliography-table
 
-         * - .. [RUST-REF-UNION]
-           - | The Rust Project Developers. "Rust Reference: Unions."
-             | *The Rust Reference*, n.d. 
-             | https://doc.rust-lang.org/reference/items/unions.html.
+         * - :bibentry:`gui_0cuTYG8RVYjg:RUST-REF-UNION`
+           - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html.
 
-         * - .. [UCG-VALIDITY]
-           - | Rust Unsafe Code Guidelines Working Group. "Validity and Safety Invariant."
-             | *Rust Unsafe Code Guidelines*, n.d. 
-             | https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
+         * - :bibentry:`gui_0cuTYG8RVYjg:UCG-VALIDITY`
+           - Rust Unsafe Code Guidelines. "Validity and Safety Invariant." https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
 
