@@ -20,7 +20,7 @@ Configuration options (in conf.py):
 import re
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 from urllib.parse import urlparse
 
 import requests
