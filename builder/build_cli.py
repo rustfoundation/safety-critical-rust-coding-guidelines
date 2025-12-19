@@ -30,6 +30,7 @@ def build_docs(
     debug: bool,
     offline: bool,
     spec_lock_consistency_check: bool,
+    validate_urls: bool,
 ) -> Path:
     """
     Builds the Sphinx documentation with the specified options.
@@ -42,6 +43,7 @@ def build_docs(
         debug: Whether to enable debug mode.
         offline: Whether to build in offline mode.
         spec_lock_consistency_check: Whether to check spec lock consistency.
+        validate_urls: Whether to validate bibliography URLs.
 
     Returns:
         Path: The path to the generated documentation.
@@ -73,6 +75,8 @@ def build_docs(
         conf_opt_values.append("offline=1")
     if debug:
         conf_opt_values.append("debug=1")
+    if validate_urls:
+        conf_opt_values.append("bibliography_check_urls=1")
 
     # Only add the --define argument if there are options to define
     if conf_opt_values:
@@ -162,6 +166,11 @@ def main(root):
     parser.add_argument(
         "--update-spec-lock-file", help="update spec.lock file", action="store_true"
     )
+    parser.add_argument(
+        "--validate-urls",
+        help="validate bibliography URLs (enables URL checking, typically used in CI)",
+        action="store_true",
+    )
     group.add_argument(
         "-s",
         "--serve",
@@ -198,4 +207,5 @@ def main(root):
         args.debug,
         args.offline,
         not args.ignore_spec_lock_diff,
+        args.validate_urls,
     )

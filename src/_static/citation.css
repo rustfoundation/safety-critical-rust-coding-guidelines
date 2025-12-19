@@ -1,0 +1,64 @@
+/* Citation and Bibliography Styles */
+
+/* Citation references in text - clickable links to bibliography */
+.citation-ref {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.citation-ref:hover {
+    text-decoration: underline;
+    color: #004499;
+}
+
+/* Highlight animation when navigating back to a citation */
+.citation-ref.citation-highlight {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+    animation: citation-fade 2s ease-out;
+}
+
+@keyframes citation-fade {
+    0% { background-color: #ffc107; }
+    100% { background-color: #fff3cd; }
+}
+
+/* Bibliography entry keys - bold anchors */
+.bibentry-key {
+    color: #333;
+    font-weight: bold;
+}
+
+/* Back link next to bibliography entries */
+.bibentry-back {
+    color: #0066cc;
+    text-decoration: none;
+    margin-left: 0.4em;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.bibentry-back:hover {
+    color: #004499;
+    text-decoration: none;
+}
+
+/* Highlight effect when navigating to a bibliography entry */
+:target .bibentry-key,
+:target > .bibentry-key {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+/* Also highlight the parent row when target is the anchor */
+tr:has(:target) {
+    background-color: #fff9e6;
+}
+
+/* Smooth scroll for citation links */
+html {
+    scroll-behavior: smooth;
+}
