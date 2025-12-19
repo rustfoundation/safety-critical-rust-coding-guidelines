@@ -4,58 +4,83 @@ This document describes the bibliography feature implementation for the Safety-C
 
 ## Overview
 
-The bibliography feature allows guideline authors to include references to external documentation, standards, and other resources that support their guidelines.
+The bibliography feature allows guideline authors to include references to external documentation, standards, and other resources that support their guidelines. Citations in the guideline text are clickable links that navigate to the corresponding bibliography entry.
 
 ## Features
 
-### 1. In-Text Citations
-Contributors can reference citations within guideline text using the `[CITATION-KEY]` syntax:
+### 1. In-Text Citations with `:cite:` Role
+
+Contributors can reference citations within guideline text using the `:cite:` role:
 
 ```rst
-As documented in [RUST-REF-UNION], union types have specific safety requirements.
+As documented in :cite:`gui_Abc123XyzQrs:RUST-REF-UNION`, union types have specific safety requirements.
 ```
 
-### 2. Bibliography Section
-Each guideline can include an optional bibliography section. The ID is auto-generated using the format `bib_` followed by 12 random alphanumeric characters:
+**Format:** `:cite:`{guideline_id}:{CITATION-KEY}``
+
+- `guideline_id` is the parent guideline's ID (e.g., `gui_Abc123XyzQrs`)
+- `CITATION-KEY` is the citation key in UPPERCASE-WITH-HYPHENS format
+
+The `:cite:` role renders as a clickable `[CITATION-KEY]` link that navigates to the bibliography entry.
+
+### 2. Bibliography Entries with `:bibentry:` Role
+
+Each guideline can include an optional bibliography section with entries defined using the `:bibentry:` role:
 
 ```rst
-.. bibliography::
-   :id: bib_7y0GAMmtMhch
-   :status: draft
+.. guideline:: Union Field Validity
+   :id: gui_Abc123XyzQrs
+   ...
 
-   .. list-table::
-      :header-rows: 0
-      :widths: auto
-      :class: bibliography-table
+   As documented in :cite:`gui_Abc123XyzQrs:RUST-REF-UNION`, unions have requirements.
 
-      * - .. [RUST-REF-UNION]
-        - | The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
-      * - .. [CERT-C-INT34]
-        - | SEI CERT C Coding Standard. "INT34-C." https://wiki.sei.cmu.edu/confluence/x/ItcxBQ
+   .. bibliography::
+      :id: bib_Abc123XyzQrs
+      :status: draft
+
+      .. list-table::
+         :header-rows: 0
+         :widths: auto
+         :class: bibliography-table
+
+         * - :bibentry:`gui_Abc123XyzQrs:RUST-REF-UNION`
+           - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
+         * - :bibentry:`gui_Abc123XyzQrs:CERT-C-INT34`
+           - SEI CERT C Coding Standard. "INT34-C." https://wiki.sei.cmu.edu/confluence/x/ItcxBQ
 ```
 
-**Note:** When using `generate_guideline_templates.py`, the bibliography ID is automatically generated. The format follows the same pattern as other sphinx-needs IDs (e.g., `gui_`, `rat_`, `compl_ex_`, `non_compl_ex_`).
+**Format:** `:bibentry:`{guideline_id}:{CITATION-KEY}``
 
-### 3. Citation Key Format
+The `:bibentry:` role creates an anchor that the `:cite:` role links to, and renders as a bold `[CITATION-KEY]`.
+
+### 3. Why Namespacing?
+
+The guideline ID prefix (`gui_Abc123XyzQrs:`) is required to avoid conflicts when multiple guidelines use the same citation key (e.g., both guidelines might cite `RUST-REF-UNION`). The prefix ensures each citation anchor is unique across the entire documentation.
+
+When using `generate_guideline_templates.py`, the guideline ID is automatically included in all `:cite:` and `:bibentry:` roles.
+
+### 4. Citation Key Format
+
 Citation keys must follow these rules:
-- **Format**: `[UPPERCASE-WITH-HYPHENS]`
+- **Format**: `UPPERCASE-WITH-HYPHENS`
 - Must start with an uppercase letter
 - Can contain uppercase letters, numbers, and hyphens
 - Must end with an uppercase letter or number
 - Maximum 50 characters
 
 **Valid examples:**
-- `[RUST-REF-UNION]`
-- `[CERT-C-INT34]`
-- `[ISO-26262-2018]`
-- `[MISRA-C-2012]`
+- `RUST-REF-UNION`
+- `CERT-C-INT34`
+- `ISO-26262-2018`
+- `MISRA-C-2012`
 
 **Invalid examples:**
-- `[lowercase]` - must be uppercase
-- `[ENDS-WITH-]` - cannot end with hyphen
-- `[-STARTS-HYPHEN]` - cannot start with hyphen
+- `lowercase` - must be uppercase
+- `ENDS-WITH-` - cannot end with hyphen
+- `-STARTS-HYPHEN` - cannot start with hyphen
 
-### 4. URL Validation
+### 5. URL Validation
+
 The bibliography validator extension checks:
 - URL accessibility (HTTP status)
 - Duplicate URLs across guidelines
@@ -113,6 +138,8 @@ The coding guideline issue template includes an optional bibliography field:
 [CERT-C-INT34] SEI CERT C Coding Standard. "INT34-C. Do not shift an expression by a negative number of bits." https://wiki.sei.cmu.edu/confluence/x/ItcxBQ
 ```
 
+The template generator automatically converts this to the proper `:cite:` and `:bibentry:` role format.
+
 ## CI Integration
 
 ### Pull Requests to Main
@@ -128,6 +155,7 @@ The coding guideline issue template includes an optional bibliography field:
 ```
 exts/coding_guidelines/
 ├── bibliography_validator.py   # URL and citation validation
+├── citation_roles.py           # :cite: and :bibentry: role implementations
 ├── __init__.py                 # Extension setup (updated)
 └── write_guidelines_ids.py     # JSON export (updated)
 
@@ -145,7 +173,8 @@ scripts/
 src/
 ├── conf.py                     # Sphinx config with bibliography settings
 └── _static/
-    └── bibliography.css        # Bibliography styling
+    ├── bibliography.css        # Bibliography table styling
+    └── citation.css            # Citation link styling
 ```
 
 ## JSON Export Format
@@ -193,9 +222,35 @@ WARNING: [bibliography_validator] Duplicate URL detected:
 ### Invalid Citation Key
 ```
 ERROR: Invalid citation key format: 'lowercase-key'. 
-Expected: [UPPERCASE-WITH-HYPHENS] (e.g., [RUST-REF-UNION], [CERT-C-INT34])
+Expected: UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION, CERT-C-INT34)
+```
+
+### Invalid Role Format
+```
+ERROR: Invalid :cite: format: "RUST-REF-UNION". 
+Expected format: :cite:`gui_XxxYyyZzz:CITATION-KEY`
 ```
 
 ## Migration
 
 Existing guidelines without bibliographies will continue to work. The bibliography section is optional and will not cause build failures if missing.
+
+### From Plain Text Format
+
+If you have guidelines using the older plain text `[CITATION-KEY]` format, update them to use the role-based syntax:
+
+**Before:**
+```rst
+As documented in [RUST-REF-UNION], ...
+
+* - **[RUST-REF-UNION]**
+  - The Rust Reference...
+```
+
+**After:**
+```rst
+As documented in :cite:`gui_YourGuidelineId:RUST-REF-UNION`, ...
+
+* - :bibentry:`gui_YourGuidelineId:RUST-REF-UNION`
+  - The Rust Reference...
+```

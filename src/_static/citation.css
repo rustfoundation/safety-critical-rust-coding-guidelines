@@ -1,0 +1,31 @@
+/* Citation and Bibliography Styles */
+
+/* Citation references in text - clickable links to bibliography */
+.citation-ref {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.citation-ref:hover {
+    text-decoration: underline;
+    color: #004499;
+}
+
+/* Bibliography entry keys - bold anchors */
+.bibentry-key {
+    color: #333;
+    font-weight: bold;
+}
+
+/* Highlight effect when navigating to a bibliography entry */
+:target .bibentry-key {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+/* Smooth scroll for citation links */
+html {
+    scroll-behavior: smooth;
+}

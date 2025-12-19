@@ -188,29 +188,34 @@ def validate_bibliography_entry(entry: tuple) -> tuple:
     return True, ""
 
 
-def format_bibliography_rst(entries: list, bibliography_id: str, status: str = "draft") -> str:
+def format_bibliography_rst(entries: list, bibliography_id: str, guideline_id: str, status: str = "draft") -> str:
     """
     Format bibliography entries as RST.
     
     Args:
         entries: List of (citation_key, author, title, url) tuples
         bibliography_id: The unique ID for this bibliography
+        guideline_id: The parent guideline ID (for namespacing citations)
         status: The status (e.g., "draft")
         
     Returns:
         Formatted RST string for the bibliography
+    
+    Note:
+        Uses :bibentry: role for citation anchors, namespaced by guideline ID
+        to avoid conflicts between guidelines using the same citation keys.
     """
     if not entries:
         return ""
     
     # Build the list-table content
+    # Use :bibentry: role with guideline_id prefix for namespacing
     table_rows = []
     for citation_key, author, title, url in entries:
-        # Format: .. [CITATION-KEY] Author. "Title." URL
         if url:
-            row = f"      * - .. [{citation_key}]\n        - | {author}. \"{title}.\" `{url} <{url}>`_"
+            row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\" {url}"
         else:
-            row = f"      * - .. [{citation_key}]\n        - | {author}. \"{title}.\""
+            row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\""
         table_rows.append(row)
     
     table_content = "\n".join(table_rows)

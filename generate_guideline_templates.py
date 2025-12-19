@@ -98,6 +98,7 @@ def generate_example_block(
 
 def generate_bibliography_block(
     bibliography_id: str,
+    guideline_id: str,
     status: str,
     entries: list,  # List of (citation_key, author, title, url) tuples
 ) -> str:
@@ -106,20 +107,25 @@ def generate_bibliography_block(
 
     Args:
         bibliography_id: The unique ID for this bibliography
+        guideline_id: The parent guideline ID (for namespacing citations)
         status: The status (e.g., "draft")
         entries: List of (citation_key, author, title, url) tuples
 
     Returns:
         Formatted RST string for the bibliography
+    
+    Note:
+        Uses :bibentry: role for citation anchors, namespaced by guideline ID
+        to avoid conflicts between guidelines using the same citation keys.
     """
     if not entries:
         return ""
     
     # Build the list-table content
+    # Use :bibentry: role with guideline_id prefix for namespacing
     table_rows = []
     for citation_key, author, title, url in entries:
-        # Format: .. [CITATION-KEY] Author. "Title." URL
-        row = f"      * - .. [{citation_key}]\n        - | {author}. \"{title}.\" {url}"
+        row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\" {url}"
         table_rows.append(row)
     
     table_content = "\n".join(table_rows)
@@ -310,6 +316,7 @@ def guideline_rst_template(
         bibliography_id = generate_id("bib")
         bibliography_block = generate_bibliography_block(
             bibliography_id,
+            guideline_id,
             norm(status),
             bibliography_entries,
         )

@@ -5,6 +5,7 @@ from sphinx.domains import Domain
 
 from . import (
     bibliography_validator,
+    citation_roles,
     common,
     fls_checks,
     fls_linking,
@@ -81,6 +82,9 @@ def setup(app):
     
     # Set up bibliography validator extension
     bibliography_validator.setup(app)
+    
+    # Set up citation roles for bibliography linking
+    citation_roles.setup(app)
 
     app.connect("env-check-consistency", guidelines_checks.validate_required_fields)
     app.connect("env-check-consistency", fls_checks.check_fls)

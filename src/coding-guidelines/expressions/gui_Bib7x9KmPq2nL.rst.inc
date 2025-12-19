@@ -15,8 +15,8 @@
 
    This is an example guideline demonstrating the bibliography feature.
    
-   As documented in [RUST-REF-UNION]_, union types in Rust have specific safety requirements.
-   The CERT C Coding Standard [CERT-C-INT34]_ provides guidance on avoiding undefined behavior
+   As documented in :cite:`gui_Bib7x9KmPq2nL:RUST-REF-UNION`, union types in Rust have specific safety requirements.
+   The CERT C Coding Standard :cite:`gui_Bib7x9KmPq2nL:CERT-C-INT34` provides guidance on avoiding undefined behavior
    in shift operations, which applies to Rust as well.
 
    .. rationale::
@@ -63,7 +63,7 @@
          :widths: auto
          :class: bibliography-table
 
-         * - .. [RUST-REF-UNION]
-           - | The Rust Reference. "Unions." `https://doc.rust-lang.org/reference/items/unions.html <https://doc.rust-lang.org/reference/items/unions.html>`_
-         * - .. [CERT-C-INT34]
-           - | SEI CERT C Coding Standard. "INT34-C. Do not shift an expression by a negative number of bits." `https://wiki.sei.cmu.edu/confluence/x/ItcxBQ <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_
+         * - :bibentry:`gui_Bib7x9KmPq2nL:RUST-REF-UNION`
+           - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
+         * - :bibentry:`gui_Bib7x9KmPq2nL:CERT-C-INT34`
+           - SEI CERT C Coding Standard. "INT34-C. Do not shift an expression by a negative number of bits." https://wiki.sei.cmu.edu/confluence/x/ItcxBQ

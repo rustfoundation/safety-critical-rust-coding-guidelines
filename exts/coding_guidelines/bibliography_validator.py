@@ -20,7 +20,7 @@ Configuration options (in conf.py):
 import re
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 import requests
@@ -33,8 +33,16 @@ from .common import bar_format, get_tqdm, logger
 # Citation key pattern: [UPPERCASE-WITH-HYPHENS] or [UPPERCASE-WITH-HYPHENS-AND-NUMBERS-123]
 CITATION_KEY_PATTERN = re.compile(r'^\[([A-Z][A-Z0-9-]*[A-Z0-9])\]$')
 
-# Pattern to find citation keys in text
-CITATION_REF_PATTERN = re.compile(r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]')
+# Pattern to find :cite: role references in text
+# Format: :cite:`gui_XxxYyyZzz:CITATION-KEY`
+CITE_ROLE_PATTERN = re.compile(r':cite:`(gui_[a-zA-Z0-9]+):([A-Z][A-Z0-9-]*[A-Z0-9])`')
+
+# Pattern to find :bibentry: role definitions in bibliography
+# Format: :bibentry:`gui_XxxYyyZzz:CITATION-KEY`
+BIBENTRY_ROLE_PATTERN = re.compile(r':bibentry:`(gui_[a-zA-Z0-9]+):([A-Z][A-Z0-9-]*[A-Z0-9])`')
+
+# Legacy pattern for plain text [KEY] format (for backwards compatibility)
+PLAIN_CITATION_REF_PATTERN = re.compile(r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]')
 
 # URL pattern for extraction from bibliography content
 URL_PATTERN = re.compile(r'https?://[^\s<>"\')\]]+')
@@ -48,14 +56,14 @@ def validate_citation_key_format(key: str) -> Tuple[bool, str]:
     """
     Validate that a citation key follows the required format.
     
-    Format: [UPPERCASE-WITH-HYPHENS]
+    Format: UPPERCASE-WITH-HYPHENS (without brackets for the raw key)
     - Must start with uppercase letter
     - Can contain uppercase letters, numbers, and hyphens
     - Must end with uppercase letter or number
     - Maximum length: 50 characters
     
     Args:
-        key: The citation key to validate (including brackets)
+        key: The citation key to validate (with or without brackets)
         
     Returns:
         Tuple of (is_valid, error_message)
@@ -63,13 +71,18 @@ def validate_citation_key_format(key: str) -> Tuple[bool, str]:
     if not key:
         return False, "Citation key is empty"
     
-    if len(key) > 52:  # 50 chars + 2 brackets
-        return False, f"Citation key '{key}' exceeds maximum length of 50 characters"
+    # Remove brackets if present
+    clean_key = key.strip('[]')
     
-    if not CITATION_KEY_PATTERN.match(key):
+    if len(clean_key) > 50:
+        return False, f"Citation key '{clean_key}' exceeds maximum length of 50 characters"
+    
+    # Check format
+    key_format_pattern = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
+    if not key_format_pattern.match(clean_key):
         return False, (
-            f"Citation key '{key}' does not follow required format. "
-            "Expected: [UPPERCASE-WITH-HYPHENS] (e.g., [RUST-REF-UNION], [CERT-C-INT34])"
+            f"Citation key '{clean_key}' does not follow required format. "
+            "Expected: UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION, CERT-C-INT34)"
         )
     
     return True, ""
@@ -88,49 +101,68 @@ def extract_urls_from_content(content: str) -> List[str]:
     return URL_PATTERN.findall(content)
 
 
-def extract_citation_keys_from_content(content: str) -> List[str]:
+def extract_citation_keys_from_content(content: str) -> List[Tuple[str, str]]:
     """
     Extract all citation key definitions from bibliography content.
     
-    Looks for patterns like:
-    - .. [CITATION-KEY]
-    - [CITATION-KEY] at the start of a line in a list-table
+    Looks for :bibentry: role patterns:
+    - :bibentry:`gui_XxxYyyZzz:CITATION-KEY`
     
     Args:
         content: The bibliography content text
         
     Returns:
-        List of citation keys found
+        List of (guideline_id, citation_key) tuples found
     """
-    keys = []
+    entries = []
     
-    # Pattern for RST citation definition: .. [KEY]
-    rst_citation = re.compile(r'^\s*\.\.\s+(\[[A-Z][A-Z0-9-]*[A-Z0-9]\])', re.MULTILINE)
-    for match in rst_citation.finditer(content):
-        keys.append(match.group(1))
+    # Pattern for :bibentry: role
+    for match in BIBENTRY_ROLE_PATTERN.finditer(content):
+        guideline_id = match.group(1)
+        citation_key = match.group(2)
+        entries.append((guideline_id, citation_key))
     
-    # Pattern for list-table style: * - .. [KEY]
-    list_table_citation = re.compile(r'^\s*\*\s+-\s+\.\.\s+(\[[A-Z][A-Z0-9-]*[A-Z0-9]\])', re.MULTILINE)
-    for match in list_table_citation.finditer(content):
-        keys.append(match.group(1))
+    # Also support legacy plain text format for backwards compatibility
+    # Pattern for bold citation key: **[KEY]**
+    bold_citation = re.compile(r'\*\*\[([A-Z][A-Z0-9-]*[A-Z0-9])\]\*\*')
+    for match in bold_citation.finditer(content):
+        # For legacy format, we don't have guideline_id
+        entries.append((None, match.group(1)))
     
-    return keys
+    return entries
 
 
-def extract_citation_references(content: str) -> List[str]:
+def extract_citation_references(content: str) -> List[Tuple[str, str]]:
     """
     Extract all citation references from guideline content.
     
-    Looks for [CITATION-KEY] patterns in the text that are references
-    to bibliography entries.
+    Looks for :cite: role patterns:
+    - :cite:`gui_XxxYyyZzz:CITATION-KEY`
     
     Args:
         content: The guideline or rationale content
         
     Returns:
-        List of citation references found
+        List of (guideline_id, citation_key) tuples found
     """
-    return CITATION_REF_PATTERN.findall(content)
+    refs = []
+    
+    # Pattern for :cite: role
+    for match in CITE_ROLE_PATTERN.finditer(content):
+        guideline_id = match.group(1)
+        citation_key = match.group(2)
+        refs.append((guideline_id, citation_key))
+    
+    # Also support legacy plain text format for backwards compatibility
+    # But exclude matches that are part of :cite: or :bibentry: roles
+    plain_refs = PLAIN_CITATION_REF_PATTERN.findall(content)
+    # Filter out keys that are already captured via roles
+    role_keys = {key for _, key in refs}
+    for key in plain_refs:
+        if key not in role_keys:
+            refs.append((None, key))
+    
+    return refs
 
 
 def check_url_validity(url: str, timeout: int = 10) -> Tuple[bool, str, int]:
