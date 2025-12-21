@@ -7,7 +7,7 @@
    :id: gui_LoopTerminat
    :category: required
    :status: draft
-   :release: 1.85.0
+   :release: unknown
    :fls: fls_sf4qnd43z2wc
    :decidability: undecidable
    :scope: function
