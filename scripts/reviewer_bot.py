@@ -492,12 +492,57 @@ def sync_members_with_queue(state: dict) -> tuple[dict, list[str]]:
     return state, changes
 
 
+def reposition_member_as_next(state: dict, username: str) -> bool:
+    """
+    Move a queue member to current_index so they're next up.
+    
+    Used when undoing or passing an assignment to maintain fairness -
+    the person who didn't complete their assignment should be next,
+    but people behind them in the queue shouldn't be pushed further back.
+    
+    Algorithm:
+    1. Remove the user from their current position
+    2. Adjust current_index if we removed before it
+    3. Insert at current_index (so they're next up)
+    
+    Returns True if successful, False if user not in queue (e.g., went /away).
+    """
+    # Find the user
+    user_index = None
+    user_entry = None
+    for i, member in enumerate(state["queue"]):
+        if member["github"].lower() == username.lower():
+            user_index = i
+            user_entry = member
+            break
+    
+    if user_entry is None:
+        return False
+    
+    # Remove from current position
+    state["queue"].pop(user_index)
+    
+    # Adjust current_index if we removed before it
+    if user_index < state["current_index"]:
+        state["current_index"] -= 1
+    
+    # Ensure current_index is valid after removal
+    if state["queue"]:
+        state["current_index"] = state["current_index"] % len(state["queue"])
+    else:
+        state["current_index"] = 0
+    
+    # Insert at current_index (so they're next up)
+    state["queue"].insert(state["current_index"], user_entry)
+    
+    return True
+
+
 def process_pass_until_expirations(state: dict) -> tuple[dict, list[str]]:
     """
     Check for expired pass-until entries and restore them to the queue.
 
-    Returning members are inserted right after the current index,
-    so they're next up in rotation.
+    Returning members are repositioned to be next up in the queue.
 
     Returns the updated state and a list of users restored.
     """
@@ -517,23 +562,15 @@ def process_pass_until_expirations(state: dict) -> tuple[dict, list[str]]:
                 return_date = return_date.date()
 
             if return_date <= now:
-                # Restore to queue - insert right after current index
+                # Restore to queue
                 restored_member = {
                     "github": entry["github"],
                     "name": entry.get("name", entry["github"]),
                 }
                 
-                if state["queue"]:
-                    # Insert right after current index
-                    insert_position = (state["current_index"] + 1) % (len(state["queue"]) + 1)
-                    state["queue"].insert(insert_position, restored_member)
-                    
-                    # Adjust current_index if we inserted before or at it
-                    if insert_position <= state["current_index"]:
-                        state["current_index"] += 1
-                else:
-                    # Queue is empty, just add them
-                    state["queue"].append(restored_member)
+                # Add to end of queue, then reposition as next
+                state["queue"].append(restored_member)
+                reposition_member_as_next(state, entry["github"])
                 
                 restored.append(entry["github"])
             else:
@@ -776,9 +813,7 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     Handle the pass! command - skip current reviewer for this issue only.
 
     Tracks who has passed on each issue to prevent re-assignment.
-    Only the first passer gets moved to "next in queue" position.
-    Subsequent passers just pass without queue reordering, and the
-    original passer remains "next" for future issues.
+    The passer is repositioned to be next up for future issues.
 
     Returns (response_message, success).
     """
@@ -809,21 +844,12 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     if not passed_reviewer:
         return "❌ No reviewer is currently assigned to pass.", False
 
-    # Check if this is the first pass on this issue
+    # Check if this is the first pass on this issue (for messaging only)
     is_first_pass = len(issue_data["skipped"]) == 0
     
     # Record this reviewer as having passed on this issue
     if passed_reviewer not in issue_data["skipped"]:
         issue_data["skipped"].append(passed_reviewer)
-
-    # Find the passed reviewer's entry and position in the queue (for first pass reordering)
-    passed_entry = None
-    passed_index = None
-    for i, member in enumerate(state["queue"]):
-        if member["github"].lower() == passed_reviewer.lower():
-            passed_entry = member
-            passed_index = i
-            break
 
     # Get the issue author to skip them
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
@@ -833,44 +859,17 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     if issue_author:
         skip_set.add(issue_author)
 
-    # Save current index - we'll restore it for non-first passes
-    saved_index = state["current_index"]
-
     # Find next reviewer, skipping all who have passed
+    # This advances current_index past the substitute
     next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
 
     if not next_reviewer:
-        # Restore index since we're failing
-        state["current_index"] = saved_index
         return ("❌ No other reviewers available. Everyone in the queue has either "
                 "passed on this issue or is the author."), False
 
-    # Only reorder queue on the FIRST pass for this issue
-    if is_first_pass and passed_entry is not None:
-        # Find the substitute's current position
-        substitute_index = None
-        for i, member in enumerate(state["queue"]):
-            if member["github"].lower() == next_reviewer.lower():
-                substitute_index = i
-                break
-
-        if substitute_index is not None:
-            # Reorder: move passed reviewer to right after substitute
-            state["queue"].pop(passed_index)
-
-            # Adjust substitute_index if it was after the removed position
-            if substitute_index > passed_index:
-                substitute_index -= 1
-
-            # Insert passed reviewer right after substitute
-            insert_position = substitute_index + 1
-            state["queue"].insert(insert_position, passed_entry)
-
-            # Set index to point at passed reviewer (they're next for future issues)
-            state["current_index"] = insert_position
-    else:
-        # NOT first pass - restore the index so original passer stays "next"
-        state["current_index"] = saved_index
+    # Reposition the passer to be next up for future issues
+    # (get_next_reviewer already advanced the index past the substitute)
+    reposition_member_as_next(state, passed_reviewer)
 
     # Unassign the passed reviewer first (best effort - may fail if no permissions)
     unassign_reviewer(issue_number, passed_reviewer)
@@ -1180,7 +1179,7 @@ def handle_claim_command(state: dict, issue_number: int,
     assign_reviewer(issue_number, comment_author)
     
     # Track the reviewer in our state
-    set_current_reviewer(state, issue_number, comment_author)
+    set_current_reviewer(state, issue_number, comment_author, assignment_method="claim")
 
     # Record the assignment
     record_assignment(state, comment_author, issue_number, "pr" if is_pr else "issue")
@@ -1234,10 +1233,12 @@ def handle_release_command(state: dict, issue_number: int,
     # Check who the current reviewer is (from our state first, then GitHub)
     issue_key = str(issue_number)
     tracked_reviewer = None
+    assignment_method = None
     if "active_reviews" in state and issue_key in state["active_reviews"]:
         issue_data = state["active_reviews"][issue_key]
         if isinstance(issue_data, dict):
             tracked_reviewer = issue_data.get("current_reviewer")
+            assignment_method = issue_data.get("assignment_method")
     
     # Also check GitHub assignees
     current_assignees = get_issue_assignees(issue_number)
@@ -1275,6 +1276,13 @@ def handle_release_command(state: dict, issue_number: int,
     if "active_reviews" in state and issue_key in state["active_reviews"]:
         if isinstance(state["active_reviews"][issue_key], dict):
             state["active_reviews"][issue_key]["current_reviewer"] = None
+
+    # If this was a round-robin assignment, reposition the released user in the queue
+    # so they're next up (since they didn't complete the review they were assigned)
+    # For 'claim' or 'manual' assignments, don't touch the queue - they volunteered
+    # or were specifically requested
+    if assignment_method == "round-robin":
+        reposition_member_as_next(state, target_username)
 
     reason_text = f" Reason: {reason}" if reason else ""
     
@@ -1337,7 +1345,7 @@ def handle_assign_command(state: dict, issue_number: int,
     assign_reviewer(issue_number, username)
     
     # Track the reviewer in our state
-    set_current_reviewer(state, issue_number, username)
+    set_current_reviewer(state, issue_number, username, assignment_method="manual")
 
     # Record the assignment (but don't advance queue - this is manual assignment)
     record_assignment(state, username, issue_number, "pr" if is_pr else "issue")
@@ -1405,8 +1413,16 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 # ==============================================================================
 
 
-def set_current_reviewer(state: dict, issue_number: int, reviewer: str) -> None:
-    """Track the designated reviewer for an issue/PR in our state."""
+def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
+                        assignment_method: str = "round-robin") -> None:
+    """Track the designated reviewer for an issue/PR in our state.
+    
+    Args:
+        state: Bot state dict
+        issue_number: Issue/PR number
+        reviewer: GitHub username of the reviewer
+        assignment_method: How they were assigned - 'round-robin', 'claim', or 'manual'
+    """
     issue_key = str(issue_number)
     now = datetime.now(timezone.utc).isoformat()
     
@@ -1419,6 +1435,7 @@ def set_current_reviewer(state: dict, issue_number: int, reviewer: str) -> None:
             "assigned_at": None,
             "last_reviewer_activity": None,
             "transition_warning_sent": None,
+            "assignment_method": None,
         }
     elif isinstance(state["active_reviews"][issue_key], list):
         # Migrate old format
@@ -1428,6 +1445,7 @@ def set_current_reviewer(state: dict, issue_number: int, reviewer: str) -> None:
             "assigned_at": None,
             "last_reviewer_activity": None,
             "transition_warning_sent": None,
+            "assignment_method": None,
         }
     
     # Ensure new fields exist (migration for existing entries)
@@ -1438,12 +1456,15 @@ def set_current_reviewer(state: dict, issue_number: int, reviewer: str) -> None:
         review_data["last_reviewer_activity"] = None
     if "transition_warning_sent" not in review_data:
         review_data["transition_warning_sent"] = None
+    if "assignment_method" not in review_data:
+        review_data["assignment_method"] = None
     
     # Set the reviewer and timestamps
     review_data["current_reviewer"] = reviewer
     review_data["assigned_at"] = now
     review_data["last_reviewer_activity"] = now
     review_data["transition_warning_sent"] = None  # Clear any previous warning
+    review_data["assignment_method"] = assignment_method
 
 
 def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
