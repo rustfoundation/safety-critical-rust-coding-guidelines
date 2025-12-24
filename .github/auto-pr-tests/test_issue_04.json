@@ -1,19 +1,124 @@
 {
-  "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/999",
+  "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/104",
   "repository_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines",
-  "html_url": "https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/999",
-  "id": 9999999999,
-  "number": 999,
+  "labels_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/104/labels{/name}",
+  "comments_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/104/comments",
+  "events_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/104/events",
+  "html_url": "https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/104",
+  "id": 3104390104,
+  "node_id": "I_kwDOOMMjbs65CTx104",
+  "number": 104,
   "title": "[Coding Guideline]: Unions shall only be accessed within unsafe blocks with documented invariants",
   "user": {
-    "login": "testuser",
-    "id": 12345678
+    "login": "rustfoundation",
+    "id": 14003018,
+    "node_id": "MDQ6VXNlcjE0MDAzMDE4",
+    "avatar_url": "https://avatars.githubusercontent.com/u/14003018?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/rustfoundation",
+    "html_url": "https://github.com/rustfoundation",
+    "followers_url": "https://api.github.com/users/rustfoundation/followers",
+    "following_url": "https://api.github.com/users/rustfoundation/following{/other_user}",
+    "gists_url": "https://api.github.com/users/rustfoundation/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/rustfoundation/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/rustfoundation/subscriptions",
+    "organizations_url": "https://api.github.com/users/rustfoundation/orgs",
+    "repos_url": "https://api.github.com/users/rustfoundation/repos",
+    "events_url": "https://api.github.com/users/rustfoundation/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/rustfoundation/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
   },
   "labels": [
     {
-      "name": "coding guideline"
+      "id": 8703664686,
+      "node_id": "LA_kwDOOMMjbs8AAAACBsdiLg",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/category:%20required",
+      "name": "category: required",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703664688,
+      "node_id": "LA_kwDOOMMjbs8AAAACBsdiMA",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/status:%20draft",
+      "name": "status: draft",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703664689,
+      "node_id": "LA_kwDOOMMjbs8AAAACBsdiMQ",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/decidability:%20undecidable",
+      "name": "decidability: undecidable",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703686409,
+      "node_id": "LA_kwDOOMMjbs8AAAACBse3CQ",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/chapter:%20unsafety",
+      "name": "chapter: unsafety",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703686412,
+      "node_id": "LA_kwDOOMMjbs8AAAACBse3DA",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/scope:%20module",
+      "name": "scope: module",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703732885,
+      "node_id": "LA_kwDOOMMjbs8AAAACBshslQ",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/accepted",
+      "name": "accepted",
+      "color": "6AABE8",
+      "default": false,
+      "description": ""
     }
   ],
   "state": "open",
-  "body": "### Chapter\n\nUnsafety\n\n### Guideline Title\n\nUnions shall only be accessed within unsafe blocks with documented invariants\n\n### Category\n\nRequired\n\n### Status\n\nDraft\n\n### Release Begin\n\n1.0.0\n\n### Release End\n\nlatest\n\n### FLS Paragraph ID\n\nfls_fmdn7n7s413d\n\n### Decidability\n\nUndecidable\n\n### Scope\n\nModule\n\n### Tags\n\nunsafe, unions, undefined-behavior\n\n### Amplification\n\nAs documented in [RUST-REF-UNION], reading from a union field is unsafe because the compiler cannot guarantee that the data stored in the union is valid for the type being read.\n\nAll union field accesses must:\n- Be within an `unsafe` block\n- Have a safety comment documenting the invariant that makes the access valid\n\n### Exception(s)\n\n_No response_\n\n### Rationale\n\nThe Rust Reference [RUST-REF-UNION] specifies that unions allow storing different types in the same memory location, similar to C unions. Reading the wrong field leads to undefined behavior.\n\nThis aligns with [CERT-C-EXP39] which addresses similar concerns in C code.\n\n### Non-Compliant Example 1 - Prose\n\nThe following code accesses a union field without documenting why the access is safe, violating the guideline.\n\n### Non-Compliant Example 1 - Code\n\n```rust\nunion MyUnion {\n    i: i32,\n    f: f32,\n}\n\nfn bad_example() {\n    let u = MyUnion { i: 42 };\n    // Missing safety comment!\n    let value = unsafe { u.i };\n}\n```\n\n### Compliant Example 1 - Prose\n\nThe following code properly documents the safety invariant when accessing the union field, as recommended by [RUST-REF-UNION].\n\n### Compliant Example 1 - Code\n\n```rust\nunion MyUnion {\n    i: i32,\n    f: f32,\n}\n\nfn good_example() {\n    let u = MyUnion { i: 42 };\n    // SAFETY: We just initialized the union with an i32 value,\n    // so reading the i32 field is valid.\n    let value = unsafe { u.i };\n}\n```\n\n### Bibliography\n\n[RUST-REF-UNION]: https://doc.rust-lang.org/reference/items/unions.html \"The Rust Reference | Unions\"\n[CERT-C-EXP39]: https://wiki.sei.cmu.edu/confluence/display/c/EXP39-C.+Do+not+access+a+variable+through+a+pointer+of+an+incompatible+type \"SEI CERT C | EXP39-C. Do not access a variable through a pointer of an incompatible type\""
+  "locked": false,
+  "assignee": null,
+  "assignees": [
+
+  ],
+  "milestone": null,
+  "comments": 0,
+  "created_at": "2025-05-30T22:24:07Z",
+  "updated_at": "2025-05-30T22:48:17Z",
+  "closed_at": null,
+  "author_association": "OWNER",
+  "active_lock_reason": null,
+  "sub_issues_summary": {
+    "total": 0,
+    "completed": 0,
+    "percent_completed": 0
+  },
+  "body": "### Chapter\n\nUnsafety\n\n### Guideline Title\n\nUnions shall only be accessed within unsafe blocks with documented invariants\n\n### Category\n\nRequired\n\n### Status\n\nDraft\n\n### Release Begin\n\n1.0.0\n\n### Release End\n\nlatest\n\n### FLS Paragraph ID\n\nfls_fmdn7n7s413d\n\n### Decidability\n\nUndecidable\n\n### Scope\n\nModule\n\n### Tags\n\nunsafe, unions, undefined-behavior\n\n### Amplification\n\nAs documented in [RUST-REF-UNION], reading from a union field is unsafe because the compiler cannot guarantee that the data stored in the union is valid for the type being read.\n\nAll union field accesses must:\n- Be within an `unsafe` block\n- Have a safety comment documenting the invariant that makes the access valid\n\n### Exception(s)\n\n_No response_\n\n### Rationale\n\nThe Rust Reference [RUST-REF-UNION] specifies that unions allow storing different types in the same memory location, similar to C unions. Reading the wrong field leads to undefined behavior.\n\nThis aligns with [CERT-C-EXP39] which addresses similar concerns in C code.\n\n### Non-Compliant Example 1 - Prose\n\nThe following code accesses a union field without documenting why the access is safe, violating the guideline.\n\n### Non-Compliant Example 1 - Code\n\n```rust\nunion MyUnion {\n    i: i32,\n    f: f32,\n}\n\nfn bad_example() {\n    let u = MyUnion { i: 42 };\n    // Missing safety comment!\n    let value = unsafe { u.i };\n}\n```\n\n### Non-Compliant Example 2 - Prose (Optional)\n\n_No response_\n\n### Non-Compliant Example 2 - Code (Optional)\n\n_No response_\n\n### Non-Compliant Example 3 - Prose (Optional)\n\n_No response_\n\n### Non-Compliant Example 3 - Code (Optional)\n\n_No response_\n\n### Non-Compliant Example 4 - Prose (Optional)\n\n_No response_\n\n### Non-Compliant Example 4 - Code (Optional)\n\n_No response_\n\n### Compliant Example 1 - Prose\n\nThe following code properly documents the safety invariant when accessing the union field, as recommended by [RUST-REF-UNION].\n\n### Compliant Example 1 - Code\n\n```rust\nunion MyUnion {\n    i: i32,\n    f: f32,\n}\n\nfn good_example() {\n    let u = MyUnion { i: 42 };\n    // SAFETY: We just initialized the union with an i32 value,\n    // so reading the i32 field is valid.\n    let value = unsafe { u.i };\n}\n```\n\n### Compliant Example 2 - Prose (Optional)\n\n_No response_\n\n### Compliant Example 2 - Code (Optional)\n\n_No response_\n\n### Compliant Example 3 - Prose (Optional)\n\n_No response_\n\n### Compliant Example 3 - Code (Optional)\n\n_No response_\n\n### Compliant Example 4 - Prose (Optional)\n\n_No response_\n\n### Compliant Example 4 - Code (Optional)\n\n_No response_\n\n### Bibliography\n\n[RUST-REF-UNION]: https://doc.rust-lang.org/reference/items/unions.html \"The Rust Reference | Unions\"\n[CERT-C-EXP39]: https://wiki.sei.cmu.edu/confluence/display/c/EXP39-C.+Do+not+access+a+variable+through+a+pointer+of+an+incompatible+type \"SEI CERT C | EXP39-C. Do not access a variable through a pointer of an incompatible type\"",
+  "closed_by": null,
+  "reactions": {
+    "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/104/reactions",
+    "total_count": 0,
+    "+1": 0,
+    "-1": 0,
+    "laugh": 0,
+    "hooray": 0,
+    "confused": 0,
+    "heart": 0,
+    "rocket": 0,
+    "eyes": 0
+  },
+  "timeline_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/104/timeline",
+  "performed_via_github_app": null,
+  "state_reason": null
 }

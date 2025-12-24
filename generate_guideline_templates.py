@@ -62,6 +62,21 @@ def generate_id(prefix):
     return f"{prefix}_{random_part}"
 
 
+def reindent(text: str, spaces: int) -> str:
+    """
+    Dedent text and re-indent all lines to specified level.
+    
+    This is necessary because Pandoc conversion adds its own indentation
+    to multiline content, which doesn't match the RST directive structure.
+    """
+    if not text or not text.strip():
+        return ""
+    # Remove common leading whitespace
+    dedented = dedent(text).strip()
+    # Re-indent all lines
+    return indent(dedented, " " * spaces)
+
+
 def generate_example_block(
     example_type: str,
     example_id: str,
@@ -80,21 +95,24 @@ def generate_example_block(
         code: The code block content
 
     Returns:
-        Formatted RST string for the example
+        Formatted RST string for the example (indented 4 spaces to nest inside guideline)
     """
-    indented_code = indent(code.strip(), " " * 13)
+    # Properly indent multiline prose (8 spaces - inside example inside guideline)
+    prose_indented = reindent(prose, 8)
+    # Properly indent code (12 spaces - inside rust-example inside example inside guideline)
+    code_indented = reindent(code, 12)
 
-    return dedent(f"""
-            .. {example_type}::
-                :id: {example_id}
-                :status: {status}
+    return f"""
+    .. {example_type}::
+        :id: {example_id}
+        :status: {status}
 
-                {prose.strip()}
+{prose_indented}
 
-                .. rust-example::
+        .. rust-example::
 
-                    {indented_code.strip()}
-    """)
+{code_indented}
+"""
 
 
 def generate_bibliography_block(
@@ -113,7 +131,7 @@ def generate_bibliography_block(
         entries: List of (citation_key, author, title, url) tuples
 
     Returns:
-        Formatted RST string for the bibliography
+        Formatted RST string for the bibliography (indented 4 spaces to nest inside guideline)
     
     Note:
         Uses :bibentry: role for citation anchors, namespaced by guideline ID
@@ -122,30 +140,30 @@ def generate_bibliography_block(
     if not entries:
         return ""
     
-    # Build the list-table content
+    # Build the list-table content (indented 10 spaces for inside list-table inside bibliography)
     # Use :bibentry: role with guideline_id prefix for namespacing
     table_rows = []
     for citation_key, author, title, url in entries:
         if url:
-            row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\" {url}"
+            row = f"          * - :bibentry:`{guideline_id}:{citation_key}`\n            - {author}. \"{title}.\" {url}"
         else:
-            row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\""
+            row = f"          * - :bibentry:`{guideline_id}:{citation_key}`\n            - {author}. \"{title}.\""
         table_rows.append(row)
     
     table_content = "\n".join(table_rows)
     
-    return dedent(f"""
-            .. bibliography::
-                :id: {bibliography_id}
-                :status: {status}
+    return f"""
+    .. bibliography::
+        :id: {bibliography_id}
+        :status: {status}
 
-                .. list-table::
-                   :header-rows: 0
-                   :widths: auto
-                   :class: bibliography-table
+        .. list-table::
+           :header-rows: 0
+           :widths: auto
+           :class: bibliography-table
 
 {table_content}
-    """)
+"""
 
 
 def parse_bibliography_entries(bibliography_text: str) -> list:
@@ -257,11 +275,11 @@ def guideline_rst_template(
     # Build optional exception section
     exception_section = ""
     if exceptions and exceptions.strip():
-        exception_section = f"""
-            **Exceptions**
+        # Properly indent exceptions content (4 spaces inside guideline directive)
+        indented_exceptions = reindent(exceptions, 4)
+        exception_section = f"""    **Exceptions**
 
-            {exceptions.strip()}
-        """
+{indented_exceptions}"""
 
     # Generate non-compliant example blocks
     non_compliant_blocks = []
@@ -309,28 +327,38 @@ def guideline_rst_template(
     if bibliography_block:
         all_examples += "\n" + bibliography_block
 
-    guideline_text = dedent(f"""
-        .. guideline:: {guideline_title.strip()}
-            :id: {guideline_id}
-            :category: {norm(category)}
-            :status: {norm(status)}
-            :release: {norm(release_begin)}-{release_end.strip()}
-            :fls: {norm(fls_id)}
-            :decidability: {norm(decidability)}
-            :scope: {norm(scope)}
-            :tags: {tags}
+    # Properly indent multiline content:
+    # - Amplification: 4 spaces (inside guideline directive)
+    # - Rationale: 8 spaces (inside rationale inside guideline)
+    amplification_indented = reindent(amplification, 4)
+    rationale_indented = reindent(rationale, 8)
+    
+    # Exception section is already properly indented, preserve it
+    exception_block = ""
+    if exception_section:
+        exception_block = "\n" + exception_section + "\n"
 
-            {amplification.strip()}
+    # Build the guideline text
+    guideline_text = f"""
+.. guideline:: {guideline_title.strip()}
+    :id: {guideline_id}
+    :category: {norm(category)}
+    :status: {norm(status)}
+    :release: {norm(release_begin)}-{release_end.strip()}
+    :fls: {norm(fls_id)}
+    :decidability: {norm(decidability)}
+    :scope: {norm(scope)}
+    :tags: {tags}
 
-            {exception_section.strip()}
+{amplification_indented}
+{exception_block}
+    .. rationale::
+        :id: {rationale_id}
+        :status: {norm(status)}
 
-            .. rationale::
-                :id: {rationale_id}
-                :status: {norm(status)}
-
-                {rationale.strip()}
+{rationale_indented}
 {all_examples}
-    """)
+"""
 
     return guideline_text
 
