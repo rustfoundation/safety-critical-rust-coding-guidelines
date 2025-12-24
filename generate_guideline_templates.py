@@ -4,6 +4,7 @@
 
 import argparse
 import random
+import re
 import string
 from textwrap import dedent, indent
 
@@ -125,7 +126,10 @@ def generate_bibliography_block(
     # Use :bibentry: role with guideline_id prefix for namespacing
     table_rows = []
     for citation_key, author, title, url in entries:
-        row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\" {url}"
+        if url:
+            row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\" {url}"
+        else:
+            row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\""
         table_rows.append(row)
     
     table_content = "\n".join(table_rows)
@@ -148,14 +152,14 @@ def parse_bibliography_entries(bibliography_text: str) -> list:
     """
     Parse bibliography entries from text input.
     
-    Expected format (one entry per line or block):
-    [CITATION-KEY] Author. "Title." URL
+    Expected format (Markdown reference link syntax):
+    [CITATION-KEY]: URL "Author | Title"
     
-    Or multi-line format:
-    [CITATION-KEY]
-    Author: Author Name
-    Title: The Title
-    URL: https://example.com
+    The title string contains "Author | Title" separated by a pipe.
+    
+    Examples:
+    [RUST-REF-UNION]: https://doc.rust-lang.org/reference/items/unions.html "The Rust Reference | Unions"
+    [CERT-C-INT34]: https://wiki.sei.cmu.edu/confluence/x/ItcxBQ "SEI CERT C | INT34-C. Do not shift by negative bits"
     
     Args:
         bibliography_text: Raw bibliography text from issue
@@ -163,78 +167,55 @@ def parse_bibliography_entries(bibliography_text: str) -> list:
     Returns:
         List of (citation_key, author, title, url) tuples
     """
-    import re
-    
     entries = []
     
     if not bibliography_text or not bibliography_text.strip():
         return entries
     
-    # Try to parse single-line format first
-    # Pattern: [KEY] Author. "Title." URL
-    single_line_pattern = re.compile(
-        r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]\s+'  # Citation key
-        r'([^"]+?)\.\s+'                      # Author (ends with .)
-        r'"([^"]+)"\.\s*'                     # Title in quotes
-        r'(https?://\S+)',                    # URL
+    # Pattern: [KEY]: URL "Author. Title"
+    # Standard Markdown reference link syntax with author.title in the title string
+    markdown_ref_pattern = re.compile(
+        r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]:\s*'  # [KEY]:
+        r'(https?://\S+)\s+'                   # URL
+        r'"([^"]+)"',                          # "Author. Title"
         re.MULTILINE
     )
     
-    for match in single_line_pattern.finditer(bibliography_text):
-        key, author, title, url = match.groups()
+    for match in markdown_ref_pattern.finditer(bibliography_text):
+        key, url, author_title = match.groups()
+        
+        # Split author and title on pipe separator
+        # e.g., "The Rust Reference | Unions" -> ("The Rust Reference", "Unions")
+        if ' | ' in author_title:
+            author, title = author_title.split(' | ', 1)
+        elif '|' in author_title:
+            # Handle case without spaces around pipe
+            author, title = author_title.split('|', 1)
+        else:
+            # No separator found - treat whole thing as title
+            author = ""
+            title = author_title
+        
         entries.append((key.strip(), author.strip(), title.strip(), url.strip()))
     
     if entries:
         return entries
     
-    # Try multi-line format
-    # Split by citation keys
-    blocks = re.split(r'(?=\[[A-Z][A-Z0-9-]*[A-Z0-9]\])', bibliography_text)
+    # Fallback: try legacy format for backwards compatibility
+    # [KEY] Author. "Title." URL
+    legacy_pattern = re.compile(
+        r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]\s+'  # Citation key in brackets
+        r'([^"]+?)\.\s+'                      # Author (non-greedy, ends with period + space)
+        r'"([^"]+)"\s+'                       # Title in quotes (may include period inside)
+        r'(https?://\S+)',                    # URL
+        re.MULTILINE
+    )
     
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
-        
-        # Extract citation key
-        key_match = re.match(r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]', block)
-        if not key_match:
-            continue
-        
-        key = key_match.group(1)
-        rest = block[key_match.end():].strip()
-        
-        # Try to extract author, title, url from rest
-        author = ""
-        title = ""
-        url = ""
-        
-        # Look for labeled format
-        author_match = re.search(r'Author:\s*(.+?)(?:\n|$)', rest, re.IGNORECASE)
-        title_match = re.search(r'Title:\s*(.+?)(?:\n|$)', rest, re.IGNORECASE)
-        url_match = re.search(r'URL:\s*(https?://\S+)', rest, re.IGNORECASE)
-        
-        if author_match:
-            author = author_match.group(1).strip()
-        if title_match:
-            title = title_match.group(1).strip()
-        if url_match:
-            url = url_match.group(1).strip()
-        
-        # If we didn't find labeled format, try simple line format
-        if not (author and title and url):
-            lines = rest.split('\n')
-            for line in lines:
-                line = line.strip()
-                if line.startswith('http'):
-                    url = line
-                elif not author:
-                    author = line
-                elif not title:
-                    title = line
-        
-        if key and (author or title or url):
-            entries.append((key, author or "Unknown", title or "Untitled", url or ""))
+    for match in legacy_pattern.finditer(bibliography_text):
+        key, author, title, url = match.groups()
+        # Strip trailing period from title if present
+        title = title.rstrip('.')
+        entries.append((key.strip(), author.strip(), title.strip(), url.strip()))
     
     return entries
 

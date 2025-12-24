@@ -41,6 +41,18 @@ GUIDELINE_FILE_HEADER = """\
 # Default guidelines directory
 DEFAULT_GUIDELINES_DIR = Path("src/coding-guidelines")
 
+# Pattern to match citation references in Markdown: [CITATION-KEY]
+# Citation keys must be UPPERCASE-WITH-HYPHENS
+MARKDOWN_CITATION_PATTERN = re.compile(
+    r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]'
+)
+
+# Pattern to avoid matching URLs or other bracket content
+# This helps distinguish citations from links like [text](url)
+MARKDOWN_LINK_PATTERN = re.compile(
+    r'\[([^\]]+)\]\([^)]+\)'
+)
+
 
 # =============================================================================
 # Markdown to RST conversion utilities
@@ -109,6 +121,92 @@ def normalize_md(issue_body: str) -> str:
     )
 
     return issue_body
+
+
+# =============================================================================
+# Citation reference utilities
+# =============================================================================
+
+def extract_citation_references(text: str) -> list:
+    """
+    Extract all citation references from Markdown text.
+    
+    Citation references are in the format [CITATION-KEY] where CITATION-KEY
+    is UPPERCASE-WITH-HYPHENS.
+    
+    Args:
+        text: Markdown text to search
+        
+    Returns:
+        List of citation keys found (without brackets)
+    """
+    # First, remove markdown links to avoid false positives
+    # [text](url) should not match as a citation
+    text_without_links = MARKDOWN_LINK_PATTERN.sub('', text)
+    
+    # Find all citation references
+    citations = MARKDOWN_CITATION_PATTERN.findall(text_without_links)
+    
+    # Return unique citations while preserving order
+    seen = set()
+    unique_citations = []
+    for citation in citations:
+        if citation not in seen:
+            seen.add(citation)
+            unique_citations.append(citation)
+    
+    return unique_citations
+
+
+def convert_citations_to_rst(text: str, guideline_id: str) -> str:
+    """
+    Convert Markdown citation references [KEY] to RST :cite: roles.
+    
+    Args:
+        text: Text that may contain Markdown citation references
+        guideline_id: The guideline ID for namespacing citations
+        
+    Returns:
+        Text with [KEY] converted to :cite:`gui_xxx:KEY`
+    """
+    if not guideline_id:
+        return text
+    
+    def replace_citation(match):
+        # Get the full match to check if it's part of a markdown link
+        full_text = match.string
+        start = match.start()
+        
+        # Check if this is part of a markdown link [text](url)
+        # by looking for a '(' immediately after the ']'
+        end = match.end()
+        if end < len(full_text) and full_text[end] == '(':
+            # This is a markdown link, don't replace
+            return match.group(0)
+        
+        citation_key = match.group(1)
+        return f':cite:`{guideline_id}:{citation_key}`'
+    
+    return MARKDOWN_CITATION_PATTERN.sub(replace_citation, text)
+
+
+def validate_citation_references(
+    text: str,
+    bibliography_keys: set
+) -> tuple:
+    """
+    Validate that all citation references in text have matching bibliography entries.
+    
+    Args:
+        text: Text to check for citation references
+        bibliography_keys: Set of valid citation keys from bibliography
+        
+    Returns:
+        Tuple of (is_valid, list of undefined citation keys)
+    """
+    citations = extract_citation_references(text)
+    undefined = [c for c in citations if c not in bibliography_keys]
+    return (len(undefined) == 0, undefined)
 
 
 # =============================================================================
@@ -306,6 +404,11 @@ def collect_examples(fields: dict, example_type: str) -> list:
 def guideline_template(fields: dict) -> str:
     """
     Convert a dictionary of guideline fields into proper RST format.
+    
+    This function:
+    1. Converts Markdown to RST
+    2. Converts citation references [KEY] to :cite:`gui_xxx:KEY` roles
+    3. Generates the complete guideline RST structure
 
     Args:
         fields: Dictionary containing all guideline fields
@@ -316,40 +419,66 @@ def guideline_template(fields: dict) -> str:
     def get(key):
         return fields.get(key, "").strip()
 
-    amplification_text = indent(md_to_rst(get("amplification")), " " * 12)
-    rationale_text = indent(md_to_rst(get("rationale")), " " * 16)
-
-    # Process exceptions field - convert MD to RST and pre-indent for multi-line support
-    exceptions_raw = get("exceptions")
-    exceptions_text = ""
-    if exceptions_raw:
-        exceptions_text = indent(md_to_rst(exceptions_raw), " " * 12)
-
-    # Collect non-compliant examples
-    non_compliant_examples = []
-    for prose, code in collect_examples(fields, "non_compliant"):
-        prose_rst = indent(md_to_rst(prose), " " * 16)
-        code_formatted = format_code_block(code)
-        non_compliant_examples.append((prose_rst, code_formatted))
-
-    # Collect compliant examples
-    compliant_examples = []
-    for prose, code in collect_examples(fields, "compliant"):
-        prose_rst = indent(md_to_rst(prose), " " * 16)
-        code_formatted = format_code_block(code)
-        compliant_examples.append((prose_rst, code_formatted))
-
-    # Parse bibliography entries if present
+    # First, generate a temporary guideline ID for citation conversion
+    # This will be replaced by the actual ID in guideline_rst_template
+    import random
+    import string
+    temp_id = "gui_" + "".join(random.choice(string.ascii_letters + string.digits) for _ in range(12))
+    
+    # Parse bibliography entries first to know what citation keys are available
     bibliography_raw = get("bibliography")
     bibliography_entries = None
+    bibliography_keys = set()
     if bibliography_raw:
         bibliography_entries = parse_bibliography_entries(bibliography_raw)
+        bibliography_keys = {entry[0] for entry in bibliography_entries}
         # Validate entries
         for entry in bibliography_entries:
             is_valid, error_msg = validate_bibliography_entry(entry)
             if not is_valid:
                 # Log warning but continue - the preview will show the issue
                 print(f"Warning: {error_msg}")
+
+    # Convert and process amplification
+    # Note: Citation conversion must happen AFTER md_to_rst to avoid Pandoc escaping backticks
+    amplification_md = get("amplification")
+    amplification_rst = md_to_rst(amplification_md)
+    amplification_with_citations = convert_citations_to_rst(amplification_rst, temp_id)
+    amplification_text = indent(amplification_with_citations, " " * 12)
+
+    # Convert and process rationale
+    rationale_md = get("rationale")
+    rationale_rst = md_to_rst(rationale_md)
+    rationale_with_citations = convert_citations_to_rst(rationale_rst, temp_id)
+    rationale_text = indent(rationale_with_citations, " " * 16)
+
+    # Process exceptions field - convert MD to RST and pre-indent for multi-line support
+    exceptions_raw = get("exceptions")
+    exceptions_text = ""
+    if exceptions_raw:
+        exceptions_rst = md_to_rst(exceptions_raw)
+        exceptions_with_citations = convert_citations_to_rst(exceptions_rst, temp_id)
+        exceptions_text = indent(exceptions_with_citations, " " * 12)
+
+    # Collect non-compliant examples
+    non_compliant_examples = []
+    for prose, code in collect_examples(fields, "non_compliant"):
+        # Convert citations in prose (after MD->RST conversion)
+        prose_rst = md_to_rst(prose)
+        prose_with_citations = convert_citations_to_rst(prose_rst, temp_id)
+        prose_indented = indent(prose_with_citations, " " * 16)
+        code_formatted = format_code_block(code)
+        non_compliant_examples.append((prose_indented, code_formatted))
+
+    # Collect compliant examples
+    compliant_examples = []
+    for prose, code in collect_examples(fields, "compliant"):
+        # Convert citations in prose (after MD->RST conversion)
+        prose_rst = md_to_rst(prose)
+        prose_with_citations = convert_citations_to_rst(prose_rst, temp_id)
+        prose_indented = indent(prose_with_citations, " " * 16)
+        code_formatted = format_code_block(code)
+        compliant_examples.append((prose_indented, code_formatted))
 
     guideline_text = guideline_rst_template(
         guideline_title=get("guideline_title"),
@@ -368,6 +497,14 @@ def guideline_template(fields: dict) -> str:
         compliant_examples=compliant_examples,
         bibliography_entries=bibliography_entries,
     )
+
+    # Replace the temporary ID with the actual generated ID
+    # The guideline_rst_template generates a new ID, so we need to extract it
+    # and update all the temporary citations
+    actual_id_match = re.search(r':id:\s*(gui_[a-zA-Z0-9]+)', guideline_text)
+    if actual_id_match:
+        actual_id = actual_id_match.group(1)
+        guideline_text = guideline_text.replace(temp_id, actual_id)
 
     return guideline_text
 
