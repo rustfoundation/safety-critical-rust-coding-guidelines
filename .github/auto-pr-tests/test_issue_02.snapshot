@@ -16,11 +16,11 @@
 
     Recursion may be permitted under the following conditions:
 
-    -  The recursion termination condition is simple, explicit, and well-defined.
-    -  The function calls itself directly, or with strictly limited and clearly documented indirection.
-    -  The maximum recursion depth is statically bounded and justified, ensuring no risk of stack overflow.
-    -  The rationale for using recursion, rather than iteration, is clearly documented and reviewed.
-    -  The code is accompanied by tests that exercise the recursion boundary conditions.
+    - The recursion termination condition is simple, explicit, and well-defined.
+    - The function calls itself directly, or with strictly limited and clearly documented indirection.
+    - The maximum recursion depth is statically bounded and justified, ensuring no risk of stack overflow.
+    - The rationale for using recursion, rather than iteration, is clearly documented and reviewed.
+    - The code is accompanied by tests that exercise the recursion boundary conditions.
 
     .. rationale::
         :id: rat_qWoRqGTQYeK5

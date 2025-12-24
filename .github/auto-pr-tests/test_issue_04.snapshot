@@ -14,8 +14,8 @@
 
     All union field accesses must:
 
-    -  Be within an ``unsafe`` block
-    -  Have a safety comment documenting the invariant that makes the access valid
+    - Be within an ``unsafe`` block
+    - Have a safety comment documenting the invariant that makes the access valid
 
     .. rationale::
         :id: rat_1AiGMQb2q0AO

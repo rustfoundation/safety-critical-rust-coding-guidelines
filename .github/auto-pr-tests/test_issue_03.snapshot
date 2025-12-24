@@ -14,18 +14,18 @@
 
     This rule applies to the following primitive types:
 
-    -  ``i8``
-    -  ``i16``
-    -  ``i32``
-    -  ``i64``
-    -  ``i128``
-    -  ``u8``
-    -  ``u16``
-    -  ``u32``
-    -  ``u64``
-    -  ``u128``
-    -  ``usize``
-    -  ``isize``
+    - ``i8``
+    - ``i16``
+    - ``i32``
+    - ``i64``
+    - ``i128``
+    - ``u8``
+    - ``u16``
+    - ``u32``
+    - ``u64``
+    - ``u128``
+    - ``usize``
+    - ``isize``
 
     .. rationale::
         :id: rat_QYov4YymiNrs
@@ -73,9 +73,9 @@
 
         ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``, in the following way:
 
-        -  If ``M < 0``, the output is ``None``
-        -  If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
-        -  If ``N <= M``, the output is ``None``
+        - If ``M < 0``, the output is ``None``
+        - If ``0 <= M < N`` for ``T`` of ``N`` bits, then the output is ``Some(T)``
+        - If ``N <= M``, the output is ``None``
 
         This API has consistent behavior across ``Debug`` and ``Release``, and makes the programmer intent explicit, which effectively solves this issue.
 
@@ -85,8 +85,8 @@
 
         As seen below in the ``non_compliant_example()`` function:
 
-        -  the use of ``<<`` will exhibit different behavior between debug and release builds,
-        -  and will panic if the shift amount is negative or greater than or equal to the number of bits.
+        - the use of ``<<`` will exhibit different behavior between debug and release builds,
+        - and will panic if the shift amount is negative or greater than or equal to the number of bits.
 
         .. rust-example::
 
@@ -106,8 +106,8 @@
 
         As seen below in the ``compliant_example()`` function:
 
-        -  the use of ``checked_shl`` will exhibit consistent behavior between debug and release builds,
-        -  and will return ``None`` if the shift amount is negative or greater than or equal to the number of bits.
+        - the use of ``checked_shl`` will exhibit consistent behavior between debug and release builds,
+        - and will return ``None`` if the shift amount is negative or greater than or equal to the number of bits.
 
         .. rust-example::
 
