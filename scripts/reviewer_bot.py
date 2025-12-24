@@ -20,8 +20,8 @@ All commands must be prefixed with @guidelines-bot /<command>:
     - Assign yourself as the reviewer for this issue/PR
     - Removes any existing reviewer assignment
 
-  @guidelines-bot /release [reason]
-    - Release your assignment from this issue/PR
+  @guidelines-bot /release [@username] [reason]
+    - Release your assignment from this issue/PR (or someone else's with triage+ permission)
     - Does NOT auto-assign the next reviewer (use /pass for that)
 
   @guidelines-bot /r? @username
@@ -85,7 +85,7 @@ TRANSITION_PERIOD_DAYS = 14  # Days after warning before transition to Observer
 COMMANDS = {
     "pass": "Pass this review to next in queue",
     "away": "Step away from queue until date (YYYY-MM-DD)",
-    "release": "Release your assignment (no auto-reassign)",
+    "release": "Release assignment (yours, or @username with triage+ permission)",
     "claim": "Claim this review for yourself",
     "r?": "Assign a reviewer (@username or 'producers')",
     "label": "Add/remove labels (+label-name or -label-name)",
@@ -236,6 +236,30 @@ def unassign_reviewer(issue_number: int, username: str) -> bool:
     
     # Always try to remove from assignees (works for both)
     return remove_assignee(issue_number, username)
+
+
+def check_user_permission(username: str, required_permission: str = "triage") -> bool:
+    """
+    Check if a user has at least the required permission level on the repo.
+    
+    Permission levels (lowest to highest): read, triage, write, maintain, admin
+    The permissions object has boolean flags for each level, and higher levels
+    include all lower permissions (e.g., admin has triage=True).
+    
+    Args:
+        username: GitHub username to check
+        required_permission: Permission level required ("triage", "push", "maintain", "admin")
+    
+    Returns:
+        True if user has the required permission, False otherwise.
+    """
+    result = github_api("GET", f"collaborators/{username}/permission")
+    if not result:
+        return False
+    
+    # The API returns a permissions object with boolean flags
+    permissions = result.get("user", {}).get("permissions", {})
+    return permissions.get(required_permission, False)
 
 
 # ==============================================================================
@@ -599,7 +623,7 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
 If you need to pass this review:
 - `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
 - `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [reason]` - Release your assignment (leaves issue unassigned)
+- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
 
 To assign someone else:
 - `{BOT_MENTION} /r? @username` - Assign a specific reviewer
@@ -642,7 +666,7 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
 If you need to pass this review:
 - `{BOT_MENTION} /pass [reason]` - Pass just this PR to the next reviewer
 - `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [reason]` - Release your assignment (leaves PR unassigned)
+- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
 
 To assign someone else:
 - `{BOT_MENTION} /r? @username` - Assign a specific reviewer
@@ -1106,7 +1130,7 @@ def handle_commands_command() -> tuple[str, bool]:
             f"**Pass or step away:**\n"
             f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue\n"
             f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n"
-            f"- `{BOT_MENTION} /release [reason]` - Release your assignment (leaves issue/PR unassigned)\n\n"
+            f"- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n"
             f"**Assign reviewers:**\n"
             f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
             f"- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n"
@@ -1170,15 +1194,43 @@ def handle_claim_command(state: dict, issue_number: int,
 
 
 def handle_release_command(state: dict, issue_number: int,
-                          comment_author: str, reason: str | None = None) -> tuple[str, bool]:
+                          comment_author: str, args: list | None = None) -> tuple[str, bool]:
     """
-    Handle the release! command - release your assignment without auto-reassigning.
+    Handle the release command - release an assignment without auto-reassigning.
 
-    Unlike pass!, this does NOT automatically assign the next reviewer.
-    Use this when you want to unassign yourself but leave it open for someone to claim.
+    Unlike pass, this does NOT automatically assign the next reviewer.
+    Use this when you want to unassign yourself or someone else but leave it
+    open for someone to claim.
+
+    Syntax:
+    - /release [reason] - Release yourself
+    - /release @username [reason] - Release someone else (requires triage+ permission)
 
     Returns (response_message, success).
     """
+    args = args or []
+    
+    # Determine if targeting self or someone else
+    target_username = None
+    reason = None
+    releasing_other = False
+    
+    if args and args[0].startswith("@"):
+        # Releasing someone else
+        target_username = args[0].lstrip("@")
+        reason = " ".join(args[1:]) if len(args) > 1 else None
+        releasing_other = target_username.lower() != comment_author.lower()
+        
+        if releasing_other:
+            # Check if comment author has triage+ permission
+            if not check_user_permission(comment_author, "triage"):
+                return (f"❌ @{comment_author} does not have permission to release "
+                        f"other reviewers. Triage access or higher is required."), False
+    else:
+        # Releasing self (original behavior)
+        target_username = comment_author
+        reason = " ".join(args) if args else None
+    
     # Check who the current reviewer is (from our state first, then GitHub)
     issue_key = str(issue_number)
     tracked_reviewer = None
@@ -1190,22 +1242,34 @@ def handle_release_command(state: dict, issue_number: int,
     # Also check GitHub assignees
     current_assignees = get_issue_assignees(issue_number)
 
-    # Determine if the comment author is the current reviewer
-    is_tracked = tracked_reviewer and tracked_reviewer.lower() == comment_author.lower()
-    is_assigned = comment_author.lower() in [a.lower() for a in current_assignees]
+    # Determine if the target is the current reviewer
+    is_tracked = tracked_reviewer and tracked_reviewer.lower() == target_username.lower()
+    is_assigned = target_username.lower() in [a.lower() for a in current_assignees]
 
     if not is_tracked and not is_assigned:
-        if tracked_reviewer:
-            return (f"❌ @{comment_author} is not the current reviewer. "
-                    f"Current reviewer: @{tracked_reviewer}"), False
-        elif current_assignees:
-            return (f"❌ @{comment_author} is not assigned to this issue/PR. "
-                    f"Current assignee(s): @{', @'.join(current_assignees)}"), False
+        if releasing_other:
+            # Trying to release someone who isn't assigned
+            if tracked_reviewer:
+                return (f"❌ @{target_username} is not the current reviewer. "
+                        f"Current reviewer: @{tracked_reviewer}"), False
+            elif current_assignees:
+                return (f"❌ @{target_username} is not assigned to this issue/PR. "
+                        f"Current assignee(s): @{', @'.join(current_assignees)}"), False
+            else:
+                return f"❌ @{target_username} is not assigned to this issue/PR.", False
         else:
-            return "❌ No reviewer is currently assigned to release.", False
+            # Trying to release self when not assigned
+            if tracked_reviewer:
+                return (f"❌ @{comment_author} is not the current reviewer. "
+                        f"Current reviewer: @{tracked_reviewer}"), False
+            elif current_assignees:
+                return (f"❌ @{comment_author} is not assigned to this issue/PR. "
+                        f"Current assignee(s): @{', @'.join(current_assignees)}"), False
+            else:
+                return "❌ No reviewer is currently assigned to release.", False
 
     # Remove the assignment (best effort)
-    unassign_reviewer(issue_number, comment_author)
+    unassign_reviewer(issue_number, target_username)
 
     # Clear the current reviewer in our state
     if "active_reviews" in state and issue_key in state["active_reviews"]:
@@ -1213,9 +1277,17 @@ def handle_release_command(state: dict, issue_number: int,
             state["active_reviews"][issue_key]["current_reviewer"] = None
 
     reason_text = f" Reason: {reason}" if reason else ""
-    return (f"✅ @{comment_author} has released this review.{reason_text}\n\n"
-            f"_This issue/PR is now unassigned. Use `{BOT_MENTION} /r? producers` to assign "
-            f"the next reviewer from the queue, or `{BOT_MENTION} /claim` to claim it._"), True
+    
+    if releasing_other:
+        # Someone else released this reviewer - notify them
+        return (f"✅ @{comment_author} has released @{target_username} from this review.{reason_text}\n\n"
+                f"_This issue/PR is now unassigned. Use `{BOT_MENTION} /r? producers` to assign "
+                f"the next reviewer from the queue, or `{BOT_MENTION} /claim` to claim it._"), True
+    else:
+        # Self-release
+        return (f"✅ @{target_username} has released this review.{reason_text}\n\n"
+                f"_This issue/PR is now unassigned. Use `{BOT_MENTION} /r? producers` to assign "
+                f"the next reviewer from the queue, or `{BOT_MENTION} /claim` to claim it._"), True
 
 
 def handle_assign_command(state: dict, issue_number: int,
@@ -1796,9 +1868,8 @@ def handle_comment_event(state: dict) -> bool:
         state_changed = success
 
     elif command == "release":
-        # Args are the optional reason
-        reason = " ".join(args) if args else None
-        response, success = handle_release_command(state, issue_number, comment_author, reason)
+        # Pass args to handle_release_command for @username parsing
+        response, success = handle_release_command(state, issue_number, comment_author, args)
         state_changed = success
 
     elif command == "r?-user":
