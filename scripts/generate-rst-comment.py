@@ -7,6 +7,7 @@ This script generates a GitHub comment containing the RST preview of a coding gu
 It reads a GitHub issue JSON from stdin and outputs a formatted Markdown comment.
 
 It also extracts and tests Rust code examples, reporting any compilation failures.
+It validates bibliography entries and citation references.
 
 Usage:
     cat issue.json | uv run python scripts/generate-rst-comment.py
@@ -19,8 +20,8 @@ import re
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
-from typing import List, Tuple
+from dataclasses import dataclass, field
+from typing import List, Set, Tuple
 
 # Add the scripts directory to Python path so we can import guideline_utils
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +30,7 @@ sys.path.insert(0, script_dir)
 from guideline_utils import (
     chapter_to_filename,
     collect_examples,
+    extract_citation_references,
     extract_form_fields,
     guideline_template,
     normalize_list_separation,
@@ -62,9 +64,13 @@ class CodeTestResult:
 class BibliographyValidationResult:
     """Result of validating bibliography entries."""
     is_valid: bool
-    errors: List[str]
-    warnings: List[str]
-    entries: List[Tuple[str, str, str, str]]  # (key, author, title, url)
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    entries: List[Tuple[str, str, str, str]] = field(default_factory=list)  # (key, author, title, url)
+    defined_keys: Set[str] = field(default_factory=set)
+    referenced_keys: Set[str] = field(default_factory=set)
+    undefined_refs: List[str] = field(default_factory=list)  # References without definitions
+    unused_entries: List[str] = field(default_factory=list)  # Definitions without references
 
 
 def extract_guideline_id(rst_content: str) -> str:
@@ -271,9 +277,50 @@ def test_all_examples(fields: dict) -> List[CodeTestResult]:
     return results
 
 
+def collect_all_citation_references(fields: dict) -> Set[str]:
+    """
+    Collect all citation references from text fields that support citations.
+    
+    Args:
+        fields: Dictionary of form fields
+        
+    Returns:
+        Set of all citation keys referenced in the text
+    """
+    all_refs = set()
+    
+    # Fields that can contain citation references
+    text_fields = [
+        "amplification",
+        "rationale",
+        "exceptions",
+    ]
+    
+    for field_name in text_fields:
+        text = fields.get(field_name, "")
+        if text:
+            refs = extract_citation_references(text)
+            all_refs.update(refs)
+    
+    # Also check example prose fields
+    for i in range(1, 5):
+        for prefix in ["non_compliant_ex_prose_", "compliant_ex_prose_"]:
+            text = fields.get(f"{prefix}{i}", "")
+            if text:
+                refs = extract_citation_references(text)
+                all_refs.update(refs)
+    
+    return all_refs
+
+
 def validate_bibliography(fields: dict) -> BibliographyValidationResult:
     """
-    Validate bibliography entries from form fields.
+    Validate bibliography entries and citation references.
+    
+    Checks:
+    1. Bibliography entry format (citation key format, URL format)
+    2. Citation references match bibliography entries
+    3. Bibliography entries are referenced (warning if not)
     
     Args:
         fields: Dictionary of form fields
@@ -283,29 +330,34 @@ def validate_bibliography(fields: dict) -> BibliographyValidationResult:
     """
     bibliography_raw = fields.get("bibliography", "").strip()
     
-    if not bibliography_raw:
-        return BibliographyValidationResult(
-            is_valid=True,
-            errors=[],
-            warnings=[],
-            entries=[]
-        )
+    result = BibliographyValidationResult(is_valid=True)
     
-    errors = []
-    warnings = []
-    entries = []
+    # Collect all citation references from text fields
+    result.referenced_keys = collect_all_citation_references(fields)
+    
+    if not bibliography_raw:
+        # No bibliography provided
+        if result.referenced_keys:
+            # But there are citation references!
+            result.is_valid = False
+            result.errors.append(
+                f"Found citation references but no bibliography: {', '.join(sorted(result.referenced_keys))}"
+            )
+            result.undefined_refs = list(result.referenced_keys)
+        return result
     
     # Parse entries
     parsed_entries = parse_bibliography_entries(bibliography_raw)
     
     if not parsed_entries:
-        warnings.append("Could not parse any bibliography entries. Check the format.")
-        return BibliographyValidationResult(
-            is_valid=True,  # Not an error, just a warning
-            errors=errors,
-            warnings=warnings,
-            entries=[]
-        )
+        result.warnings.append("Could not parse any bibliography entries. Check the format.")
+        if result.referenced_keys:
+            result.is_valid = False
+            result.errors.append(
+                f"Citation references without valid bibliography: {', '.join(sorted(result.referenced_keys))}"
+            )
+            result.undefined_refs = list(result.referenced_keys)
+        return result
     
     # Validate each entry
     citation_key_pattern = re.compile(r'^[A-Z][A-Z0-9-]*[A-Z0-9]$')
@@ -313,30 +365,55 @@ def validate_bibliography(fields: dict) -> BibliographyValidationResult:
     for key, author, title, url in parsed_entries:
         # Validate citation key format
         if not citation_key_pattern.match(key):
-            errors.append(f"Invalid citation key format: `{key}`. Must be UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION)")
+            result.errors.append(
+                f"Invalid citation key format: `{key}`. Must be UPPERCASE-WITH-HYPHENS (e.g., RUST-REF-UNION)"
+            )
+            result.is_valid = False
         elif len(key) > 50:
-            errors.append(f"Citation key `{key}` exceeds 50 character limit")
+            result.errors.append(f"Citation key `{key}` exceeds 50 character limit")
+            result.is_valid = False
+        else:
+            result.defined_keys.add(key)
         
         # Validate URL format
         if url and not url.startswith(('http://', 'https://')):
-            errors.append(f"Invalid URL for `{key}`: `{url}`. Must start with http:// or https://")
+            result.errors.append(f"Invalid URL for `{key}`: `{url}`. Must start with http:// or https://")
+            result.is_valid = False
         
         # Warn about missing fields
         if not author or author == "Unknown":
-            warnings.append(f"Missing author for citation `{key}`")
+            result.warnings.append(f"Missing author for citation `{key}`")
         if not title or title == "Untitled":
-            warnings.append(f"Missing title for citation `{key}`")
+            result.warnings.append(f"Missing title for citation `{key}`")
         if not url:
-            warnings.append(f"Missing URL for citation `{key}`")
+            result.warnings.append(f"Missing URL for citation `{key}`")
         
-        entries.append((key, author, title, url))
+        result.entries.append((key, author, title, url))
     
-    return BibliographyValidationResult(
-        is_valid=len(errors) == 0,
-        errors=errors,
-        warnings=warnings,
-        entries=entries
-    )
+    # Check for undefined references
+    result.undefined_refs = [
+        ref for ref in result.referenced_keys 
+        if ref not in result.defined_keys
+    ]
+    if result.undefined_refs:
+        result.is_valid = False
+        result.errors.append(
+            f"Undefined citation references: {', '.join(sorted(result.undefined_refs))}. "
+            f"Add these to your bibliography or remove the references."
+        )
+    
+    # Check for unused bibliography entries (warning only)
+    result.unused_entries = [
+        key for key in result.defined_keys 
+        if key not in result.referenced_keys
+    ]
+    if result.unused_entries:
+        result.warnings.append(
+            f"Unused bibliography entries: {', '.join(sorted(result.unused_entries))}. "
+            f"Consider adding citations like `[{result.unused_entries[0]}]` in your text."
+        )
+    
+    return result
 
 
 def format_test_results(results: List[CodeTestResult]) -> str:
@@ -414,46 +491,83 @@ def format_bibliography_validation(result: BibliographyValidationResult) -> str:
     Returns:
         Formatted markdown string
     """
-    if not result.entries and not result.errors and not result.warnings:
+    # Only show section if there are entries, errors, warnings, or references
+    if (not result.entries and not result.errors and not result.warnings 
+        and not result.referenced_keys):
         return ""
     
     lines = []
-    lines.append("### 📚 Bibliography Validation")
+    lines.append("### 📚 Bibliography & Citations")
     lines.append("")
     
     if result.is_valid and not result.warnings:
-        lines.append(f"✅ **{len(result.entries)} bibliography entry/entries validated successfully!**")
+        if result.entries:
+            lines.append(f"✅ **{len(result.entries)} bibliography entry/entries validated successfully!**")
+            if result.referenced_keys:
+                lines.append(f"   - {len(result.referenced_keys)} citation reference(s) found and matched")
+        else:
+            lines.append("ℹ️ **No bibliography provided** (this is optional)")
     elif result.is_valid and result.warnings:
         lines.append(f"⚠️ **{len(result.entries)} bibliography entry/entries parsed with warnings**")
     else:
-        lines.append("❌ **Bibliography validation failed**")
+        lines.append("❌ **Bibliography/citation validation failed**")
     
     if result.errors:
         lines.append("")
         lines.append("**Errors:**")
         for error in result.errors:
-            lines.append(f"- {error}")
+            lines.append(f"- ❌ {error}")
     
     if result.warnings:
         lines.append("")
         lines.append("**Warnings:**")
         for warning in result.warnings:
-            lines.append(f"- {warning}")
+            lines.append(f"- ⚠️ {warning}")
+    
+    # Show citation reference summary
+    if result.referenced_keys or result.defined_keys:
+        lines.append("")
+        lines.append("**Citation Summary:**")
+        
+        if result.referenced_keys:
+            matched = result.referenced_keys - set(result.undefined_refs)
+            if matched:
+                lines.append(f"- ✅ Matched references: {', '.join(f'`[{k}]`' for k in sorted(matched))}")
+        
+        if result.undefined_refs:
+            lines.append(f"- ❌ Undefined references: {', '.join(f'`[{k}]`' for k in sorted(result.undefined_refs))}")
+        
+        if result.unused_entries:
+            lines.append(f"- ⚠️ Unused entries: {', '.join(f'`[{k}]`' for k in sorted(result.unused_entries))}")
     
     if result.entries:
         lines.append("")
         lines.append("**Parsed entries:**")
         lines.append("")
-        lines.append("| Citation Key | Author | Title | URL |")
-        lines.append("|--------------|--------|-------|-----|")
+        lines.append("| Citation Key | Author | Title | URL | Used? |")
+        lines.append("|--------------|--------|-------|-----|-------|")
         for key, author, title, url in result.entries:
             url_display = f"[Link]({url})" if url else "-"
-            lines.append(f"| `[{key}]` | {author[:30]}... | {title[:40]}... | {url_display} |")
+            author_display = (author[:27] + "...") if len(author) > 30 else author
+            title_display = (title[:37] + "...") if len(title) > 40 else title
+            used = "✅" if key in result.referenced_keys else "⚠️"
+            lines.append(f"| `[{key}]` | {author_display} | {title_display} | {url_display} | {used} |")
+    
+    # Add usage tip
+    if result.entries and result.unused_entries:
+        lines.append("")
+        lines.append("> **Tip:** To cite a bibliography entry, use `[CITATION-KEY]` in your Amplification or Rationale.")
+        lines.append(f"> Example: `As documented in [{result.unused_entries[0]}], ...`")
     
     return "\n".join(lines)
 
 
-def generate_comment(rst_content: str, chapter: str, test_results: List[CodeTestResult], bib_result: BibliographyValidationResult) -> str:
+def generate_comment(
+    rst_content: str, 
+    chapter: str, 
+    test_results: List[CodeTestResult], 
+    bib_result: BibliographyValidationResult
+) -> str:
     """
     Generate a formatted GitHub comment with instructions and RST content.
 
@@ -587,7 +701,7 @@ def main():
     # Test code examples
     test_results = test_all_examples(fields)
     
-    # Validate bibliography
+    # Validate bibliography and citations
     bib_result = validate_bibliography(fields)
 
     # Generate the comment

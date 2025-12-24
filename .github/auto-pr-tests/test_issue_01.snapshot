@@ -1,7 +1,7 @@
 =====CONTENT=====
 
 .. guideline:: test ga
-    :id: gui_3Wl9gOTto7p2 
+    :id: gui_7z5DAWrBiHII
     :category: advisory
     :status: draft
     :release: 1.1.1-1.1.1
@@ -12,30 +12,32 @@
 
     hehehehe
 
-    .. rationale:: 
-        :id: rat_PVjXjtM9G383 
+    .. rationale::
+        :id: rat_DJpPWV9VgX3D
         :status: draft
 
         test ga
 
     .. non_compliant_example::
-        :id: non_compl_ex_ABSVsT97MwLG 
+        :id: non_compl_ex_EnaoDIwTWTqh
         :status: draft
 
         test ga
 
-        .. code-block:: rust
+        .. rust-example::
 
             dfhsdfkjshdfskdjhftest ga
 
+
     .. compliant_example::
-        :id: compl_ex_Z9TjeDsRTnwL 
+        :id: compl_ex_s8i5EEcLTmXz
         :status: draft
 
         test ga
 
-        .. code-block:: rust
+        .. rust-example::
 
             test ga
+
 
 =====CONTENT=END=====

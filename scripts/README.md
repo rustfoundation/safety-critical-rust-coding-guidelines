@@ -15,6 +15,92 @@ This directory contains utility scripts for managing coding guidelines.
 
 ---
 
+## Bibliography and Citations
+
+The coding guidelines support bibliography references using standard Markdown reference link syntax.
+
+### In the Issue Template
+
+When creating a new guideline via the issue template:
+
+1. **Add bibliography entries** in the Bibliography field using Markdown reference links:
+   ```
+   [RUST-REF-UNION]: https://doc.rust-lang.org/reference/items/unions.html "The Rust Reference | Unions"
+   [CERT-C-INT34]: https://wiki.sei.cmu.edu/confluence/x/ItcxBQ "SEI CERT C | INT34-C. Do not shift by negative bits"
+   ```
+
+2. **Reference citations** in your Amplification, Rationale, or example prose using `[CITATION-KEY]`:
+   ```markdown
+   As documented in [RUST-REF-UNION], union types in Rust have specific safety requirements.
+   The CERT C Coding Standard [CERT-C-INT34] provides guidance on avoiding undefined behavior.
+   ```
+
+### Bibliography Entry Format
+
+Use standard Markdown reference link syntax with "Author | Title" in the title string:
+
+```
+[KEY]: URL "Author | Title"
+```
+
+The author and title are separated by a pipe (`|`).
+
+### Citation Key Rules
+
+- Must be **UPPERCASE-WITH-HYPHENS** (e.g., `RUST-REF-UNION`, `CERT-C-INT34`)
+- Start with a letter
+- Contain only letters, numbers, and hyphens
+- Maximum 50 characters
+
+### How It Works
+
+1. The `generate-rst-comment.py` script:
+   - Parses bibliography entries from the issue
+   - Validates citation key formats and URL formats
+   - Checks that all `[CITATION-KEY]` references have matching entries
+   - Warns about unused bibliography entries
+
+2. The `guideline_utils.py` script:
+   - Converts Markdown `[CITATION-KEY]` to RST `:cite:\`gui_xxx:CITATION-KEY\`` roles
+   - Generates bibliography blocks with `:bibentry:` anchors
+   - Namespaces citations per-guideline to avoid conflicts
+
+3. The generated RST:
+   - Uses `:cite:` roles for clickable in-text citations
+   - Uses `:bibentry:` roles for bibliography anchors with back-links
+   - Supports navigation between citations and their definitions
+
+### Example
+
+**Input (Markdown in issue):**
+```markdown
+### Amplification
+As documented in [RUST-REF-UNION], unions have specific requirements.
+
+### Bibliography
+[RUST-REF-UNION]: https://doc.rust-lang.org/reference/items/unions.html "The Rust Reference | Unions"
+```
+
+**Output (RST):**
+```rst
+.. guideline:: Example Guideline
+   :id: gui_abc123XyzQrs
+   
+   As documented in :cite:`gui_abc123XyzQrs:RUST-REF-UNION`, unions have specific requirements.
+   
+   .. bibliography::
+      :id: bib_abc123XyzQrs
+      :status: draft
+      
+      .. list-table::
+         :header-rows: 0
+         
+         * - :bibentry:`gui_abc123XyzQrs:RUST-REF-UNION`
+           - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
+```
+
+---
+
 ## Rust Example Scripts
 
 These scripts support the rustdoc-style code example system.
@@ -189,6 +275,9 @@ A shared module containing common functions used by other scripts:
 - `guideline_template()` - Generate RST from fields dictionary
 - `chapter_to_filename()` - Convert chapter name to filename slug
 - `save_guideline_file()` - Append guideline to chapter file
+- `extract_citation_references()` - Extract `[CITATION-KEY]` patterns from text
+- `convert_citations_to_rst()` - Convert Markdown citations to `:cite:` roles
+- `validate_citation_references()` - Check that citations match bibliography
 
 ---
 
@@ -228,6 +317,13 @@ cat path/to/issue.json | uv run python scripts/generate-rst-comment.py
 # From GitHub API directly
 curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/123 | uv run python scripts/generate-rst-comment.py
 ```
+
+### Features
+
+- **Code Compilation Testing**: Tests all Rust code examples and reports compilation errors
+- **Bibliography Validation**: Validates citation key format, URL format, and cross-references
+- **Citation Reference Checking**: Ensures all `[CITATION-KEY]` references have matching bibliography entries
+- **Unused Entry Detection**: Warns about bibliography entries that aren't referenced
 
 ---
 

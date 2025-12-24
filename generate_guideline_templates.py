@@ -4,6 +4,7 @@
 
 import argparse
 import random
+import re
 import string
 from textwrap import dedent, indent
 
@@ -61,6 +62,21 @@ def generate_id(prefix):
     return f"{prefix}_{random_part}"
 
 
+def reindent(text: str, spaces: int) -> str:
+    """
+    Dedent text and re-indent all lines to specified level.
+    
+    This is necessary because Pandoc conversion adds its own indentation
+    to multiline content, which doesn't match the RST directive structure.
+    """
+    if not text or not text.strip():
+        return ""
+    # Remove common leading whitespace
+    dedented = dedent(text).strip()
+    # Re-indent all lines
+    return indent(dedented, " " * spaces)
+
+
 def generate_example_block(
     example_type: str,
     example_id: str,
@@ -79,21 +95,24 @@ def generate_example_block(
         code: The code block content
 
     Returns:
-        Formatted RST string for the example
+        Formatted RST string for the example (indented 4 spaces to nest inside guideline)
     """
-    indented_code = indent(code.strip(), " " * 13)
+    # Properly indent multiline prose (8 spaces - inside example inside guideline)
+    prose_indented = reindent(prose, 8)
+    # Properly indent code (12 spaces - inside rust-example inside example inside guideline)
+    code_indented = reindent(code, 12)
 
-    return dedent(f"""
-            .. {example_type}::
-                :id: {example_id}
-                :status: {status}
+    return f"""
+    .. {example_type}::
+        :id: {example_id}
+        :status: {status}
 
-                {prose.strip()}
+{prose_indented}
 
-                .. rust-example::
+        .. rust-example::
 
-                    {indented_code.strip()}
-    """)
+{code_indented}
+"""
 
 
 def generate_bibliography_block(
@@ -112,7 +131,7 @@ def generate_bibliography_block(
         entries: List of (citation_key, author, title, url) tuples
 
     Returns:
-        Formatted RST string for the bibliography
+        Formatted RST string for the bibliography (indented 4 spaces to nest inside guideline)
     
     Note:
         Uses :bibentry: role for citation anchors, namespaced by guideline ID
@@ -121,41 +140,44 @@ def generate_bibliography_block(
     if not entries:
         return ""
     
-    # Build the list-table content
+    # Build the list-table content (indented 10 spaces for inside list-table inside bibliography)
     # Use :bibentry: role with guideline_id prefix for namespacing
     table_rows = []
     for citation_key, author, title, url in entries:
-        row = f"      * - :bibentry:`{guideline_id}:{citation_key}`\n        - {author}. \"{title}.\" {url}"
+        if url:
+            row = f"          * - :bibentry:`{guideline_id}:{citation_key}`\n            - {author}. \"{title}.\" {url}"
+        else:
+            row = f"          * - :bibentry:`{guideline_id}:{citation_key}`\n            - {author}. \"{title}.\""
         table_rows.append(row)
     
     table_content = "\n".join(table_rows)
     
-    return dedent(f"""
-            .. bibliography::
-                :id: {bibliography_id}
-                :status: {status}
+    return f"""
+    .. bibliography::
+        :id: {bibliography_id}
+        :status: {status}
 
-                .. list-table::
-                   :header-rows: 0
-                   :widths: auto
-                   :class: bibliography-table
+        .. list-table::
+           :header-rows: 0
+           :widths: auto
+           :class: bibliography-table
 
 {table_content}
-    """)
+"""
 
 
 def parse_bibliography_entries(bibliography_text: str) -> list:
     """
     Parse bibliography entries from text input.
     
-    Expected format (one entry per line or block):
-    [CITATION-KEY] Author. "Title." URL
+    Expected format (Markdown reference link syntax):
+    [CITATION-KEY]: URL "Author | Title"
     
-    Or multi-line format:
-    [CITATION-KEY]
-    Author: Author Name
-    Title: The Title
-    URL: https://example.com
+    The title string contains "Author | Title" separated by a pipe.
+    
+    Examples:
+    [RUST-REF-UNION]: https://doc.rust-lang.org/reference/items/unions.html "The Rust Reference | Unions"
+    [CERT-C-INT34]: https://wiki.sei.cmu.edu/confluence/x/ItcxBQ "SEI CERT C | INT34-C. Do not shift by negative bits"
     
     Args:
         bibliography_text: Raw bibliography text from issue
@@ -163,78 +185,55 @@ def parse_bibliography_entries(bibliography_text: str) -> list:
     Returns:
         List of (citation_key, author, title, url) tuples
     """
-    import re
-    
     entries = []
     
     if not bibliography_text or not bibliography_text.strip():
         return entries
     
-    # Try to parse single-line format first
-    # Pattern: [KEY] Author. "Title." URL
-    single_line_pattern = re.compile(
-        r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]\s+'  # Citation key
-        r'([^"]+?)\.\s+'                      # Author (ends with .)
-        r'"([^"]+)"\.\s*'                     # Title in quotes
-        r'(https?://\S+)',                    # URL
+    # Pattern: [KEY]: URL "Author. Title"
+    # Standard Markdown reference link syntax with author.title in the title string
+    markdown_ref_pattern = re.compile(
+        r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]:\s*'  # [KEY]:
+        r'(https?://\S+)\s+'                   # URL
+        r'"([^"]+)"',                          # "Author. Title"
         re.MULTILINE
     )
     
-    for match in single_line_pattern.finditer(bibliography_text):
-        key, author, title, url = match.groups()
+    for match in markdown_ref_pattern.finditer(bibliography_text):
+        key, url, author_title = match.groups()
+        
+        # Split author and title on pipe separator
+        # e.g., "The Rust Reference | Unions" -> ("The Rust Reference", "Unions")
+        if ' | ' in author_title:
+            author, title = author_title.split(' | ', 1)
+        elif '|' in author_title:
+            # Handle case without spaces around pipe
+            author, title = author_title.split('|', 1)
+        else:
+            # No separator found - treat whole thing as title
+            author = ""
+            title = author_title
+        
         entries.append((key.strip(), author.strip(), title.strip(), url.strip()))
     
     if entries:
         return entries
     
-    # Try multi-line format
-    # Split by citation keys
-    blocks = re.split(r'(?=\[[A-Z][A-Z0-9-]*[A-Z0-9]\])', bibliography_text)
+    # Fallback: try legacy format for backwards compatibility
+    # [KEY] Author. "Title." URL
+    legacy_pattern = re.compile(
+        r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]\s+'  # Citation key in brackets
+        r'([^"]+?)\.\s+'                      # Author (non-greedy, ends with period + space)
+        r'"([^"]+)"\s+'                       # Title in quotes (may include period inside)
+        r'(https?://\S+)',                    # URL
+        re.MULTILINE
+    )
     
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
-        
-        # Extract citation key
-        key_match = re.match(r'\[([A-Z][A-Z0-9-]*[A-Z0-9])\]', block)
-        if not key_match:
-            continue
-        
-        key = key_match.group(1)
-        rest = block[key_match.end():].strip()
-        
-        # Try to extract author, title, url from rest
-        author = ""
-        title = ""
-        url = ""
-        
-        # Look for labeled format
-        author_match = re.search(r'Author:\s*(.+?)(?:\n|$)', rest, re.IGNORECASE)
-        title_match = re.search(r'Title:\s*(.+?)(?:\n|$)', rest, re.IGNORECASE)
-        url_match = re.search(r'URL:\s*(https?://\S+)', rest, re.IGNORECASE)
-        
-        if author_match:
-            author = author_match.group(1).strip()
-        if title_match:
-            title = title_match.group(1).strip()
-        if url_match:
-            url = url_match.group(1).strip()
-        
-        # If we didn't find labeled format, try simple line format
-        if not (author and title and url):
-            lines = rest.split('\n')
-            for line in lines:
-                line = line.strip()
-                if line.startswith('http'):
-                    url = line
-                elif not author:
-                    author = line
-                elif not title:
-                    title = line
-        
-        if key and (author or title or url):
-            entries.append((key, author or "Unknown", title or "Untitled", url or ""))
+    for match in legacy_pattern.finditer(bibliography_text):
+        key, author, title, url = match.groups()
+        # Strip trailing period from title if present
+        title = title.rstrip('.')
+        entries.append((key.strip(), author.strip(), title.strip(), url.strip()))
     
     return entries
 
@@ -276,11 +275,11 @@ def guideline_rst_template(
     # Build optional exception section
     exception_section = ""
     if exceptions and exceptions.strip():
-        exception_section = f"""
-            **Exceptions**
+        # Properly indent exceptions content (4 spaces inside guideline directive)
+        indented_exceptions = reindent(exceptions, 4)
+        exception_section = f"""    **Exceptions**
 
-            {exceptions.strip()}
-        """
+{indented_exceptions}"""
 
     # Generate non-compliant example blocks
     non_compliant_blocks = []
@@ -328,28 +327,38 @@ def guideline_rst_template(
     if bibliography_block:
         all_examples += "\n" + bibliography_block
 
-    guideline_text = dedent(f"""
-        .. guideline:: {guideline_title.strip()}
-            :id: {guideline_id}
-            :category: {norm(category)}
-            :status: {norm(status)}
-            :release: {norm(release_begin)}-{release_end.strip()}
-            :fls: {norm(fls_id)}
-            :decidability: {norm(decidability)}
-            :scope: {norm(scope)}
-            :tags: {tags}
+    # Properly indent multiline content:
+    # - Amplification: 4 spaces (inside guideline directive)
+    # - Rationale: 8 spaces (inside rationale inside guideline)
+    amplification_indented = reindent(amplification, 4)
+    rationale_indented = reindent(rationale, 8)
+    
+    # Exception section is already properly indented, preserve it
+    exception_block = ""
+    if exception_section:
+        exception_block = "\n" + exception_section + "\n"
 
-            {amplification.strip()}
+    # Build the guideline text
+    guideline_text = f"""
+.. guideline:: {guideline_title.strip()}
+    :id: {guideline_id}
+    :category: {norm(category)}
+    :status: {norm(status)}
+    :release: {norm(release_begin)}-{release_end.strip()}
+    :fls: {norm(fls_id)}
+    :decidability: {norm(decidability)}
+    :scope: {norm(scope)}
+    :tags: {tags}
 
-            {exception_section.strip()}
+{amplification_indented}
+{exception_block}
+    .. rationale::
+        :id: {rationale_id}
+        :status: {norm(status)}
 
-            .. rationale::
-                :id: {rationale_id}
-                :status: {norm(status)}
-
-                {rationale.strip()}
+{rationale_indented}
 {all_examples}
-    """)
+"""
 
     return guideline_text
 
