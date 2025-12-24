@@ -1,0 +1,86 @@
+=====CONTENT=====
+
+.. guideline:: Unions shall only be accessed within unsafe blocks with documented invariants
+    :id: gui_IGNORED_ID
+    :category: required
+    :status: draft
+    :release: 1.0.0-latest
+    :fls: fls_fmdn7n7s413d
+    :decidability: undecidable
+    :scope: module
+    :tags: unsafe, unions, undefined-behavior
+
+    As documented in :cite:`gui_IGNORED_ID:RUST-REF-UNION`, reading from a union field is unsafe because the compiler cannot guarantee that the data stored in the union is valid for the type being read.
+
+    All union field accesses must:
+
+    -  Be within an ``unsafe`` block
+    -  Have a safety comment documenting the invariant that makes the access valid
+
+
+
+    .. rationale::
+	:id: rat_IGNORED_ID
+	:status: draft
+
+	The Rust Reference :cite:`gui_IGNORED_ID:RUST-REF-UNION` specifies that unions allow storing different types in the same memory location, similar to C unions. Reading the wrong field leads to undefined behavior.
+
+	This aligns with :cite:`gui_IGNORED_ID:CERT-C-EXP39` which addresses similar concerns in C code.
+
+.. non_compliant_example::
+    :id: non_compl_ex_IGNORED_ID
+    :status: draft
+
+    The following code accesses a union field without documenting why the access is safe, violating the guideline.
+
+    .. rust-example::
+
+        union MyUnion {
+            i: i32,
+            f: f32,
+        }
+
+        fn bad_example() {
+            let u = MyUnion { i: 42 };
+            // Missing safety comment!
+            let value = unsafe { u.i };
+        }
+
+
+.. compliant_example::
+    :id: compl_ex_IGNORED_ID
+    :status: draft
+
+    The following code properly documents the safety invariant when accessing the union field, as recommended by :cite:`gui_IGNORED_ID:RUST-REF-UNION`.
+
+    .. rust-example::
+
+        union MyUnion {
+            i: i32,
+            f: f32,
+        }
+
+        fn good_example() {
+            let u = MyUnion { i: 42 };
+            // SAFETY: We just initialized the union with an i32 value,
+            // so reading the i32 field is valid.
+            let value = unsafe { u.i };
+        }
+
+
+      .. bibliography::
+          :id: bib_IGNORED_ID
+          :status: draft
+
+          .. list-table::
+             :header-rows: 0
+             :widths: auto
+             :class: bibliography-table
+
+* - :bibentry:`gui_IGNORED_ID:RUST-REF-UNION`
+  - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
+* - :bibentry:`gui_IGNORED_ID:CERT-C-EXP39`
+  - SEI CERT C. "EXP39-C. Do not access a variable through a pointer of an incompatible type." https://wiki.sei.cmu.edu/confluence/display/c/EXP39-C.+Do+not+access+a+variable+through+a+pointer+of+an+incompatible+type
+
+
+=====CONTENT=END=====

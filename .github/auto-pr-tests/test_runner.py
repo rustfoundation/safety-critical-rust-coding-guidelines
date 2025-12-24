@@ -8,6 +8,24 @@ def normalize_ids(text: str) -> str:
     return re.sub(r"(:id:\s+[a-z_]+)_[a-zA-Z0-9]+", r"\1_IGNORED_ID", text)
 
 
+def normalize_cite_ids(text: str) -> str:
+    """Normalize citation IDs like :cite:`gui_xxx:KEY` to :cite:`gui_IGNORED_ID:KEY`"""
+    return re.sub(r"(:cite:`gui_)[a-zA-Z0-9]+(:)", r"\1IGNORED_ID\2", text)
+
+
+def normalize_bibentry_ids(text: str) -> str:
+    """Normalize bibentry IDs like :bibentry:`gui_xxx:KEY` to :bibentry:`gui_IGNORED_ID:KEY`"""
+    return re.sub(r"(:bibentry:`gui_)[a-zA-Z0-9]+(:)", r"\1IGNORED_ID\2", text)
+
+
+def normalize_all(text: str) -> str:
+    """Apply all normalizations"""
+    text = normalize_ids(text)
+    text = normalize_cite_ids(text)
+    text = normalize_bibentry_ids(text)
+    return text
+
+
 def compare(issue_json_path: Path, snapshot_path: Path) -> bool:
     input_json = issue_json_path.read_text()
 
@@ -21,8 +39,8 @@ def compare(issue_json_path: Path, snapshot_path: Path) -> bool:
 
     # Normalize the actual output and the snapshot, this is crucial in snapshot tests to
     # ignore random/volatile values.
-    actual_output = normalize_ids(result.stdout.decode())
-    expected_output = normalize_ids(snapshot_path.read_text())
+    actual_output = normalize_all(result.stdout.decode())
+    expected_output = normalize_all(snapshot_path.read_text())
 
     # Compare
     if actual_output != expected_output:
@@ -56,6 +74,10 @@ tests = {
     "test_03": (
         Path(".github/auto-pr-tests/test_issue_03.json"),
         Path(".github/auto-pr-tests/test_issue_03.snapshot"),
+    ),
+    "test_04_bibliography": (
+        Path(".github/auto-pr-tests/test_issue_04.json"),
+        Path(".github/auto-pr-tests/test_issue_04.snapshot"),
     ),
 }
 

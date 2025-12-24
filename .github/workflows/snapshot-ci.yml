@@ -5,6 +5,8 @@ on:
     paths:
       - 'generate_guideline_templates.py'
       - 'scripts/auto-pr-helper.py'
+      - 'scripts/guideline_utils.py'
+      - 'scripts/generate-rst-comment.py'
       - '.github/auto-pr-tests/**'
   workflow_dispatch:      # also allow manual runs
 
