@@ -147,51 +147,78 @@
 
       .. rust-example::
 
-         union IntOrBool {
+         #[repr(C)]
+         #[derive(Copy, Clone)]
+         union IntOrBoolData {
              i: u8,
              b: bool,
          }
-
+         
+         /// Tracks which field of the union is currently active.
+         #[derive(Clone, Copy, PartialEq, Eq)]
          enum ActiveField {
              Int,
              Bool,
          }
-
-         struct SafeUnion {
-             data: IntOrBool,
+         
+         /// A union wrapper that tracks the active field at runtime.
+         pub struct IntOrBool {
+             data: IntOrBoolData,
              active: ActiveField,
          }
-
-         impl SafeUnion {
-             fn new_int(value: u8) -> Self {
+         
+         impl IntOrBool {
+             pub fn from_int(value: u8) -> Self {
                  Self {
-                     data: IntOrBool { i: value },
+                     data: IntOrBoolData { i: value },
                      active: ActiveField::Int,
                  }
              }
-
-             fn new_bool(value: bool) -> Self {
+         
+             pub fn from_bool(value: bool) -> Self {
                  Self {
-                     data: IntOrBool { b: value },
+                     data: IntOrBoolData { b: value },
                      active: ActiveField::Bool,
                  }
              }
-
-             fn get_bool(&self) -> Option<bool> {
+         
+             pub fn set_int(&mut self, value: u8) {
+                 self.data.i = value;
+                 self.active = ActiveField::Int;
+             }
+         
+             pub fn set_bool(&mut self, value: bool) {
+                 self.data.b = value;
+                 self.active = ActiveField::Bool;
+             }
+         
+             /// Returns the integer value if that field is active.
+             pub fn as_int(&self) -> Option<u8> {
                  match self.active {
-                     // Compliant: only read bool when we know it was written as bool
-                     ActiveField::Bool => Some(unsafe { self.data.b }),
+                     // SAFETY: We only read `i` when we know it was last written as `i`
+                     ActiveField::Int => Some(unsafe { self.data.i }), // compliant
+                     ActiveField::Bool => None,
+                 }
+             }
+         
+             /// Returns the boolean value if that field is active.
+             pub fn as_bool(&self) -> Option<bool> {
+                 match self.active {
+                     // SAFETY: We only read `b` when we know it was last written as `b`
+                     ActiveField::Bool => Some(unsafe { self.data.b }), // compliant
                      ActiveField::Int => None,
                  }
              }
          }
-
+         
          fn main() {
-             let union_bool = SafeUnion::new_bool(true);
-             let union_int = SafeUnion::new_int(42);
-             
-             println!("Bool union as bool: {:?}", union_bool.get_bool());  // Some(true)
-             println!("Int union as bool: {:?}", union_int.get_bool());    // None
+             let mut value = IntOrBool::from_bool(true);
+             assert_eq!(value.as_bool(), Some(true));
+             assert_eq!(value.as_int(), None);
+         
+             value.set_int(42);
+             assert_eq!(value.as_bool(), None);
+             assert_eq!(value.as_int(), Some(42));
          }
 
    .. compliant_example::
