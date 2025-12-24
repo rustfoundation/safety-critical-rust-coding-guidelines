@@ -175,7 +175,6 @@ def convert_citations_to_rst(text: str, guideline_id: str) -> str:
     def replace_citation(match):
         # Get the full match to check if it's part of a markdown link
         full_text = match.string
-        start = match.start()
         
         # Check if this is part of a markdown link [text](url)
         # by looking for a '(' immediately after the ']'
@@ -428,10 +427,8 @@ def guideline_template(fields: dict) -> str:
     # Parse bibliography entries first to know what citation keys are available
     bibliography_raw = get("bibliography")
     bibliography_entries = None
-    bibliography_keys = set()
     if bibliography_raw:
         bibliography_entries = parse_bibliography_entries(bibliography_raw)
-        bibliography_keys = {entry[0] for entry in bibliography_entries}
         # Validate entries
         for entry in bibliography_entries:
             is_valid, error_msg = validate_bibliography_entry(entry)
