@@ -24,7 +24,7 @@
    If the active field is uncertain, use explicit validity checks.
 
    .. rationale::
-      :id: rat_UnionFieldValidityReason
+      :id: rat_8QeimyAvM7cH
       :status: draft
 
       Similar to C, unions allow multiple fields to occupy the same memory.
@@ -49,13 +49,13 @@
       Reading an invalid value is undefined behavior.
 
    .. non_compliant_example::
-      :id: non_compl_ex_UnionBool
+      :id: non_compl_ex_ecHYRXb4Ncpu
       :status: draft
 
       This noncompliant example reads an invalid bit pattern from a Boolean union field.
       The value ``3`` is not a valid value of type ``bool`` (only ``0`` and ``1`` are valid).
 
-      .. code-block:: rust
+      .. rust-example::
 
          union IntOrBool {
              i: u8,
@@ -70,12 +70,12 @@
          }
 
    .. non_compliant_example::
-      :id: non_compl_ex_UnionChar
+      :id: non_compl_ex_8bloNOcsLEKX
       :status: draft
 
       This noncompliant example reads an invalid Unicode value from a ``union`` field of type ``char`` .
 
-      .. code-block:: rust
+      .. rust-example::
 
          union IntOrChar {
              i: u32,
@@ -91,12 +91,12 @@
          }
 
    .. non_compliant_example::
-      :id: non_compl_ex_UnionEnum
+      :id: non_compl_ex_PsJAB4WglRZl
       :status: draft
 
       This noncompliant example reads an invalid discriminant from a union field of 'Color' enumeration type.
 
-      .. code-block:: rust
+      .. rust-example::
 
          #[repr(u8)]
          #[derive(Copy, Clone)]
@@ -119,13 +119,13 @@
          }
 
    .. non_compliant_example::
-      :id: non_compl_ex_UnionRef
+      :id: non_compl_ex_aEx4HnDD8xIp
       :status: draft
 
       This noncompliant example reads a reference from a union containing a null pointer.
       A similar problem occurs when reading a misaligned pointer.
 
-      .. code-block:: rust
+      .. rust-example::
 
          union PtrOrRef {
              p: *const i32,
@@ -140,12 +140,12 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_UnionTrackField
+      :id: compl_ex_x27meeLDMZNI
       :status: draft
 
       This compliant example tracks the active field explicitly to ensure valid reads.
 
-      .. code-block:: rust
+      .. rust-example::
 
          union IntOrBool {
              i: u8,
@@ -195,12 +195,12 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_UnionSameField
+      :id: compl_ex_Y7xaYuD2xdmq
       :status: draft
 
       This compliant solution reads from the same field that was written.
 
-      .. code-block:: rust
+      .. rust-example::
 
          union IntOrBool {
              i: u8,
@@ -215,12 +215,12 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_UnionValidReinterpret
+      :id: compl_ex_Jsxenev7lNf0
       :status: draft
 
       This compliant example reinterprets the value as a different types where all bit patterns are valid.
 
-      .. code-block:: rust
+      .. rust-example::
 
          union IntBytes {
              i: u32,
@@ -240,12 +240,12 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_UnionValidateBool
+      :id: compl_ex_vIITtPAeKHrp
       :status: draft
 
       This compliant example validates bytes before reading as a constrained type.
 
-      .. code-block:: rust
+      .. rust-example::
 
          union IntOrBool {
              i: u8,
