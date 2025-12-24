@@ -51,7 +51,7 @@ def build_docs(
 
     dest = root / "build"
 
-    args = ["-b", builder, "-d", dest / "doctrees"]
+    args = ["-b", builder, "-d", dest / "doctrees", "-wtest.txt"]
 
     if debug:
         # Disable parallel builds and show exceptions in debug mode.
