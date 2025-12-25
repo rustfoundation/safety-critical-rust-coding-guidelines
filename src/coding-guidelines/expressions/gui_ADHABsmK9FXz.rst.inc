@@ -118,7 +118,9 @@
              let _a3: u64   = std::mem::transmute(p1);  // OK, size is checked
              // let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes
 
+             #[allow(integer_to_ptr_transmutes)]
              let _p2: * const u32 = std::mem::transmute(a1); // OK
+             #[allow(integer_to_ptr_transmutes)]
              let _p3: * const u32 = std::mem::transmute(a1); // OK
            }
 

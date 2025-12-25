@@ -59,7 +59,9 @@
             // let p5: * const u32 = std::mem::transmute(x);  // not valid
             // let p6: * const u32 = std::mem::transmute(y);  // not valid
 
+            #[allow(integer_to_ptr_transmutes)]
             let _p7: * const u32 = std::mem::transmute(z); // not compliant
+            #[allow(integer_to_ptr_transmutes)]
             let _p8: * const u32 = std::mem::transmute(w); // not compliant
 
             let _p9: * const u32 = std::mem::transmute(_f); // not compliant, and very strange
