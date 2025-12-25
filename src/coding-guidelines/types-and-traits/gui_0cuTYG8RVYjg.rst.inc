@@ -290,7 +290,7 @@
              assert_eq!(unsafe { u.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant
              unsafe { u.i }  // compliant
          }
-         
+
          fn main() {
              println!("{:#04x?}", get_bytes());
              println!("{}", get_u32());
@@ -304,30 +304,31 @@
 
       .. rust-example::
 
+         #[repr(C)]
          union IntOrBool {
              i: u8,
              b: bool,
          }
 
          fn try_read_bool(u: &IntOrBool) -> Option<bool> {
-             // Read as integer (always valid for 'u8')
-             let raw = unsafe { u.i };
-             
-             // Validate before interpreting as a value of type 'bool'
+             // SAFETY: Reading as `u8` is always valid because all bit patterns
+             // are valid for `u8`, regardless of which field was last written.
+             let raw = unsafe { u.i }; // compliant
+         
+             // Validate before interpreting as `bool` (only 0 and 1 are valid)
              match raw {
                  0 => Some(false),
                  1 => Some(true),
-                 _ => None,  // Invalid Boolean value
-             }
+                 _ => None,
+             } // compliant
          }
 
          fn main() {
              let u1 = IntOrBool { i: 1 };
              let u2 = IntOrBool { i: 3 };
-             
-             // Validates before reading as value of type 'bool'
-             println!("u1 as bool: {:?}", try_read_bool(&u1));  // Some(true)
-             println!("u2 as bool: {:?}", try_read_bool(&u2));  // None
+         
+             assert_eq!(try_read_bool(&u1), Some(true));
+             assert_eq!(try_read_bool(&u2), None);
          }
 
    .. bibliography::
