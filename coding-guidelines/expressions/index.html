@@ -122,7 +122,7 @@
              
   <section id="expressions">
 <h1>Expressions<a class="headerlink" href="#expressions" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-08946ef9">
+<div class="need_container docutils container" id="SNCB-0fba2473">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_7y0GAMmtMhch">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -139,14 +139,13 @@
 <div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
 <div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">latest</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_vLFlPWSCHRje" title="gui_7y0GAMmtMhch">rat_vLFlPWSCHRje</a>, <a class="reference internal" href="#non_compl_ex_0XeioBrgfh5z" title="gui_7y0GAMmtMhch">non_compl_ex_0XeioBrgfh5z</a>, <a class="reference internal" href="#compl_ex_k1CD6xoZxhXb" title="gui_7y0GAMmtMhch">compl_ex_k1CD6xoZxhXb</a>, <a class="reference internal" href="#compl_ex_k1CD6xoZxhXc" title="gui_7y0GAMmtMhch">compl_ex_k1CD6xoZxhXc</a></span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_vLFlPWSCHRje" title="gui_7y0GAMmtMhch">rat_vLFlPWSCHRje</a>, <a class="reference internal" href="#non_compl_ex_0XeioBrgfh5z" title="gui_7y0GAMmtMhch">non_compl_ex_0XeioBrgfh5z</a>, <a class="reference internal" href="#compl_ex_k1CD6xoZxhXb" title="gui_7y0GAMmtMhch">compl_ex_k1CD6xoZxhXb</a>, <a class="reference internal" href="#compl_ex_k1CD6xoZxhXc" title="gui_7y0GAMmtMhch">compl_ex_k1CD6xoZxhXc</a>, <a class="reference internal" href="#bib_7y0GAMmtMhch" title="gui_7y0GAMmtMhch">bib_7y0GAMmtMhch</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>Do not provide a right operand of
-<a class="reference external" href="https://rust-lang.github.io/fls/types-and-traits.html#integer-types">integer type</a>
-during a <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression">division expression</a> or <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression">remainder expression</a> when the left operand also has integer type.</p>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Do not provide a right operand of integer type <a class="citation-ref reference internal" href="#cite-gui_7y0GAMmtMhch-FLS-INTEGER-TYPES">[FLS-INTEGER-TYPES]</a>
+during a division expression <a class="citation-ref reference internal" href="#cite-gui_7y0GAMmtMhch-FLS-DIVISION-EXPR">[FLS-DIVISION-EXPR]</a> or remainder expression <a class="citation-ref reference internal" href="#cite-gui_7y0GAMmtMhch-FLS-REMAINDER-EXPR">[FLS-REMAINDER-EXPR]</a> when the left operand also has integer type.</p>
 <blockquote>
 <div><p>This rule applies to the following primitive integer types:</p>
 <ul class="simple">
@@ -164,7 +163,7 @@ during a <a class="reference external" href="https://rust-lang.github.io/fls/exp
 <li><p><code class="docutils literal notranslate"><span class="pre">isize</span></code></p></li>
 </ul>
 </div></blockquote>
-<div class="need_container docutils container" id="SNCB-e934b56d">
+<div class="need_container docutils container" id="SNCB-eff58141">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_vLFlPWSCHRje">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -186,7 +185,7 @@ Division by zero is undefined in mathematics because it leads to contradictions 
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-9e80a0c4">
+<div class="need_container docutils container" id="SNCB-7ded640f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_0XeioBrgfh5z">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -219,7 +218,7 @@ Division by zero is undefined in mathematics because it leads to contradictions 
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-bc32668e">
+<div class="need_container docutils container" id="SNCB-4d989bd7">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_k1CD6xoZxhXb">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -236,7 +235,7 @@ Division by zero is undefined in mathematics because it leads to contradictions 
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Checked division prevents division by zero from occurring.
-The programmer can then handle the returned <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Aoption%3A%3AOption"><code class="docutils literal notranslate"><span class="pre">std::option::Option</span></code></a>.
+The programmer can then handle the returned <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Aoption%3A%3AOption"><code class="docutils literal notranslate"><span class="pre">std::option::Option</span></code></a>.
 Using checked division and remainder is particularly important in the signed integer case,
 where arithmetic overflow can also occur when dividing the minimum representable value by -1.</p>
 <div class="rust-example-container docutils container">
@@ -261,7 +260,7 @@ where arithmetic overflow can also occur when dividing the minimum representable
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fed78572">
+<div class="need_container docutils container" id="SNCB-28dbe247">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_k1CD6xoZxhXc">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -277,9 +276,9 @@ where arithmetic overflow can also occur when dividing the minimum representable
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant solution creates a divisor using <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ANonZero"><code class="docutils literal notranslate"><span class="pre">std::num::NonZero</span></code></a>.
-<a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ANonZero"><code class="docutils literal notranslate"><span class="pre">std::num::NonZero</span></code></a> is a wrapper around primitive integer types that guarantees the contained value is never zero.
-<a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ANonZero%3A%3Anew"><code class="docutils literal notranslate"><span class="pre">std::num::NonZero::new</span></code></a> creates a new binding that represents a value that is known not to be zero.
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant solution creates a divisor using <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ANonZero"><code class="docutils literal notranslate"><span class="pre">std::num::NonZero</span></code></a>.
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ANonZero"><code class="docutils literal notranslate"><span class="pre">std::num::NonZero</span></code></a> is a wrapper around primitive integer types that guarantees the contained value is never zero.
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ANonZero%3A%3Anew"><code class="docutils literal notranslate"><span class="pre">std::num::NonZero::new</span></code></a> creates a new binding that represents a value that is known not to be zero.
 This ensures that functions operating on its value can correctly assume that they are not being given zero as their input.</p>
 <p>Note that the test for arithmetic overflow that occurs when dividing the minimum representable value by -1 is unnecessary
 in this compliant example because the result of the division expression is an unsigned integer type.</p>
@@ -302,12 +301,46 @@ in this compliant example because the result of the division expression is an un
 </tbody>
 </table>
 </div>
+<div class="need_container docutils container" id="SNCB-28ea0269">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_7y0GAMmtMhch">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bibliography</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bib_7y0GAMmtMhch" title="bib_7y0GAMmtMhch">bib_7y0GAMmtMhch</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_7y0GAMmtMhch" title="bib_7y0GAMmtMhch">gui_7y0GAMmtMhch</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><table class="bibliography-table docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_7y0GAMmtMhch-FLS-INTEGER-TYPES"></span><strong class="bibentry-key">[FLS-INTEGER-TYPES]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_7y0GAMmtMhch-FLS-INTEGER-TYPES')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Types and Traits - Integer Types.” <a class="reference external" href="https://rust-lang.github.io/fls/types-and-traits.html#integer-types">https://rust-lang.github.io/fls/types-and-traits.html#integer-types</a></p></td>
+</tr>
+<tr class="row-even"><td><p><span class="target" id="cite-gui_7y0GAMmtMhch-FLS-DIVISION-EXPR"></span><strong class="bibentry-key">[FLS-DIVISION-EXPR]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_7y0GAMmtMhch-FLS-DIVISION-EXPR')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Syntax - DivisionExpression.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression">https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression</a></p></td>
+</tr>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_7y0GAMmtMhch-FLS-REMAINDER-EXPR"></span><strong class="bibentry-key">[FLS-REMAINDER-EXPR]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_7y0GAMmtMhch-FLS-REMAINDER-EXPR')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Syntax - RemainderExpression.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression">https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression</a></p></td>
+</tr>
+</tbody>
+</table>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-7d9b75ec">
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-3e72f37a">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_ADHABsmK9FXz">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -338,7 +371,7 @@ in this compliant example because the result of the division expression is an un
 <p>as either the right operand or the type of the left operand.</p>
 <p><strong>Exception:</strong> <code class="docutils literal notranslate"><span class="pre">as</span></code> may be used with <code class="docutils literal notranslate"><span class="pre">usize</span></code> as the right operand and an expression of raw pointer
 type as the left operand.</p>
-<div class="need_container docutils container" id="SNCB-12804d41">
+<div class="need_container docutils container" id="SNCB-12bc4d94">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_v56bjjcveLxQ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -366,14 +399,14 @@ that these should avoid using fallible conversions.</p>
 enough to hold the address value. The <code class="docutils literal notranslate"><span class="pre">usize</span></code> type is guaranteed to be wide enough for this purpose.</p>
 <p>A pointer-to-address cast is not symmetrical because the resulting pointer may not point to a valid object,
 may not point to an object of the right type, or may not be properly aligned.
-If a conversion in this direction is needed, <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> will communicate the intent to perform
+If a conversion in this direction is needed, <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> will communicate the intent to perform
 an unsafe operation.</p>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-1c61a09c">
+<div class="need_container docutils container" id="SNCB-d669a87f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_hzGUYoMnK59w">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -424,7 +457,7 @@ we intend to allow lossy conversions, or only expect valid conversions.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fa386586">
+<div class="need_container docutils container" id="SNCB-c465e900">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_uilHTIOgxD37">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -498,7 +531,7 @@ Other forms of conversion may find <code class="docutils literal notranslate"><s
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-842a3af6">
+<div class="need_container docutils container" id="SNCB-c7efd1a6">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_HDnAZ7EZ4z6G">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -520,9 +553,9 @@ Other forms of conversion may find <code class="docutils literal notranslate"><s
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s type inference when doing explicit pointer casts via <code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>.
-Instead, explicitly specify the complete target type in the <code class="docutils literal notranslate"><span class="pre">as</span></code> expression or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a> call expression.</p>
-<div class="need_container docutils container" id="SNCB-7f96c45e">
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s type inference when doing explicit pointer casts via <code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> or <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>.
+Instead, explicitly specify the complete target type in the <code class="docutils literal notranslate"><span class="pre">as</span></code> expression or <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a> call expression.</p>
+<div class="need_container docutils container" id="SNCB-320524f9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_h8LdJQ1MNKu9">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -538,7 +571,7 @@ Instead, explicitly specify the complete target type in the <code class="docutil
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p><code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> casts and <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>s between raw pointer types are generally valid and unchecked by the compiler as long the target pointer type is a thin pointer.
+<tr class="need content row-odd"><td class="need content" colspan="1"><p><code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> casts and <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>s between raw pointer types are generally valid and unchecked by the compiler as long the target pointer type is a thin pointer.
 Not specifying the concrete target pointer type allows the compiler to infer it from the surroundings context which may result in the cast accidentally changing due to surrounding type changes resulting in semantically invalid pointer casts.</p>
 <p>Raw pointers have a variety of invariants to manually keep track of.
 Specifying the concrete types in these scenarios allows the compiler to catch some of these potential issues for the user.</p>
@@ -547,7 +580,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-2e74dab3">
+<div class="need_container docutils container" id="SNCB-8f0ab410">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_V37Pl103aUW4">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -595,7 +628,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-9f7c8ba9">
+<div class="need_container docutils container" id="SNCB-5019863b">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_W08ckDrkOhkt">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -648,7 +681,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-bec3e05a">
+<div class="need_container docutils container" id="SNCB-7bb9dd0e">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_LvmzGKdsAgI5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -665,15 +698,15 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 <div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
 <div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.0.0-latest</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_tVkDl6gOqz25" title="gui_LvmzGKdsAgI5">rat_tVkDl6gOqz25</a>, <a class="reference internal" href="#non_compl_ex_KLiDMsCesLx7" title="gui_LvmzGKdsAgI5">non_compl_ex_KLiDMsCesLx7</a>, <a class="reference internal" href="#compl_ex_Ux1WqHbGKV73" title="gui_LvmzGKdsAgI5">compl_ex_Ux1WqHbGKV73</a>, <a class="reference internal" href="#compl_ex_Ux1WqHbGKV74" title="gui_LvmzGKdsAgI5">compl_ex_Ux1WqHbGKV74</a></span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_tVkDl6gOqz25" title="gui_LvmzGKdsAgI5">rat_tVkDl6gOqz25</a>, <a class="reference internal" href="#non_compl_ex_KLiDMsCesLx7" title="gui_LvmzGKdsAgI5">non_compl_ex_KLiDMsCesLx7</a>, <a class="reference internal" href="#compl_ex_Ux1WqHbGKV73" title="gui_LvmzGKdsAgI5">compl_ex_Ux1WqHbGKV73</a>, <a class="reference internal" href="#compl_ex_Ux1WqHbGKV74" title="gui_LvmzGKdsAgI5">compl_ex_Ux1WqHbGKV74</a>, <a class="reference internal" href="#bib_LvmzGKdsAgI5" title="gui_LvmzGKdsAgI5">bib_LvmzGKdsAgI5</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Shifting negative positions or a value greater than or equal to the width of the left operand
-in <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#bit-expressions">shift left and shift right expressions</a>
+in shift left and shift right expressions <a class="citation-ref reference internal" href="#cite-gui_LvmzGKdsAgI5-FLS-BIT-EXPRESSIONS">[FLS-BIT-EXPRESSIONS]</a>
 are defined by this guideline to be <em>out-of-range shifts</em>.
-The Rust FLS incorrectly describes this behavior as &lt;<a class="reference external" href="https://github.com/rust-lang/fls/issues/632">arithmetic overflow</a>.</p>
+The Rust FLS incorrectly describes this behavior as arithmetic overflow <a class="citation-ref reference internal" href="#cite-gui_LvmzGKdsAgI5-FLS-ISSUE-632">[FLS-ISSUE-632]</a>.</p>
 <p>If the types of both operands are integer types,
 the shift left expression <code class="docutils literal notranslate"><span class="pre">lhs</span> <span class="pre">&lt;&lt;</span> <span class="pre">rhs</span></code> evaluates to the value of the left operand <code class="docutils literal notranslate"><span class="pre">lhs</span></code> whose bits are
 shifted left by the number of positions specified by the right operand <code class="docutils literal notranslate"><span class="pre">rhs</span></code>.
@@ -725,9 +758,8 @@ then the operation results in an out-of-range shift.</p>
 <p>This rule is a less strict but undecidable version of
 <cite>Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand</cite>.
 All code that complies with that rule also complies with this rule.</p>
-<p>This rule is based on The CERT C Coding Standard Rule
-<a class="reference external" href="https://wiki.sei.cmu.edu/confluence/x/ItcxBQ">INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand</a>.</p>
-<div class="need_container docutils container" id="SNCB-aa6261d7">
+<p>This rule is based on The CERT C Coding Standard Rule <a class="citation-ref reference internal" href="#cite-gui_LvmzGKdsAgI5-CERT-C-INT34">[CERT-C-INT34]</a>.</p>
+<div class="need_container docutils container" id="SNCB-2479ad1f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_tVkDl6gOqz25">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -750,7 +782,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-163893ae">
+<div class="need_container docutils container" id="SNCB-234a18d5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_KLiDMsCesLx7">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -784,7 +816,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-9e2e60c2">
+<div class="need_container docutils container" id="SNCB-212edd9d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Ux1WqHbGKV73">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -821,7 +853,7 @@ than or equal to the width of the left operand.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-a90008f9">
+<div class="need_container docutils container" id="SNCB-4f6b3015">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Ux1WqHbGKV74">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -869,12 +901,46 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 </tbody>
 </table>
 </div>
+<div class="need_container docutils container" id="SNCB-eda6286c">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_LvmzGKdsAgI5">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bibliography</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bib_LvmzGKdsAgI5" title="bib_LvmzGKdsAgI5">bib_LvmzGKdsAgI5</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_LvmzGKdsAgI5" title="bib_LvmzGKdsAgI5">gui_LvmzGKdsAgI5</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><table class="bibliography-table docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_LvmzGKdsAgI5-CERT-C-INT34"></span><strong class="bibentry-key">[CERT-C-INT34]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_LvmzGKdsAgI5-CERT-C-INT34')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>SEI CERT C Coding Standard. “INT34-C. Do not shift an expression by a negative number of bits.” <a class="reference external" href="https://wiki.sei.cmu.edu/confluence/x/ItcxBQ">https://wiki.sei.cmu.edu/confluence/x/ItcxBQ</a></p></td>
+</tr>
+<tr class="row-even"><td><p><span class="target" id="cite-gui_LvmzGKdsAgI5-FLS-BIT-EXPRESSIONS"></span><strong class="bibentry-key">[FLS-BIT-EXPRESSIONS]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_LvmzGKdsAgI5-FLS-BIT-EXPRESSIONS')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Bit Expressions.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#bit-expressions">https://rust-lang.github.io/fls/expressions.html#bit-expressions</a></p></td>
+</tr>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_LvmzGKdsAgI5-FLS-ISSUE-632"></span><strong class="bibentry-key">[FLS-ISSUE-632]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_LvmzGKdsAgI5-FLS-ISSUE-632')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS Repository. “Issue 632.” <a class="reference external" href="https://github.com/rust-lang/fls/issues/632">https://github.com/rust-lang/fls/issues/632</a></p></td>
+</tr>
+</tbody>
+</table>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-4acf897f">
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-3d9474f4">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_PM8Vpf7lZ51U">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -898,9 +964,9 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>The <code class="docutils literal notranslate"><span class="pre">as</span></code> operator shall not be used with an expression of numeric type as the left operand,
 and any pointer type as the right operand.</p>
-<p><a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> shall not be used with any numeric type (including floating point types)
+<p><a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> shall not be used with any numeric type (including floating point types)
 as the argument to the <code class="docutils literal notranslate"><span class="pre">Src</span></code> parameter, and any pointer type as the argument to the <code class="docutils literal notranslate"><span class="pre">Dst</span></code> parameter.</p>
-<div class="need_container docutils container" id="SNCB-1cda4c47">
+<div class="need_container docutils container" id="SNCB-7ddb02ca">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_YqhEiWTj9z6L">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -924,13 +990,13 @@ to access memory will result in undefined behavior.</p>
 the size of a pointer, which may lead to unexpected results if the address computation was
 originally performed in a differently-sized address space.</p>
 <p>While <code class="docutils literal notranslate"><span class="pre">as</span></code> can notionally be used to create a null pointer, the functions
-<a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aptr%3A%3Anull"><code class="docutils literal notranslate"><span class="pre">core::ptr::null</span></code></a> and <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aptr%3A%3Anull_mut"><code class="docutils literal notranslate"><span class="pre">core::ptr::null_mut</span></code></a> are the more idiomatic way to do this.</p>
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aptr%3A%3Anull"><code class="docutils literal notranslate"><span class="pre">core::ptr::null</span></code></a> and <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aptr%3A%3Anull_mut"><code class="docutils literal notranslate"><span class="pre">core::ptr::null_mut</span></code></a> are the more idiomatic way to do this.</p>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-13d819cd">
+<div class="need_container docutils container" id="SNCB-f2a5f016">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_0ydPk7VENSrA">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -981,7 +1047,7 @@ is non-compliant:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-7761b480">
+<div class="need_container docutils container" id="SNCB-af403cd3">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oneKuF52yzrx">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1007,7 +1073,7 @@ is non-compliant:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-eb646248">
+<div class="need_container docutils container" id="SNCB-bb2a4763">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_RHvQj8BHlz9b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1024,15 +1090,15 @@ is non-compliant:</p>
 <div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
 <div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.7.0-latest</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_3MpR8QfHodGT" title="gui_RHvQj8BHlz9b">rat_3MpR8QfHodGT</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcn" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcn</a>, <a class="reference internal" href="#non_compl_ex_mvkgTL3kulZ5" title="gui_RHvQj8BHlz9b">non_compl_ex_mvkgTL3kulZ5</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcm" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcm</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcx" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcx</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcp" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcp</a>, <a class="reference internal" href="#compl_ex_xpPQqYeEPGIo" title="gui_RHvQj8BHlz9b">compl_ex_xpPQqYeEPGIo</a></span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_3MpR8QfHodGT" title="gui_RHvQj8BHlz9b">rat_3MpR8QfHodGT</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcn" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcn</a>, <a class="reference internal" href="#non_compl_ex_mvkgTL3kulZ5" title="gui_RHvQj8BHlz9b">non_compl_ex_mvkgTL3kulZ5</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcm" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcm</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcx" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcx</a>, <a class="reference internal" href="#non_compl_ex_O9FZuazu3Lcp" title="gui_RHvQj8BHlz9b">non_compl_ex_O9FZuazu3Lcp</a>, <a class="reference internal" href="#compl_ex_xpPQqYeEPGIo" title="gui_RHvQj8BHlz9b">compl_ex_xpPQqYeEPGIo</a>, <a class="reference internal" href="#bib_RHvQj8BHlz9b" title="gui_RHvQj8BHlz9b">bib_RHvQj8BHlz9b</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Shifting negative positions or a value greater than or equal to the width of the left operand
-in <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#bit-expressions">shift left and shift right expressions</a>
+in shift left and shift right expressions <a class="citation-ref reference internal" href="#cite-gui_RHvQj8BHlz9b-FLS-BIT-EXPRESSIONS">[FLS-BIT-EXPRESSIONS]</a>
 are defined by this guideline to be <em>out-of-range shifts</em>.
-The Rust FLS incorrectly describes this behavior as &lt;<a class="reference external" href="https://github.com/rust-lang/fls/issues/632">arithmetic overflow</a>.</p>
+The Rust FLS incorrectly describes this behavior as arithmetic overflow <a class="citation-ref reference internal" href="#cite-gui_RHvQj8BHlz9b-FLS-ISSUE-632">[FLS-ISSUE-632]</a>.</p>
 <p>If the types of both operands are integer types,
 the shift left expression <code class="docutils literal notranslate"><span class="pre">lhs</span> <span class="pre">&lt;&lt;</span> <span class="pre">rhs</span></code> evaluates to the value of the left operand <code class="docutils literal notranslate"><span class="pre">lhs</span></code> whose bits are
 shifted left by the number of positions specified by the right operand <code class="docutils literal notranslate"><span class="pre">rhs</span></code>.
@@ -1081,9 +1147,8 @@ then the operation results in an out-of-range shift.</p>
 </div>
 <script type="application/json" class="rust-example-data">{"code": "use core::ops::Shl;\n#[allow(dead_code)]\nstruct MyType;\n\nimpl Shl<u32> for MyType {\n    type Output = MyType;\n    fn shl(self, _rhs: u32) -> Self::Output { MyType }\n}\n\nfn main() {}", "displayCode": "use core::ops::Shl;\n#[allow(dead_code)]\nstruct MyType;\n\nimpl Shl<u32> for MyType {\n    type Output = MyType;\n    fn shl(self, _rhs: u32) -> Self::Output { MyType }\n}", "hiddenLineNumbers": [8, 9], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"k\">use</span><span class=\"w\"> </span><span class=\"n\">core</span><span class=\"p\">::</span><span class=\"n\">ops</span><span class=\"p\">::</span><span class=\"n\">Shl</span><span class=\"p\">;</span>\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">struct</span><span class=\"w\"> </span><span class=\"nc\">MyType</span><span class=\"p\">;</span>\n\n<span class=\"k\">impl</span><span class=\"w\"> </span><span class=\"n\">Shl</span><span class=\"o\">&lt;</span><span class=\"kt\">u32</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"k\">for</span><span class=\"w\"> </span><span class=\"n\">MyType</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"k\">type</span><span class=\"w\"> </span><span class=\"nc\">Output</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">MyType</span><span class=\"p\">;</span>\n<span class=\"w\">    </span><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">shl</span><span class=\"p\">(</span><span class=\"bp\">self</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">_rhs</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nc\">Self</span><span class=\"p\">::</span><span class=\"n\">Output</span><span class=\"w\"> </span><span class=\"p\">{</span><span class=\"w\"> </span><span class=\"n\">MyType</span><span class=\"w\"> </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 <p>You may choose any type for the right operand (not just integers), because you control the implementation.</p>
-<p>This rule is based on The CERT C Coding Standard Rule
-<a class="reference external" href="https://wiki.sei.cmu.edu/confluence/x/ItcxBQ">INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand</a>.</p>
-<div class="need_container docutils container" id="SNCB-0e61b9a9">
+<p>This rule is based on The CERT C Coding Standard Rule <a class="citation-ref reference internal" href="#cite-gui_RHvQj8BHlz9b-CERT-C-INT34">[CERT-C-INT34]</a>.</p>
+<div class="need_container docutils container" id="SNCB-d7b79479">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_3MpR8QfHodGT">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1106,7 +1171,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-4678fc31">
+<div class="need_container docutils container" id="SNCB-dbc396e7">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcn">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1140,7 +1205,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c88b4150">
+<div class="need_container docutils container" id="SNCB-c6559b4d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_mvkgTL3kulZ5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1177,7 +1242,7 @@ than or equal to the width of the left operand.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-5ded95f8">
+<div class="need_container docutils container" id="SNCB-dc431298">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcm">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1216,7 +1281,7 @@ The <code class="docutils literal notranslate"><span class="pre">wrapping_shl</s
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-df2271c0">
+<div class="need_container docutils container" id="SNCB-9da27d13">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcx">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1257,7 +1322,7 @@ The use of this function is noncompliant because it does not detect out-of-range
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-e88d2a54">
+<div class="need_container docutils container" id="SNCB-073312db">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcp">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1300,7 +1365,7 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-ee48a3b7">
+<div class="need_container docutils container" id="SNCB-3fd04e62">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_xpPQqYeEPGIo">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1316,9 +1381,9 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example performs left shifts via the <a class="reference external" href="https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22">checked_shl</a>
-function and right shifts via the <a class="reference external" href="https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22">checked_shr</a> function.
-Both of these functions are defined in <a class="reference external" href="https://doc.rust-lang.org/core/index.html">core</a>.</p>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example performs left shifts via the <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Achecked_shl"><code class="docutils literal notranslate"><span class="pre">u32::checked_shl</span></code></a>
+function and right shifts via the <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Achecked_shr"><code class="docutils literal notranslate"><span class="pre">u32::checked_shr</span></code></a> function.
+Both of these functions are defined in <code class="docutils literal notranslate"><span class="pre">core</span></code>.</p>
 <blockquote>
 <div><p><code class="docutils literal notranslate"><span class="pre">&lt;T&gt;::checked_shl(M)</span></code> returns a value of type <code class="docutils literal notranslate"><span class="pre">Option&lt;T&gt;</span></code>:</p>
 <ul class="simple">
@@ -1352,12 +1417,46 @@ Shifting by:</p>
 </tbody>
 </table>
 </div>
+<div class="need_container docutils container" id="SNCB-439f265d">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_RHvQj8BHlz9b">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bibliography</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bib_RHvQj8BHlz9b" title="bib_RHvQj8BHlz9b">bib_RHvQj8BHlz9b</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_RHvQj8BHlz9b" title="bib_RHvQj8BHlz9b">gui_RHvQj8BHlz9b</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><table class="bibliography-table docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_RHvQj8BHlz9b-CERT-C-INT34"></span><strong class="bibentry-key">[CERT-C-INT34]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_RHvQj8BHlz9b-CERT-C-INT34')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>SEI CERT C Coding Standard. “INT34-C. Do not shift an expression by a negative number of bits.” <a class="reference external" href="https://wiki.sei.cmu.edu/confluence/x/ItcxBQ">https://wiki.sei.cmu.edu/confluence/x/ItcxBQ</a></p></td>
+</tr>
+<tr class="row-even"><td><p><span class="target" id="cite-gui_RHvQj8BHlz9b-FLS-BIT-EXPRESSIONS"></span><strong class="bibentry-key">[FLS-BIT-EXPRESSIONS]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_RHvQj8BHlz9b-FLS-BIT-EXPRESSIONS')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Bit Expressions.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#bit-expressions">https://rust-lang.github.io/fls/expressions.html#bit-expressions</a></p></td>
+</tr>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_RHvQj8BHlz9b-FLS-ISSUE-632"></span><strong class="bibentry-key">[FLS-ISSUE-632]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_RHvQj8BHlz9b-FLS-ISSUE-632')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS Repository. “Issue 632.” <a class="reference external" href="https://github.com/rust-lang/fls/issues/632">https://github.com/rust-lang/fls/issues/632</a></p></td>
+</tr>
+</tbody>
+</table>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-336d08cd">
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-9e0cb528">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_dCquvqE1csI3">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1374,12 +1473,12 @@ Shifting by:</p>
 <div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">system</span></span></div>
 <div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.0 - latest</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_LvrS1jTCXEOk" title="gui_dCquvqE1csI3">rat_LvrS1jTCXEOk</a>, <a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0N" title="gui_dCquvqE1csI3">non_compl_ex_cCh2RQUXeH0N</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4b_1" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4b_1</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4c" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4c</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4b</a>, <a class="reference internal" href="#compl_ex_BhUHiRB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BhUHiRB4kc4b</a>, <a class="reference internal" href="#compl_ex_BgUHiSB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiSB4kc4b</a>, <a class="reference internal" href="#compl_ex_BgUHiSB4kd4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiSB4kd4b</a>, <a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0O" title="gui_dCquvqE1csI3">non_compl_ex_cCh2RQUXeH0O</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4d" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4d</a></span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_LvrS1jTCXEOk" title="gui_dCquvqE1csI3">rat_LvrS1jTCXEOk</a>, <a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0N" title="gui_dCquvqE1csI3">non_compl_ex_cCh2RQUXeH0N</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4b_1" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4b_1</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4c" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4c</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4b</a>, <a class="reference internal" href="#compl_ex_BhUHiRB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BhUHiRB4kc4b</a>, <a class="reference internal" href="#compl_ex_BgUHiSB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiSB4kc4b</a>, <a class="reference internal" href="#compl_ex_BgUHiSB4kd4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiSB4kd4b</a>, <a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0O" title="gui_dCquvqE1csI3">non_compl_ex_cCh2RQUXeH0O</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4d" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4d</a>, <a class="reference internal" href="#bib_dCquvqE1csI3" title="gui_dCquvqE1csI3">bib_dCquvqE1csI3</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>Eliminate <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow">arithmetic overflow</a> of both signed and unsigned integer types.
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Eliminate arithmetic overflow <a class="citation-ref reference internal" href="#cite-gui_dCquvqE1csI3-FLS-ARITHMETIC-OVERFLOW">[FLS-ARITHMETIC-OVERFLOW]</a> of both signed and unsigned integer types.
 Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.</p>
 <p>This rule applies to the following primitive types:</p>
 <ul class="simple">
@@ -1396,7 +1495,7 @@ Any wraparound behavior must be explicitly specified to ensure the same behavior
 <li><p><code class="docutils literal notranslate"><span class="pre">usize</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">isize</span></code></p></li>
 </ul>
-<div class="need_container docutils container" id="SNCB-f8e6ad21">
+<div class="need_container docutils container" id="SNCB-60462025">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_LvrS1jTCXEOk">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1414,14 +1513,14 @@ Any wraparound behavior must be explicitly specified to ensure the same behavior
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
 Arithmetic overflow will panic in debug mode, but wraparound in release mode, resulting in inconsistent behavior.
-Use explicit <a class="reference external" href="https://doc.rust-lang.org/std/num/struct.Wrapping.html">wrapping</a> or
-<a class="reference external" href="https://doc.rust-lang.org/std/num/struct.Saturating.html">saturating</a> semantics where these behaviors are intentional.
+Use explicit <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> or
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> semantics where these behaviors are intentional.
 Range checking can be used to eliminate the possibility of arithmetic overflow.</p></td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-5fe7d098">
+<div class="need_container docutils container" id="SNCB-6f147ccf">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_cCh2RQUXeH0N">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1452,7 +1551,7 @@ Range checking can be used to eliminate the possibility of arithmetic overflow.<
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-356f77a1">
+<div class="need_container docutils container" id="SNCB-9d7e1f63">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4b_1">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1471,9 +1570,9 @@ Range checking can be used to eliminate the possibility of arithmetic overflow.<
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant solution ensures that the addition operation cannot result in arithmetic overflow,
 based on the maximum range of a signed 32-bit integer.
 Functions such as
-<a class="reference external" href="https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_add">overflowing_add</a>,
-<a class="reference external" href="https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_sub">overflowing_sub</a>, and
-<a class="reference external" href="https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_mul">overflowing_mul</a>
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Aoverflowing_add"><code class="docutils literal notranslate"><span class="pre">u32::overflowing_add</span></code></a>,
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Aoverflowing_sub"><code class="docutils literal notranslate"><span class="pre">u32::overflowing_sub</span></code></a>, and
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Aoverflowing_mul"><code class="docutils literal notranslate"><span class="pre">u32::overflowing_mul</span></code></a>
 can also be used to detect overflow.
 Code that invoked these functions would typically further restrict the range of possible values,
 based on the anticipated range of the inputs.</p>
@@ -1529,7 +1628,7 @@ based on the anticipated range of the inputs.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-0620dabf">
+<div class="need_container docutils container" id="SNCB-f7163c26">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4c">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1573,7 +1672,7 @@ Checked functions can reduce readability when complex arithmetic expressions are
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-b5ed88eb">
+<div class="need_container docutils container" id="SNCB-3ea829af">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1613,7 +1712,7 @@ Checked functions can reduce readability when complex arithmetic expressions are
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6dcfa0b6">
+<div class="need_container docutils container" id="SNCB-53dea849">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BhUHiRB4kc4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1629,10 +1728,10 @@ Checked functions can reduce readability when complex arithmetic expressions are
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p>Wrapping behavior call also be achieved using the <code class="docutils literal notranslate"><span class="pre">Wrapping&lt;T&gt;</span></code> type as in this compliant solution.
-The <code class="docutils literal notranslate"><span class="pre">Wrapping&lt;T&gt;</span></code> type is a <code class="docutils literal notranslate"><span class="pre">struct</span></code> found in the <code class="docutils literal notranslate"><span class="pre">std::num</span></code> module that explicitly enables two’s complement
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Wrapping behavior call also be achieved using the <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> type as in this compliant solution.
+The <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> type is a <code class="docutils literal notranslate"><span class="pre">struct</span></code> found in the <code class="docutils literal notranslate"><span class="pre">core::num</span></code> module that explicitly enables two’s complement
 wrapping arithmetic for the inner type <code class="docutils literal notranslate"><span class="pre">T</span></code> (which must be an integer or <code class="docutils literal notranslate"><span class="pre">usize/isize</span></code>).
-The <code class="docutils literal notranslate"><span class="pre">Wrapping&lt;T&gt;</span></code> type provides a consistent way to force wrapping behavior in all build modes,
+The <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> type provides a consistent way to force wrapping behavior in all build modes,
 which is useful in specific scenarios like implementing cryptography or hash functions where wrapping arithmetic is the intended behavior.</p>
 <div class="rust-example-container docutils container">
 <div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">num</span><span class="p">::</span><span class="n">Wrapping</span><span class="p">;</span>
@@ -1664,7 +1763,7 @@ which is useful in specific scenarios like implementing cryptography or hash fun
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fc7e1a61">
+<div class="need_container docutils container" id="SNCB-b8cb0d6c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiSB4kc4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1711,7 +1810,7 @@ This compliant solution shows how to use saturating functions to provide saturat
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-64e2f337">
+<div class="need_container docutils container" id="SNCB-352b2abf">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiSB4kd4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1727,9 +1826,9 @@ This compliant solution shows how to use saturating functions to provide saturat
 </div>
 </td>
 </tr>
-<tr class="need content row-odd"><td class="need content" colspan="1"><p><code class="docutils literal notranslate"><span class="pre">Saturating&lt;T&gt;</span></code> is a wrapper type in Rust’s <code class="docutils literal notranslate"><span class="pre">core</span></code> library (<code class="docutils literal notranslate"><span class="pre">core::num::Saturating&lt;T&gt;</span></code>) that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
-<code class="docutils literal notranslate"><span class="pre">Saturating&lt;T&gt;</span></code> is useful when you have a section of code or a data type where all arithmetic must be saturating.
-This compliant solution uses the <code class="docutils literal notranslate"><span class="pre">Saturating&lt;T&gt;</span></code> type to define several functions that perform basic integer operations using saturation semantics.</p>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p><a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> is a wrapper type in Rust’s <code class="docutils literal notranslate"><span class="pre">core</span></code> library that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> is useful when you have a section of code or a data type where all arithmetic must be saturating.
+This compliant solution uses the <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> type to define several functions that perform basic integer operations using saturation semantics.</p>
 <div class="rust-example-container docutils container">
 <div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">num</span><span class="p">::</span><span class="n">Saturating</span><span class="p">;</span>
 
@@ -1760,7 +1859,7 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-69c989b6">
+<div class="need_container docutils container" id="SNCB-08fa76df">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_cCh2RQUXeH0O">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1797,7 +1896,7 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-e69c7e6e">
+<div class="need_container docutils container" id="SNCB-af78a00a">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4d">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1836,12 +1935,40 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tbody>
 </table>
 </div>
+<div class="need_container docutils container" id="SNCB-85625131">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_dCquvqE1csI3">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bibliography</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bib_dCquvqE1csI3" title="bib_dCquvqE1csI3">bib_dCquvqE1csI3</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="bib_dCquvqE1csI3">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><table class="bibliography-table docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_dCquvqE1csI3-FLS-ARITHMETIC-OVERFLOW"></span><strong class="bibentry-key">[FLS-ARITHMETIC-OVERFLOW]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_dCquvqE1csI3-FLS-ARITHMETIC-OVERFLOW')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Arithmetic Overflow.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow">https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow</a></p></td>
+</tr>
+</tbody>
+</table>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-5da10232">
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-015c28c9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_iv9yCMHRgpE0">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1865,7 +1992,7 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>An expression of numeric type shall not be converted to a pointer if the resulting pointer
 is incorrectly aligned, does not point to an entity of the referenced type, or is an invalid representation.</p>
-<div class="need_container docutils container" id="SNCB-ba27cbd9">
+<div class="need_container docutils container" id="SNCB-d0a4e42a">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_OhxKm751axKw">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1887,7 +2014,7 @@ execution environment. Issues may arise, for example, on architectures that have
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-9fd25608">
+<div class="need_container docutils container" id="SNCB-a42b49be">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_CkytKjRQezfQ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1923,7 +2050,7 @@ particularly unexpected results.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-4aeac75b">
+<div class="need_container docutils container" id="SNCB-204806aa">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oBoluiKSvREu">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1970,7 +2097,7 @@ working even when pointers cannot be represented in any integer type.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-1d55ac19">
+<div class="need_container docutils container" id="SNCB-0829e206">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_kMbiWbn8Z6g5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1987,16 +2114,16 @@ working even when pointers cannot be represented in any integer type.</p>
 <div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">system</span></span></div>
 <div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">latest</span></span></div>
 </span></span></div>
-<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_h84NjY2tLSBW" title="gui_kMbiWbn8Z6g5">rat_h84NjY2tLSBW</a>, <a class="reference internal" href="#non_compl_ex_LLs3vY8aGz0F" title="gui_kMbiWbn8Z6g5">non_compl_ex_LLs3vY8aGz0F</a>, <a class="reference internal" href="#compl_ex_Ri9pP5Ch3kcc" title="gui_kMbiWbn8Z6g5">compl_ex_Ri9pP5Ch3kcc</a></span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_h84NjY2tLSBW" title="gui_kMbiWbn8Z6g5">rat_h84NjY2tLSBW</a>, <a class="reference internal" href="#non_compl_ex_LLs3vY8aGz0F" title="gui_kMbiWbn8Z6g5">non_compl_ex_LLs3vY8aGz0F</a>, <a class="reference internal" href="#compl_ex_Ri9pP5Ch3kcc" title="gui_kMbiWbn8Z6g5">compl_ex_Ri9pP5Ch3kcc</a>, <a class="reference internal" href="#bib_kMbiWbn8Z6g5" title="gui_kMbiWbn8Z6g5">bib_kMbiWbn8Z6g5</a></span></span></div>
 </span></div>
 </div>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Integer division by zero results in a panic.
-This includes both <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression">division expressions</a> and <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression">remainder expressions</a>.</p>
+This includes both division expressions <a class="citation-ref reference internal" href="#cite-gui_kMbiWbn8Z6g5-FLS-DIVISION-EXPR">[FLS-DIVISION-EXPR]</a> and remainder expressions <a class="citation-ref reference internal" href="#cite-gui_kMbiWbn8Z6g5-FLS-REMAINDER-EXPR">[FLS-REMAINDER-EXPR]</a>.</p>
 <p>Division and remainder expressions on signed integers are also susceptible to arithmetic overflow.
 Overflow is covered in full by the guideline <cite>Ensure that integer operations do not result in arithmetic overflow</cite>.</p>
-<p>This rule applies to the following primitive integer types:</p>
+<p>This rule applies to the following primitive integer types <a class="citation-ref reference internal" href="#cite-gui_kMbiWbn8Z6g5-FLS-INTEGER-TYPES">[FLS-INTEGER-TYPES]</a>:</p>
 <blockquote>
 <div><ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">i8</span></code></p></li>
@@ -2013,11 +2140,10 @@ Overflow is covered in full by the guideline <cite>Ensure that integer operation
 <li><p><code class="docutils literal notranslate"><span class="pre">isize</span></code></p></li>
 </ul>
 </div></blockquote>
-<p>This rule does not apply to evaluation of the <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aops%3A%3ADiv"><code class="docutils literal notranslate"><span class="pre">core::ops::Div</span></code></a> trait on types other than <a class="reference external" href="https://rust-lang.github.io/fls/types-and-traits.html#integer-types">integer
-types</a>.</p>
+<p>This rule does not apply to evaluation of the <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Aops%3A%3ADiv"><code class="docutils literal notranslate"><span class="pre">core::ops::Div</span></code></a> trait on types other than integer types <a class="citation-ref reference internal" href="#cite-gui_kMbiWbn8Z6g5-FLS-INTEGER-TYPES">[FLS-INTEGER-TYPES]</a>.</p>
 <p>This rule is a less strict version of <cite>Do not use an integer type as a divisor during integer division</cite>.
 All code that complies with that rule also complies with this rule.</p>
-<div class="need_container docutils container" id="SNCB-d5bc9c93">
+<div class="need_container docutils container" id="SNCB-917774e5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_h84NjY2tLSBW">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2038,7 +2164,7 @@ All code that complies with that rule also complies with this rule.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fb17c35d">
+<div class="need_container docutils container" id="SNCB-26afce7c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_LLs3vY8aGz0F">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2071,7 +2197,7 @@ All code that complies with that rule also complies with this rule.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-8ac9fbda">
+<div class="need_container docutils container" id="SNCB-52a9dafe">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Ri9pP5Ch3kcc">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2116,12 +2242,46 @@ it becomes increasingly harder for both programmers and static analysis tools to
 </tbody>
 </table>
 </div>
+<div class="need_container docutils container" id="SNCB-ac694fba">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_kMbiWbn8Z6g5">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bibliography</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bib_kMbiWbn8Z6g5" title="bib_kMbiWbn8Z6g5">bib_kMbiWbn8Z6g5</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_kMbiWbn8Z6g5" title="bib_kMbiWbn8Z6g5">gui_kMbiWbn8Z6g5</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><table class="bibliography-table docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_kMbiWbn8Z6g5-FLS-INTEGER-TYPES"></span><strong class="bibentry-key">[FLS-INTEGER-TYPES]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_kMbiWbn8Z6g5-FLS-INTEGER-TYPES')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Types and Traits - Integer Types.” <a class="reference external" href="https://rust-lang.github.io/fls/types-and-traits.html#integer-types">https://rust-lang.github.io/fls/types-and-traits.html#integer-types</a></p></td>
+</tr>
+<tr class="row-even"><td><p><span class="target" id="cite-gui_kMbiWbn8Z6g5-FLS-DIVISION-EXPR"></span><strong class="bibentry-key">[FLS-DIVISION-EXPR]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_kMbiWbn8Z6g5-FLS-DIVISION-EXPR')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Syntax - DivisionExpression.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression">https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression</a></p></td>
+</tr>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_kMbiWbn8Z6g5-FLS-REMAINDER-EXPR"></span><strong class="bibentry-key">[FLS-REMAINDER-EXPR]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_kMbiWbn8Z6g5-FLS-REMAINDER-EXPR')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Syntax - RemainderExpression.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression">https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression</a></p></td>
+</tr>
+</tbody>
+</table>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-5d4175de">
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-727ecd1c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2147,7 +2307,7 @@ it becomes increasingly harder for both programmers and static analysis tools to
 <p>As documented in <a class="citation-ref reference internal" href="#cite-gui_Bib7x9KmPq2nL-RUST-REF-UNION">[RUST-REF-UNION]</a>, union types in Rust have specific safety requirements.
 The CERT C Coding Standard <a class="citation-ref reference internal" href="#cite-gui_Bib7x9KmPq2nL-CERT-C-INT34">[CERT-C-INT34]</a> provides guidance on avoiding undefined behavior
 in shift operations, which applies to Rust as well.</p>
-<div class="need_container docutils container" id="SNCB-5fc279e3">
+<div class="need_container docutils container" id="SNCB-1d0b6591">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2209,7 +2369,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-d09be07c">
+<div class="need_container docutils container" id="SNCB-50b7808f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2240,7 +2400,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-0d047a0c">
+<div class="need_container docutils container" id="SNCB-510ead7e">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2271,7 +2431,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fbfded2a">
+<div class="need_container docutils container" id="SNCB-8ededdb1">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2307,7 +2467,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-4ad8195b">
+<div class="need_container docutils container" id="SNCB-d0d7686c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2333,7 +2493,7 @@ References help users find authoritative sources for the recommendations made.</
 <p>As documented in <a class="citation-ref reference internal" href="#cite-gui_Bob7x9KmPq2nL-RUST-REF-UNION">[RUST-REF-UNION]</a>, union types in Rust have specific safety requirements.
 The CERT C Coding Standard <a class="citation-ref reference internal" href="#cite-gui_Bob7x9KmPq2nL-CERT-C-INT34">[CERT-C-INT34]</a> provides guidance on avoiding undefined behavior
 in shift operations, which applies to Rust as well.</p>
-<div class="need_container docutils container" id="SNCB-ea371116">
+<div class="need_container docutils container" id="SNCB-1b48c7aa">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2395,7 +2555,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-2c95c99a">
+<div class="need_container docutils container" id="SNCB-455af864">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2426,7 +2586,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-d7d4f2e1">
+<div class="need_container docutils container" id="SNCB-890af2e9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2457,7 +2617,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-2e3bd8d2">
+<div class="need_container docutils container" id="SNCB-df04e578">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">

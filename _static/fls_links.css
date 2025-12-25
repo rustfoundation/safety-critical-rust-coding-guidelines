@@ -17,3 +17,14 @@ a.fls-id:hover {
     border-bottom: 1px dashed #cc0000;
     color: #cc0000;
 }
+
+/* Styling for std library reference links */
+a.std-ref code.docutils.literal.notranslate {
+    border-bottom: 1px dotted #0078d7;
+    text-decoration: none;
+}
+a.std-ref:hover code.docutils.literal.notranslate {
+    background-color: rgba(0, 120, 215, 0.1);
+    border-bottom-style: solid;
+    border-bottom-color: #0078d7;
+}
