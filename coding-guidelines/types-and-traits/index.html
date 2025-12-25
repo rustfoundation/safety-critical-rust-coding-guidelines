@@ -10,6 +10,7 @@
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/rust_playground.css?v=a15f506b" />
       <link rel="stylesheet" type="text/css" href="../../_static/citation.css?v=569c3786" />
       <link rel="stylesheet" type="text/css" href="../../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
       <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
@@ -27,6 +28,7 @@
       <script src="../../_static/documentation_options.js?v=2709fde1"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/rust_playground.js?v=acd109cb"></script>
       <script src="../../_static/citation.js?v=1e6d5203"></script>
       <script src="../../_static/sphinx-data-viewer/jsonview.bundle.js?v=18cd53c5"></script>
       <script src="../../_static/sphinx-data-viewer/jsonview_loader.js?v=f7ff7e7d"></script>
@@ -119,7 +121,7 @@
              
   <section id="types-and-traits">
 <h1>Types and Traits<a class="headerlink" href="#types-and-traits" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-553e6b97">
+<div class="need_container docutils container" id="SNCB-ae99ed40">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_xztNdXA2oFNC">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -150,7 +152,7 @@
 <li><p>You need to enable trait-based behavior</p></li>
 <li><p>You need to establish new invariants</p></li>
 </ul>
-<div class="need_container docutils container" id="SNCB-9739faaf">
+<div class="need_container docutils container" id="SNCB-9bf57a68">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_kYiIiW8R2qD2">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -190,7 +192,7 @@ Statically distinct types act as strong API contracts that can evolve independen
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-a13d8883">
+<div class="need_container docutils container" id="SNCB-19212237">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWw">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -223,14 +225,14 @@ Mistakes compile cleanly and silently produce wrong results.</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "fn travel(distance: u32, time: u32) -> u32 {\n   distance / time\n}\n\nfn main() {\n   let d = 100;\n   let t = 10;\n   let _result = travel(t, d);  // Compiles, but semantically incorrect\n}", "displayCode": "fn travel(distance: u32, time: u32) -> u32 {\n   distance / time\n}\n\nfn main() {\n   let d = 100;\n   let t = 10;\n   let _result = travel(t, d);  // Compiles, but semantically incorrect\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </div></blockquote>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-951ba2df">
+<div class="need_container docutils container" id="SNCB-1d5fc8e8">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PO5TyFsRTlWv">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -270,14 +272,14 @@ Mistakes compile cleanly and silently produce wrong results.</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "type Meters = u32;\ntype Seconds = u32;\ntype MetersPerSecond = u32;\n\nfn travel(distance: Meters, time: Seconds) -> MetersPerSecond {\n   distance / time\n}\n\nfn main() {\n   let d: Meters = 100;\n   let t: Seconds = 10;\n   let _result = travel(t, d);  // Compiles, but semantically incorrect\n}", "displayCode": "type Meters = u32;\ntype Seconds = u32;\ntype MetersPerSecond = u32;\n\nfn travel(distance: Meters, time: Seconds) -> MetersPerSecond {\n   distance / time\n}\n\nfn main() {\n   let d: Meters = 100;\n   let t: Seconds = 10;\n   let _result = travel(t, d);  // Compiles, but semantically incorrect\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </div></blockquote>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6557c3f4">
+<div class="need_container docutils container" id="SNCB-7b864ecd">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_WTe7GoPu5Ez1">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -321,11 +323,11 @@ The function signature clearly conveys the intended semantics of each parameter 
 <span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Meters</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
 <span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Seconds</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
 <span class="w">     </span><span class="kd">let</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">t</span><span class="p">;</span><span class="w">  </span><span class="c1">// Clean and type-safe!</span>
-<span class="w">     </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">);</span><span class="w">  </span><span class="c1">// MetersPerSecond(10)</span>
+<span class="w">     </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;Speed: {} m/s&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// Access the inner value</span>
 <span class="w"> </span><span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "use std::ops::Div;\n\n#[derive(Debug, Clone, Copy)]\nstruct Meters(u32);\n\n#[derive(Debug, Clone, Copy)]\nstruct Seconds(u32);\n\n#[derive(Debug, Clone, Copy)]\nstruct MetersPerSecond(u32);\n\nimpl Div<Seconds> for Meters {\n    type Output = MetersPerSecond;\n\n    fn div(self, rhs: Seconds) -> Self::Output {\n         MetersPerSecond(self.0 / rhs.0)\n    }\n }\n\n fn main() {\n     let d = Meters(100);\n     let t = Seconds(10);\n     let result = d / t;  // Clean and type-safe!\n     println!(\"Speed: {} m/s\", result.0);  // Access the inner value\n }", "displayCode": "use std::ops::Div;\n\n#[derive(Debug, Clone, Copy)]\nstruct Meters(u32);\n\n#[derive(Debug, Clone, Copy)]\nstruct Seconds(u32);\n\n#[derive(Debug, Clone, Copy)]\nstruct MetersPerSecond(u32);\n\nimpl Div<Seconds> for Meters {\n    type Output = MetersPerSecond;\n\n    fn div(self, rhs: Seconds) -> Self::Output {\n         MetersPerSecond(self.0 / rhs.0)\n    }\n }\n\n fn main() {\n     let d = Meters(100);\n     let t = Seconds(10);\n     let result = d / t;  // Clean and type-safe!\n     println!(\"Speed: {} m/s\", result.0);  // Access the inner value\n }", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </div></blockquote>
 </td>
 </tr>

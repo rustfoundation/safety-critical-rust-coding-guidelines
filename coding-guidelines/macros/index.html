@@ -10,6 +10,7 @@
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/rust_playground.css?v=a15f506b" />
       <link rel="stylesheet" type="text/css" href="../../_static/citation.css?v=569c3786" />
       <link rel="stylesheet" type="text/css" href="../../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
       <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
@@ -27,6 +28,7 @@
       <script src="../../_static/documentation_options.js?v=2709fde1"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/rust_playground.js?v=acd109cb"></script>
       <script src="../../_static/citation.js?v=1e6d5203"></script>
       <script src="../../_static/sphinx-data-viewer/jsonview.bundle.js?v=18cd53c5"></script>
       <script src="../../_static/sphinx-data-viewer/jsonview_loader.js?v=f7ff7e7d"></script>
@@ -119,7 +121,7 @@
              
   <section id="macros">
 <h1>Macros<a class="headerlink" href="#macros" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-0b462bd2">
+<div class="need_container docutils container" id="SNCB-f7cd9151">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_13XWp3mb0g2P">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -143,7 +145,7 @@
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Attribute macros shall neither be declared nor invoked.
 Prefer less powerful macros that only extend source code.</p>
-<div class="need_container docutils container" id="SNCB-2377ae87">
+<div class="need_container docutils container" id="SNCB-d9ef64d5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_X8uCF5yx7Mpo">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -164,7 +166,7 @@ Prefer less powerful macros that only extend source code.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-e1948719">
+<div class="need_container docutils container" id="SNCB-74e70cc5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_eW374waRPbeL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -182,22 +184,21 @@ Prefer less powerful macros that only extend source code.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>The <code class="docutils literal notranslate"><span class="pre">#[test]</span></code> attribute macro transforms the function into a test harness entry point.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-badge rust-example-badge-no-run docutils container">
-<p>no_run</p>
-</div>
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-no-run">no run</span></div>
 <div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[test]</span><span class="w">  </span><span class="c1">// non-compliant: attribute macro rewrites the item</span>
 <span class="k">fn</span><span class="w"> </span><span class="nf">example_test</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="fm">assert!</span><span class="p">(</span><span class="kc">true</span><span class="p">);</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[test]  // non-compliant: attribute macro rewrites the item\nfn example_test() {\n    assert!(true);\n}\n\nfn main() {}", "displayCode": "#[test]  // non-compliant: attribute macro rewrites the item\nfn example_test() {\n    assert!(true);\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "no_run", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[test]</span><span class=\"w\">  </span><span class=\"c1\">// non-compliant: attribute macro rewrites the item</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_test</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"fm\">assert!</span><span class=\"p\">(</span><span class=\"kc\">true</span><span class=\"p\">);</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-43fe8d60">
+<div class="need_container docutils container" id="SNCB-158245a1">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Mg8ePOgbGJeW">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -215,12 +216,13 @@ Prefer less powerful macros that only extend source code.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -231,7 +233,7 @@ Prefer less powerful macros that only extend source code.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-85b13fe7">
+<div class="need_container docutils container" id="SNCB-7bff54e5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_2jjWUoF1teOY">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -257,7 +259,7 @@ Prefer less powerful macros that only extend source code.</p>
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<div class="need_container docutils container" id="SNCB-7903bd35">
+<div class="need_container docutils container" id="SNCB-68a7bc43">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_M9bp23ctkzQ7">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -296,7 +298,7 @@ Prefer less powerful macros that only extend source code.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-8e563c5e">
+<div class="need_container docutils container" id="SNCB-6b4b1fbe">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_TZgk2vG42t2r">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -331,14 +333,14 @@ Prefer less powerful macros that only extend source code.</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "macro_rules! increment_and_double {\n    ($x:expr) => {\n        {\n            $x += 1; // mutation is implicit\n            $x * 2\n        }\n    };\n}\n\nfn main() {\n    let mut num = 5;\n    let result = increment_and_double!(num);\n    println!(\"Result: {}, Num: {}\", result, num);\n    // Result: 12, Num: 6\n}", "displayCode": "macro_rules! increment_and_double {\n    ($x:expr) => {\n        {\n            $x += 1; // mutation is implicit\n            $x * 2\n        }\n    };\n}\n\nfn main() {\n    let mut num = 5;\n    let result = increment_and_double!(num);\n    println!(\"Result: {}, Num: {}\", result, num);\n    // Result: 12, Num: 6\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 <p>In this example, calling the macro both increments and returns the value in one go—without any clear indication in its “signature” that it mutates its argument. As a result, num is changed behind the scenes, which can surprise readers and make debugging more difficult.</p>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-09ca90df">
+<div class="need_container docutils container" id="SNCB-2a242d30">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_iPTgzrvO7qr3">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -369,7 +371,7 @@ Prefer less powerful macros that only extend source code.</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "fn increment_and_double(x: &mut i32) -> i32 {\n    *x += 1; // mutation is explicit\n    *x * 2\n}\n\nfn main() {\n    let mut num = 5;\n    let result = increment_and_double(&mut num);\n    println!(\"Result: {}, Num: {}\", result, num);\n    // Result: 12, Num: 6\n}", "displayCode": "fn increment_and_double(x: &mut i32) -> i32 {\n    *x += 1; // mutation is explicit\n    *x * 2\n}\n\nfn main() {\n    let mut num = 5;\n    let result = increment_and_double(&mut num);\n    println!(\"Result: {}, Num: {}\", result, num);\n    // Result: 12, Num: 6\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 <p>The function version makes the mutation and borrowing explicit in its signature, improving readability, safety, and debuggability.</p>
 </td>
 </tr>
@@ -381,7 +383,7 @@ Prefer less powerful macros that only extend source code.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-ee922271">
+<div class="need_container docutils container" id="SNCB-74e5fba3">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_66FSqzD55VRZ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -405,7 +407,7 @@ Prefer less powerful macros that only extend source code.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Macros should be expressed using declarative syntax
 in preference to procedural syntax.</p>
-<div class="need_container docutils container" id="SNCB-5f8e367f">
+<div class="need_container docutils container" id="SNCB-83692aa5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_AmCavSymv3Ev">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -429,7 +431,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-afba47d5">
+<div class="need_container docutils container" id="SNCB-b30b5bed">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_pJhVZW6a1HP9">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -451,13 +453,13 @@ expose a vulnerability for users of adopted code.</p></td>
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "// TODO\nfn main() {}", "displayCode": "// TODO\nfn main() {}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-9a19fcce">
+<div class="need_container docutils container" id="SNCB-78fea460">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_4VFyucETB7C3">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -479,7 +481,7 @@ expose a vulnerability for users of adopted code.</p></td>
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "// TODO\nfn main() {}", "displayCode": "// TODO\nfn main() {}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -490,7 +492,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6cb83968">
+<div class="need_container docutils container" id="SNCB-0cdfd44c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_8hs33nyp0ipX">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -513,7 +515,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Description of the guideline goes here.</p>
-<div class="need_container docutils container" id="SNCB-e35bca4f">
+<div class="need_container docutils container" id="SNCB-964d0886">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_e9iS187skbHH">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -534,7 +536,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-7150ce2b">
+<div class="need_container docutils container" id="SNCB-e1fa557b">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_lRt4LBen6Lkc">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -552,18 +554,19 @@ expose a vulnerability for users of adopted code.</p></td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Non-compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Non-compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c361be69">
+<div class="need_container docutils container" id="SNCB-55f79ae9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_GLP05s9c1g8N">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -581,12 +584,13 @@ expose a vulnerability for users of adopted code.</p></td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -597,7 +601,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-69eaf873">
+<div class="need_container docutils container" id="SNCB-33dbdbd9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_FRLaMIMb4t3S">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -620,7 +624,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Description of the guideline goes here.</p>
-<div class="need_container docutils container" id="SNCB-72fac82f">
+<div class="need_container docutils container" id="SNCB-6dd13d44">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_WJubG7KuUDLW">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -641,7 +645,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-19a628ae">
+<div class="need_container docutils container" id="SNCB-55bb2d2d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_AyFnP0lJLHxi">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -659,18 +663,19 @@ expose a vulnerability for users of adopted code.</p></td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Non-compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Non-compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-e9002890">
+<div class="need_container docutils container" id="SNCB-a6aa5d11">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_pO5gP1aj2v4F">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -688,12 +693,13 @@ expose a vulnerability for users of adopted code.</p></td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -704,7 +710,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-f458aed8">
+<div class="need_container docutils container" id="SNCB-5044a85a">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_SJMrWDYZ0dN4">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -727,7 +733,7 @@ expose a vulnerability for users of adopted code.</p></td>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Each name inside of the definition of a macro shall either use a global path or path prefixed with $crate.</p>
-<div class="need_container docutils container" id="SNCB-77f65793">
+<div class="need_container docutils container" id="SNCB-b7470b16">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_VRNXaxmW1l2s">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -752,7 +758,7 @@ will resolve to.</p></td>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-510f7086">
+<div class="need_container docutils container" id="SNCB-39d43db8">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_m2XR1ihTbCQS">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -773,29 +779,31 @@ where the macro is used a different <cite>Vec</cite> could be used than is inten
 defines a struct <cite>Vec</cite> which is not preset at the macro definition, the macro user might be intending to
 use that in the macro.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="cp">#[macro_export]</span>
-<span class="w">    </span><span class="fm">macro_rules!</span><span class="w"> </span><span class="n">vec</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="p">(</span><span class="w"> </span><span class="cp">$(</span><span class="w"> </span><span class="cp">$x</span><span class="p">:</span><span class="nc">expr</span><span class="w"> </span><span class="p">),</span><span class="o">*</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="p">{</span>
-<span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">temp_vec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span><span class="w"> </span><span class="c1">// non-global path</span>
-<span class="w">                </span><span class="cp">$(</span>
-<span class="w">                    </span><span class="n">temp_vec</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="cp">$x</span><span class="p">);</span>
-<span class="w">                </span><span class="p">)</span><span class="o">*</span>
-<span class="w">                </span><span class="n">temp_vec</span>
-<span class="w">            </span><span class="p">}</span>
-<span class="w">        </span><span class="p">};</span>
-<span class="w">    </span><span class="p">}</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[macro_export]</span>
+<span class="fm">macro_rules!</span><span class="w"> </span><span class="n">my_vec</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="w"> </span><span class="cp">$(</span><span class="w"> </span><span class="cp">$x</span><span class="p">:</span><span class="nc">expr</span><span class="w"> </span><span class="p">),</span><span class="o">*</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">temp_vec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span><span class="w"> </span><span class="c1">// non-global path</span>
+<span class="w">            </span><span class="cp">$(</span>
+<span class="w">                </span><span class="n">temp_vec</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="cp">$x</span><span class="p">);</span>
+<span class="w">            </span><span class="p">)</span><span class="o">*</span>
+<span class="w">            </span><span class="n">temp_vec</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">my_vec</span><span class="o">!</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">];</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[macro_export]\nmacro_rules! my_vec {\n    ( $( $x:expr ),* ) => {\n        {\n            let mut temp_vec = Vec::new(); // non-global path\n            $(\n                temp_vec.push($x);\n            )*\n            temp_vec\n        }\n    };\n}\n\nfn main() {\n    let _ = my_vec![1, 2, 3];\n}", "displayCode": "#[macro_export]\nmacro_rules! my_vec {\n    ( $( $x:expr ),* ) => {\n        {\n            let mut temp_vec = Vec::new(); // non-global path\n            $(\n                temp_vec.push($x);\n            )*\n            temp_vec\n        }\n    };\n}\n\nfn main() {\n    let _ = my_vec![1, 2, 3];\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-0a60d7a1">
+<div class="need_container docutils container" id="SNCB-a0b9381a">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_xyaShvxL9JAM">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -815,23 +823,25 @@ use that in the macro.</p>
 <cite>Vec</cite> defined in the scope of the macro usage, this macro will unambiguously use the <cite>Vec</cite> from the
 Standard Library.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="cp">#[macro_export]</span>
-<span class="w">    </span><span class="fm">macro_rules!</span><span class="w"> </span><span class="n">vec</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="p">(</span><span class="w"> </span><span class="cp">$(</span><span class="w"> </span><span class="cp">$x</span><span class="p">:</span><span class="nc">expr</span><span class="w"> </span><span class="p">),</span><span class="o">*</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">            </span><span class="p">{</span>
-<span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">temp_vec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">::</span><span class="n">std</span><span class="p">::</span><span class="n">vec</span><span class="p">::</span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span><span class="w"> </span><span class="c1">// global path</span>
-<span class="w">                </span><span class="cp">$(</span>
-<span class="w">                    </span><span class="n">temp_vec</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="cp">$x</span><span class="p">);</span>
-<span class="w">                </span><span class="p">)</span><span class="o">*</span>
-<span class="w">                </span><span class="n">temp_vec</span>
-<span class="w">            </span><span class="p">}</span>
-<span class="w">        </span><span class="p">};</span>
-<span class="w">    </span><span class="p">}</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[macro_export]</span>
+<span class="fm">macro_rules!</span><span class="w"> </span><span class="n">my_vec_global</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="w"> </span><span class="cp">$(</span><span class="w"> </span><span class="cp">$x</span><span class="p">:</span><span class="nc">expr</span><span class="w"> </span><span class="p">),</span><span class="o">*</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">temp_vec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">::</span><span class="n">std</span><span class="p">::</span><span class="n">vec</span><span class="p">::</span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span><span class="w"> </span><span class="c1">// global path</span>
+<span class="w">            </span><span class="cp">$(</span>
+<span class="w">                </span><span class="n">temp_vec</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="cp">$x</span><span class="p">);</span>
+<span class="w">            </span><span class="p">)</span><span class="o">*</span>
+<span class="w">            </span><span class="n">temp_vec</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">my_vec_global</span><span class="o">!</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">];</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[macro_export]\nmacro_rules! my_vec_global {\n    ( $( $x:expr ),* ) => {\n        {\n            let mut temp_vec = ::std::vec::Vec::new(); // global path\n            $(\n                temp_vec.push($x);\n            )*\n            temp_vec\n        }\n    };\n}\n\nfn main() {\n    let _ = my_vec_global![1, 2, 3];\n}", "displayCode": "#[macro_export]\nmacro_rules! my_vec_global {\n    ( $( $x:expr ),* ) => {\n        {\n            let mut temp_vec = ::std::vec::Vec::new(); // global path\n            $(\n                temp_vec.push($x);\n            )*\n            temp_vec\n        }\n    };\n}\n\nfn main() {\n    let _ = my_vec_global![1, 2, 3];\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -842,7 +852,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-3aa56764">
+<div class="need_container docutils container" id="SNCB-13f97c2a">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_WJlWqgIxmE8P">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -865,7 +875,7 @@ Standard Library.</p>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Description of the guideline goes here.</p>
-<div class="need_container docutils container" id="SNCB-671cbcaf">
+<div class="need_container docutils container" id="SNCB-8ccd8f44">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_C8RRidiVzhRj">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -886,7 +896,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-32214e26">
+<div class="need_container docutils container" id="SNCB-6ab47806">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_TjRiRkmBY6wG">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -904,18 +914,19 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Non-compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Non-compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-12b55c9a">
+<div class="need_container docutils container" id="SNCB-a3e4e8e5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_AEKEOYhBWPMl">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -933,12 +944,13 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -949,7 +961,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-f5e67d58">
+<div class="need_container docutils container" id="SNCB-30a2b480">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_a1mHfjgKk4Xr">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -972,7 +984,7 @@ Standard Library.</p>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Description of the guideline goes here.</p>
-<div class="need_container docutils container" id="SNCB-c2e2145b">
+<div class="need_container docutils container" id="SNCB-46d2c96f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_62mSorNF05kD">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -993,7 +1005,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6cd52b07">
+<div class="need_container docutils container" id="SNCB-d2deea86">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_hP5KLhqQfDcd">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1011,18 +1023,19 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Non-compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Non-compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c38ae181">
+<div class="need_container docutils container" id="SNCB-ecc5df84">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_ti7GWHCOhUvT">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1040,12 +1053,13 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -1056,7 +1070,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-814c8729">
+<div class="need_container docutils container" id="SNCB-c7e001cc">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_h0uG1C9ZjryA">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1079,7 +1093,7 @@ Standard Library.</p>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Description of the guideline goes here.</p>
-<div class="need_container docutils container" id="SNCB-82f0716b">
+<div class="need_container docutils container" id="SNCB-39fd2eda">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_U3AEUPyaUhcb">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1100,7 +1114,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-607d2e4a">
+<div class="need_container docutils container" id="SNCB-074f40dd">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_Gb4zimei8cNI">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1118,18 +1132,19 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Non-compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Non-compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-010335b8">
+<div class="need_container docutils container" id="SNCB-838144f5">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Pw7YCh4Iv47Z">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1147,12 +1162,13 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -1163,7 +1179,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c08cc1ac">
+<div class="need_container docutils container" id="SNCB-019805e7">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_uuDOArzyO3Qw">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1186,7 +1202,7 @@ Standard Library.</p>
 </td>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Description of the guideline goes here.</p>
-<div class="need_container docutils container" id="SNCB-99f14ee5">
+<div class="need_container docutils container" id="SNCB-8f76eb98">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_dNgSvC0SZ3JJ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1207,7 +1223,7 @@ Standard Library.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-daebdb42">
+<div class="need_container docutils container" id="SNCB-6c756bcb">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_g9j8shyGM2Rh">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1225,18 +1241,19 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Non-compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Non-compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Non-compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fc6002d2">
+<div class="need_container docutils container" id="SNCB-b4226d6e">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_cFPg6y7upNdl">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1254,12 +1271,13 @@ Standard Library.</p>
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Explanation of code example.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">example_function</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Compliant implementation</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn example_function() {\n    // Compliant implementation\n}", "hiddenLineNumbers": [4, 5], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">example_function</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// Compliant implementation</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 </td>
 </tr>
 </tbody>
