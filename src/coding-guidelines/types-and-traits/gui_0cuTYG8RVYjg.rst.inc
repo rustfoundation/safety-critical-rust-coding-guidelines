@@ -272,9 +272,9 @@
              bytes: [u8; 4],
          }
 
-        fn get_bytes() -> [u8; 4] {
+         fn get_bytes() -> [u8; 4] {
              let u = IntBytes { i: 0x12345678 };
-         
+
              // SAFETY: All bit patterns are valid for '[u8; 4]'
              // Note: byte order depends on target endianness
              assert_eq!(unsafe { u.bytes }, 0x12345678_u32.to_ne_bytes()); // compliant
@@ -285,7 +285,7 @@
              let u = IntBytes {
                  bytes: [0x11, 0x22, 0x33, 0x44],
              };
-         
+
              // SAFETY: All bit patterns are valid for 'u32'
              assert_eq!(unsafe { u.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant
              unsafe { u.i }  // compliant
