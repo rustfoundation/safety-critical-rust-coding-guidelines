@@ -14,7 +14,7 @@ Configuration options (in conf.py):
 """
 
 import re
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 from sphinx.application import Sphinx
 from sphinx.errors import SphinxError
