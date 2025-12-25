@@ -171,6 +171,12 @@ class RustExamplesConfig:
         self.channel = None
         self.version = None
         self.version_mismatch_threshold = None
+        # Miri settings
+        self.miri_require_for_unsafe = True
+        self.miri_timeout = 60
+        # Warning settings
+        self.fail_on_warnings = True
+        self.warn_mode_default = "error"  # Computed from fail_on_warnings
     
     @classmethod
     def load(cls, config_path: Path) -> "RustExamplesConfig":
@@ -219,6 +225,13 @@ class RustExamplesConfig:
         
         warnings = data.get("warnings", {})
         config.version_mismatch_threshold = warnings.get("version_mismatch_threshold", 2)
+        config.fail_on_warnings = warnings.get("fail_on_warnings", True)
+        config.warn_mode_default = "error" if config.fail_on_warnings else "allow"
+        
+        # Miri settings
+        miri = data.get("miri", {})
+        config.miri_require_for_unsafe = miri.get("require_for_unsafe", True)
+        config.miri_timeout = miri.get("timeout", 60)
         
         return config
     
@@ -296,7 +309,7 @@ def parse_directive_options(content: str, start_pos: int, base_indent: str) -> T
     options = {}
     pos = start_pos
     lines = content[start_pos:].split('\n')
-    option_indent = base_indent + "    "
+    base_indent_len = len(base_indent)
     
     for line in lines:
         pos += len(line) + 1
@@ -304,26 +317,28 @@ def parse_directive_options(content: str, start_pos: int, base_indent: str) -> T
         if not line.strip():
             continue
         
-        # Check if this is an option line
-        if line.startswith(option_indent) and line.strip().startswith(':'):
-            # Parse option
-            match = re.match(r'\s*:(\w+):\s*(.*)', line)
+        stripped = line.lstrip()
+        current_indent = len(line) - len(stripped)
+        
+        # Check if this is an option line: indented more than directive and starts with :word:
+        # Be flexible about exact indentation to handle tabs, varying spaces, etc.
+        if current_indent > base_indent_len and stripped.startswith(':'):
+            # Parse option - must match :word: or :word: value pattern
+            match = re.match(r':(\w+):\s*(.*)', stripped)
             if match:
                 opt_name = match.group(1)
                 opt_value = match.group(2).strip()
                 options[opt_name] = opt_value
-            continue
+                continue
         
         # Check if we've moved past options (content starts)
-        stripped = line.lstrip()
-        current_indent = len(line) - len(stripped)
-        
-        if current_indent >= len(option_indent) and not stripped.startswith(':'):
+        # Content is indented more than directive and doesn't start with :
+        if current_indent > base_indent_len and not stripped.startswith(':'):
             # This is content, not an option
             pos -= len(line) + 1  # Back up
             break
-        elif current_indent < len(option_indent):
-            # Dedented past directive
+        elif current_indent <= base_indent_len:
+            # Dedented to or past directive level
             pos -= len(line) + 1
             break
     
@@ -485,6 +500,15 @@ def extract_rust_examples_from_file(
             else:
                 miri_mode = 'check'  # Default for unknown values
         
+        # Parse warn option
+        warn_mode = config.warn_mode_default  # Use config default
+        if 'warn' in options:
+            warn_value = options.get('warn', '').strip().lower()
+            if warn_value == 'allow':
+                warn_mode = 'allow'
+            else:
+                warn_mode = 'error'  # Default to error for :warn: or :warn: error
+        
         # Parse version/edition requirements with config defaults
         min_version = options.get('version') or options.get('min-version') or config.version
         channel = options.get('channel', config.channel)
@@ -508,6 +532,7 @@ def extract_rust_examples_from_file(
             parent_id=parent_id or '',
             guideline_id=guideline_id or '',
             miri_mode=miri_mode,
+            warn_mode=warn_mode,
         )
         
         examples.append(example)
@@ -551,6 +576,7 @@ def extract_rust_examples_from_file(
             parent_directive=parent_type or '',
             parent_id=parent_id or '',
             guideline_id=guideline_id or '',
+            warn_mode=config.warn_mode_default,
         )
         
         examples.append(example)
@@ -674,16 +700,25 @@ def test_examples_individually(
     
     # Check for Miri examples
     miri_examples = [e for e in examples if getattr(e, 'miri_mode', None) in ('check', 'expect_ub')]
+    miri_available = False
     
     if miri_examples and run_miri:
         miri_available, miri_info = check_miri_available()
         if miri_available:
             print(f"🔬 Miri available: {miri_info}")
+            print(f"   {len(miri_examples)} examples will be tested with Miri")
         else:
             print(f"\n⚠️  Miri not available: {miri_info}")
-            print(f"   Install with: rustup +nightly component add miri")
-            print(f"   {len(miri_examples)} examples require Miri testing")
+            print(f"   {len(miri_examples)} examples have :miri: option but will be skipped")
+            print(f"")
+            print(f"   To install Miri:")
+            print(f"      rustup +nightly component add miri")
+            print(f"      rustup run nightly cargo miri setup")
+            print(f"")
+            print(f"   Or use --no-miri to skip Miri tests without this warning")
             run_miri = False
+    elif miri_examples and not run_miri:
+        print(f"⏭️  Skipping Miri tests for {len(miri_examples)} examples (--no-miri)")
     
     print(f"\n🧪 Testing {len(examples)} examples...")
     
@@ -974,6 +1009,22 @@ def main():
         help="Only test examples with no special requirements (default channel/version)"
     )
     
+    # Miri options
+    miri_group = parser.add_mutually_exclusive_group()
+    miri_group.add_argument(
+        "--miri",
+        action="store_true",
+        dest="run_miri",
+        default=True,
+        help="Run Miri tests on examples with :miri: option (default)"
+    )
+    miri_group.add_argument(
+        "--no-miri",
+        action="store_false",
+        dest="run_miri",
+        help="Skip Miri tests even for examples with :miri: option"
+    )
+    
     args = parser.parse_args()
     
     # Validate arguments
@@ -990,6 +1041,8 @@ def main():
         
         if args.verbose:
             print(f"📋 Loaded config: edition={config.edition}, channel={config.channel}, version={config.version}", file=sys.stderr)
+            print(f"   warnings: fail_on_warnings={config.fail_on_warnings}", file=sys.stderr)
+            print(f"   miri: require_for_unsafe={config.miri_require_for_unsafe}, timeout={config.miri_timeout}", file=sys.stderr)
     except ConfigurationError as e:
         print(f"❌ Configuration error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -1071,7 +1124,12 @@ def main():
         
         if args.test:
             # Run tests
-            results = test_examples_individually(examples, prelude)
+            results = test_examples_individually(
+                examples, 
+                prelude, 
+                run_miri=args.run_miri,
+                miri_timeout=config.miri_timeout
+            )
             
             # Print results
             print(format_test_results(results))
@@ -1098,7 +1156,12 @@ def main():
             examples = [RustExample.from_dict(e) for e in json.load(f)]
         
         # Run tests
-        results = test_examples_individually(examples, prelude)
+        results = test_examples_individually(
+            examples, 
+            prelude, 
+            run_miri=args.run_miri,
+            miri_timeout=config.miri_timeout
+        )
         
         # Print results
         print(format_test_results(results))

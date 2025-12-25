@@ -65,6 +65,9 @@ MIRI_MODES = {"check", "expect_ub", "skip"}
 # Options incompatible with :miri: (code must compile and run for Miri)
 MIRI_INCOMPATIBLE_OPTIONS = {"ignore", "compile_fail", "no_run"}
 
+# Warn mode values
+WARN_MODES = {"error", "allow"}  # error = fail on warnings (default), allow = permit warnings
+
 
 class RustExamplesConfig:
     """Configuration loaded from rust_examples_config.toml"""
@@ -78,6 +81,8 @@ class RustExamplesConfig:
         # Miri settings
         self.miri_require_for_unsafe = True
         self.miri_timeout = 60
+        # Warning settings
+        self.warn_fail_on_warnings = True  # Fail on compiler warnings by default
     
     @classmethod
     def load(cls, config_path: Path) -> "RustExamplesConfig":
@@ -110,10 +115,14 @@ class RustExamplesConfig:
         playground = data.get("playground", {})
         config.playground_api_url = playground.get("api_url", config.playground_api_url)
         
-        warnings = data.get("warnings", {})
-        config.version_mismatch_threshold = warnings.get(
+        warnings_section = data.get("warnings", {})
+        config.version_mismatch_threshold = warnings_section.get(
             "version_mismatch_threshold", 
             config.version_mismatch_threshold
+        )
+        config.warn_fail_on_warnings = warnings_section.get(
+            "fail_on_warnings",
+            config.warn_fail_on_warnings
         )
         
         # Miri settings
@@ -193,6 +202,40 @@ def parse_miri_option(value: Optional[str]) -> Tuple[str, Optional[str]]:
     # Unknown value - treat as check but log warning
     logger.warning(f"Unknown :miri: value '{value}', treating as 'check'")
     return ("check", None)
+
+
+def parse_warn_option(value: Optional[str], default_fail: bool = True) -> str:
+    """
+    Parse :warn: option value.
+    
+    Args:
+        value: The option value ("allow" or empty/None for default)
+        default_fail: Whether to fail on warnings by default (from config)
+        
+    Returns:
+        "error" (fail on warnings) or "allow" (permit warnings)
+    
+    Examples:
+        None (no option) -> "error" if default_fail else "allow"
+        "" (flag present) -> "error"  
+        "allow" -> "allow"
+    """
+    if value is None:
+        # Option not present - use default from config
+        return "error" if default_fail else "allow"
+    
+    value = value.strip().lower()
+    
+    if value == "" or value == "error":
+        # :warn: or :warn: error - fail on warnings
+        return "error"
+    
+    if value == "allow":
+        return "allow"
+    
+    # Unknown value - log warning and use default
+    logger.warning(f"Unknown :warn: value '{value}', treating as 'error'")
+    return "error"
 
 
 def contains_unsafe_keyword(code: str) -> bool:
@@ -407,6 +450,8 @@ class RustExampleDirective(Directive):
         "no_run": directives.flag,
         # Miri (UB detection)
         "miri": directives.unchanged,  # Values: "" (check), "expect_ub", "skip"
+        # Warning handling
+        "warn": directives.unchanged,  # Values: "" (error/fail on warnings), "allow"
         # Toolchain options
         "edition": directives.unchanged,
         "channel": directives.unchanged,
@@ -499,6 +544,18 @@ class RustExampleDirective(Directive):
                 f"or :miri: skip (to opt out)."
             )
         
+        # Parse warn option
+        # If :warn: is present, use its value; otherwise use config default
+        has_warn_option = 'warn' in self.options
+        default_fail_on_warnings = getattr(env.config, 'rust_examples_fail_on_warnings',
+                                           config.warn_fail_on_warnings)
+        
+        if has_warn_option:
+            warn_mode = parse_warn_option(self.options.get('warn', ''), default_fail_on_warnings)
+        else:
+            # No :warn: option - use config default
+            warn_mode = "error" if default_fail_on_warnings else "allow"
+        
         # Get toolchain options
         edition = self.options.get('edition', config.edition)
         channel = self.options.get('channel', config.channel)
@@ -541,6 +598,9 @@ class RustExampleDirective(Directive):
                 "mode": miri_mode,
                 "pattern": miri_pattern,
             }
+        
+        # Add warn mode
+        js_data["warnMode"] = warn_mode
         
         # If there are hidden lines, pre-generate the highlighted HTML for the full code
         if has_hidden_lines:
@@ -614,6 +674,7 @@ class RustExampleDirective(Directive):
         code_node['rustdoc_version'] = version
         code_node['rustdoc_miri_mode'] = miri_mode
         code_node['rustdoc_miri_pattern'] = miri_pattern
+        code_node['rustdoc_warn_mode'] = warn_mode
         code_node['source'] = source
         code_node['line'] = line
         
@@ -856,6 +917,9 @@ def get_css_content() -> str:
 
 .rust-example-output-status.expected { color: #ff9800; }
 .rust-example-output-status.expected::before { content: "✓ "; }
+
+.rust-example-output-status.warning { color: #ffc107; }
+.rust-example-output-status.warning::before { content: "⚠ "; }
 
 .rust-example-output-close {
     background: none;
@@ -1167,6 +1231,11 @@ def get_js_content() -> str:
         }
         if (!output) output = success ? '(no output)' : '(compilation failed)';
         
+        // Check for warnings in output
+        const hasWarnings = output.includes('warning:') || output.includes('warning[');
+        const warnMode = data.warnMode || 'allow';  // Default to allow if not set
+        const failOnWarnings = warnMode === 'error';
+        
         let statusText = '';
         let statusClass = '';
         
@@ -1197,17 +1266,32 @@ def get_js_content() -> str:
                 break;
             case 'no_run':
                 if (success) {
-                    statusText = 'Compiled successfully';
-                    statusClass = 'success';
-                    output = '(compilation successful - not executed)';
+                    if (hasWarnings && failOnWarnings) {
+                        statusText = 'Compiled with warnings';
+                        statusClass = 'warning';
+                    } else {
+                        statusText = 'Compiled successfully';
+                        statusClass = 'success';
+                    }
+                    output = '(compilation successful - not executed)' + (hasWarnings ? '\\n\\n' + output : '');
                 } else {
                     statusText = 'Compilation failed';
                     statusClass = 'error';
                 }
                 break;
             default:
-                statusText = success ? 'Success' : 'Failed';
-                statusClass = success ? 'success' : 'error';
+                if (success) {
+                    if (hasWarnings && failOnWarnings) {
+                        statusText = 'Success with warnings';
+                        statusClass = 'warning';
+                    } else {
+                        statusText = 'Success';
+                        statusClass = 'success';
+                    }
+                } else {
+                    statusText = 'Failed';
+                    statusClass = 'error';
+                }
         }
         
         statusSpan.textContent = statusText;
@@ -1295,16 +1379,24 @@ def get_js_content() -> str:
                       output.includes('error: unsupported operation') ||
                       output.includes('error[');
         
+        // Check for warnings
+        const hasWarnings = output.includes('warning:') || output.includes('warning[');
+        const warnMode = data.warnMode || 'allow';
+        const failOnWarnings = warnMode === 'error';
+        
         const expectUB = data.miri && data.miri.mode === 'expect_ub';
-        const success = expectUB ? hasUB : !hasUB;
+        const ubSuccess = expectUB ? hasUB : !hasUB;
         
         let statusText = '';
         let statusClass = '';
         
-        if (success) {
+        if (ubSuccess) {
             if (expectUB) {
                 statusText = 'UB detected as expected';
                 statusClass = 'miri-ub';
+            } else if (hasWarnings && failOnWarnings) {
+                statusText = 'No UB, but has warnings';
+                statusClass = 'warning';
             } else {
                 statusText = 'No undefined behavior detected';
                 statusClass = 'miri-success';
@@ -1482,6 +1574,9 @@ def setup(app: Sphinx):
     # Miri configuration
     app.add_config_value('rust_examples_require_miri_for_unsafe', True, 'env')
     app.add_config_value('rust_examples_miri_timeout', 60, 'env')
+    
+    # Warning configuration
+    app.add_config_value('rust_examples_fail_on_warnings', True, 'env')
     
     # Register static files
     app.add_css_file('rust_playground.css')

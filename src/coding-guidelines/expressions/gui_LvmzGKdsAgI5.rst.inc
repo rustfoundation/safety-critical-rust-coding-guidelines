@@ -59,7 +59,8 @@
     .. rust-example::
 
        use core::ops::Shl;
-       # struct MyType;
+       #[allow(dead_code)]
+       struct MyType;
 
        impl Shl<u32> for MyType {
            type Output = MyType;

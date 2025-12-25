@@ -45,6 +45,7 @@
       .. rust-example::
         :miri:
 
+        #[allow(dead_code)]
         fn f1(x: u16, y: i32, z: u64, w: usize) {
           let _p1 = x as * const u32;  // not compliant
           let _p2 = y as * const u32;  // not compliant

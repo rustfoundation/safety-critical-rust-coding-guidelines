@@ -46,6 +46,7 @@
 
       .. rust-example::
 
+        #[allow(dead_code)]
         fn example_function() {
             // Compliant implementation
         }

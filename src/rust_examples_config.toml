@@ -25,6 +25,12 @@ api_url = "https://play.rust-lang.org"
 # number to effectively disable.
 version_mismatch_threshold = 2
 
+# Fail on compiler warnings by default. When true, examples that compile with
+# warnings will show a warning status in the interactive output. Set to false
+# to allow warnings by default. Individual examples can override this with
+# :warn: (fail on warnings) or :warn: allow (permit warnings).
+fail_on_warnings = true
+
 [miri]
 # Require :miri: option for all examples containing `unsafe` code.
 # When true, build will emit warnings for unsafe code without explicit miri option.

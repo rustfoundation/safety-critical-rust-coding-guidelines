@@ -34,6 +34,7 @@
 
       .. rust-example::
 
+        #[allow(dead_code)]
         fn f1(flag: u32, ptr: * const u32) {
           /* ... */
           let mut rep = ptr as usize;
@@ -53,11 +54,13 @@
 
       .. rust-example::
 
+        #[allow(dead_code)]
         struct PtrFlag {
           pointer: * const u32,
           flag: u32
         }
 
+        #[allow(dead_code)]
         fn f2(flag: u32, ptr: * const u32) {
           let _ptrflag = PtrFlag {
             pointer: ptr,

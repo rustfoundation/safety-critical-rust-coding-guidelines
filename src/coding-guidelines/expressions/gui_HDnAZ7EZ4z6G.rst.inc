@@ -36,16 +36,19 @@
          :miri: expect_ub
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Base {
             position: (u32, u32)
          }
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Extended {
             base: Base,
             scale: f32
          }
 
+         #[allow(dead_code)]
          fn non_compliant_example(extended: &Extended) {
             let extended = extended as *const _;
             with_base(unsafe { &*(extended as *const _) })
@@ -65,16 +68,19 @@
          :miri:
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Base {
             position: (u32, u32)
          }
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Extended {
             base: Base,
             scale: f32
          }
 
+         #[allow(dead_code)]
          fn compliant_example(extended: &Extended) {
             let extended = extended as *const Extended;
             with_base(unsafe { &*(extended as *const Base) })
