@@ -225,21 +225,37 @@
       :id: compl_ex_Y7xaYuD2xdmq
       :status: draft
 
-      This compliant solution reads from the same field that was written.
+      This compliant example reads from the same field that was written.
 
       .. rust-example::
 
-         union IntOrBool {
-             i: u8,
-             b: bool,
+         #[repr(C)]
+         #[derive(Copy, Clone)]
+         union IntBytes {
+             i: u32,
+             bytes: [u8; 4],
+         }
+         
+         fn get_int() -> u32 {
+             let u = IntBytes { i: 0x12345678 };
+         
+             // SAFETY: All bit patterns are valid for [u8; 4]
+             // Note: byte order depends on target endianness
+             assert_eq!(unsafe { u.bytes }, 0x12345678_u32.to_ne_bytes()); // compliant
+         
+             let u2 = IntBytes {
+                 bytes: [0x11, 0x22, 0x33, 0x44],
+             };
+         
+             // SAFETY: All bit patterns are valid for 'u32'
+             assert_eq!(unsafe { u2.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant
+             
+             unsafe { u2.i } // compliant
          }
 
          fn main() {
-             let u = IntOrBool { b: true };
-             
-             // Read the same field that was written
-             println!("bool value: {}", unsafe { u.b }); // compliant
-         }
+            println!("{}", get_int());
+         }   
 
    .. compliant_example::
       :id: compl_ex_Jsxenev7lNf0
