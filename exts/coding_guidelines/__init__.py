@@ -12,6 +12,7 @@ from . import (
     guidelines_checks,
     rust_examples,
     std_role,
+    text_checks,
     write_guidelines_ids,
 )
 from .common import bar_format, get_tqdm, logger, logging
@@ -87,6 +88,9 @@ def setup(app):
     
     # Set up citation roles for bibliography linking
     citation_roles.setup(app)
+    
+    # Set up text content validation
+    text_checks.setup(app)
 
     app.connect("env-check-consistency", guidelines_checks.validate_required_fields)
     app.connect("env-check-consistency", fls_checks.check_fls)
