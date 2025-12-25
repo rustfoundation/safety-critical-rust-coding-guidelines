@@ -14,9 +14,9 @@
     :tags: numerics, reduce-human-error, maintainability, surprising-behavior, subset
 
     Shifting negative positions or a value greater than or equal to the width of the left operand
-    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    in shift left and shift right expressions :cite:`gui_RHvQj8BHlz9b:FLS-BIT-EXPRESSIONS`
     are defined by this guideline to be *out-of-range shifts*.
-    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`__.
+    The Rust FLS incorrectly describes this behavior as arithmetic overflow :cite:`gui_RHvQj8BHlz9b:FLS-ISSUE-632`.
     
     If the types of both operands are integer types,
     the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
@@ -71,8 +71,7 @@
 
     You may choose any type for the right operand (not just integers), because you control the implementation.
 
-    This rule is based on The CERT C Coding Standard Rule
-    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+    This rule is based on The CERT C Coding Standard Rule :cite:`gui_RHvQj8BHlz9b:CERT-C-INT34`.
 
     .. rationale:: 
         :id: rat_3MpR8QfHodGT 
@@ -190,9 +189,9 @@
         :id: compl_ex_xpPQqYeEPGIo 
         :status: draft
 
-        This compliant example performs left shifts via the `checked_shl <https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22>`_
-        function and right shifts via the `checked_shr <https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22>`_ function.
-        Both of these functions are defined in `core <https://doc.rust-lang.org/core/index.html>`_.
+        This compliant example performs left shifts via the :std:`u32::checked_shl`
+        function and right shifts via the :std:`u32::checked_shr` function.
+        Both of these functions are defined in ``core``.
 
           ``<T>::checked_shl(M)`` returns a value of type ``Option<T>``:
 
@@ -218,3 +217,19 @@
                      println!("{bits} << {sh} = {:?}", bits.checked_shl(sh));
                  }
              }
+
+    .. bibliography::
+        :id: bib_RHvQj8BHlz9b
+        :status: draft
+
+        .. list-table::
+           :header-rows: 0
+           :widths: auto
+           :class: bibliography-table
+
+           * - :bibentry:`gui_RHvQj8BHlz9b:CERT-C-INT34`
+             - SEI CERT C Coding Standard. "INT34-C. Do not shift an expression by a negative number of bits." https://wiki.sei.cmu.edu/confluence/x/ItcxBQ
+           * - :bibentry:`gui_RHvQj8BHlz9b:FLS-BIT-EXPRESSIONS`
+             - The Rust FLS. "Expressions - Bit Expressions." https://rust-lang.github.io/fls/expressions.html#bit-expressions
+           * - :bibentry:`gui_RHvQj8BHlz9b:FLS-ISSUE-632`
+             - The Rust FLS Repository. "Issue 632." https://github.com/rust-lang/fls/issues/632

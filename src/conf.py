@@ -230,6 +230,16 @@ bibliography_fail_on_broken = True
 # Whether duplicate URLs should fail the build
 bibliography_fail_on_duplicates = True
 
+# -- Text content validation configuration -----------------------------------
+
+# Enable inline URL detection in guideline text
+# When enabled, URLs in guideline content will be flagged as errors
+# Contributors should use :std: role or bibliography citations instead
+text_check_inline_urls = True
+
+# Whether inline URLs should fail the build (True) or just warn (False)
+text_check_fail_on_inline_urls = True
+
 # -- Options for HTML output -------------------------------------------------
 
 # Configure the theme

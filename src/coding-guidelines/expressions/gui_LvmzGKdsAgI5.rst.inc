@@ -14,9 +14,9 @@
     :tags: numerics, surprising-behavior, defect
 
     Shifting negative positions or a value greater than or equal to the width of the left operand
-    in `shift left and shift right expressions <https://rust-lang.github.io/fls/expressions.html#bit-expressions>`_
+    in shift left and shift right expressions :cite:`gui_LvmzGKdsAgI5:FLS-BIT-EXPRESSIONS`
     are defined by this guideline to be *out-of-range shifts*.
-    The Rust FLS incorrectly describes this behavior as <`arithmetic overflow <https://github.com/rust-lang/fls/issues/632>`_.
+    The Rust FLS incorrectly describes this behavior as arithmetic overflow :cite:`gui_LvmzGKdsAgI5:FLS-ISSUE-632`.
 
     If the types of both operands are integer types,
     the shift left expression ``lhs << rhs`` evaluates to the value of the left operand ``lhs`` whose bits are 
@@ -75,8 +75,7 @@
     `Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand`.
     All code that complies with that rule also complies with this rule.
 
-    This rule is based on The CERT C Coding Standard Rule
-    `INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand <https://wiki.sei.cmu.edu/confluence/x/ItcxBQ>`_.
+    This rule is based on The CERT C Coding Standard Rule :cite:`gui_LvmzGKdsAgI5:CERT-C-INT34`.
 
     .. rationale:: 
         :id: rat_tVkDl6gOqz25 
@@ -151,3 +150,19 @@
                      println!("{bits} << {sh} = {result}");
                  }
              }
+
+    .. bibliography::
+        :id: bib_LvmzGKdsAgI5
+        :status: draft
+
+        .. list-table::
+           :header-rows: 0
+           :widths: auto
+           :class: bibliography-table
+
+           * - :bibentry:`gui_LvmzGKdsAgI5:CERT-C-INT34`
+             - SEI CERT C Coding Standard. "INT34-C. Do not shift an expression by a negative number of bits." https://wiki.sei.cmu.edu/confluence/x/ItcxBQ
+           * - :bibentry:`gui_LvmzGKdsAgI5:FLS-BIT-EXPRESSIONS`
+             - The Rust FLS. "Expressions - Bit Expressions." https://rust-lang.github.io/fls/expressions.html#bit-expressions
+           * - :bibentry:`gui_LvmzGKdsAgI5:FLS-ISSUE-632`
+             - The Rust FLS Repository. "Issue 632." https://github.com/rust-lang/fls/issues/632

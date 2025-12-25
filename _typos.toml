@@ -5,5 +5,6 @@ extend-ignore-identifiers-re = [
   "rat_.*",
   "compl_ex_.*",
   "non_compl_ex_.*",
+  "bib_.*",
 ]
 

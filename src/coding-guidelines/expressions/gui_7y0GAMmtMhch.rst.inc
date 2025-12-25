@@ -13,11 +13,8 @@
    :scope: module
    :tags: numerics, subset
 
-   Do not provide a right operand of
-   `integer type <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_  
-   during a `division expression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ or `remainder expression
-   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_ when the left operand also has integer type.
+   Do not provide a right operand of integer type :cite:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`
+   during a division expression :cite:`gui_7y0GAMmtMhch:FLS-DIVISION-EXPR` or remainder expression :cite:`gui_7y0GAMmtMhch:FLS-REMAINDER-EXPR` when the left operand also has integer type.
 
     This rule applies to the following primitive integer types:
 
@@ -104,3 +101,19 @@
                  let _result = 5u32 / divisor;
              }
          }
+
+   .. bibliography::
+      :id: bib_7y0GAMmtMhch
+      :status: draft
+
+      .. list-table::
+         :header-rows: 0
+         :widths: auto
+         :class: bibliography-table
+
+         * - :bibentry:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`
+           - The Rust FLS. "Types and Traits - Integer Types." https://rust-lang.github.io/fls/types-and-traits.html#integer-types
+         * - :bibentry:`gui_7y0GAMmtMhch:FLS-DIVISION-EXPR`
+           - The Rust FLS. "Expressions - Syntax - DivisionExpression." https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression
+         * - :bibentry:`gui_7y0GAMmtMhch:FLS-REMAINDER-EXPR`
+           - The Rust FLS. "Expressions - Syntax - RemainderExpression." https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression

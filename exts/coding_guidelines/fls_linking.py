@@ -41,8 +41,8 @@ def post_process_html(app):
     if not hasattr(app, "fls_urls"):
         app.fls_urls = load_fls_ids(app)
 
-    # Pattern to match the proper HTML structure
-    pattern = r'<span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data">(fls_[a-zA-Z0-9]{9,12})</span></span>'
+    # Pattern to match the proper HTML structure for FLS IDs
+    fls_pattern = r'<span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data">(fls_[a-zA-Z0-9]{9,12})</span></span>'
 
     # Function to replace FLS IDs with links
     def replace_fls(match):
@@ -54,7 +54,7 @@ def post_process_html(app):
         else:
             return f'<span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><span class="fls-id unknown-fls">{fls_id}</span></span></span>'
 
-    # CSS for styling
+    # CSS for styling both FLS and std refs
     css = """
 /* Styling for FLS ID links */
 .fls-id {
@@ -74,6 +74,17 @@ a.fls-id:hover {
     border-bottom: 1px dashed #cc0000;
     color: #cc0000;
 }
+
+/* Styling for std library reference links */
+a.std-ref code.docutils.literal.notranslate {
+    border-bottom: 1px dotted #0078d7;
+    text-decoration: none;
+}
+a.std-ref:hover code.docutils.literal.notranslate {
+    background-color: rgba(0, 120, 215, 0.1);
+    border-bottom-style: solid;
+    border-bottom-color: #0078d7;
+}
 """
 
     # Write CSS file
@@ -81,6 +92,9 @@ a.fls-id:hover {
     os.makedirs(os.path.dirname(css_path), exist_ok=True)
     with open(css_path, "w") as f:
         f.write(css)
+
+    # Pattern to detect std refs in HTML (to know when to include CSS)
+    std_ref_pattern = r'<a[^>]*class="[^"]*std-ref[^"]*"'
 
     # Process all HTML files
     for root, _, files in os.walk(app.outdir):
@@ -93,23 +107,24 @@ a.fls-id:hover {
                     content = f.read()
 
                 # Replace FLS IDs with links
-                modified = re.sub(pattern, replace_fls, content)
+                modified = re.sub(fls_pattern, replace_fls, content)
+
+                # Check if we need to add CSS (if page has FLS IDs or std refs)
+                has_fls = modified != content
+                has_std_refs = re.search(std_ref_pattern, content) is not None
+                needs_css = has_fls or has_std_refs
 
                 # Add CSS link if needed
-                if (
-                    modified != content
-                    and '<link rel="stylesheet" href="_static/fls_links.css"'
-                    not in modified
-                ):
+                if needs_css and '<link rel="stylesheet" href="_static/fls_links.css"' not in modified:
                     # Fix path to CSS file based on file location relative to outdir
                     rel_path = os.path.relpath(app.outdir, os.path.dirname(filepath))
-                    css_path = os.path.join(
+                    css_path_rel = os.path.join(
                         rel_path, "_static", "fls_links.css"
                     ).replace("\\", "/")
 
                     modified = modified.replace(
                         "</head>",
-                        f'<link rel="stylesheet" href="{css_path}" type="text/css" />\n</head>',
+                        f'<link rel="stylesheet" href="{css_path_rel}" type="text/css" />\n</head>',
                     )
 
                 # Write modified content back
