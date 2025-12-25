@@ -13,7 +13,7 @@
     :scope: system
     :tags: security, performance, numerics
 
-    Eliminate `arithmetic overflow <https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow>`__ of both signed and unsigned integer types. 
+    Eliminate arithmetic overflow :cite:`gui_dCquvqE1csI3:FLS-ARITHMETIC-OVERFLOW` of both signed and unsigned integer types. 
     Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.
 
     This rule applies to the following primitive types:
@@ -37,8 +37,8 @@
 
         Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
         Arithmetic overflow will panic in debug mode, but wraparound in release mode, resulting in inconsistent behavior.
-        Use explicit `wrapping <https://doc.rust-lang.org/std/num/struct.Wrapping.html>`_ or
-        `saturating <https://doc.rust-lang.org/std/num/struct.Saturating.html>`_ semantics where these behaviors are intentional.
+        Use explicit :std:`std::num::Wrapping` or
+        :std:`std::num::Saturating` semantics where these behaviors are intentional.
         Range checking can be used to eliminate the possibility of arithmetic overflow.
 
     .. non_compliant_example::
@@ -64,9 +64,9 @@
         This compliant solution ensures that the addition operation cannot result in arithmetic overflow,
         based on the maximum range of a signed 32-bit integer.
         Functions such as 
-        `overflowing_add <https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_add>`_,
-        `overflowing_sub <https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_sub>`_, and 
-        `overflowing_mul <https://doc.rust-lang.org/stable/core/primitive.u32.html#method.overflowing_mul>`_
+        :std:`u32::overflowing_add`,
+        :std:`u32::overflowing_sub`, and 
+        :std:`u32::overflowing_mul`
         can also be used to detect overflow.
         Code that invoked these functions would typically further restrict the range of possible values,
         based on the anticipated range of the inputs.
@@ -179,10 +179,10 @@
         :id: compl_ex_BhUHiRB4kc4b
         :status: draft
 
-        Wrapping behavior call also be achieved using the ``Wrapping<T>`` type as in this compliant solution.
-        The ``Wrapping<T>`` type is a ``struct`` found in the ``std::num`` module that explicitly enables two's complement
+        Wrapping behavior call also be achieved using the :std:`std::num::Wrapping` type as in this compliant solution.
+        The :std:`std::num::Wrapping` type is a ``struct`` found in the ``core::num`` module that explicitly enables two's complement
         wrapping arithmetic for the inner type ``T`` (which must be an integer or ``usize/isize``). 
-        The ``Wrapping<T>`` type provides a consistent way to force wrapping behavior in all build modes,
+        The :std:`std::num::Wrapping` type provides a consistent way to force wrapping behavior in all build modes,
         which is useful in specific scenarios like implementing cryptography or hash functions where wrapping arithmetic is the intended behavior.
 
         .. rust-example::
@@ -245,9 +245,9 @@
         :id: compl_ex_BgUHiSB4kd4b
         :status: draft
 
-        ``Saturating<T>`` is a wrapper type in Rust's ``core`` library (``core::num::Saturating<T>``) that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
-        ``Saturating<T>`` is useful when you have a section of code or a data type where all arithmetic must be saturating.
-        This compliant solution uses the ``Saturating<T>`` type to define several functions that perform basic integer operations using saturation semantics.
+        :std:`std::num::Saturating` is a wrapper type in Rust's ``core`` library that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
+        :std:`std::num::Saturating` is useful when you have a section of code or a data type where all arithmetic must be saturating.
+        This compliant solution uses the :std:`std::num::Saturating` type to define several functions that perform basic integer operations using saturation semantics.
 
         .. rust-example::
 
@@ -320,3 +320,15 @@
             }
             #
             # fn main() {}
+
+    .. bibliography::
+        :id: bib_dCquvqE1csI3
+        :status: draft
+
+        .. list-table::
+           :header-rows: 0
+           :widths: auto
+           :class: bibliography-table
+
+           * - :bibentry:`gui_dCquvqE1csI3:FLS-ARITHMETIC-OVERFLOW`
+             - The Rust FLS. "Expressions - Arithmetic Overflow." https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow

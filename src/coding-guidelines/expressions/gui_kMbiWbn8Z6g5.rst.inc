@@ -14,14 +14,12 @@
    :tags: numerics, defect
 
    Integer division by zero results in a panic.
-   This includes both `division expressions
-   <https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression>`_ and `remainder expressions
-   <https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression>`_.
+   This includes both division expressions :cite:`gui_kMbiWbn8Z6g5:FLS-DIVISION-EXPR` and remainder expressions :cite:`gui_kMbiWbn8Z6g5:FLS-REMAINDER-EXPR`.
 
    Division and remainder expressions on signed integers are also susceptible to arithmetic overflow.
    Overflow is covered in full by the guideline `Ensure that integer operations do not result in arithmetic overflow`.
 
-   This rule applies to the following primitive integer types:
+   This rule applies to the following primitive integer types :cite:`gui_kMbiWbn8Z6g5:FLS-INTEGER-TYPES`:
 
     * ``i8``
     * ``i16``
@@ -36,8 +34,7 @@
     * ``usize``
     * ``isize``
 
-   This rule does not apply to evaluation of the :std:`core::ops::Div` trait on types other than `integer
-   types <https://rust-lang.github.io/fls/types-and-traits.html#integer-types>`_.
+   This rule does not apply to evaluation of the :std:`core::ops::Div` trait on types other than integer types :cite:`gui_kMbiWbn8Z6g5:FLS-INTEGER-TYPES`.
 
    This rule is a less strict version of `Do not use an integer type as a divisor during integer division`.
    All code that complies with that rule also complies with this rule.
@@ -91,3 +88,19 @@
                  0u32
              };
          }
+
+   .. bibliography::
+      :id: bib_kMbiWbn8Z6g5
+      :status: draft
+
+      .. list-table::
+         :header-rows: 0
+         :widths: auto
+         :class: bibliography-table
+
+         * - :bibentry:`gui_kMbiWbn8Z6g5:FLS-INTEGER-TYPES`
+           - The Rust FLS. "Types and Traits - Integer Types." https://rust-lang.github.io/fls/types-and-traits.html#integer-types
+         * - :bibentry:`gui_kMbiWbn8Z6g5:FLS-DIVISION-EXPR`
+           - The Rust FLS. "Expressions - Syntax - DivisionExpression." https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression
+         * - :bibentry:`gui_kMbiWbn8Z6g5:FLS-REMAINDER-EXPR`
+           - The Rust FLS. "Expressions - Syntax - RemainderExpression." https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression
