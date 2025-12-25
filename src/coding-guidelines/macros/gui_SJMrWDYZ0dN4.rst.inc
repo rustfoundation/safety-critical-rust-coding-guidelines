@@ -36,19 +36,21 @@
 
       .. rust-example::
 
+        #[macro_export]
+        macro_rules! my_vec {
+            ( $( $x:expr ),* ) => {
+                {
+                    let mut temp_vec = Vec::new(); // non-global path
+                    $(
+                        temp_vec.push($x);
+                    )*
+                    temp_vec
+                }
+            };
+        }
+
         fn main() {
-            #[macro_export]
-            macro_rules! vec {
-                ( $( $x:expr ),* ) => {
-                    {
-                        let mut temp_vec = Vec::new(); // non-global path
-                        $(
-                            temp_vec.push($x);
-                        )*
-                        temp_vec
-                    }
-                };
-            }
+            let _ = my_vec![1, 2, 3];
         }
 
    .. compliant_example::
@@ -61,17 +63,19 @@
 
       .. rust-example::
 
+        #[macro_export]
+        macro_rules! my_vec_global {
+            ( $( $x:expr ),* ) => {
+                {
+                    let mut temp_vec = ::std::vec::Vec::new(); // global path
+                    $(
+                        temp_vec.push($x);
+                    )*
+                    temp_vec
+                }
+            };
+        }
+
         fn main() {
-            #[macro_export]
-            macro_rules! vec {
-                ( $( $x:expr ),* ) => {
-                    {
-                        let mut temp_vec = ::std::vec::Vec::new(); // global path
-                        $(
-                            temp_vec.push($x);
-                        )*
-                        temp_vec
-                    }
-                };
-            }
+            let _ = my_vec_global![1, 2, 3];
         }

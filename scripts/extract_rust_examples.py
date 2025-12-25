@@ -13,6 +13,8 @@ This script:
 
 Supports both monolithic chapter files (*.rst) and per-guideline files (*.rst.inc).
 
+Configuration is loaded from src/rust_examples_config.toml for default values.
+
 Usage:
     # Extract examples and generate test crate
     uv run python scripts/extract_rust_examples.py --extract
@@ -31,7 +33,10 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
+import tomllib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -50,6 +55,222 @@ from rustdoc_utils import (
     process_hidden_lines,
     save_results_json,
 )
+
+
+def check_miri_available() -> Tuple[bool, str]:
+    """
+    Check if cargo miri is available.
+    
+    Returns:
+        (available, version_or_error)
+    """
+    try:
+        result = subprocess.run(
+            ['cargo', '+nightly', 'miri', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            return True, result.stdout.strip()
+        return False, result.stderr.strip() or "Miri not available"
+    except FileNotFoundError:
+        return False, "cargo not found"
+    except subprocess.TimeoutExpired:
+        return False, "timeout checking miri"
+    except Exception as e:
+        return False, str(e)
+
+
+def run_miri_on_example(
+    example,  # RustExample
+    timeout: int = 60
+) -> Tuple[bool, str, str]:
+    """
+    Run Miri on a single example.
+    
+    Args:
+        example: RustExample object with code and miri_mode
+        timeout: Timeout in seconds
+        
+    Returns:
+        (success, stdout, stderr) where success is based on miri_mode:
+        - check: success if no UB detected
+        - expect_ub: success if UB detected
+        - skip: returns (True, "", "skipped")
+    """
+    miri_mode = getattr(example, 'miri_mode', None)
+    
+    if miri_mode == 'skip' or miri_mode is None:
+        return True, "", "skipped"
+    
+    # Create a temporary crate
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir)
+        
+        # Create Cargo.toml
+        cargo_toml = tmppath / "Cargo.toml"
+        cargo_toml.write_text(f'''[package]
+name = "miri_test"
+version = "0.1.0"
+edition = "{example.edition}"
+
+[dependencies]
+''')
+        
+        # Create src directory and main.rs
+        src_dir = tmppath / "src"
+        src_dir.mkdir()
+        main_rs = src_dir / "main.rs"
+        main_rs.write_text(example.code)
+        
+        try:
+            # Run cargo miri
+            result = subprocess.run(
+                ['cargo', '+nightly', 'miri', 'run'],
+                cwd=tmppath,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env={**os.environ, 'MIRIFLAGS': '-Zmiri-disable-isolation'}
+            )
+            
+            stdout = result.stdout
+            stderr = result.stderr
+            
+            # Check for UB in output
+            has_ub = ('Undefined Behavior' in stderr or 
+                      'error: unsupported operation' in stderr or
+                      'error[' in stderr)
+            
+            if miri_mode == 'check':
+                success = not has_ub
+            elif miri_mode == 'expect_ub':
+                success = has_ub
+            else:
+                success = not has_ub  # Default to check mode
+            
+            return success, stdout, stderr
+            
+        except subprocess.TimeoutExpired:
+            return False, "", "Miri execution timed out"
+        except Exception as e:
+            return False, "", f"Miri execution error: {e}"
+
+
+class ConfigurationError(Exception):
+    """Raised when configuration cannot be loaded."""
+    pass
+
+
+class RustExamplesConfig:
+    """Configuration loaded from rust_examples_config.toml"""
+    
+    def __init__(self):
+        self.edition = None
+        self.channel = None
+        self.version = None
+        self.version_mismatch_threshold = None
+        # Miri settings
+        self.miri_require_for_unsafe = True
+        self.miri_timeout = 60
+        # Warning settings
+        self.fail_on_warnings = True
+        self.warn_mode_default = "error"  # Computed from fail_on_warnings
+    
+    @classmethod
+    def load(cls, config_path: Path) -> "RustExamplesConfig":
+        """
+        Load configuration from TOML file.
+        
+        Args:
+            config_path: Path to the TOML configuration file
+            
+        Returns:
+            RustExamplesConfig instance
+            
+        Raises:
+            ConfigurationError: If config file doesn't exist or is invalid
+        """
+        config = cls()
+        
+        if not config_path.exists():
+            raise ConfigurationError(
+                f"Rust examples config not found: {config_path}\n"
+                f"Please create this file with the required configuration.\n"
+                f"See src/rust_examples_config.toml for the expected format."
+            )
+        
+        try:
+            with open(config_path, "rb") as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            raise ConfigurationError(
+                f"Invalid TOML in config file {config_path}: {e}"
+            )
+        
+        defaults = data.get("defaults", {})
+        
+        # Validate required fields
+        required_fields = ["edition", "channel", "version"]
+        missing = [f for f in required_fields if f not in defaults]
+        if missing:
+            raise ConfigurationError(
+                f"Missing required fields in {config_path} [defaults] section: {', '.join(missing)}"
+            )
+        
+        config.edition = defaults["edition"]
+        config.channel = defaults["channel"]
+        config.version = defaults["version"]
+        
+        warnings = data.get("warnings", {})
+        config.version_mismatch_threshold = warnings.get("version_mismatch_threshold", 2)
+        config.fail_on_warnings = warnings.get("fail_on_warnings", True)
+        config.warn_mode_default = "error" if config.fail_on_warnings else "allow"
+        
+        # Miri settings
+        miri = data.get("miri", {})
+        config.miri_require_for_unsafe = miri.get("require_for_unsafe", True)
+        config.miri_timeout = miri.get("timeout", 60)
+        
+        return config
+    
+    @classmethod
+    def find_and_load(cls, search_paths: List[Path] = None) -> "RustExamplesConfig":
+        """
+        Find and load configuration from standard locations.
+        
+        Args:
+            search_paths: Additional paths to search (searched first)
+            
+        Returns:
+            RustExamplesConfig instance
+            
+        Raises:
+            ConfigurationError: If no config file found or config is invalid
+        """
+        candidates = []
+        
+        if search_paths:
+            candidates.extend(search_paths)
+        
+        # Standard locations
+        candidates.extend([
+            Path("src/rust_examples_config.toml"),
+            Path("rust_examples_config.toml"),
+            Path("config/rust_examples_config.toml"),
+        ])
+        
+        for candidate in candidates:
+            if candidate.exists():
+                return cls.load(candidate)
+        
+        searched = "\n  - ".join(str(p) for p in candidates)
+        raise ConfigurationError(
+            f"Rust examples config not found. Searched:\n  - {searched}\n\n"
+            f"Please create src/rust_examples_config.toml with the required configuration."
+        )
+
 
 # Patterns for parsing RST
 RUST_EXAMPLE_PATTERN = re.compile(
@@ -88,7 +309,7 @@ def parse_directive_options(content: str, start_pos: int, base_indent: str) -> T
     options = {}
     pos = start_pos
     lines = content[start_pos:].split('\n')
-    option_indent = base_indent + "    "
+    base_indent_len = len(base_indent)
     
     for line in lines:
         pos += len(line) + 1
@@ -96,26 +317,28 @@ def parse_directive_options(content: str, start_pos: int, base_indent: str) -> T
         if not line.strip():
             continue
         
-        # Check if this is an option line
-        if line.startswith(option_indent) and line.strip().startswith(':'):
-            # Parse option
-            match = re.match(r'\s*:(\w+):\s*(.*)', line)
+        stripped = line.lstrip()
+        current_indent = len(line) - len(stripped)
+        
+        # Check if this is an option line: indented more than directive and starts with :word:
+        # Be flexible about exact indentation to handle tabs, varying spaces, etc.
+        if current_indent > base_indent_len and stripped.startswith(':'):
+            # Parse option - must match :word: or :word: value pattern
+            match = re.match(r':(\w+):\s*(.*)', stripped)
             if match:
                 opt_name = match.group(1)
                 opt_value = match.group(2).strip()
                 options[opt_name] = opt_value
-            continue
+                continue
         
         # Check if we've moved past options (content starts)
-        stripped = line.lstrip()
-        current_indent = len(line) - len(stripped)
-        
-        if current_indent >= len(option_indent) and not stripped.startswith(':'):
+        # Content is indented more than directive and doesn't start with :
+        if current_indent > base_indent_len and not stripped.startswith(':'):
             # This is content, not an option
             pos -= len(line) + 1  # Back up
             break
-        elif current_indent < len(option_indent):
-            # Dedented past directive
+        elif current_indent <= base_indent_len:
+            # Dedented to or past directive level
             pos -= len(line) + 1
             break
     
@@ -213,7 +436,10 @@ def find_parent_context(content: str, pos: int) -> Tuple[Optional[str], Optional
     return parent_type, parent_id, guideline_id
 
 
-def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
+def extract_rust_examples_from_file(
+    file_path: Path,
+    config: RustExamplesConfig
+) -> List[RustExample]:
     """
     Extract all Rust examples from an RST file.
     
@@ -223,6 +449,7 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
     
     Args:
         file_path: Path to the RST file (supports .rst and .rst.inc)
+        config: Configuration with default values
         
     Returns:
         List of RustExample objects
@@ -260,10 +487,34 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
         elif 'no_run' in options:
             attr = 'no_run'
         
-        # Parse version/edition requirements
-        min_version = options.get('version') or options.get('min-version')
-        channel = options.get('channel', 'stable')
-        edition = options.get('edition', '2021')
+        # Parse miri option
+        miri_mode = None
+        if 'miri' in options:
+            miri_value = options.get('miri', '').strip()
+            if miri_value == '' or miri_value is None:
+                miri_mode = 'check'
+            elif miri_value == 'expect_ub':
+                miri_mode = 'expect_ub'
+            elif miri_value == 'skip':
+                miri_mode = 'skip'
+            else:
+                miri_mode = 'check'  # Default for unknown values
+        
+        # Parse warn option
+        warn_mode = config.warn_mode_default  # Use config default
+        if 'warn' in options:
+            warn_value = options.get('warn', '').strip().lower()
+            if warn_value == 'allow':
+                warn_mode = 'allow'
+            else:
+                warn_mode = 'error'  # Default to error for :warn: or :warn: error
+        
+        # Parse version/edition requirements with config defaults
+        # Note: min_version should only be set if explicitly specified in the example
+        # config.version is the reference toolchain version, not a requirement for all examples
+        min_version = options.get('version') or options.get('min-version') or None
+        channel = options.get('channel', config.channel)
+        edition = options.get('edition', config.edition)
         
         # Find parent context
         parent_type, parent_id, guideline_id = find_parent_context(content, start)
@@ -282,6 +533,8 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
             parent_directive=parent_type or '',
             parent_id=parent_id or '',
             guideline_id=guideline_id or '',
+            miri_mode=miri_mode,
+            warn_mode=warn_mode,
         )
         
         examples.append(example)
@@ -318,9 +571,14 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
             line_number=line_number,
             code=code,
             display_code=code,
+            # Legacy examples have no version requirement (None means works on any version)
+            min_version=None,
+            channel=config.channel,
+            edition=config.edition,
             parent_directive=parent_type or '',
             parent_id=parent_id or '',
             guideline_id=guideline_id or '',
+            warn_mode=config.warn_mode_default,
         )
         
         examples.append(example)
@@ -347,12 +605,17 @@ def find_rst_files(src_dir: Path) -> List[Path]:
     return rst_files + rst_inc_files
 
 
-def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[RustExample]:
+def extract_all_examples(
+    src_dirs: List[Path],
+    config: RustExamplesConfig,
+    quiet: bool = False
+) -> List[RustExample]:
     """
     Extract all Rust examples from all RST files in the given directories.
     
     Args:
         src_dirs: List of directories to scan
+        config: Configuration with default values
         quiet: If True, suppress progress output
         
     Returns:
@@ -391,7 +654,7 @@ def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[Rust
             
             # Extract examples from each file
             for file_path in sorted(chapter_files):
-                file_examples = extract_rust_examples_from_file(file_path)
+                file_examples = extract_rust_examples_from_file(file_path, config)
                 if file_examples:
                     file_results.append((file_path, file_examples))
                     examples.extend(file_examples)
@@ -405,13 +668,16 @@ def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[Rust
     
     if not quiet:
         print(f"\n📊 Total: {len(examples)} examples found", file=sys.stderr)
+        print(f"   Using defaults: edition={config.edition}, channel={config.channel}, version={config.version}", file=sys.stderr)
     
     return examples
 
 
 def test_examples_individually(
     examples: List[RustExample],
-    prelude: str = ""
+    prelude: str = "",
+    run_miri: bool = True,
+    miri_timeout: int = 60
 ) -> List[TestResult]:
     """
     Test each example individually.
@@ -419,6 +685,8 @@ def test_examples_individually(
     Args:
         examples: List of examples to test
         prelude: Optional prelude code
+        run_miri: Whether to run Miri tests
+        miri_timeout: Timeout for Miri execution in seconds
         
     Returns:
         List of TestResult objects
@@ -431,6 +699,28 @@ def test_examples_individually(
         print(f"\n🦀 Detected Rust {current_version} ({current_channel})")
     else:
         print("\n⚠️  Could not detect Rust version")
+    
+    # Check for Miri examples
+    miri_examples = [e for e in examples if getattr(e, 'miri_mode', None) in ('check', 'expect_ub')]
+    miri_available = False
+    
+    if miri_examples and run_miri:
+        miri_available, miri_info = check_miri_available()
+        if miri_available:
+            print(f"🔬 Miri available: {miri_info}")
+            print(f"   {len(miri_examples)} examples will be tested with Miri")
+        else:
+            print(f"\n⚠️  Miri not available: {miri_info}")
+            print(f"   {len(miri_examples)} examples have :miri: option but will be skipped")
+            print("")
+            print("   To install Miri:")
+            print("      rustup +nightly component add miri")
+            print("      rustup run nightly cargo miri setup")
+            print("")
+            print("   Or use --no-miri to skip Miri tests without this warning")
+            run_miri = False
+    elif miri_examples and not run_miri:
+        print(f"⏭️  Skipping Miri tests for {len(miri_examples)} examples (--no-miri)")
     
     print(f"\n🧪 Testing {len(examples)} examples...")
     
@@ -451,6 +741,46 @@ def test_examples_individually(
         else:
             status = "❌"
         print(f"   [{i+1}/{len(examples)}] {status} {example.source_file}:{example.line_number}")
+    
+    # Run Miri tests if enabled
+    if run_miri and miri_examples:
+        print(f"\n🔬 Running Miri on {len(miri_examples)} examples...")
+        
+        miri_results = []
+        for i, example in enumerate(miri_examples):
+            miri_mode = getattr(example, 'miri_mode', 'check')
+            success, stdout, stderr = run_miri_on_example(example, timeout=miri_timeout)
+            
+            # Determine status
+            if success:
+                if miri_mode == 'expect_ub':
+                    status = "☣️"  # Expected UB found
+                    msg = "UB detected as expected"
+                else:
+                    status = "🔬"  # No UB (good)
+                    msg = "No UB detected"
+            else:
+                if miri_mode == 'expect_ub':
+                    status = "❌"  # Expected UB but not found
+                    msg = "Expected UB not found"
+                else:
+                    status = "☣️"  # UB found (bad)
+                    msg = "UB detected!"
+            
+            print(f"   [{i+1}/{len(miri_examples)}] {status} {example.source_file}:{example.line_number} - {msg}")
+            
+            miri_results.append({
+                'example': example,
+                'success': success,
+                'miri_mode': miri_mode,
+                'stdout': stdout,
+                'stderr': stderr,
+            })
+        
+        # Summary
+        miri_passed = sum(1 for r in miri_results if r['success'])
+        miri_failed = len(miri_results) - miri_passed
+        print(f"\n🔬 Miri: {miri_passed} passed, {miri_failed} failed")
     
     return results
 
@@ -628,6 +958,12 @@ def main():
         help="Output directory for generated test crate"
     )
     parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to rust_examples_config.toml (default: searches standard locations)"
+    )
+    parser.add_argument(
         "--prelude",
         type=str,
         default=None,
@@ -675,11 +1011,42 @@ def main():
         help="Only test examples with no special requirements (default channel/version)"
     )
     
+    # Miri options
+    miri_group = parser.add_mutually_exclusive_group()
+    miri_group.add_argument(
+        "--miri",
+        action="store_true",
+        dest="run_miri",
+        default=True,
+        help="Run Miri tests on examples with :miri: option (default)"
+    )
+    miri_group.add_argument(
+        "--no-miri",
+        action="store_false",
+        dest="run_miri",
+        help="Skip Miri tests even for examples with :miri: option"
+    )
+    
     args = parser.parse_args()
     
     # Validate arguments
     if not any([args.extract, args.test, args.test_only, args.list, args.list_requirements]):
         parser.print_help()
+        sys.exit(1)
+    
+    # Load configuration
+    try:
+        if args.config:
+            config = RustExamplesConfig.load(Path(args.config))
+        else:
+            config = RustExamplesConfig.find_and_load()
+        
+        if args.verbose:
+            print(f"📋 Loaded config: edition={config.edition}, channel={config.channel}, version={config.version}", file=sys.stderr)
+            print(f"   warnings: fail_on_warnings={config.fail_on_warnings}", file=sys.stderr)
+            print(f"   miri: require_for_unsafe={config.miri_require_for_unsafe}, timeout={config.miri_timeout}", file=sys.stderr)
+    except ConfigurationError as e:
+        print(f"❌ Configuration error: {e}", file=sys.stderr)
         sys.exit(1)
     
     # Handle source directories - default to src/coding-guidelines if none specified
@@ -707,7 +1074,7 @@ def main():
     if args.list or args.extract or args.test or args.list_requirements:
         # Use quiet mode for list-requirements to get clean JSON output
         quiet = args.list_requirements
-        examples = extract_all_examples(validated_src_dirs, quiet=quiet)
+        examples = extract_all_examples(validated_src_dirs, config, quiet=quiet)
         
         # Handle --list-requirements
         if args.list_requirements:
@@ -723,6 +1090,7 @@ def main():
                 if args.verbose:
                     print(f"      Parent: {example.parent_directive} ({example.parent_id})")
                     print(f"      Guideline: {example.guideline_id}")
+                    print(f"      Edition: {example.edition}, Channel: {example.channel}, Version: {example.min_version}")
             sys.exit(0)
         
         # Apply filters if specified
@@ -758,7 +1126,12 @@ def main():
         
         if args.test:
             # Run tests
-            results = test_examples_individually(examples, prelude)
+            results = test_examples_individually(
+                examples, 
+                prelude, 
+                run_miri=args.run_miri,
+                miri_timeout=config.miri_timeout
+            )
             
             # Print results
             print(format_test_results(results))
@@ -785,7 +1158,12 @@ def main():
             examples = [RustExample.from_dict(e) for e in json.load(f)]
         
         # Run tests
-        results = test_examples_individually(examples, prelude)
+        results = test_examples_individually(
+            examples, 
+            prelude, 
+            run_miri=args.run_miri,
+            miri_timeout=config.miri_timeout
+        )
         
         # Print results
         print(format_test_results(results))

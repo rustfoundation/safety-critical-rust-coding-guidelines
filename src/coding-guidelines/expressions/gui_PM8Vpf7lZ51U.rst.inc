@@ -43,7 +43,9 @@
       is non-compliant:
 
       .. rust-example::
+        :miri:
 
+        #[allow(dead_code)]
         fn f1(x: u16, y: i32, z: u64, w: usize) {
           let _p1 = x as * const u32;  // not compliant
           let _p2 = y as * const u32;  // not compliant
@@ -57,7 +59,9 @@
             // let p5: * const u32 = std::mem::transmute(x);  // not valid
             // let p6: * const u32 = std::mem::transmute(y);  // not valid
 
+            #[allow(integer_to_ptr_transmutes)]
             let _p7: * const u32 = std::mem::transmute(z); // not compliant
+            #[allow(integer_to_ptr_transmutes)]
             let _p8: * const u32 = std::mem::transmute(w); // not compliant
 
             let _p9: * const u32 = std::mem::transmute(_f); // not compliant, and very strange

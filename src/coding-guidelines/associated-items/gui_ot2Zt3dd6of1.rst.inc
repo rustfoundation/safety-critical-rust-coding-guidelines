@@ -30,12 +30,14 @@
         .. rust-example::
 
             // Recursive enum to represent a string or a list of `MyEnum`
+            #[allow(dead_code)]
             enum MyEnum {
                 Str(String),
                 List(Vec<MyEnum>),
             }
 
             // Concatenates strings from a nested structure of `MyEnum` using recursion.
+            #[allow(dead_code)]
             fn concat_strings(input: &[MyEnum]) -> String {
                 let mut result = String::new();
                 for item in input {
@@ -58,6 +60,7 @@
         .. rust-example::
 
             // Recursive enum to represent a string or a list of `MyEnum`
+            #[allow(dead_code)]
             enum MyEnum {
                 Str(String),
                 List(Vec<MyEnum>),
@@ -65,6 +68,7 @@
 
             /// Concatenates strings from a nested structure of `MyEnum` without using recursion.
             /// Returns an error if the stack size exceeds `MAX_STACK_SIZE`.
+            #[allow(dead_code)]
             fn concat_strings_non_recursive(input: &[MyEnum]) -> Result<String, &'static str> {
                 const MAX_STACK_SIZE: usize = 1000;
                 let mut result = String::new();

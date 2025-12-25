@@ -33,18 +33,22 @@
       The following code leaves it up to type inference to figure out the concrete types of the raw pointer casts, allowing changes to ``with_base``'s function signature to affect the types the function body of ``non_compliant_example`` without incurring a compiler error.
 
       .. rust-example::
+         :miri:
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Base {
             position: (u32, u32)
          }
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Extended {
             base: Base,
             scale: f32
          }
 
+         #[allow(dead_code)]
          fn non_compliant_example(extended: &Extended) {
             let extended = extended as *const _;
             with_base(unsafe { &*(extended as *const _) })
@@ -61,18 +65,22 @@
       We specify the concrete target types for our pointer casts resulting in a compilation error if the function signature of ``with_base`` is changed.
 
       .. rust-example::
+         :miri:
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Base {
             position: (u32, u32)
          }
 
          #[repr(C)]
+         #[allow(dead_code)]
          struct Extended {
             base: Base,
             scale: f32
          }
 
+         #[allow(dead_code)]
          fn compliant_example(extended: &Extended) {
             let extended = extended as *const Extended;
             with_base(unsafe { &*(extended as *const Base) })

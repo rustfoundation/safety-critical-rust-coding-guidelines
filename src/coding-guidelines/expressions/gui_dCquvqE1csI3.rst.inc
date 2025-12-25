@@ -49,6 +49,7 @@
 
         .. rust-example::
 
+            #[allow(dead_code)]
             fn add(si_a: i32, si_b: i32) {
               let _sum: i32 = si_a + si_b;
               // ...
@@ -73,9 +74,11 @@
         .. rust-example::
 
             # #[derive(Debug)]
-            # enum ArithmeticError { Overflow, DivisionByZero }
+            #[allow(dead_code)]
+            enum ArithmeticError { Overflow, DivisionByZero }
             use std::i32::{MAX as INT_MAX, MIN as INT_MIN};
 
+            #[allow(dead_code)]
             fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 if (si_b > 0 && si_a > INT_MAX - si_b)
                     || (si_b < 0 && si_a < INT_MIN - si_b)
@@ -86,6 +89,7 @@
                 }
             }
 
+            #[allow(dead_code)]
             fn sub(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 if (si_b < 0 && si_a > INT_MAX + si_b)
                     || (si_b > 0 && si_a < INT_MIN + si_b)
@@ -96,6 +100,7 @@
                 }
             }
 
+            #[allow(dead_code)]
             fn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 if si_a == 0 || si_b == 0 {
                     return Ok(0);
@@ -125,15 +130,20 @@
         .. rust-example::
 
             # #[derive(Debug)]
-            # enum ArithmeticError { Overflow, DivisionByZero }
+            #[allow(dead_code)]
+            enum ArithmeticError { Overflow, DivisionByZero }
+
+            #[allow(dead_code)]
             fn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {
                 si_a.checked_add(si_b).ok_or(ArithmeticError::Overflow)
             }
 
+            #[allow(dead_code)]
             fn sub(a: i32, b: i32) -> Result<i32, ArithmeticError> {
                 a.checked_sub(b).ok_or(ArithmeticError::Overflow)
             }
 
+            #[allow(dead_code)]
             fn mul(a: i32, b: i32) -> Result<i32, ArithmeticError> {
                 a.checked_mul(b).ok_or(ArithmeticError::Overflow)
             }
@@ -148,14 +158,17 @@
 
         .. rust-example::
 
+            #[allow(dead_code)]
             fn add(a: i32, b: i32) -> i32 {
                 a.wrapping_add(b)
             }
 
+            #[allow(dead_code)]
             fn sub(a: i32, b: i32) -> i32 {
                 a.wrapping_sub(b)
             }
 
+            #[allow(dead_code)]
             fn mul(a: i32, b: i32) -> i32 {
                 a.wrapping_mul(b)
             }
@@ -180,10 +193,12 @@
                 si_a + si_b
             }
 
+            #[allow(dead_code)]
             fn sub(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {
                 si_a - si_b
             }
 
+            #[allow(dead_code)]
             fn mul(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {
                 si_a * si_b
             }
@@ -209,14 +224,17 @@
 
         .. rust-example::
 
+            #[allow(dead_code)]
             fn add(a: i32, b: i32) -> i32 {
                 a.saturating_add(b)
             }
 
+            #[allow(dead_code)]
             fn sub(a: i32, b: i32) -> i32 {
                 a.saturating_sub(b)
             }
 
+            #[allow(dead_code)]
             fn mul(a: i32, b: i32) -> i32 {
                 a.saturating_mul(b)
             }
@@ -239,10 +257,12 @@
                 si_a + si_b
             }
 
+            #[allow(dead_code)]
             fn sub(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {
                 si_a - si_b
             }
 
+            #[allow(dead_code)]
             fn mul(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {
                 si_a * si_b
             }
@@ -262,7 +282,10 @@
         .. rust-example::
 
             # #[derive(Debug)]
-            # enum DivError { DivisionByZero, Overflow }
+            #[allow(dead_code)]
+            enum DivError { DivisionByZero, Overflow }
+
+            #[allow(dead_code)]
             fn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {
                 if s_b == 0 {
                     Err(DivError::DivisionByZero)
@@ -282,7 +305,10 @@
         .. rust-example::
 
             # #[derive(Debug)]
-            # enum DivError { DivisionByZero, Overflow }
+            #[allow(dead_code)]
+            enum DivError { DivisionByZero, Overflow }
+
+            #[allow(dead_code)]
             fn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {
                 if s_b == 0 {
                     Err(DivError::DivisionByZero)

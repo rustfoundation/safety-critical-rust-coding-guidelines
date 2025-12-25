@@ -129,5 +129,5 @@
               let d = Meters(100);
               let t = Seconds(10);
               let result = d / t;  // Clean and type-safe!
-              println!("{:?}", result);  // MetersPerSecond(10)
+              println!("Speed: {} m/s", result.0);  // Access the inner value
           }

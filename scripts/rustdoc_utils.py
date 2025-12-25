@@ -15,7 +15,7 @@ import json
 import re
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -64,6 +64,12 @@ class RustExample:
     parent_id: str = ""
     guideline_id: str = ""
     
+    # Miri (UB detection)
+    miri_mode: Optional[str] = None  # None, "check", "expect_ub", "skip"
+    
+    # Warning handling
+    warn_mode: str = "error"  # "error" (fail on warnings) or "allow"
+    
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -80,6 +86,8 @@ class RustExample:
             'parent_directive': self.parent_directive,
             'parent_id': self.parent_id,
             'guideline_id': self.guideline_id,
+            'miri_mode': self.miri_mode,
+            'warn_mode': self.warn_mode,
         }
     
     @classmethod
@@ -99,6 +107,8 @@ class RustExample:
             parent_directive=data.get('parent_directive', ''),
             parent_id=data.get('parent_id', ''),
             guideline_id=data.get('guideline_id', ''),
+            miri_mode=data.get('miri_mode'),
+            warn_mode=data.get('warn_mode', 'error'),
         )
 
 
@@ -113,6 +123,7 @@ class TestResult:
     skip_reason: str = ""
     error_message: str = ""
     compiler_output: str = ""
+    warnings: List[str] = field(default_factory=list)
     
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization."""
@@ -124,6 +135,7 @@ class TestResult:
             'skip_reason': self.skip_reason,
             'error_message': self.error_message,
             'compiler_output': self.compiler_output,
+            'warnings': self.warnings,
         }
 
 
@@ -630,6 +642,13 @@ def compile_single_example(
             compiled_successfully = result.returncode == 0
             compiler_output = result.stderr
             
+            # Check for warnings
+            warnings = []
+            if 'warning:' in compiler_output or 'warning[' in compiler_output:
+                for line in compiler_output.split('\n'):
+                    if 'warning:' in line or 'warning[' in line:
+                        warnings.append(line)
+            
             if should_fail:
                 # Expected to fail
                 if compiled_successfully:
@@ -639,6 +658,7 @@ def compile_single_example(
                         expected_to_fail=True,
                         error_message="Expected compilation to fail, but it succeeded",
                         compiler_output=compiler_output,
+                        warnings=warnings,
                     )
                 else:
                     # Check error code if specified
@@ -649,6 +669,7 @@ def compile_single_example(
                                 passed=True,
                                 expected_to_fail=True,
                                 compiler_output=compiler_output,
+                                warnings=warnings,
                             )
                         else:
                             return TestResult(
@@ -657,6 +678,7 @@ def compile_single_example(
                                 expected_to_fail=True,
                                 error_message=f"Expected error {example.attr_value} not found in output",
                                 compiler_output=compiler_output,
+                                warnings=warnings,
                             )
                     else:
                         return TestResult(
@@ -664,14 +686,26 @@ def compile_single_example(
                             passed=True,
                             expected_to_fail=True,
                             compiler_output=compiler_output,
+                            warnings=warnings,
                         )
             else:
                 # Expected to compile
                 if compiled_successfully:
+                    # Check warn_mode - if "error" and there are warnings, fail
+                    if example.warn_mode == "error" and warnings:
+                        return TestResult(
+                            example=example,
+                            passed=False,
+                            expected_to_fail=False,
+                            error_message="Compilation succeeded but produced warnings",
+                            compiler_output=compiler_output,
+                            warnings=warnings,
+                        )
                     return TestResult(
                         example=example,
                         passed=True,
                         expected_to_fail=False,
+                        warnings=warnings,
                     )
                 else:
                     return TestResult(
@@ -680,6 +714,7 @@ def compile_single_example(
                         expected_to_fail=False,
                         error_message="Compilation failed unexpectedly",
                         compiler_output=compiler_output,
+                        warnings=warnings,
                     )
                     
         except subprocess.TimeoutExpired:
@@ -712,12 +747,15 @@ def format_test_results(results: List[TestResult]) -> str:
     passed = sum(1 for r in results if r.passed and not r.skipped)
     skipped = sum(1 for r in results if r.skipped)
     failed = sum(1 for r in results if not r.passed)
+    with_warnings = sum(1 for r in results if r.warnings and r.passed)
     
     lines.append(f"{'='*60}")
     if skipped:
         lines.append(f"Test Results: {passed} passed, {failed} failed, {skipped} skipped")
     else:
         lines.append(f"Test Results: {passed} passed, {failed} failed")
+    if with_warnings:
+        lines.append(f"             ({with_warnings} passed with warnings)")
     lines.append(f"{'='*60}")
     
     # Show failures first
@@ -759,12 +797,14 @@ def save_results_json(results: List[TestResult], output_path: Path):
     passed = sum(1 for r in results if r.passed and not r.skipped)
     skipped = sum(1 for r in results if r.skipped)
     failed = sum(1 for r in results if not r.passed)
+    with_warnings = sum(1 for r in results if r.warnings and r.passed)
     
     data = {
         'total': len(results),
         'passed': passed,
         'failed': failed,
         'skipped': skipped,
+        'with_warnings': with_warnings,
         'results': [r.to_dict() for r in results],
     }
     

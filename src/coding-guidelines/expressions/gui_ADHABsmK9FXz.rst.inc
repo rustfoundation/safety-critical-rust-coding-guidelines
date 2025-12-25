@@ -56,7 +56,8 @@
 
       .. rust-example::
 
-         fn f1(x: u16, y: i32, z: u64, w: u8) {
+         #[allow(dead_code)]
+         fn f1(x: u16, y: i32, _z: u64, w: u8) {
            let _a = w as char;           // non-compliant
            let _b = y as u32;            // non-compliant - changes value range, converting negative values
            let _c = x as i64;            // non-compliant - could use .into()
@@ -92,9 +93,11 @@
       Other forms of conversion may find ``transmute`` better communicates their intent.
 
       .. rust-example::
+         :miri:
 
          use std::convert::TryInto;
 
+         #[allow(dead_code)]
          fn f2(x: u16, y: i32, _z: u64, w: u8) {
            let _a: char            = w.into();
            let _b: Result <u32, _> = y.try_into(); // produce an error on range clip
@@ -115,7 +118,9 @@
              let _a3: u64   = std::mem::transmute(p1);  // OK, size is checked
              // let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes
 
+             #[allow(integer_to_ptr_transmutes)]
              let _p2: * const u32 = std::mem::transmute(a1); // OK
+             #[allow(integer_to_ptr_transmutes)]
              let _p3: * const u32 = std::mem::transmute(a1); // OK
            }
 
@@ -123,6 +128,7 @@
              // does something entirely different,
              // reinterpreting the bits of z as the IEEE bit pattern of a double
              // precision object, rather than converting the integer value
+             #[allow(unnecessary_transmutes)]
              let _f1: f64 = std::mem::transmute(_z);
            }
          }
