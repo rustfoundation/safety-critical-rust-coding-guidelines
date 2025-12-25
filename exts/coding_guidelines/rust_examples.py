@@ -41,7 +41,7 @@ from sphinx.application import Sphinx
 from sphinx.errors import SphinxError
 from sphinx.util import logging
 
-from .common import bar_format, get_tqdm
+from .common import bar_format, get_tqdm, sanitize_directive_content
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,13 @@ MIRI_INCOMPATIBLE_OPTIONS = {"ignore", "compile_fail", "no_run"}
 
 # Warn mode values
 WARN_MODES = {"error", "allow"}  # error = fail on warnings (default), allow = permit warnings
+
+# Known directive options for rust-example (used for validation in sanitization)
+KNOWN_DIRECTIVE_OPTIONS = {
+    "ignore", "compile_fail", "should_panic", "no_run",
+    "miri", "warn", "edition", "channel", "version",
+    "show_hidden", "name"
+}
 
 
 class RustExamplesConfig:
@@ -479,12 +486,53 @@ class RustExampleDirective(Directive):
                 config = RustExamplesConfig()
             env.rust_examples_config = config
         
+        # Get source location early (needed for error messages)
+        source, line = self.state_machine.get_source_and_line(self.lineno)
+        
+        # Parse the code content
+        raw_code = '\n'.join(self.content)
+        
+        # Sanitize content - detect and extract misplaced directive options
+        # This handles RST indentation issues where Sphinx puts options into content
+        raw_code, extracted_options, raw_option_lines = sanitize_directive_content(raw_code)
+        
+        if extracted_options:
+            # Log a detailed warning about the indentation issue
+            opt_names = list(extracted_options.keys())
+            
+            # Build informative message with context
+            warning_parts = [
+                f"{source}:{line}: Found directive options in code content "
+                f"(RST indentation issue): {opt_names}.",
+                "These options were extracted and will be applied, but please fix the source file.",
+                "The code content should be indented at least as much as the options."
+            ]
+            
+            # Add specific context for version-related options
+            if 'version' in extracted_options:
+                extracted_version = extracted_options['version']
+                warning_parts.append(
+                    f"Note: Extracted :version: {extracted_version} "
+                    f"(config default: {config.version}, "
+                    f"mismatch threshold: {config.version_mismatch_threshold} minor versions)"
+                )
+            
+            logger.warning(" ".join(warning_parts))
+            
+            # Merge extracted options into self.options
+            # Sphinx-parsed options take precedence (they were properly formatted)
+            for opt_name, opt_value in extracted_options.items():
+                if opt_name not in self.options:
+                    # Handle flag-style options (empty value means flag is set)
+                    if opt_name in ('ignore', 'no_run', 'show_hidden') and opt_value == '':
+                        self.options[opt_name] = None  # Flag style
+                    else:
+                        self.options[opt_name] = opt_value
+        
         # Get configuration for showing hidden lines
         show_hidden_global = getattr(env.config, 'rust_examples_show_hidden', False)
         show_hidden = 'show_hidden' in self.options or show_hidden_global
         
-        # Parse the code content
-        raw_code = '\n'.join(self.content)
         display_code, full_code, hidden_line_numbers = process_hidden_lines(raw_code, show_hidden)
         
         # Determine rustdoc attribute
@@ -508,9 +556,6 @@ class RustExampleDirective(Directive):
         miri_mode = None
         miri_pattern = None
         has_miri_option = 'miri' in self.options
-        
-        # Store source location (needed for error messages)
-        source, line = self.state_machine.get_source_and_line(self.lineno)
         
         if has_miri_option:
             miri_mode, miri_pattern = parse_miri_option(self.options.get('miri', ''))
