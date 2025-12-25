@@ -187,8 +187,8 @@ def highlight_code_with_hidden_lines(full_code: str, hidden_line_numbers: List[i
     result_lines = []
     for i, line in enumerate(lines):
         if i in hidden_set:
-            # Wrap the entire line content in a span, and prepend the # marker
-            result_lines.append(f'<span class="rust-hidden-line"># {line}</span>')
+            # Wrap the entire line content in a span (no # prefix - just visual styling)
+            result_lines.append(f'<span class="rust-hidden-line">{line}</span>')
         else:
             result_lines.append(line)
     
