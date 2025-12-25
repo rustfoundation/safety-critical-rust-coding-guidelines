@@ -710,12 +710,12 @@ def test_examples_individually(
         else:
             print(f"\n⚠️  Miri not available: {miri_info}")
             print(f"   {len(miri_examples)} examples have :miri: option but will be skipped")
-            print(f"")
-            print(f"   To install Miri:")
-            print(f"      rustup +nightly component add miri")
-            print(f"      rustup run nightly cargo miri setup")
-            print(f"")
-            print(f"   Or use --no-miri to skip Miri tests without this warning")
+            print("")
+            print("   To install Miri:")
+            print("      rustup +nightly component add miri")
+            print("      rustup run nightly cargo miri setup")
+            print("")
+            print("   Or use --no-miri to skip Miri tests without this warning")
             run_miri = False
     elif miri_examples and not run_miri:
         print(f"⏭️  Skipping Miri tests for {len(miri_examples)} examples (--no-miri)")

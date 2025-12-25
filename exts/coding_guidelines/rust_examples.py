@@ -35,8 +35,8 @@ from typing import List, Optional, Tuple
 from docutils import nodes
 from docutils.parsers.rst import Directive, directives
 from pygments import highlight
-from pygments.lexers import RustLexer
 from pygments.formatters import HtmlFormatter
+from pygments.lexers import RustLexer
 from sphinx.application import Sphinx
 from sphinx.errors import SphinxError
 from sphinx.util import logging
@@ -574,9 +574,6 @@ class RustExampleDirective(Directive):
         has_hidden_lines = len(hidden_line_numbers) > 0
         version_mismatch = version_diff(version, config.version) >= config.version_mismatch_threshold
         show_channel_badge = channel == "nightly"
-        
-        # Determine if Miri button should be shown (miri set and not skip)
-        show_miri_button = miri_mode is not None and miri_mode != "skip"
         
         # Build JSON data for JavaScript
         js_data = {
