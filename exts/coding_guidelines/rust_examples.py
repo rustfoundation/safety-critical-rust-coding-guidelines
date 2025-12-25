@@ -1067,11 +1067,11 @@ def get_js_content() -> str:
     const PLAYGROUND_URL = 'https://play.rust-lang.org/execute';
     const PLAYGROUND_MIRI_URL = 'https://play.rust-lang.org/miri';
     
-    // SVG icons (Font Awesome Free 6.2.0)
+    // SVG icons (Font Awesome Free 6.x)
     const ICON_COPY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448H256V416h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>';
     const ICON_PLAY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg>';
     const ICON_EYE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg>';
-    const ICON_MIRI = '🔬';  // Microscope emoji for Miri
+    const ICON_MIRI = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><!--!Font Awesome Free v7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M240 64C213.5 64 192 85.5 192 112L192 320C192 346.5 213.5 368 240 368L304 368C330.5 368 352 346.5 352 320L352 256L384 256C454.7 256 512 313.3 512 384C512 454.7 454.7 512 384 512L96 512C78.3 512 64 526.3 64 544C64 561.7 78.3 576 96 576L544 576C561.7 576 576 561.7 576 544C576 526.3 561.7 512 544 512L527.1 512C557.5 478 576 433.2 576 384C576 278 490 192 384 192L352 192L352 112C352 85.5 330.5 64 304 64L240 64zM184 416C170.7 416 160 426.7 160 440C160 453.3 170.7 464 184 464L360 464C373.3 464 384 453.3 384 440C384 426.7 373.3 416 360 416L184 416z"/></svg>';
     
     document.addEventListener('DOMContentLoaded', initializeRustExamples);
     
