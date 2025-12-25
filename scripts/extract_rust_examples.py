@@ -510,7 +510,9 @@ def extract_rust_examples_from_file(
                 warn_mode = 'error'  # Default to error for :warn: or :warn: error
         
         # Parse version/edition requirements with config defaults
-        min_version = options.get('version') or options.get('min-version') or config.version
+        # Note: min_version should only be set if explicitly specified in the example
+        # config.version is the reference toolchain version, not a requirement for all examples
+        min_version = options.get('version') or options.get('min-version') or None
         channel = options.get('channel', config.channel)
         edition = options.get('edition', config.edition)
         
@@ -569,8 +571,8 @@ def extract_rust_examples_from_file(
             line_number=line_number,
             code=code,
             display_code=code,
-            # Use config defaults for legacy examples
-            min_version=config.version,
+            # Legacy examples have no version requirement (None means works on any version)
+            min_version=None,
             channel=config.channel,
             edition=config.edition,
             parent_directive=parent_type or '',
