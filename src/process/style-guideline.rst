@@ -944,7 +944,7 @@ significantly from the configured default.
 Hidden Lines
 ============
 
-Lines prefixed with ``# `` (hash-space) are hidden by default but included
+Lines prefixed with ``#`` followed by a space are hidden by default but included
 when compiling and running the code. This allows showing only the relevant
 parts of an example while maintaining compilability.
 
