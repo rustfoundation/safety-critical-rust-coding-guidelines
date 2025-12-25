@@ -1,34 +1,6 @@
 {
   "documents": [
     {
-      "title": "Types and Traits",
-      "link": "coding-guidelines/types-and-traits/index.html",
-      "guidelines": [
-        {
-          "id": "gui_xztNdXA2oFNC",
-          "title": "Use strong types to differentiate between logically distinct values",
-          "link": "coding-guidelines/types-and-traits/index.html#gui_xztNdXA2oFNC",
-          "checksum": "ae6b2091e888f12f405ee77a2febc6e84cf362d1c32507e26110d805e5dcb5ad",
-          "rationale": {
-            "id": "rat_kYiIiW8R2qD2",
-            "link": "coding-guidelines/types-and-traits/index.html#rat_kYiIiW8R2qD2",
-            "checksum": "3f17c93db59b8aad68bce68f962befb16e58f686f5b5220c7b12135bc624ecbb"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_PO5TyFsRTlWv",
-            "link": "coding-guidelines/types-and-traits/index.html#non_compl_ex_PO5TyFsRTlWv",
-            "checksum": "bbb8463135909e0c46e832b84a58d3cb81ef8ae4078f8901c172f04a46975753"
-          },
-          "compliant_example": {
-            "id": "compl_ex_WTe7GoPu5Ez1",
-            "link": "coding-guidelines/types-and-traits/index.html#compl_ex_WTe7GoPu5Ez1",
-            "checksum": "506806e69b15a031a1f6b62add1cca182869241a339ab020868877ce64971d99"
-          },
-          "bibliography": null
-        }
-      ]
-    },
-    {
       "title": "Macros",
       "link": "coding-guidelines/macros/index.html",
       "guidelines": [
@@ -255,6 +227,34 @@
       ]
     },
     {
+      "title": "Types and Traits",
+      "link": "coding-guidelines/types-and-traits/index.html",
+      "guidelines": [
+        {
+          "id": "gui_xztNdXA2oFNC",
+          "title": "Use strong types to differentiate between logically distinct values",
+          "link": "coding-guidelines/types-and-traits/index.html#gui_xztNdXA2oFNC",
+          "checksum": "ae6b2091e888f12f405ee77a2febc6e84cf362d1c32507e26110d805e5dcb5ad",
+          "rationale": {
+            "id": "rat_kYiIiW8R2qD2",
+            "link": "coding-guidelines/types-and-traits/index.html#rat_kYiIiW8R2qD2",
+            "checksum": "3f17c93db59b8aad68bce68f962befb16e58f686f5b5220c7b12135bc624ecbb"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_PO5TyFsRTlWv",
+            "link": "coding-guidelines/types-and-traits/index.html#non_compl_ex_PO5TyFsRTlWv",
+            "checksum": "bbb8463135909e0c46e832b84a58d3cb81ef8ae4078f8901c172f04a46975753"
+          },
+          "compliant_example": {
+            "id": "compl_ex_WTe7GoPu5Ez1",
+            "link": "coding-guidelines/types-and-traits/index.html#compl_ex_WTe7GoPu5Ez1",
+            "checksum": "506806e69b15a031a1f6b62add1cca182869241a339ab020868877ce64971d99"
+          },
+          "bibliography": null
+        }
+      ]
+    },
+    {
       "title": "Expressions",
       "link": "coding-guidelines/expressions/index.html",
       "guidelines": [
@@ -262,7 +262,7 @@
           "id": "gui_7y0GAMmtMhch",
           "title": "Do not use an integer type as a divisor during integer division",
           "link": "coding-guidelines/expressions/index.html#gui_7y0GAMmtMhch",
-          "checksum": "2d6666dad5a1631e360ba9d19878aaf5e3836d90918da801262a5851cfd79bb2",
+          "checksum": "437127cb54d7b37dc3515e0131734b85c8133bd95946cc0e6f941040b1f52b4f",
           "rationale": {
             "id": "rat_vLFlPWSCHRje",
             "link": "coding-guidelines/expressions/index.html#rat_vLFlPWSCHRje",
@@ -276,7 +276,7 @@
           "compliant_example": {
             "id": "compl_ex_k1CD6xoZxhXc",
             "link": "coding-guidelines/expressions/index.html#compl_ex_k1CD6xoZxhXc",
-            "checksum": "f82b16eaa29059625f71ff1ddd10cd5d85967d612b56a8463409e822860adcfc"
+            "checksum": "7a047cf85cfe0c3f0c27b95bf47c240344875b68b672760102576b8d876f18f8"
           },
           "bibliography": null
         },
@@ -372,7 +372,7 @@
           "id": "gui_RHvQj8BHlz9b",
           "title": "Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand",
           "link": "coding-guidelines/expressions/index.html#gui_RHvQj8BHlz9b",
-          "checksum": "ac17dea46e1744a30f87068067b6308b41e13798197d4f65c453977bab5d47c1",
+          "checksum": "b95da5449fb41b9a1dbe2332ebf736118e2d12ab01f8adec9a75f9bf2ec2bbe5",
           "rationale": {
             "id": "rat_3MpR8QfHodGT",
             "link": "coding-guidelines/expressions/index.html#rat_3MpR8QfHodGT",

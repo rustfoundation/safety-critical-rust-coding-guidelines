@@ -122,7 +122,7 @@
              
   <section id="expressions">
 <h1>Expressions<a class="headerlink" href="#expressions" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-0d94665e">
+<div class="need_container docutils container" id="SNCB-2b5fa3a6">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_7y0GAMmtMhch">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -164,7 +164,7 @@ during a <a class="reference external" href="https://rust-lang.github.io/fls/exp
 <li><p><code class="docutils literal notranslate"><span class="pre">isize</span></code></p></li>
 </ul>
 </div></blockquote>
-<div class="need_container docutils container" id="SNCB-8abb79e0">
+<div class="need_container docutils container" id="SNCB-4dcd4c3b">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_vLFlPWSCHRje">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -186,7 +186,7 @@ Division by zero is undefined in mathematics because it leads to contradictions 
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-920858ff">
+<div class="need_container docutils container" id="SNCB-1eb2ea1b">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_0XeioBrgfh5z">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -219,7 +219,7 @@ Division by zero is undefined in mathematics because it leads to contradictions 
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-a9bea002">
+<div class="need_container docutils container" id="SNCB-138c8ac1">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_k1CD6xoZxhXb">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -261,7 +261,7 @@ where arithmetic overflow can also occur when dividing the minimum representable
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-e179cea0">
+<div class="need_container docutils container" id="SNCB-5164f0ab">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_k1CD6xoZxhXc">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -284,9 +284,9 @@ This ensures that functions operating on its value can correctly assume that the
 <p>Note that the test for arithmetic overflow that occurs when dividing the minimum representable value by -1 is unnecessary
 in this compliant example because the result of the division expression is an unsigned integer type.</p>
 <div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="w"> </span><span class="p">:</span><span class="nc">version</span><span class="p">:</span><span class="w"> </span><span class="mf">1.79</span>
-
-<span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">num</span><span class="p">::</span><span class="n">NonZero</span><span class="p">;</span>
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-version">Rust 1.79 ⚠️</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">num</span><span class="p">::</span><span class="n">NonZero</span><span class="p">;</span>
 
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="k">u32</span><span class="p">;</span>
@@ -296,7 +296,7 @@ in this compliant example because the result of the division expression is an un
 <span class="p">}</span>
 </pre></div>
 </div>
-<script type="application/json" class="rust-example-data">{"code": " :version: 1.79\n\nuse std::num::NonZero;\n\nfn main() {\n    let x = 0u32;\n    if let Some(divisor) = NonZero::<u32>::new(x) {\n        let _result = 5u32 / divisor;\n    }\n}", "displayCode": " :version: 1.79\n\nuse std::num::NonZero;\n\nfn main() {\n    let x = 0u32;\n    if let Some(divisor) = NonZero::<u32>::new(x) {\n        let _result = 5u32 / divisor;\n    }\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
+<script type="application/json" class="rust-example-data">{"code": "use std::num::NonZero;\n\nfn main() {\n    let x = 0u32;\n    if let Some(divisor) = NonZero::<u32>::new(x) {\n        let _result = 5u32 / divisor;\n    }\n}", "displayCode": "use std::num::NonZero;\n\nfn main() {\n    let x = 0u32;\n    if let Some(divisor) = NonZero::<u32>::new(x) {\n        let _result = 5u32 / divisor;\n    }\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.79", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </td>
 </tr>
 </tbody>
@@ -307,7 +307,7 @@ in this compliant example because the result of the division expression is an un
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-d053b35d">
+<div class="need_container docutils container" id="SNCB-0c7ff48c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_ADHABsmK9FXz">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -338,7 +338,7 @@ in this compliant example because the result of the division expression is an un
 <p>as either the right operand or the type of the left operand.</p>
 <p><strong>Exception:</strong> <code class="docutils literal notranslate"><span class="pre">as</span></code> may be used with <code class="docutils literal notranslate"><span class="pre">usize</span></code> as the right operand and an expression of raw pointer
 type as the left operand.</p>
-<div class="need_container docutils container" id="SNCB-3656b414">
+<div class="need_container docutils container" id="SNCB-350d68b9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_v56bjjcveLxQ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -373,7 +373,7 @@ an unsafe operation.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-328a1a9d">
+<div class="need_container docutils container" id="SNCB-cdd74645">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_hzGUYoMnK59w">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -424,7 +424,7 @@ we intend to allow lossy conversions, or only expect valid conversions.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6202e6c3">
+<div class="need_container docutils container" id="SNCB-a7700dfc">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_uilHTIOgxD37">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -498,7 +498,7 @@ Other forms of conversion may find <code class="docutils literal notranslate"><s
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-30ab77f7">
+<div class="need_container docutils container" id="SNCB-953040ff">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_HDnAZ7EZ4z6G">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -522,7 +522,7 @@ Other forms of conversion may find <code class="docutils literal notranslate"><s
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>Code must not rely on Rust’s type inference when doing explicit pointer casts via <code class="docutils literal notranslate"><span class="pre">var</span> <span class="pre">as</span> <span class="pre">Type</span></code> or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a>.
 Instead, explicitly specify the complete target type in the <code class="docutils literal notranslate"><span class="pre">as</span></code> expression or <a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=core%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">core::mem::transmute</span></code></a> call expression.</p>
-<div class="need_container docutils container" id="SNCB-87b58250">
+<div class="need_container docutils container" id="SNCB-85499452">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_h8LdJQ1MNKu9">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -547,7 +547,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-bec33dac">
+<div class="need_container docutils container" id="SNCB-07f04faf">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_V37Pl103aUW4">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -595,7 +595,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-462b6d49">
+<div class="need_container docutils container" id="SNCB-fba468b2">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_W08ckDrkOhkt">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -648,7 +648,7 @@ Specifying the concrete types in these scenarios allows the compiler to catch so
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-f8a111cc">
+<div class="need_container docutils container" id="SNCB-6e9ceaae">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_LvmzGKdsAgI5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -727,7 +727,7 @@ then the operation results in an out-of-range shift.</p>
 All code that complies with that rule also complies with this rule.</p>
 <p>This rule is based on The CERT C Coding Standard Rule
 <a class="reference external" href="https://wiki.sei.cmu.edu/confluence/x/ItcxBQ">INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand</a>.</p>
-<div class="need_container docutils container" id="SNCB-b03ba621">
+<div class="need_container docutils container" id="SNCB-f021eb68">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_tVkDl6gOqz25">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -750,7 +750,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-d6654fe5">
+<div class="need_container docutils container" id="SNCB-2d585053">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_KLiDMsCesLx7">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -784,7 +784,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-9346fe63">
+<div class="need_container docutils container" id="SNCB-a9003f91">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Ux1WqHbGKV73">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -821,7 +821,7 @@ than or equal to the width of the left operand.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-a1fddafd">
+<div class="need_container docutils container" id="SNCB-c71b3926">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Ux1WqHbGKV74">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -874,7 +874,7 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-fd5dd215">
+<div class="need_container docutils container" id="SNCB-e5877942">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_PM8Vpf7lZ51U">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -900,7 +900,7 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 and any pointer type as the right operand.</p>
 <p><a class="reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> shall not be used with any numeric type (including floating point types)
 as the argument to the <code class="docutils literal notranslate"><span class="pre">Src</span></code> parameter, and any pointer type as the argument to the <code class="docutils literal notranslate"><span class="pre">Dst</span></code> parameter.</p>
-<div class="need_container docutils container" id="SNCB-222f2fb0">
+<div class="need_container docutils container" id="SNCB-1ef126b1">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_YqhEiWTj9z6L">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -930,7 +930,7 @@ originally performed in a differently-sized address space.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6dc3203b">
+<div class="need_container docutils container" id="SNCB-ce9b36bd">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_0ydPk7VENSrA">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -981,7 +981,7 @@ is non-compliant:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-eff19bf8">
+<div class="need_container docutils container" id="SNCB-c9e8d47a">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oneKuF52yzrx">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1007,7 +1007,7 @@ is non-compliant:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-47d1bb8c">
+<div class="need_container docutils container" id="SNCB-669bc4d0">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_RHvQj8BHlz9b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1083,7 +1083,7 @@ then the operation results in an out-of-range shift.</p>
 <p>You may choose any type for the right operand (not just integers), because you control the implementation.</p>
 <p>This rule is based on The CERT C Coding Standard Rule
 <a class="reference external" href="https://wiki.sei.cmu.edu/confluence/x/ItcxBQ">INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the left operand</a>.</p>
-<div class="need_container docutils container" id="SNCB-c79c86cc">
+<div class="need_container docutils container" id="SNCB-2fa794ef">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_3MpR8QfHodGT">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1106,7 +1106,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-31be1b3d">
+<div class="need_container docutils container" id="SNCB-a1985898">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcn">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1140,7 +1140,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-b285fce7">
+<div class="need_container docutils container" id="SNCB-d23e1060">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_mvkgTL3kulZ5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1177,7 +1177,7 @@ than or equal to the width of the left operand.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-7ae58a8d">
+<div class="need_container docutils container" id="SNCB-f6e02364">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcm">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1216,7 +1216,7 @@ The <code class="docutils literal notranslate"><span class="pre">wrapping_shl</s
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-26a62183">
+<div class="need_container docutils container" id="SNCB-02e77d53">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcx">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1240,9 +1240,7 @@ and -1 for a negative number.
 The use of this function is noncompliant because it does not detect out-of-range shifts.</p>
 <blockquote>
 <div><div class="rust-example-container docutils container">
-<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="w"> </span><span class="p">:</span><span class="nc">version</span><span class="p">:</span><span class="w"> </span><span class="mf">1.87</span>
-
-<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">bits</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">61</span><span class="p">;</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">shifts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">40</span><span class="p">];</span>
 
@@ -1252,14 +1250,14 @@ The use of this function is noncompliant because it does not detect out-of-range
 <span class="p">}</span>
 </pre></div>
 </div>
-<script type="application/json" class="rust-example-data">{"code": " :version: 1.87\n\nfn main() {\n    let bits : u32 = 61;\n    let shifts = vec![4, 40];\n\n    for sh in shifts {\n        println!(\"{bits} << {sh} = {:?}\", bits.unbounded_shr(sh));\n    }\n}", "displayCode": " :version: 1.87\n\nfn main() {\n    let bits : u32 = 61;\n    let shifts = vec![4, 40];\n\n    for sh in shifts {\n        println!(\"{bits} << {sh} = {:?}\", bits.unbounded_shr(sh));\n    }\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
+<script type="application/json" class="rust-example-data">{"code": "fn main() {\n    let bits : u32 = 61;\n    let shifts = vec![4, 40];\n\n    for sh in shifts {\n        println!(\"{bits} << {sh} = {:?}\", bits.unbounded_shr(sh));\n    }\n}", "displayCode": "fn main() {\n    let bits : u32 = 61;\n    let shifts = vec![4, 40];\n\n    for sh in shifts {\n        println!(\"{bits} << {sh} = {:?}\", bits.unbounded_shr(sh));\n    }\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.87", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
 </div></blockquote>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-90d2d567">
+<div class="need_container docutils container" id="SNCB-572a4c6d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcp">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1302,7 +1300,7 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-af6e0e69">
+<div class="need_container docutils container" id="SNCB-a567b62b">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_xpPQqYeEPGIo">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1359,7 +1357,7 @@ Shifting by:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-22e32492">
+<div class="need_container docutils container" id="SNCB-d199d2ce">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_dCquvqE1csI3">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1398,7 +1396,7 @@ Any wraparound behavior must be explicitly specified to ensure the same behavior
 <li><p><code class="docutils literal notranslate"><span class="pre">usize</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">isize</span></code></p></li>
 </ul>
-<div class="need_container docutils container" id="SNCB-0fa0097f">
+<div class="need_container docutils container" id="SNCB-93f13f67">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_LvrS1jTCXEOk">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1423,7 +1421,7 @@ Range checking can be used to eliminate the possibility of arithmetic overflow.<
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-9a41693d">
+<div class="need_container docutils container" id="SNCB-3a0fadab">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_cCh2RQUXeH0N">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1454,7 +1452,7 @@ Range checking can be used to eliminate the possibility of arithmetic overflow.<
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-dc458ba6">
+<div class="need_container docutils container" id="SNCB-66f78a0d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4b_1">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1531,7 +1529,7 @@ based on the anticipated range of the inputs.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-29d2ca71">
+<div class="need_container docutils container" id="SNCB-5d8d7b54">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4c">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1575,7 +1573,7 @@ Checked functions can reduce readability when complex arithmetic expressions are
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-969ac97b">
+<div class="need_container docutils container" id="SNCB-dc59a818">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1615,7 +1613,7 @@ Checked functions can reduce readability when complex arithmetic expressions are
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-6f006fb1">
+<div class="need_container docutils container" id="SNCB-e1cb52cb">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BhUHiRB4kc4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1666,7 +1664,7 @@ which is useful in specific scenarios like implementing cryptography or hash fun
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-84348866">
+<div class="need_container docutils container" id="SNCB-7f6dcab6">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiSB4kc4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1713,7 +1711,7 @@ This compliant solution shows how to use saturating functions to provide saturat
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-8f34be08">
+<div class="need_container docutils container" id="SNCB-8f4e8ad8">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiSB4kd4b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1762,7 +1760,7 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-72a9a459">
+<div class="need_container docutils container" id="SNCB-10a0280d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_cCh2RQUXeH0O">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1799,7 +1797,7 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-56a7e3f4">
+<div class="need_container docutils container" id="SNCB-c4cf7183">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4d">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1843,7 +1841,7 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-107a3fc0">
+<div class="need_container docutils container" id="SNCB-f9c38a8c">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_iv9yCMHRgpE0">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1867,7 +1865,7 @@ This compliant solution uses the <code class="docutils literal notranslate"><spa
 </tr>
 <tr class="need content row-odd"><td class="need content" colspan="1"><p>An expression of numeric type shall not be converted to a pointer if the resulting pointer
 is incorrectly aligned, does not point to an entity of the referenced type, or is an invalid representation.</p>
-<div class="need_container docutils container" id="SNCB-9e610d6b">
+<div class="need_container docutils container" id="SNCB-dee458db">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_OhxKm751axKw">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1889,7 +1887,7 @@ execution environment. Issues may arise, for example, on architectures that have
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-965c21ac">
+<div class="need_container docutils container" id="SNCB-523db1e2">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_CkytKjRQezfQ">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1925,7 +1923,7 @@ particularly unexpected results.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c81f149b">
+<div class="need_container docutils container" id="SNCB-eb5ec178">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_oBoluiKSvREu">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -1972,7 +1970,7 @@ working even when pointers cannot be represented in any integer type.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-763d9d10">
+<div class="need_container docutils container" id="SNCB-309470c1">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_kMbiWbn8Z6g5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2019,7 +2017,7 @@ Overflow is covered in full by the guideline <cite>Ensure that integer operation
 types</a>.</p>
 <p>This rule is a less strict version of <cite>Do not use an integer type as a divisor during integer division</cite>.
 All code that complies with that rule also complies with this rule.</p>
-<div class="need_container docutils container" id="SNCB-789b9f3f">
+<div class="need_container docutils container" id="SNCB-8f64fedd">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_h84NjY2tLSBW">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2040,7 +2038,7 @@ All code that complies with that rule also complies with this rule.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-728b6b05">
+<div class="need_container docutils container" id="SNCB-a2eac676">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_LLs3vY8aGz0F">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2073,7 +2071,7 @@ All code that complies with that rule also complies with this rule.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-bb6b763e">
+<div class="need_container docutils container" id="SNCB-272e08b9">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Ri9pP5Ch3kcc">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2123,7 +2121,7 @@ it becomes increasingly harder for both programmers and static analysis tools to
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-e2975f10">
+<div class="need_container docutils container" id="SNCB-4a833f1f">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2149,7 +2147,7 @@ it becomes increasingly harder for both programmers and static analysis tools to
 <p>As documented in <a class="citation-ref reference internal" href="#cite-gui_Bib7x9KmPq2nL-RUST-REF-UNION">[RUST-REF-UNION]</a>, union types in Rust have specific safety requirements.
 The CERT C Coding Standard <a class="citation-ref reference internal" href="#cite-gui_Bib7x9KmPq2nL-CERT-C-INT34">[CERT-C-INT34]</a> provides guidance on avoiding undefined behavior
 in shift operations, which applies to Rust as well.</p>
-<div class="need_container docutils container" id="SNCB-a1c767fe">
+<div class="need_container docutils container" id="SNCB-d3d2e97e">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2211,7 +2209,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-8e8db4a5">
+<div class="need_container docutils container" id="SNCB-945f4172">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2242,7 +2240,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c2604e40">
+<div class="need_container docutils container" id="SNCB-fd12124d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2273,7 +2271,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-18675589">
+<div class="need_container docutils container" id="SNCB-355e8d92">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_Bib7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2309,7 +2307,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-62b21f21">
+<div class="need_container docutils container" id="SNCB-994d0795">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2335,7 +2333,7 @@ References help users find authoritative sources for the recommendations made.</
 <p>As documented in <a class="citation-ref reference internal" href="#cite-gui_Bob7x9KmPq2nL-RUST-REF-UNION">[RUST-REF-UNION]</a>, union types in Rust have specific safety requirements.
 The CERT C Coding Standard <a class="citation-ref reference internal" href="#cite-gui_Bob7x9KmPq2nL-CERT-C-INT34">[CERT-C-INT34]</a> provides guidance on avoiding undefined behavior
 in shift operations, which applies to Rust as well.</p>
-<div class="need_container docutils container" id="SNCB-c8b2fae0">
+<div class="need_container docutils container" id="SNCB-66b6ca3d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2397,7 +2395,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-c68db042">
+<div class="need_container docutils container" id="SNCB-7dbb7337">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2428,7 +2426,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-07dc2b73">
+<div class="need_container docutils container" id="SNCB-4accb5d2">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -2459,7 +2457,7 @@ References help users find authoritative sources for the recommendations made.</
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-d28923ba">
+<div class="need_container docutils container" id="SNCB-7486bfff">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_Bob7x9KmPq2nL">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
