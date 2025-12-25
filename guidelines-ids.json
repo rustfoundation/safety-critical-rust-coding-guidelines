@@ -1,34 +1,6 @@
 {
   "documents": [
     {
-      "title": "Types and Traits",
-      "link": "coding-guidelines/types-and-traits/index.html",
-      "guidelines": [
-        {
-          "id": "gui_xztNdXA2oFNC",
-          "title": "Use strong types to differentiate between logically distinct values",
-          "link": "coding-guidelines/types-and-traits/index.html#gui_xztNdXA2oFNC",
-          "checksum": "ae6b2091e888f12f405ee77a2febc6e84cf362d1c32507e26110d805e5dcb5ad",
-          "rationale": {
-            "id": "rat_kYiIiW8R2qD2",
-            "link": "coding-guidelines/types-and-traits/index.html#rat_kYiIiW8R2qD2",
-            "checksum": "3f17c93db59b8aad68bce68f962befb16e58f686f5b5220c7b12135bc624ecbb"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_PO5TyFsRTlWv",
-            "link": "coding-guidelines/types-and-traits/index.html#non_compl_ex_PO5TyFsRTlWv",
-            "checksum": "bbb8463135909e0c46e832b84a58d3cb81ef8ae4078f8901c172f04a46975753"
-          },
-          "compliant_example": {
-            "id": "compl_ex_WTe7GoPu5Ez1",
-            "link": "coding-guidelines/types-and-traits/index.html#compl_ex_WTe7GoPu5Ez1",
-            "checksum": "506806e69b15a031a1f6b62add1cca182869241a339ab020868877ce64971d99"
-          },
-          "bibliography": null
-        }
-      ]
-    },
-    {
       "title": "Macros",
       "link": "coding-guidelines/macros/index.html",
       "guidelines": [
@@ -249,6 +221,34 @@
             "id": "compl_ex_cFPg6y7upNdl",
             "link": "coding-guidelines/macros/index.html#compl_ex_cFPg6y7upNdl",
             "checksum": "932102ac1f11306943d324254bfe68fe2cdc3c69da9efc1d2c352bf9e5798d88"
+          },
+          "bibliography": null
+        }
+      ]
+    },
+    {
+      "title": "Types and Traits",
+      "link": "coding-guidelines/types-and-traits/index.html",
+      "guidelines": [
+        {
+          "id": "gui_xztNdXA2oFNC",
+          "title": "Use strong types to differentiate between logically distinct values",
+          "link": "coding-guidelines/types-and-traits/index.html#gui_xztNdXA2oFNC",
+          "checksum": "ae6b2091e888f12f405ee77a2febc6e84cf362d1c32507e26110d805e5dcb5ad",
+          "rationale": {
+            "id": "rat_kYiIiW8R2qD2",
+            "link": "coding-guidelines/types-and-traits/index.html#rat_kYiIiW8R2qD2",
+            "checksum": "3f17c93db59b8aad68bce68f962befb16e58f686f5b5220c7b12135bc624ecbb"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_PO5TyFsRTlWv",
+            "link": "coding-guidelines/types-and-traits/index.html#non_compl_ex_PO5TyFsRTlWv",
+            "checksum": "bbb8463135909e0c46e832b84a58d3cb81ef8ae4078f8901c172f04a46975753"
+          },
+          "compliant_example": {
+            "id": "compl_ex_WTe7GoPu5Ez1",
+            "link": "coding-guidelines/types-and-traits/index.html#compl_ex_WTe7GoPu5Ez1",
+            "checksum": "506806e69b15a031a1f6b62add1cca182869241a339ab020868877ce64971d99"
           },
           "bibliography": null
         }

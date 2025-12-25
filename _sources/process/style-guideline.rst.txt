@@ -26,71 +26,120 @@ We will examine each part:
 * ``rationale``
 * ``non_compliant_example``
 * ``compliant_example``
+* ``bibliography``
 
 ::
 
-   .. guideline:: Avoid Implicit Integer Wrapping
-      :id: gui_xztNdXA2oFNB
-      :category: required
+   .. guideline:: Do not use an integer type as a divisor during integer division
+      :id: gui_7y0GAMmtMhch
+      :category: advisory
       :status: draft
-      :release: 1.85.0;1.85.1
-      :fls: fls_cokwseo3nnr
+      :release: latest
+      :fls: fls_Q9dhNiICGIfr
       :decidability: decidable
       :scope: module
-      :tags: numerics
+      :tags: numerics, subset
 
-      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
-      Instead, explicitly handle potential overflows using the standard library's checked,
-      saturating, or wrapping operations.
+      Do not provide a right operand of integer type :cite:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`
+      during a division expression :cite:`gui_7y0GAMmtMhch:FLS-DIVISION-EXPR` or remainder
+      expression :cite:`gui_7y0GAMmtMhch:FLS-REMAINDER-EXPR` when the left operand also has
+      integer type.
 
       .. rationale::
-         :id: rat_kYiIiW8R2qD1
+         :id: rat_vLFlPWSCHRje
          :status: draft
 
-         In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
-         However, in release builds (with optimizations enabled), integer operations silently wrap
-         around on overflow, creating potential for silent failures and security vulnerabilities.
-
-         Safety-critical software requires consistent and predictable behavior across all build
-         configurations. Explicit handling of potential overflow conditions improves code clarity,
-         maintainability, and reduces the risk of numerical errors in production.
+         Integer division and integer remainder division both panic when the right operand
+         has a value of zero. Division by zero is undefined in mathematics because it leads
+         to contradictions and there is no consistent value that can be assigned as its result.
 
       .. non_compliant_example::
-         :id: non_compl_ex_PO5TyFsRTlWv
+         :id: non_compl_ex_0XeioBrgfh5z
          :status: draft
 
-          .. code-block:: rust
+         Both the division and remainder operations in this non-compliant example will panic
+         if evaluated because the right operand is zero.
 
-            fn calculate_next_position(current: u32, velocity: u32) -> u32 {
-                // Potential for silent overflow in release builds
-                current + velocity
+         .. rust-example::
+             :compile_fail:
+
+             fn main() {
+                 let x = 0;
+                 let _y = 5 / x; // This line will panic.
+                 let _z = 5 % x; // This line would also panic.
+             }
+
+      .. compliant_example::
+         :id: compl_ex_k1CD6xoZxhXb
+         :status: draft
+
+         Checked division prevents division by zero from occurring.
+         The programmer can then handle the returned :std:`std::option::Option`.
+
+         .. rust-example::
+
+            fn main() {
+                // Using the checked division API
+                let _y = match 5i32.checked_div(0) {
+                    None => 0,
+                    Some(r) => r,
+                };
+
+                // Using the checked remainder API
+                let _z = match 5i32.checked_rem(0) {
+                    None => 0,
+                    Some(r) => r,
+                };
             }
 
       .. compliant_example::
-         :id: compl_ex_WTe7GoPu5Ez0
+         :id: compl_ex_k1CD6xoZxhXc
          :status: draft
 
-          .. code-block:: rust
+         This compliant solution creates a divisor using :std:`std::num::NonZero`.
 
-            fn calculate_next_position(current: u32, velocity: u32) -> u32 {
-                // Explicitly handle potential overflow with checked addition
-                current.checked_add(velocity).expect("Position calculation overflowed")
+         .. rust-example::
+            :version: 1.79
+
+            use std::num::NonZero;
+
+            fn main() {
+                let x = 0u32;
+                if let Some(divisor) = NonZero::<u32>::new(x) {
+                    let _result = 5u32 / divisor;
+                }
             }
+
+      .. bibliography::
+         :id: bib_7y0GAMmtMhch
+         :status: draft
+
+         .. list-table::
+            :header-rows: 0
+            :widths: auto
+            :class: bibliography-table
+
+            * - :bibentry:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`
+              - The Rust FLS. "Types and Traits - Integer Types." https://rust-lang.github.io/fls/types-and-traits.html#integer-types
+            * - :bibentry:`gui_7y0GAMmtMhch:FLS-DIVISION-EXPR`
+              - The Rust FLS. "Expressions - Syntax - DivisionExpression." https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression
+            * - :bibentry:`gui_7y0GAMmtMhch:FLS-REMAINDER-EXPR`
+              - The Rust FLS. "Expressions - Syntax - RemainderExpression." https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression
 
 ``guideline``
 =============
 
 ::
 
-   .. guideline:: Avoid Implicit Integer Wrapping
-      :id: gui_xztNdXA2oFNB
-      :category: required
+   .. guideline:: Do not use an integer type as a divisor during integer division
+      :id: gui_7y0GAMmtMhch
+      :category: advisory
       :status: draft
-      :release: 1.85.0;1.85.1
-      :fls: fls_cokwseo3nnr
+      :release: latest
+      :fls: fls_Q9dhNiICGIfr
       :decidability: decidable
       :scope: module
-      :tags: numerics
+      :tags: numerics, subset
 
 ``guideline`` Title
 -------------------
@@ -173,7 +222,7 @@ the ``status`` to ``retired``.
 
 **MUST** be one of these values:
 
-* ``provisional``
+* ``draft``
 * ``approved``
 * ``retired``
 
@@ -322,11 +371,15 @@ Content in the Amplification **SHOULD NOT** cover the rationale for the guidelin
 non-normative explanations, which **SHOULD** be provided in the ``rationale`` and examples sections
 where helpful.
 
+The Amplification **MAY** contain citations to the bibliography using the ``:cite:`` role
+(see `Citation Roles`_ below).
+
 ::
 
-      Code must not rely on Rust's implicit integer wrapping behavior that occurs in release builds.
-      Instead, explicitly handle potential overflows using the standard library's checked,
-      saturating, or wrapping operations.
+      Do not provide a right operand of integer type :cite:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`
+      during a division expression :cite:`gui_7y0GAMmtMhch:FLS-DIVISION-EXPR` or remainder
+      expression :cite:`gui_7y0GAMmtMhch:FLS-REMAINDER-EXPR` when the left operand also has
+      integer type.
 
 Exception
 ^^^^^^^^^
@@ -351,16 +404,12 @@ Each Guideline **MUST** provide a *Rationale* for its inclusion and enforcement.
 ::
 
       .. rationale::
-         :id: rat_kYiIiW8R2qD1
+         :id: rat_vLFlPWSCHRje
          :status: draft
 
-         In debug builds, Rust performs runtime checks for integer overflow and will panic if detected.
-         However, in release builds (with optimizations enabled), integer operations silently wrap
-         around on overflow, creating potential for silent failures and security vulnerabilities.
-
-         Safety-critical software requires consistent and predictable behavior across all build
-         configurations. Explicit handling of potential overflow conditions improves code clarity,
-         maintainability, and reduces the risk of numerical errors in production.
+         Integer division and integer remainder division both panic when the right operand
+         has a value of zero. Division by zero is undefined in mathematics because it leads
+         to contradictions and there is no consistent value that can be assigned as its result.
 
 ``rationale`` ``id``
 --------------------
@@ -395,15 +444,20 @@ The Rationale **SHOULD** be supported by code examples wherever concise examples
 ::
 
       .. non_compliant_example::
-         :id: non_compl_ex_PO5TyFsRTlWv
+         :id: non_compl_ex_0XeioBrgfh5z
          :status: draft
 
-          .. code-block:: rust
+         Both the division and remainder operations in this non-compliant example will panic
+         if evaluated because the right operand is zero.
 
-            fn calculate_next_position(current: u32, velocity: u32) -> u32 {
-                // Potential for silent overflow in release builds
-                current + velocity
-            }
+         .. rust-example::
+             :compile_fail:
+
+             fn main() {
+                 let x = 0;
+                 let _y = 5 / x; // This line will panic.
+                 let _z = 5 % x; // This line would also panic.
+             }
 
 ``non_compliant_example`` ``id``
 --------------------------------
@@ -444,8 +498,8 @@ the Code Example that follows.
 ``non_compliant_example`` Code Example
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A ``non_compliant_example`` Code Example **MUST** have a single ``.. code-block:: rust``
-in which the example code is placed.
+A ``non_compliant_example`` Code Example **MUST** use the ``.. rust-example::`` directive
+(see `The rust-example Directive`_ below).
 
 A ``non_compliant_example`` Code Example **SHOULD** be made as short and simple to understand
 as possible.
@@ -468,14 +522,26 @@ be provided after the corresponding non-compliant example.
 ::
 
       .. compliant_example::
-         :id: compl_ex_WTe7GoPu5Ez0
+         :id: compl_ex_k1CD6xoZxhXb
          :status: draft
 
-          .. code-block:: rust
+         Checked division prevents division by zero from occurring.
+         The programmer can then handle the returned :std:`std::option::Option`.
 
-            fn calculate_next_position(current: u32, velocity: u32) -> u32 {
-                // Explicitly handle potential overflow with checked addition
-                current.checked_add(velocity).expect("Position calculation overflowed")
+         .. rust-example::
+
+            fn main() {
+                // Using the checked division API
+                let _y = match 5i32.checked_div(0) {
+                    None => 0,
+                    Some(r) => r,
+                };
+
+                // Using the checked remainder API
+                let _z = match 5i32.checked_rem(0) {
+                    None => 0,
+                    Some(r) => r,
+                };
             }
 
 ``compliant_example`` ``id``
@@ -515,8 +581,8 @@ the Code Example that follows.
 ``compliant_example`` Code Example
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A ``compliant_example`` Code Example **MUST** have a single ``.. code-block:: rust``
-in which the example code is placed.
+A ``compliant_example`` Code Example **MUST** use the ``.. rust-example::`` directive
+(see `The rust-example Directive`_ below).
 
 A ``compliant_example`` Code Example **SHOULD** be made as short and simple to understand
 as possible.
@@ -529,3 +595,466 @@ A ``compliant_example`` Code Example **MUST** comply with every guideline.
 A ``compliant_example`` Code Example **SHOULD** try to illustrate the guideline by
 getting close to violating it, but staying within compliance.
 
+``bibliography``
+================
+
+Each ``guideline`` **SHOULD** have an associated ``bibliography`` if it references external
+documents or specifications. The bibliography provides a structured way to cite sources
+and enables readers to navigate directly to referenced materials.
+
+::
+
+      .. bibliography::
+         :id: bib_7y0GAMmtMhch
+         :status: draft
+
+         .. list-table::
+            :header-rows: 0
+            :widths: auto
+            :class: bibliography-table
+
+            * - :bibentry:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`
+              - The Rust FLS. "Types and Traits - Integer Types." https://rust-lang.github.io/fls/types-and-traits.html#integer-types
+            * - :bibentry:`gui_7y0GAMmtMhch:FLS-DIVISION-EXPR`
+              - The Rust FLS. "Expressions - Syntax - DivisionExpression." https://rust-lang.github.io/fls/expressions.html#syntax_divisionexpression
+            * - :bibentry:`gui_7y0GAMmtMhch:FLS-REMAINDER-EXPR`
+              - The Rust FLS. "Expressions - Syntax - RemainderExpression." https://rust-lang.github.io/fls/expressions.html#syntax_remainderexpression
+
+``bibliography`` ``id``
+-----------------------
+
+A unique identifier for each ``bibliography``. ``bibliography`` identifiers
+**MUST** begin with ``bib_``.
+
+The suffix after ``bib_`` **SHOULD** match the guideline's ID suffix (e.g., ``bib_7y0GAMmtMhch``
+for guideline ``gui_7y0GAMmtMhch``).
+
+``bibliography`` ``status``
+---------------------------
+
+The ``status`` option of a ``bibliography`` **MUST** match the ``status`` of its parent ``guideline``.
+
+``bibliography`` Content
+------------------------
+
+The bibliography **MUST** be formatted as a ``list-table`` with no header rows and the
+``bibliography-table`` class for proper styling.
+
+Each row **MUST** contain two columns:
+
+1. The citation anchor using the ``:bibentry:`` role
+2. The citation description including author, title, and URL
+
+Bibliography Validation
+^^^^^^^^^^^^^^^^^^^^^^^
+
+The build system validates bibliography entries for:
+
+* **Citation key format** - Keys **MUST** be ``UPPERCASE-WITH-HYPHENS`` (e.g., ``FLS-INTEGER-TYPES``, ``CERT-C-INT34``)
+* **Guideline ID matching** - The guideline ID in ``:bibentry:`` roles **MUST** match the containing guideline
+* **URL consistency** - The same URL used across different guidelines **MUST** use identical citation keys and descriptions
+* **Citation references** - All ``:cite:`` references **MUST** have corresponding ``:bibentry:`` definitions
+
+*****************************
+Citation Roles
+*****************************
+
+The documentation system provides two roles for managing citations: ``:cite:`` for referencing
+citations in text, and ``:bibentry:`` for defining citation anchors in bibliographies.
+
+``:cite:`` Role
+===============
+
+The ``:cite:`` role creates a clickable reference in the guideline text that links to the
+corresponding bibliography entry.
+
+**Syntax:** ``:cite:`gui_GUIDELINE_ID:CITATION-KEY```
+
+**Example:**
+
+::
+
+   As documented in :cite:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`, integer types have
+   specific behaviors during division operations.
+
+This renders as ``[FLS-INTEGER-TYPES]`` and links to the bibliography entry.
+
+The guideline ID prefix (``gui_7y0GAMmtMhch:``) **MUST** match the ID of the guideline
+containing the citation. This ensures citations are properly namespaced and validated
+during the build.
+
+``:bibentry:`` Role
+===================
+
+The ``:bibentry:`` role creates an anchor in the bibliography table that ``:cite:`` references
+can link to.
+
+**Syntax:** ``:bibentry:`gui_GUIDELINE_ID:CITATION-KEY```
+
+**Example:**
+
+::
+
+   * - :bibentry:`gui_7y0GAMmtMhch:FLS-INTEGER-TYPES`
+     - The Rust FLS. "Types and Traits - Integer Types." https://rust-lang.github.io/fls/...
+
+This renders as ``[FLS-INTEGER-TYPES] ↩`` with a back-navigation button that returns
+the reader to the citation in the text.
+
+Citation Key Format
+===================
+
+Citation keys **MUST** follow this format:
+
+* Start with an uppercase letter
+* Contain only uppercase letters, numbers, and hyphens
+* End with an uppercase letter or number
+* Maximum 50 characters
+
+**Valid examples:**
+
+* ``FLS-INTEGER-TYPES``
+* ``RUST-REF-UNION``
+* ``CERT-C-INT34``
+* ``ISO-26262-2018``
+
+**Invalid examples:**
+
+* ``fls-integer-types`` (lowercase)
+* ``123-KEY`` (starts with number)
+* ``KEY_WITH_UNDERSCORE`` (contains underscore)
+
+*****************************
+The rust-example Directive
+*****************************
+
+All Rust code examples in guidelines **MUST** use the ``.. rust-example::`` directive
+instead of ``.. code-block:: rust``. This directive provides:
+
+* Interactive execution via the Rust Playground
+* Copy-to-clipboard functionality
+* Miri integration for undefined behavior detection
+* Build-time validation of code examples
+* Support for hidden lines
+
+Basic Usage
+===========
+
+::
+
+   .. rust-example::
+
+      fn main() {
+          println!("Hello, world!");
+      }
+
+This creates an interactive code block with copy, run, and toggle buttons.
+
+Rustdoc Attributes
+==================
+
+The directive supports standard rustdoc attributes that control how examples are compiled and run.
+
+``:ignore:``
+------------
+
+The example is not compiled or tested. Use for illustrative code that is intentionally incomplete.
+
+::
+
+   .. rust-example::
+      :ignore:
+
+      // This code is for illustration only
+      fn hypothetical_feature() { ... }
+
+``:compile_fail:``
+------------------
+
+The example **SHOULD** fail to compile. Optionally specify an expected error code.
+
+::
+
+   .. rust-example::
+      :compile_fail: E0277
+
+      fn example() {
+          let x: i32 = "string"; // Type mismatch
+      }
+
+``:should_panic:``
+------------------
+
+The example **SHOULD** compile but panic at runtime.
+
+::
+
+   .. rust-example::
+      :should_panic:
+
+      fn main() {
+          panic!("This is expected");
+      }
+
+``:no_run:``
+------------
+
+The example is compiled but not executed. Use for code that requires specific
+runtime conditions or has side effects.
+
+::
+
+   .. rust-example::
+      :no_run:
+
+      fn main() {
+          std::process::exit(1);
+      }
+
+Miri Integration
+================
+
+The ``:miri:`` option enables Miri checking for undefined behavior detection.
+Examples containing ``unsafe`` code **MUST** include a ``:miri:`` option.
+
+``:miri:`` (default: check)
+---------------------------
+
+Run Miri and expect no undefined behavior.
+
+::
+
+   .. rust-example::
+      :miri:
+
+      fn main() {
+          unsafe {
+              let x: i32 = 42;
+              let ptr = &x as *const i32;
+              println!("{}", *ptr); // Safe: valid pointer
+          }
+      }
+
+``:miri: expect_ub``
+--------------------
+
+Run Miri and expect undefined behavior to be detected. Use when demonstrating
+what *not* to do.
+
+::
+
+   .. rust-example::
+      :miri: expect_ub
+
+      fn main() {
+          unsafe {
+              let ptr: *const i32 = std::ptr::null();
+              let _ = *ptr; // UB: null pointer dereference
+          }
+      }
+
+``:miri: skip``
+---------------
+
+Skip Miri checking. Use when Miri does not support the operations in the example.
+The reason for skipping **SHOULD** be documented in the surrounding prose.
+
+::
+
+   .. rust-example::
+      :miri: skip
+
+      // Miri doesn't support this FFI operation
+      fn main() {
+          unsafe { /* FFI call */ }
+      }
+
+*Note:* ``:miri:`` cannot be combined with ``:ignore:``, ``:compile_fail:``, or ``:no_run:``
+because Miri requires code that compiles and runs.
+
+Warning Handling
+================
+
+The ``:warn:`` option controls how compiler warnings are treated.
+
+``:warn:`` or ``:warn: error``
+------------------------------
+
+Fail on compiler warnings. This is the default when ``rust_examples_fail_on_warnings = True``
+in the configuration.
+
+``:warn: allow``
+----------------
+
+Allow compiler warnings without failing.
+
+::
+
+   .. rust-example::
+      :warn: allow
+
+      fn main() {
+          let x = 42; // Warning: unused variable (allowed)
+      }
+
+Toolchain Options
+=================
+
+``:edition:``
+-------------
+
+Specify the Rust edition. Default is ``2021``.
+
+::
+
+   .. rust-example::
+      :edition: 2018
+
+      // Edition 2018 specific code
+
+``:channel:``
+-------------
+
+Specify the release channel: ``stable``, ``beta``, or ``nightly``.
+
+::
+
+   .. rust-example::
+      :channel: nightly
+
+      #![feature(some_nightly_feature)]
+
+``:version:``
+-------------
+
+Specify a target Rust version. A badge appears if the version differs
+significantly from the configured default.
+
+::
+
+   .. rust-example::
+      :version: 1.79
+
+      use std::num::NonZero;
+
+      fn main() {
+          // Code using features from Rust 1.79
+      }
+
+Hidden Lines
+============
+
+Lines prefixed with ``#`` followed by a space are hidden by default but included
+when compiling and running the code. This allows showing only the relevant
+parts of an example while maintaining compilability.
+
+::
+
+   .. rust-example::
+
+      # use std::collections::HashMap;
+      # fn main() {
+      let mut map = HashMap::new();
+      map.insert("key", "value");
+      # }
+
+The hidden lines can be revealed using the toggle button (eye icon) in the
+rendered output.
+
+Hidden lines **SHOULD** be used for:
+
+* Boilerplate imports
+* ``fn main() {}`` wrappers
+* Setup code that distracts from the example's purpose
+* ``#[allow(dead_code)]`` and similar attributes
+
+Display Options
+===============
+
+``:show_hidden:``
+-----------------
+
+Show hidden lines by default instead of hiding them.
+
+``:name:``
+----------
+
+Assign a name to the example for reference purposes.
+
+*****************************
+Standard Library Links
+*****************************
+
+The ``:std:`` role creates links to Rust standard library documentation.
+
+**Syntax:** ``:std:`path::to::Item```
+
+**Examples:**
+
+::
+
+   The type needs to implement :std:`core::marker::Copy`.
+
+   See :std:`std::option::Option` for the return type.
+
+   Use :std:`std::num::NonZero` for guaranteed non-zero values.
+
+The role generates a link to the Rust documentation search with the provided path.
+This **SHOULD** be used instead of inline URLs to standard library documentation.
+
+*****************************
+Build-Time Validation
+*****************************
+
+The build system performs several validations to ensure guideline quality:
+
+Required Fields
+===============
+
+Each guideline **MUST** have the following fields populated:
+
+* ``category``
+* ``release``
+* ``fls``
+* ``decidability``
+* ``scope``
+* ``tags``
+
+Required Child Elements
+=======================
+
+Each guideline **MUST** have the following child elements:
+
+* ``rationale``
+* ``non_compliant_example``
+* ``compliant_example``
+
+The ``bibliography`` is **OPTIONAL** but **SHOULD** be included when external
+sources are referenced.
+
+Inline URL Detection
+====================
+
+The build system detects inline URLs in guideline text and flags them as errors.
+URLs **MUST NOT** appear directly in guideline content. Instead:
+
+* For Rust standard library documentation, use the ``:std:`` role
+* For external references, add them to the ``bibliography`` and use ``:cite:``
+
+**Non-compliant:**
+
+::
+
+   See https://doc.rust-lang.org/std/num/struct.Wrapping.html for details.
+
+**Compliant:**
+
+::
+
+   See :std:`std::num::Wrapping` for details.
+
+Or for external sources:
+
+::
+
+   As documented in :cite:`gui_MyGuideline:SOURCE-NAME`, ...
