@@ -151,7 +151,7 @@
         The use of this function is noncompliant because it does not detect out-of-range shifts.
 
           .. rust-example::
-              :version: 1.87
+             :version: 1.87
 
              fn main() {
                  let bits : u32 = 61;

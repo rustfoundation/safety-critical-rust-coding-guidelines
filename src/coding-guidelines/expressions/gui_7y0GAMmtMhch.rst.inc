@@ -94,7 +94,7 @@
       in this compliant example because the result of the division expression is an unsigned integer type.
 
       .. rust-example::
-          :version: 1.79
+         :version: 1.79
 
          use std::num::NonZero;
 
