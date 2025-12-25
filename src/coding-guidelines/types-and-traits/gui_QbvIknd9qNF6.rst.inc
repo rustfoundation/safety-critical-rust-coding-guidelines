@@ -43,29 +43,6 @@
 
       This rule applies even when the functions are semantically identical, exported as ``pub``, or defined once in source form.
 
-      Compiler optimizations may cause function pointers to lose stable identity, for example:
-
-      - Cross-crate inlining can produce multiple code instantiations
-      - Codegen-unit separation can cause function emission in multiple codegen units
-      - Identical function implementations may be automatically merged as an optimization.
-        Functions that are equivalent based only on specific hardware semantics may be merged in the machine-specific backend. Merging may also be performed as link-time optimization.
-
-      This behavior has resulted in real-world issues,
-      such as the bug reported in `rust-lang/rust#117047 <https://github.com/rust-lang/rust/issues/117047>`_,
-      where function pointer comparisons unexpectedly failed because the function in question was instantiated multiple times.
-
-      Violating this rule may cause:
-
-      - Silent logic failures: callbacks not matching, dispatch tables misbehaving.
-      - Inappropriate branching: identity-based dispatch selecting wrong handler.
-      - Security issues: adversary-controlled conditions bypassing function-based authorization/dispatch logic.
-      - Nondeterministic behavior: correctness depending on build flags or incremental state.
-      - Test-only correctness: function pointer equality passing in debug builds but failing in release/link-time optimization builds.
-
-      In short, dependence on function address stability introduces non-portable, build-profile-dependent behavior,
-      which is incompatible with high-integrity Rust.
-
-
       .. rationale::
          :id: rat_xcVE5Hfnbb2u
          :status: draft
@@ -74,9 +51,32 @@
 
          - Cross-crate inlining can produce multiple code instantiations
          - Codegen-unit separation can cause function emission in multiple codegen units
-         - Identical function implementations may be automatically merged as an optimization.
-           Functions that are equivalent based only on specific hardware semantics may be merged in the machine-specific backend.
-           Merging may also be performed as link-time optimization.
+         - Function implementations may be merged as an optimization. 
+           
+         Functions that are equivalent based only on specific hardware semantics may be merged in the machine-specific backend.
+         For example:
+
+          .. rust-example::
+
+         #[unsafe(no_mangle)]
+         fn foo(x: *mut i32, y: *mut i32) {
+             unsafe {
+                 let a = &mut *x;
+                 let b = &mut *y;
+                 *a = *b;
+             }
+         }
+
+         #[unsafe(no_mangle)]
+         fn bar(x: *mut i32, y: *mut i32) {
+             unsafe {
+                 x.write(y.read());
+             }
+         }
+
+         For specific backends, That is, the two functions are deduplicated, and therefore have the same address.
+         This happened even though these two functions have different behavior in the abstract machine:
+         the ``foo`` function has undefined behavior if ``x`` and ``y`` alias, while the ``bar`` function doesn't.
 
          This behavior has resulted in real-world issues,
          such as the bug reported in `rust-lang/rust#117047 <https://github.com/rust-lang/rust/issues/117047>`_,
@@ -98,7 +98,7 @@
       :status: draft
 
       Due to cross-crate inlining or codegen-unit partitioning,
-      the address of ``handler_a`` in crate ``B`` may differ from its address in crate A,
+      the address of ``handler_a`` in crate ``B`` may differ from its address in crate ``A``,
       causing comparisons to fail as shown in this noncompliant code example:
 
        .. rust-example::
@@ -120,13 +120,13 @@
 
          dispatch(handler_a);
 
-         //  Error:  This may fail unpredictably if handler_a is inlined or duplicated.
+         //  Error:  This may fail unpredictably if 'handler_a' is inlined or duplicated.
 
    .. compliant_example::
       :id: compl_ex_oiqSSclTXmIi
       :status: draft
 
-      Replace function pointer comparison with an explicit enum as shown in this compliant example:
+      Replace function pointer comparison with an explicit enumeration type as shown in this compliant example:
 
        .. rust-example::
 
