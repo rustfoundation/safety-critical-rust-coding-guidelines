@@ -43,6 +43,7 @@
       is non-compliant:
 
       .. rust-example::
+        :miri:
 
         fn f1(x: u16, y: i32, z: u64, w: usize) {
           let _p1 = x as * const u32;  // not compliant

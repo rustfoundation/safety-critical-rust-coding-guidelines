@@ -92,6 +92,7 @@
       Other forms of conversion may find ``transmute`` better communicates their intent.
 
       .. rust-example::
+         :miri:
 
          use std::convert::TryInto;
 

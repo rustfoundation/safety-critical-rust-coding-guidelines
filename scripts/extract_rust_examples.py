@@ -33,7 +33,9 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 import tomllib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -53,6 +55,107 @@ from rustdoc_utils import (
     process_hidden_lines,
     save_results_json,
 )
+
+
+def check_miri_available() -> Tuple[bool, str]:
+    """
+    Check if cargo miri is available.
+    
+    Returns:
+        (available, version_or_error)
+    """
+    try:
+        result = subprocess.run(
+            ['cargo', '+nightly', 'miri', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            return True, result.stdout.strip()
+        return False, result.stderr.strip() or "Miri not available"
+    except FileNotFoundError:
+        return False, "cargo not found"
+    except subprocess.TimeoutExpired:
+        return False, "timeout checking miri"
+    except Exception as e:
+        return False, str(e)
+
+
+def run_miri_on_example(
+    example,  # RustExample
+    timeout: int = 60
+) -> Tuple[bool, str, str]:
+    """
+    Run Miri on a single example.
+    
+    Args:
+        example: RustExample object with code and miri_mode
+        timeout: Timeout in seconds
+        
+    Returns:
+        (success, stdout, stderr) where success is based on miri_mode:
+        - check: success if no UB detected
+        - expect_ub: success if UB detected
+        - skip: returns (True, "", "skipped")
+    """
+    miri_mode = getattr(example, 'miri_mode', None)
+    
+    if miri_mode == 'skip' or miri_mode is None:
+        return True, "", "skipped"
+    
+    # Create a temporary crate
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmppath = Path(tmpdir)
+        
+        # Create Cargo.toml
+        cargo_toml = tmppath / "Cargo.toml"
+        cargo_toml.write_text(f'''[package]
+name = "miri_test"
+version = "0.1.0"
+edition = "{example.edition}"
+
+[dependencies]
+''')
+        
+        # Create src directory and main.rs
+        src_dir = tmppath / "src"
+        src_dir.mkdir()
+        main_rs = src_dir / "main.rs"
+        main_rs.write_text(example.code)
+        
+        try:
+            # Run cargo miri
+            result = subprocess.run(
+                ['cargo', '+nightly', 'miri', 'run'],
+                cwd=tmppath,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env={**os.environ, 'MIRIFLAGS': '-Zmiri-disable-isolation'}
+            )
+            
+            stdout = result.stdout
+            stderr = result.stderr
+            
+            # Check for UB in output
+            has_ub = ('Undefined Behavior' in stderr or 
+                      'error: unsupported operation' in stderr or
+                      'error[' in stderr)
+            
+            if miri_mode == 'check':
+                success = not has_ub
+            elif miri_mode == 'expect_ub':
+                success = has_ub
+            else:
+                success = not has_ub  # Default to check mode
+            
+            return success, stdout, stderr
+            
+        except subprocess.TimeoutExpired:
+            return False, "", "Miri execution timed out"
+        except Exception as e:
+            return False, "", f"Miri execution error: {e}"
 
 
 class ConfigurationError(Exception):
@@ -369,6 +472,19 @@ def extract_rust_examples_from_file(
         elif 'no_run' in options:
             attr = 'no_run'
         
+        # Parse miri option
+        miri_mode = None
+        if 'miri' in options:
+            miri_value = options.get('miri', '').strip()
+            if miri_value == '' or miri_value is None:
+                miri_mode = 'check'
+            elif miri_value == 'expect_ub':
+                miri_mode = 'expect_ub'
+            elif miri_value == 'skip':
+                miri_mode = 'skip'
+            else:
+                miri_mode = 'check'  # Default for unknown values
+        
         # Parse version/edition requirements with config defaults
         min_version = options.get('version') or options.get('min-version') or config.version
         channel = options.get('channel', config.channel)
@@ -391,6 +507,7 @@ def extract_rust_examples_from_file(
             parent_directive=parent_type or '',
             parent_id=parent_id or '',
             guideline_id=guideline_id or '',
+            miri_mode=miri_mode,
         )
         
         examples.append(example)
@@ -530,7 +647,9 @@ def extract_all_examples(
 
 def test_examples_individually(
     examples: List[RustExample],
-    prelude: str = ""
+    prelude: str = "",
+    run_miri: bool = True,
+    miri_timeout: int = 60
 ) -> List[TestResult]:
     """
     Test each example individually.
@@ -538,6 +657,8 @@ def test_examples_individually(
     Args:
         examples: List of examples to test
         prelude: Optional prelude code
+        run_miri: Whether to run Miri tests
+        miri_timeout: Timeout for Miri execution in seconds
         
     Returns:
         List of TestResult objects
@@ -550,6 +671,19 @@ def test_examples_individually(
         print(f"\n🦀 Detected Rust {current_version} ({current_channel})")
     else:
         print("\n⚠️  Could not detect Rust version")
+    
+    # Check for Miri examples
+    miri_examples = [e for e in examples if getattr(e, 'miri_mode', None) in ('check', 'expect_ub')]
+    
+    if miri_examples and run_miri:
+        miri_available, miri_info = check_miri_available()
+        if miri_available:
+            print(f"🔬 Miri available: {miri_info}")
+        else:
+            print(f"\n⚠️  Miri not available: {miri_info}")
+            print(f"   Install with: rustup +nightly component add miri")
+            print(f"   {len(miri_examples)} examples require Miri testing")
+            run_miri = False
     
     print(f"\n🧪 Testing {len(examples)} examples...")
     
@@ -570,6 +704,46 @@ def test_examples_individually(
         else:
             status = "❌"
         print(f"   [{i+1}/{len(examples)}] {status} {example.source_file}:{example.line_number}")
+    
+    # Run Miri tests if enabled
+    if run_miri and miri_examples:
+        print(f"\n🔬 Running Miri on {len(miri_examples)} examples...")
+        
+        miri_results = []
+        for i, example in enumerate(miri_examples):
+            miri_mode = getattr(example, 'miri_mode', 'check')
+            success, stdout, stderr = run_miri_on_example(example, timeout=miri_timeout)
+            
+            # Determine status
+            if success:
+                if miri_mode == 'expect_ub':
+                    status = "☣️"  # Expected UB found
+                    msg = "UB detected as expected"
+                else:
+                    status = "🔬"  # No UB (good)
+                    msg = "No UB detected"
+            else:
+                if miri_mode == 'expect_ub':
+                    status = "❌"  # Expected UB but not found
+                    msg = "Expected UB not found"
+                else:
+                    status = "☣️"  # UB found (bad)
+                    msg = "UB detected!"
+            
+            print(f"   [{i+1}/{len(miri_examples)}] {status} {example.source_file}:{example.line_number} - {msg}")
+            
+            miri_results.append({
+                'example': example,
+                'success': success,
+                'miri_mode': miri_mode,
+                'stdout': stdout,
+                'stderr': stderr,
+            })
+        
+        # Summary
+        miri_passed = sum(1 for r in miri_results if r['success'])
+        miri_failed = len(miri_results) - miri_passed
+        print(f"\n🔬 Miri: {miri_passed} passed, {miri_failed} failed")
     
     return results
 

@@ -24,3 +24,11 @@ api_url = "https://play.rust-lang.org"
 # behind the configured default version. Set to 0 to always show, or a high
 # number to effectively disable.
 version_mismatch_threshold = 2
+
+[miri]
+# Require :miri: option for all examples containing `unsafe` code.
+# When true, build will emit warnings for unsafe code without explicit miri option.
+require_for_unsafe = true
+
+# Timeout for Miri execution in seconds (Miri is slower than normal execution)
+timeout = 60
