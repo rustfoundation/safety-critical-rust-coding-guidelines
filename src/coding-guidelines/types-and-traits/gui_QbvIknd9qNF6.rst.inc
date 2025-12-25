@@ -94,6 +94,84 @@
          which is incompatible with high-integrity Rust.
 
    .. non_compliant_example::
+      :id: non_compl_ex_MkAkFxjRTijy
+      :status: draft
+
+      In this noncompliant example, the ``write_first`` and ``write_second`` functions each initialize one field within a ``MaybeUninit``,
+      and write ``uninit`` to the other.
+      If those addresses are equal, the code at that address must initialize both fields,
+      as we could call the same code and then assume either field to be initialized.
+      In that case it should be sound to call a function pointer created from that address and assume that both fields were initialized,
+      even though you didn't write any such function.
+      It's the only way the same function pointer could be a valid implementation of both functions.
+      MyMaybeUninit - A union with two fields: uninit (empty) and init (a 4-byte tuple). The #[repr(align(4))] ensures 4-byte alignment.
+      write_first and write_second - Two nearly identical functions that:
+
+      * Initialize then "uninitialize" the union
+      * Write to different subsets of init: write_first sets indices 0, 1, 3; write_second sets 0, 2, 3
+
+      get_a - 
+
+      Compares the addresses of the two functions
+      If the compiler merged them (ICF), addr1 == addr2 is true
+      It then calls the function through a transmuted pointer
+      The comments claim that if merged, calling the single function should satisfy both functions' postconditions (setting both .1 and .2)
+
+       .. rust-example::
+
+         // recently started warning by default
+         #![allow(function_casts_as_integer)]
+         
+         #[repr(align(4))]
+         union MyMaybeUninit {
+             uninit: (),
+             // extra fields to make it more likely that both
+             // functions are compiled to a single 4-byte write
+             init: (u8, u8, u8, u8),
+         }
+         
+         #[unsafe(no_mangle)]
+         fn write_first(a: &mut MyMaybeUninit) {
+             *a = MyMaybeUninit { init: (0, 1, 2, 3) };
+             *a = MyMaybeUninit { uninit: () };
+             a.init.0 = 0;
+             a.init.1 = 1;
+             a.init.3 = 3;
+         }
+         
+         #[unsafe(no_mangle)]
+         fn write_second(a: &mut MyMaybeUninit) {
+             *a = MyMaybeUninit { init: (0, 1, 2, 3) };
+             *a = MyMaybeUninit { uninit: () };
+             a.init.0 = 0;
+             a.init.2 = 2;
+             a.init.3 = 3;
+         }
+         
+         fn get_a() -> (u8, u8, u8, u8) {
+             let mut a = MyMaybeUninit { init: (0, 0, 0, 0) };
+             let addr1 = write_first as usize;
+             let addr2 = write_second as usize;
+             if addr1 == addr2 {
+                 unsafe {
+                     let ptr = addr1 as usize as *const ();
+                     let f: fn(&mut MyMaybeUninit) = core::mem::transmute(ptr);
+                     f(&mut a);
+                 }
+                 // Assuming that calling the (int as fnptr) is valid for either function,
+                 // we can assume that
+                 //  - `a.init.1 = 1` (because calling `write_first` ensures that)
+                 //  - `a.init.2 = 2` (because calling `write_second` ensures that)
+             }
+             unsafe { a.init }
+         }
+         
+         fn main() {
+             println!("{:?}", get_a());
+         }
+
+
+   .. non_compliant_example::
       :id: non_compl_ex_MkAkFxjRTijx
       :status: draft
 
