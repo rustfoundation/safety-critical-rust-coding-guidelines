@@ -331,6 +331,243 @@
              assert_eq!(try_read_bool(&u2), None);
          }
 
+   .. compliant_example::
+      :id: compl_ex_4Z8tmqYLLjtw
+      :status: draft
+      
+      Complex example showing:
+
+      * use of compile-time check for valid type using generics
+      * way to fence between FFI-facing code and rest of safe Rust codebase
+      
+      .. rust-example::
+      
+         use std::marker::PhantomData;
+         use std::mem::size_of;
+         
+         /// Marker types representing the active field.
+         pub struct AsInt;
+         pub struct AsBool;
+         
+         /// A union type which can be used to interact across FFI boundary.
+         #[repr(C)]
+         #[derive(Copy, Clone)]
+         pub union IntOrBoolData {
+             pub i: u8,
+             pub b: bool,
+         }
+         
+         /// Tag sent alongside the union from C code.
+         #[repr(u8)]
+         #[derive(Copy, Clone, PartialEq, Eq)]
+         pub enum IntOrBoolTag {
+             Int = 0,
+             Bool = 1,
+         }
+         
+         /// C-compatible tagged union as it might arrive from FFI.
+         #[repr(C)]
+         #[derive(Copy, Clone)]
+         pub struct CIntOrBool {
+             pub tag: IntOrBoolTag,
+             pub data: IntOrBoolData,
+         }
+         
+         // ============================================================================
+         // Safe wrapper types for use in the rest of the Rust codebase
+         // ============================================================================
+         
+         /// A union wrapper where the type parameter statically tracks the active field.
+         /// This is zero-cost: same size as the raw union.
+         #[repr(C)]
+         pub struct IntOrBool<T> {
+             data: IntOrBoolData,
+             _marker: PhantomData<T>,
+         }
+
+         impl IntOrBool<AsInt> {
+             pub fn from_int(value: u8) -> Self {
+                 Self {
+                     data: IntOrBoolData { i: value },
+                     _marker: PhantomData,
+                 }
+             }
+
+             pub fn get(&self) -> u8 {
+                 // SAFETY: Type parameter `AsInt` guarantees the integer field is active
+                 unsafe { self.data.i }
+             }
+
+             /// Convert to boolean representation.
+             /// Only valid when the integer value is 0 or 1.
+             pub fn try_into_bool(self) -> Option<IntOrBool<AsBool>> {
+                 match self.get() {
+                     0 | 1 => Some(IntOrBool {
+                         data: IntOrBoolData { b: self.get() == 1 },
+                         _marker: PhantomData,
+                     }),
+                     _ => None,
+                 }
+             }
+         }
+
+         impl IntOrBool<AsBool> {
+             pub fn from_bool(value: bool) -> Self {
+                 Self {
+                     data: IntOrBoolData { b: value },
+                     _marker: PhantomData,
+                 }
+             }
+
+             pub fn get(&self) -> bool {
+                 // SAFETY: Type parameter `AsBool` guarantees the boolean field is active
+                 unsafe { self.data.b }
+             }
+
+             /// Convert to integer representation. Always valid since bool is a subset of u8.
+             pub fn into_int(self) -> IntOrBool<AsInt> {
+                 IntOrBool {
+                     data: self.data,
+                     _marker: PhantomData,
+                 }
+             }
+         }
+
+         // ============================================================================
+         // FFI boundary: convert from C representation to safe Rust types
+         // ============================================================================
+
+         /// Result of converting a C tagged union to a safe Rust type.
+         /// The caller must handle both variants, ensuring type safety.
+         pub enum SafeIntOrBool {
+             Int(IntOrBool<AsInt>),
+             Bool(IntOrBool<AsBool>),
+         }
+
+         impl CIntOrBool {
+             /// Convert from C representation to safe Rust type at the FFI boundary.
+             /// After this point, all code uses the type-safe wrappers.
+             pub fn into_safe(self) -> SafeIntOrBool {
+                 match self.tag {
+                     IntOrBoolTag::Int => {
+                         // SAFETY: Tag guarantees integer field is active
+                         let value = unsafe { self.data.i };
+                         SafeIntOrBool::Int(IntOrBool::from_int(value))
+                     }
+                     IntOrBoolTag::Bool => {
+                         // SAFETY: Tag guarantees boolean field is active
+                         let value = unsafe { self.data.b };
+                         SafeIntOrBool::Bool(IntOrBool::from_bool(value))
+                     }
+                 }
+             }
+         }
+
+         // ============================================================================
+         // FFI boundary: convert from safe Rust types back to C representation
+         // ============================================================================
+
+         impl From<IntOrBool<AsInt>> for CIntOrBool {
+             fn from(val: IntOrBool<AsInt>) -> Self {
+                 CIntOrBool {
+                     tag: IntOrBoolTag::Int,
+                     data: IntOrBoolData { i: val.get() },
+                 }
+             }
+         }
+
+         impl From<IntOrBool<AsBool>> for CIntOrBool {
+             fn from(val: IntOrBool<AsBool>) -> Self {
+                 CIntOrBool {
+                     tag: IntOrBoolTag::Bool,
+                     data: IntOrBoolData { b: val.get() },
+                 }
+             }
+         }
+
+         // ============================================================================
+         // Example: application code that uses the safe types
+         // ============================================================================
+
+         /// Process a boolean value. This function can ONLY receive IntOrBool<AsBool>,
+         /// so there's no possibility of reading invalid bool bytes.
+         fn process_bool(val: IntOrBool<AsBool>) -> &'static str {
+             if val.get() { "yes" } else { "no" }
+         }
+
+         /// Process an integer value.
+         fn process_int(val: IntOrBool<AsInt>) -> u8 {
+             val.get().saturating_mul(2)
+         }
+
+         // Simulated FFI functions that would normally be defined in C.
+         // In real code, these would be `extern "C"` declarations linked to a C library.
+
+         /// Simulated C function that "receives" data from C.
+         extern "C" fn receive_from_ffi() -> CIntOrBool {
+             CIntOrBool {
+                 tag: IntOrBoolTag::Bool,
+                 data: IntOrBoolData { b: true },
+             }
+         }
+
+         /// Simulated C function that "sends" data to C.
+         extern "C" fn send_to_ffi(data: CIntOrBool) {
+             // In real code, this would be implemented in C
+             match data.tag {
+                 IntOrBoolTag::Int => {
+                     let i = unsafe { data.data.i };
+                     assert_eq!(i, 84);
+                 }
+                 IntOrBoolTag::Bool => {
+                     let b = unsafe { data.data.b };
+                     assert!(b);
+                 }
+             }
+         }
+
+         fn main() {
+             // Prove zero-cost: PhantomData adds no size
+             assert_eq!(size_of::<IntOrBoolData>(), size_of::<IntOrBool<AsInt>>());
+             assert_eq!(size_of::<IntOrBoolData>(), size_of::<IntOrBool<AsBool>>());
+             assert_eq!(size_of::<IntOrBoolData>(), 1); // Just one byte
+
+             // === FFI boundary: receive from C ===
+             let from_c = receive_from_ffi();
+             let safe_value = from_c.into_safe();
+
+             // === Application code: fully type-safe, no unsafe ===
+             match safe_value {
+                 SafeIntOrBool::Bool(b) => {
+                     // Can only call process_bool with IntOrBool<AsBool>
+                     assert_eq!(process_bool(b), "yes");
+                 }
+                 SafeIntOrBool::Int(i) => {
+                     // Can only call process_int with IntOrBool<AsInt>
+                     let _ = process_int(i);
+                 }
+             }
+
+             // === Type-safe conversions within Rust ===
+             let int_val = IntOrBool::from_int(1);
+
+             // Cannot pass IntOrBool<AsInt> to process_bool - won't compile:
+             // process_bool(int_val); // Error: expected IntOrBool<AsBool>, found IntOrBool<AsInt>
+
+             // Must explicitly convert, which validates the value
+             if let Some(bool_val) = int_val.try_into_bool() {
+                 assert_eq!(process_bool(bool_val), "yes");
+             }
+
+             // Invalid conversion is caught at the conversion point
+             let int_val = IntOrBool::from_int(42);
+             assert!(int_val.try_into_bool().is_none()); // 42 is not a valid bool
+
+             // === FFI boundary: send back to C ===
+             let int_val = IntOrBool::from_int(42);
+             let doubled = IntOrBool::from_int(process_int(int_val));
+             send_to_ffi(doubled.into());
+         }
    .. bibliography::
       :id: bib_WNCi5njUWLuZ
       :status: draft
