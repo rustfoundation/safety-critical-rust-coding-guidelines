@@ -13,6 +13,8 @@ This script:
 
 Supports both monolithic chapter files (*.rst) and per-guideline files (*.rst.inc).
 
+Configuration is loaded from src/rust_examples_config.toml for default values.
+
 Usage:
     # Extract examples and generate test crate
     uv run python scripts/extract_rust_examples.py --extract
@@ -32,6 +34,7 @@ import json
 import os
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -50,6 +53,108 @@ from rustdoc_utils import (
     process_hidden_lines,
     save_results_json,
 )
+
+
+class ConfigurationError(Exception):
+    """Raised when configuration cannot be loaded."""
+    pass
+
+
+class RustExamplesConfig:
+    """Configuration loaded from rust_examples_config.toml"""
+    
+    def __init__(self):
+        self.edition = None
+        self.channel = None
+        self.version = None
+        self.version_mismatch_threshold = None
+    
+    @classmethod
+    def load(cls, config_path: Path) -> "RustExamplesConfig":
+        """
+        Load configuration from TOML file.
+        
+        Args:
+            config_path: Path to the TOML configuration file
+            
+        Returns:
+            RustExamplesConfig instance
+            
+        Raises:
+            ConfigurationError: If config file doesn't exist or is invalid
+        """
+        config = cls()
+        
+        if not config_path.exists():
+            raise ConfigurationError(
+                f"Rust examples config not found: {config_path}\n"
+                f"Please create this file with the required configuration.\n"
+                f"See src/rust_examples_config.toml for the expected format."
+            )
+        
+        try:
+            with open(config_path, "rb") as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            raise ConfigurationError(
+                f"Invalid TOML in config file {config_path}: {e}"
+            )
+        
+        defaults = data.get("defaults", {})
+        
+        # Validate required fields
+        required_fields = ["edition", "channel", "version"]
+        missing = [f for f in required_fields if f not in defaults]
+        if missing:
+            raise ConfigurationError(
+                f"Missing required fields in {config_path} [defaults] section: {', '.join(missing)}"
+            )
+        
+        config.edition = defaults["edition"]
+        config.channel = defaults["channel"]
+        config.version = defaults["version"]
+        
+        warnings = data.get("warnings", {})
+        config.version_mismatch_threshold = warnings.get("version_mismatch_threshold", 2)
+        
+        return config
+    
+    @classmethod
+    def find_and_load(cls, search_paths: List[Path] = None) -> "RustExamplesConfig":
+        """
+        Find and load configuration from standard locations.
+        
+        Args:
+            search_paths: Additional paths to search (searched first)
+            
+        Returns:
+            RustExamplesConfig instance
+            
+        Raises:
+            ConfigurationError: If no config file found or config is invalid
+        """
+        candidates = []
+        
+        if search_paths:
+            candidates.extend(search_paths)
+        
+        # Standard locations
+        candidates.extend([
+            Path("src/rust_examples_config.toml"),
+            Path("rust_examples_config.toml"),
+            Path("config/rust_examples_config.toml"),
+        ])
+        
+        for candidate in candidates:
+            if candidate.exists():
+                return cls.load(candidate)
+        
+        searched = "\n  - ".join(str(p) for p in candidates)
+        raise ConfigurationError(
+            f"Rust examples config not found. Searched:\n  - {searched}\n\n"
+            f"Please create src/rust_examples_config.toml with the required configuration."
+        )
+
 
 # Patterns for parsing RST
 RUST_EXAMPLE_PATTERN = re.compile(
@@ -213,7 +318,10 @@ def find_parent_context(content: str, pos: int) -> Tuple[Optional[str], Optional
     return parent_type, parent_id, guideline_id
 
 
-def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
+def extract_rust_examples_from_file(
+    file_path: Path,
+    config: RustExamplesConfig
+) -> List[RustExample]:
     """
     Extract all Rust examples from an RST file.
     
@@ -223,6 +331,7 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
     
     Args:
         file_path: Path to the RST file (supports .rst and .rst.inc)
+        config: Configuration with default values
         
     Returns:
         List of RustExample objects
@@ -260,10 +369,10 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
         elif 'no_run' in options:
             attr = 'no_run'
         
-        # Parse version/edition requirements
-        min_version = options.get('version') or options.get('min-version')
-        channel = options.get('channel', 'stable')
-        edition = options.get('edition', '2021')
+        # Parse version/edition requirements with config defaults
+        min_version = options.get('version') or options.get('min-version') or config.version
+        channel = options.get('channel', config.channel)
+        edition = options.get('edition', config.edition)
         
         # Find parent context
         parent_type, parent_id, guideline_id = find_parent_context(content, start)
@@ -318,6 +427,10 @@ def extract_rust_examples_from_file(file_path: Path) -> List[RustExample]:
             line_number=line_number,
             code=code,
             display_code=code,
+            # Use config defaults for legacy examples
+            min_version=config.version,
+            channel=config.channel,
+            edition=config.edition,
             parent_directive=parent_type or '',
             parent_id=parent_id or '',
             guideline_id=guideline_id or '',
@@ -347,12 +460,17 @@ def find_rst_files(src_dir: Path) -> List[Path]:
     return rst_files + rst_inc_files
 
 
-def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[RustExample]:
+def extract_all_examples(
+    src_dirs: List[Path],
+    config: RustExamplesConfig,
+    quiet: bool = False
+) -> List[RustExample]:
     """
     Extract all Rust examples from all RST files in the given directories.
     
     Args:
         src_dirs: List of directories to scan
+        config: Configuration with default values
         quiet: If True, suppress progress output
         
     Returns:
@@ -391,7 +509,7 @@ def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[Rust
             
             # Extract examples from each file
             for file_path in sorted(chapter_files):
-                file_examples = extract_rust_examples_from_file(file_path)
+                file_examples = extract_rust_examples_from_file(file_path, config)
                 if file_examples:
                     file_results.append((file_path, file_examples))
                     examples.extend(file_examples)
@@ -405,6 +523,7 @@ def extract_all_examples(src_dirs: List[Path], quiet: bool = False) -> List[Rust
     
     if not quiet:
         print(f"\n📊 Total: {len(examples)} examples found", file=sys.stderr)
+        print(f"   Using defaults: edition={config.edition}, channel={config.channel}, version={config.version}", file=sys.stderr)
     
     return examples
 
@@ -628,6 +747,12 @@ def main():
         help="Output directory for generated test crate"
     )
     parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to rust_examples_config.toml (default: searches standard locations)"
+    )
+    parser.add_argument(
         "--prelude",
         type=str,
         default=None,
@@ -682,6 +807,19 @@ def main():
         parser.print_help()
         sys.exit(1)
     
+    # Load configuration
+    try:
+        if args.config:
+            config = RustExamplesConfig.load(Path(args.config))
+        else:
+            config = RustExamplesConfig.find_and_load()
+        
+        if args.verbose:
+            print(f"📋 Loaded config: edition={config.edition}, channel={config.channel}, version={config.version}", file=sys.stderr)
+    except ConfigurationError as e:
+        print(f"❌ Configuration error: {e}", file=sys.stderr)
+        sys.exit(1)
+    
     # Handle source directories - default to src/coding-guidelines if none specified
     src_dirs = args.src_dirs if args.src_dirs else ["src/coding-guidelines"]
     
@@ -707,7 +845,7 @@ def main():
     if args.list or args.extract or args.test or args.list_requirements:
         # Use quiet mode for list-requirements to get clean JSON output
         quiet = args.list_requirements
-        examples = extract_all_examples(validated_src_dirs, quiet=quiet)
+        examples = extract_all_examples(validated_src_dirs, config, quiet=quiet)
         
         # Handle --list-requirements
         if args.list_requirements:
@@ -723,6 +861,7 @@ def main():
                 if args.verbose:
                     print(f"      Parent: {example.parent_directive} ({example.parent_id})")
                     print(f"      Guideline: {example.guideline_id}")
+                    print(f"      Edition: {example.edition}, Channel: {example.channel}, Version: {example.min_version}")
             sys.exit(0)
         
         # Apply filters if specified

@@ -11,14 +11,30 @@ Supported attributes:
 - should_panic: Example should compile but panic at runtime
 - no_run: Compile but don't run the example
 
-Hidden lines (prefixed with `# `) can be shown or hidden based on configuration.
+Hidden lines (prefixed with `# `) can be shown or hidden via interactive toggle.
+
+Interactive features (via JavaScript post-processing):
+- Copy button: Copies full code including hidden lines
+- Run button: Executes code on Rust Playground
+- Toggle button: Shows/hides hidden lines
+
+The directive outputs standard docutils nodes which Sphinx processes normally.
+JavaScript then enhances the rendered HTML with interactive buttons by finding
+elements with the 'rust-example-container' class.
 """
 
+import json
+import os
 import re
+import tomllib
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from docutils import nodes
 from docutils.parsers.rst import Directive, directives
+from pygments import highlight
+from pygments.lexers import RustLexer
+from pygments.formatters import HtmlFormatter
 from sphinx.application import Sphinx
 from sphinx.util import logging
 
@@ -34,26 +50,89 @@ RUSTDOC_ATTRIBUTES = {
 }
 
 
+class RustExamplesConfig:
+    """Configuration loaded from rust_examples_config.toml"""
+    
+    def __init__(self):
+        self.edition = "2021"
+        self.channel = "stable"
+        self.version = "1.85.0"
+        self.playground_api_url = "https://play.rust-lang.org"
+        self.version_mismatch_threshold = 2
+    
+    @classmethod
+    def load(cls, config_path: Path) -> "RustExamplesConfig":
+        """
+        Load configuration from TOML file.
+        
+        Args:
+            config_path: Path to the TOML configuration file
+            
+        Returns:
+            RustExamplesConfig instance
+            
+        Raises:
+            FileNotFoundError: If config file doesn't exist
+            tomllib.TOMLDecodeError: If config file is invalid
+        """
+        config = cls()
+        
+        if not config_path.exists():
+            raise FileNotFoundError(f"Rust examples config not found: {config_path}")
+        
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+        
+        defaults = data.get("defaults", {})
+        config.edition = defaults.get("edition", config.edition)
+        config.channel = defaults.get("channel", config.channel)
+        config.version = defaults.get("version", config.version)
+        
+        playground = data.get("playground", {})
+        config.playground_api_url = playground.get("api_url", config.playground_api_url)
+        
+        warnings = data.get("warnings", {})
+        config.version_mismatch_threshold = warnings.get(
+            "version_mismatch_threshold", 
+            config.version_mismatch_threshold
+        )
+        
+        return config
+
+
+def parse_version(version_str: str) -> Tuple[int, int, int]:
+    """Parse a version string into (major, minor, patch) tuple."""
+    parts = version_str.split(".")
+    major = int(parts[0]) if len(parts) > 0 else 0
+    minor = int(parts[1]) if len(parts) > 1 else 0
+    patch = int(parts[2]) if len(parts) > 2 else 0
+    return (major, minor, patch)
+
+
+def version_diff(v1: str, v2: str) -> int:
+    """Calculate the minor version difference between two versions."""
+    try:
+        maj1, min1, _ = parse_version(v1)
+        maj2, min2, _ = parse_version(v2)
+        
+        if maj1 != maj2:
+            return (maj2 - maj1) * 100 + (min2 - min1)
+        
+        return min2 - min1
+    except (ValueError, IndexError):
+        return 0
+
+
 def parse_compile_fail_error(value: str) -> Tuple[bool, Optional[str]]:
-    """
-    Parse compile_fail option value.
-    
-    Returns:
-        Tuple of (is_compile_fail, optional_error_code)
-    
-    Examples:
-        "" -> (True, None)
-        "E0277" -> (True, "E0277")
-    """
+    """Parse compile_fail option value."""
     if not value or value.lower() in ("true", "yes", "1"):
         return (True, None)
-    # Check if it looks like an error code (E followed by digits)
     if re.match(r"^E\d{4}$", value.strip()):
         return (True, value.strip())
     return (True, None)
 
 
-def process_hidden_lines(code: str, show_hidden: bool = False) -> Tuple[str, str]:
+def process_hidden_lines(code: str, show_hidden: bool = False) -> Tuple[str, str, List[int]]:
     """
     Process code to handle hidden lines (prefixed with `# `).
     
@@ -62,25 +141,58 @@ def process_hidden_lines(code: str, show_hidden: bool = False) -> Tuple[str, str
         show_hidden: Whether to include hidden lines in rendered output
         
     Returns:
-        Tuple of (display_code, full_code_for_testing)
+        Tuple of (display_code, full_code_for_testing, hidden_line_numbers)
+        hidden_line_numbers is 0-indexed list of lines that are hidden
     """
     lines = code.split('\n')
     display_lines = []
     full_lines = []
+    hidden_line_numbers = []
     
-    for line in lines:
-        # Check for hidden line marker (rustdoc style: line starts with # followed by space or nothing)
+    for i, line in enumerate(lines):
         if line.startswith('# ') or line == '#':
-            # Hidden line - always include in full code
             full_lines.append(line[2:] if line.startswith('# ') else '')
+            hidden_line_numbers.append(i)
             if show_hidden:
-                # Show with a visual indicator
                 display_lines.append(line)
         else:
             display_lines.append(line)
             full_lines.append(line)
     
-    return '\n'.join(display_lines), '\n'.join(full_lines)
+    return '\n'.join(display_lines), '\n'.join(full_lines), hidden_line_numbers
+
+
+def highlight_code_with_hidden_lines(full_code: str, hidden_line_numbers: List[int]) -> str:
+    """
+    Highlight code using Pygments and wrap hidden lines with a marker class.
+    
+    Args:
+        full_code: The complete code (hidden lines already stripped of # prefix)
+        hidden_line_numbers: 0-indexed list of which lines were hidden
+        
+    Returns:
+        HTML string with syntax highlighting and hidden lines wrapped
+    """
+    # Use Pygments to highlight the full code
+    lexer = RustLexer()
+    # Use a formatter that doesn't wrap in <pre> - we just want the highlighted spans
+    formatter = HtmlFormatter(nowrap=True)
+    highlighted = highlight(full_code, lexer, formatter)
+    
+    # Now we need to wrap hidden lines with our marker class
+    # Split by newlines, being careful to preserve the HTML structure
+    lines = highlighted.split('\n')
+    hidden_set = set(hidden_line_numbers)
+    
+    result_lines = []
+    for i, line in enumerate(lines):
+        if i in hidden_set:
+            # Wrap the entire line content in a span, and prepend the # marker
+            result_lines.append(f'<span class="rust-hidden-line"># {line}</span>')
+        else:
+            result_lines.append(line)
+    
+    return '\n'.join(result_lines)
 
 
 class RustExampleDirective(Directive):
@@ -97,7 +209,9 @@ class RustExampleDirective(Directive):
         
         .. rust-example::
             :ignore:
-            :show_hidden:
+            :edition: 2018
+            :channel: nightly
+            :version: 1.79.0
             
             # use std::collections::HashMap;
             # fn main() {
@@ -113,27 +227,45 @@ class RustExampleDirective(Directive):
     option_spec = {
         # Rustdoc attributes
         "ignore": directives.flag,
-        "compile_fail": directives.unchanged,  # Can be flag or error code
-        "should_panic": directives.unchanged,  # Can be flag or expected message
+        "compile_fail": directives.unchanged,
+        "should_panic": directives.unchanged,
         "no_run": directives.flag,
+        # Toolchain options
+        "edition": directives.unchanged,
+        "channel": directives.unchanged,
+        "version": directives.unchanged,
         # Display options
-        "show_hidden": directives.flag,  # Show hidden lines in rendered output
+        "show_hidden": directives.flag,
         # Metadata
-        "name": directives.unchanged,  # Optional name for the example
+        "name": directives.unchanged,
     }
     
     def run(self) -> List[nodes.Node]:
         env = self.state.document.settings.env
         
-        # Get configuration for showing hidden lines globally
+        # Load configuration (with fallback defaults)
+        config = getattr(env, 'rust_examples_config', None)
+        if config is None:
+            config_path = Path(env.app.confdir) / "rust_examples_config.toml"
+            try:
+                config = RustExamplesConfig.load(config_path)
+            except FileNotFoundError:
+                logger.warning(f"Rust examples config not found at {config_path}, using defaults")
+                config = RustExamplesConfig()
+            except Exception as e:
+                logger.error(f"Error loading rust examples config: {e}")
+                config = RustExamplesConfig()
+            env.rust_examples_config = config
+        
+        # Get configuration for showing hidden lines
         show_hidden_global = getattr(env.config, 'rust_examples_show_hidden', False)
         show_hidden = 'show_hidden' in self.options or show_hidden_global
         
         # Parse the code content
         raw_code = '\n'.join(self.content)
-        display_code, full_code = process_hidden_lines(raw_code, show_hidden)
+        display_code, full_code, hidden_line_numbers = process_hidden_lines(raw_code, show_hidden)
         
-        # Determine which rustdoc attribute is set (only one should be set)
+        # Determine rustdoc attribute
         rustdoc_attr = None
         attr_value = None
         
@@ -150,192 +282,652 @@ class RustExampleDirective(Directive):
         elif 'no_run' in self.options:
             rustdoc_attr = 'no_run'
         
-        # Store metadata for extraction by the test runner
-        example_name = self.options.get('name', '')
+        # Get toolchain options
+        edition = self.options.get('edition', config.edition)
+        channel = self.options.get('channel', config.channel)
+        version = self.options.get('version', config.version)
         
-        # Create the container node
+        # Determine expected outcome
+        expected_outcome = "success"
+        if rustdoc_attr == "compile_fail":
+            expected_outcome = "compile_fail"
+        elif rustdoc_attr == "should_panic":
+            expected_outcome = "should_panic"
+        elif rustdoc_attr == "no_run":
+            expected_outcome = "no_run"
+        
+        is_runnable = rustdoc_attr != "ignore"
+        has_hidden_lines = len(hidden_line_numbers) > 0
+        version_mismatch = version_diff(version, config.version) >= config.version_mismatch_threshold
+        show_channel_badge = channel == "nightly"
+        
+        # Store source location
+        source, line = self.state_machine.get_source_and_line(self.lineno)
+        
+        # Build JSON data for JavaScript
+        js_data = {
+            "code": full_code,
+            "displayCode": display_code,
+            "hiddenLineNumbers": hidden_line_numbers,
+            "edition": edition,
+            "channel": channel,
+            "version": version,
+            "expectedOutcome": expected_outcome,
+            "expectedError": attr_value if rustdoc_attr == "compile_fail" else None,
+            "runnable": is_runnable,
+            "hasHiddenLines": has_hidden_lines,
+        }
+        
+        # If there are hidden lines, pre-generate the highlighted HTML for the full code
+        if has_hidden_lines:
+            js_data["fullCodeHighlighted"] = highlight_code_with_hidden_lines(
+                full_code, hidden_line_numbers
+            )
+        
+        # Create the outer container
         container = nodes.container()
         container['classes'].append('rust-example-container')
         
-        # Add the badge if there's an attribute
-        if rustdoc_attr:
-            badge = nodes.container()
-            badge['classes'].append('rust-example-badge')
-            badge['classes'].append(f'rust-example-badge-{rustdoc_attr.replace("_", "-")}')
+        # Add badge container if needed
+        if rustdoc_attr or show_channel_badge or version_mismatch:
+            badge_container = nodes.container()
+            badge_container['classes'].append('rust-example-badges')
             
-            badge_text = rustdoc_attr
-            if attr_value:
-                badge_text += f"({attr_value})"
+            if rustdoc_attr:
+                badge = nodes.inline()
+                badge['classes'].append('rust-example-badge')
+                badge['classes'].append(f'rust-example-badge-{rustdoc_attr.replace("_", "-")}')
+                badge_text = rustdoc_attr.replace("_", " ")
+                if attr_value:
+                    badge_text += f"({attr_value})"
+                badge += nodes.Text(badge_text)
+                badge_container += badge
             
-            badge_para = nodes.paragraph()
-            badge_para += nodes.Text(badge_text)
-            badge += badge_para
-            container += badge
+            if show_channel_badge:
+                badge = nodes.inline()
+                badge['classes'].append('rust-example-badge')
+                badge['classes'].append('rust-example-badge-nightly')
+                badge += nodes.Text('nightly')
+                badge_container += badge
+            
+            if version_mismatch:
+                badge = nodes.inline()
+                badge['classes'].append('rust-example-badge')
+                badge['classes'].append('rust-example-badge-version')
+                badge += nodes.Text(f'Rust {version} ⚠️')
+                badge_container += badge
+            
+            container += badge_container
         
-        # Create the code block
+        # Create the code block - Sphinx will syntax highlight this
         code_node = nodes.literal_block(display_code, display_code)
         code_node['language'] = 'rust'
         code_node['classes'].append('rust-example-code')
         
-        # Store rustdoc metadata as custom attributes for later extraction
+        # Store metadata on the code node for potential extraction
         code_node['rustdoc_attr'] = rustdoc_attr
         code_node['rustdoc_attr_value'] = attr_value
         code_node['rustdoc_full_code'] = full_code
-        code_node['rustdoc_example_name'] = example_name
-        
-        # Store source location for error reporting
-        source, line = self.state_machine.get_source_and_line(self.lineno)
+        code_node['rustdoc_example_name'] = self.options.get('name', '')
+        code_node['rustdoc_edition'] = edition
+        code_node['rustdoc_channel'] = channel
+        code_node['rustdoc_version'] = version
         code_node['source'] = source
         code_node['line'] = line
         
         container += code_node
         
+        # Add a hidden element with the JSON data for JavaScript
+        json_str = json.dumps(js_data)
+        json_node = nodes.raw(
+            '',
+            f'<script type="application/json" class="rust-example-data">{json_str}</script>',
+            format='html'
+        )
+        container += json_node
+        
         return [container]
 
 
-class RustExampleCollector:
-    """
-    Collector that gathers all rust-example code blocks for testing.
-    """
+def add_static_files(app: Sphinx, exception):
+    """Write CSS and JS files when build finishes."""
+    if exception is not None:
+        return
     
-    def __init__(self):
-        self.examples = []
+    # Write CSS
+    css_path = os.path.join(app.outdir, "_static", "rust_playground.css")
+    os.makedirs(os.path.dirname(css_path), exist_ok=True)
+    with open(css_path, "w") as f:
+        f.write(get_css_content())
     
-    def collect(self, app, doctree, docname):
-        """Collect rust examples from the doctree."""
-        for node in doctree.traverse(nodes.literal_block):
-            if node.get('language') == 'rust' and 'rustdoc_full_code' in node.attributes:
-                example = {
-                    'docname': docname,
-                    'source': node.get('source', ''),
-                    'line': node.get('line', 0),
-                    'code': node.get('rustdoc_full_code', ''),
-                    'display_code': node.astext(),
-                    'attr': node.get('rustdoc_attr'),
-                    'attr_value': node.get('rustdoc_attr_value'),
-                    'name': node.get('rustdoc_example_name', ''),
-                }
-                self.examples.append(example)
+    # Write JS
+    js_path = os.path.join(app.outdir, "_static", "rust_playground.js")
+    with open(js_path, "w") as f:
+        f.write(get_js_content())
 
 
-def add_css(app: Sphinx):
-    """Add CSS for rust-example styling."""
-    css = """
-/* Rust Example Container */
+def get_css_content() -> str:
+    """Return the CSS content for rust playground styling."""
+    return '''\
+/* Rust Playground Interactive Examples */
+
+/* Container */
 .rust-example-container {
+    position: relative;
     margin: 1em 0;
-    border-radius: 4px;
-    overflow: hidden;
 }
 
-/* Badge styling */
+/* Badges row */
+.rust-example-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    margin-bottom: 0.5em;
+}
+
 .rust-example-badge {
-    padding: 0.3em 0.8em;
+    display: inline-block;
+    padding: 0.2em 0.6em;
     font-family: monospace;
-    font-size: 0.85em;
+    font-size: 0.8em;
     font-weight: bold;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.rust-example-badge p {
-    margin: 0;
+    border-radius: 3px;
+    text-transform: lowercase;
 }
 
 .rust-example-badge-ignore {
     background-color: #6c757d;
     color: white;
 }
-
-.rust-example-badge-ignore::before {
-    content: "⏭ ";
-}
+.rust-example-badge-ignore::before { content: "⏭ "; }
 
 .rust-example-badge-compile-fail {
     background-color: #dc3545;
     color: white;
 }
-
-.rust-example-badge-compile-fail::before {
-    content: "✗ ";
-}
+.rust-example-badge-compile-fail::before { content: "✗ "; }
 
 .rust-example-badge-should-panic {
     background-color: #fd7e14;
     color: white;
 }
-
-.rust-example-badge-should-panic::before {
-    content: "💥 ";
-}
+.rust-example-badge-should-panic::before { content: "💥 "; }
 
 .rust-example-badge-no-run {
     background-color: #17a2b8;
     color: white;
 }
+.rust-example-badge-no-run::before { content: "⚙ "; }
 
-.rust-example-badge-no-run::before {
-    content: "⚙ ";
+.rust-example-badge-nightly {
+    background-color: #6f42c1;
+    color: white;
+}
+.rust-example-badge-nightly::before { content: "🌙 "; }
+
+.rust-example-badge-version {
+    background-color: #ffc107;
+    color: #212529;
+    cursor: help;
 }
 
-/* Hidden lines styling (when shown) */
-.rust-example-code .hidden-line {
+/* Button toolbar - injected by JavaScript */
+.rust-example-buttons {
+    position: absolute;
+    top: 0.5em;
+    right: 0.5em;
+    display: flex;
+    gap: 0.3em;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+
+.rust-example-container:hover .rust-example-buttons {
+    opacity: 1;
+}
+
+/* Adjust button position when badges are present */
+.rust-example-container:has(.rust-example-badges) .rust-example-buttons {
+    top: calc(0.5em + 1.8em + 0.5em);
+}
+
+/* Individual buttons */
+.rust-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.rust-btn:hover {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.rust-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.rust-btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+}
+
+.rust-btn-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+/* Copy button tooltip */
+.rust-btn-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.3em 0.6em;
+    margin-bottom: 0.3em;
+    font-size: 0.75em;
+    white-space: nowrap;
+    background-color: #333;
+    color: #fff;
+    border-radius: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.rust-btn-tooltip.show {
+    opacity: 1;
+}
+
+/* Running state */
+.rust-btn-run.running {
     opacity: 0.6;
-    font-style: italic;
+    cursor: wait;
 }
 
-/* Code block within container */
-.rust-example-container .rust-example-code {
-    margin-top: 0;
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
+/* Hidden lines toggle active state */
+.rust-btn-toggle-hidden.active {
+    background-color: rgba(0, 0, 0, 0.6);
 }
-"""
+
+/* Hidden lines styling when revealed */
+.rust-hidden-line {
+    opacity: 0.5;
+    background-color: rgba(128, 128, 128, 0.15);
+}
+
+/* Output area - injected by JavaScript */
+.rust-example-output {
+    margin-top: 0.5em;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #1e1e1e;
+    overflow: hidden;
+}
+
+.rust-example-output-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5em 1em;
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #444;
+}
+
+.rust-example-output-status {
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.rust-example-output-status.success { color: #4caf50; }
+.rust-example-output-status.success::before { content: "✓ "; }
+
+.rust-example-output-status.error { color: #f44336; }
+.rust-example-output-status.error::before { content: "✗ "; }
+
+.rust-example-output-status.expected { color: #ff9800; }
+.rust-example-output-status.expected::before { content: "✓ "; }
+
+.rust-example-output-close {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 0 0.3em;
+}
+
+.rust-example-output-close:hover {
+    color: #fff;
+}
+
+.rust-example-output-content {
+    margin: 0;
+    padding: 1em;
+    max-height: 300px;
+    overflow: auto;
+    font-family: monospace;
+    font-size: 0.85em;
+    color: #d4d4d4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Hide the JSON data script */
+.rust-example-data {
+    display: none !important;
+}
+'''
+
+
+def get_js_content() -> str:
+    """Return the JavaScript content for rust playground interactivity."""
+    return '''\
+/* Rust Playground Interactive Examples */
+(function() {
+    'use strict';
     
-    import os
-    css_path = os.path.join(app.outdir, "_static", "rust_examples.css")
-    os.makedirs(os.path.dirname(css_path), exist_ok=True)
-    with open(css_path, "w") as f:
-        f.write(css)
-
-
-def inject_css_link(app, pagename, templatename, context, doctree):
-    """Inject CSS link into HTML pages that have rust examples."""
-    if doctree is None:
-        return
+    const PLAYGROUND_URL = 'https://play.rust-lang.org/execute';
     
-    # Check if this page has any rust examples
-    has_examples = False
-    for node in doctree.traverse(nodes.container):
-        if 'rust-example-container' in node.get('classes', []):
-            has_examples = True
-            break
+    // SVG icons (Font Awesome Free 6.2.0)
+    const ICON_COPY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448H256V416h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>';
+    const ICON_PLAY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg>';
+    const ICON_EYE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg>';
     
-    if has_examples:
-        # Add CSS to metatags or similar
-        if 'metatags' not in context:
-            context['metatags'] = ''
-        context['metatags'] += '\n<link rel="stylesheet" href="_static/rust_examples.css" type="text/css" />'
-
-
-def build_finished(app, exception):
-    """Write CSS file when build finishes."""
-    if exception is not None:
-        return
-    add_css(app)
+    document.addEventListener('DOMContentLoaded', initializeRustExamples);
+    
+    function initializeRustExamples() {
+        const containers = document.querySelectorAll('.rust-example-container');
+        containers.forEach(initializeExample);
+    }
+    
+    function initializeExample(container) {
+        // Find the JSON data script
+        const dataScript = container.querySelector('script.rust-example-data');
+        if (!dataScript) {
+            console.warn('No rust-example-data found in container', container);
+            return;
+        }
+        
+        let data;
+        try {
+            data = JSON.parse(dataScript.textContent);
+        } catch (e) {
+            console.error('Failed to parse rust example data:', e);
+            return;
+        }
+        
+        container._rustData = data;
+        
+        // Find the code block (Sphinx wraps it in div.highlight)
+        const highlightDiv = container.querySelector('.highlight');
+        if (!highlightDiv) {
+            console.warn('No .highlight found in container', container);
+            return;
+        }
+        
+        // Make the highlight div position:relative for button positioning
+        highlightDiv.style.position = 'relative';
+        
+        // Create and inject the button toolbar
+        const buttons = createButtonToolbar(container, data);
+        highlightDiv.appendChild(buttons);
+        
+        // Store reference to pre element for code manipulation
+        container._preElement = highlightDiv.querySelector('pre');
+        container._originalHTML = container._preElement ? container._preElement.innerHTML : '';
+    }
+    
+    function createButtonToolbar(container, data) {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'rust-example-buttons';
+        
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'rust-btn rust-btn-copy';
+        copyBtn.title = 'Copy to clipboard';
+        copyBtn.setAttribute('aria-label', 'Copy to clipboard');
+        copyBtn.innerHTML = '<span class="rust-btn-icon">' + ICON_COPY + '</span><span class="rust-btn-tooltip"></span>';
+        copyBtn.addEventListener('click', function() { handleCopy(container, data); });
+        toolbar.appendChild(copyBtn);
+        
+        // Run button
+        const runBtn = document.createElement('button');
+        runBtn.className = 'rust-btn rust-btn-run';
+        runBtn.title = data.runnable ? 'Run this code' : 'This example cannot be run';
+        runBtn.setAttribute('aria-label', runBtn.title);
+        runBtn.disabled = !data.runnable;
+        runBtn.innerHTML = '<span class="rust-btn-icon">' + ICON_PLAY + '</span>';
+        if (data.runnable) {
+            runBtn.addEventListener('click', function() { handleRun(container, data); });
+        }
+        toolbar.appendChild(runBtn);
+        
+        // Toggle hidden lines button (only if there are hidden lines)
+        if (data.hasHiddenLines) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'rust-btn rust-btn-toggle-hidden';
+            toggleBtn.title = 'Show hidden lines';
+            toggleBtn.setAttribute('aria-label', 'Show hidden lines');
+            toggleBtn.innerHTML = '<span class="rust-btn-icon">' + ICON_EYE + '</span>';
+            toggleBtn.addEventListener('click', function() { handleToggleHidden(container, data); });
+            toolbar.appendChild(toggleBtn);
+        }
+        
+        return toolbar;
+    }
+    
+    function handleCopy(container, data) {
+        const copyBtn = container.querySelector('.rust-btn-copy');
+        const tooltip = copyBtn.querySelector('.rust-btn-tooltip');
+        
+        navigator.clipboard.writeText(data.code).then(function() {
+            tooltip.textContent = 'Copied!';
+            tooltip.classList.add('show');
+            setTimeout(function() { tooltip.classList.remove('show'); }, 1500);
+        }).catch(function(err) {
+            console.error('Failed to copy:', err);
+            tooltip.textContent = 'Failed';
+            tooltip.classList.add('show');
+            setTimeout(function() { tooltip.classList.remove('show'); }, 1500);
+        });
+    }
+    
+    function handleRun(container, data) {
+        const runBtn = container.querySelector('.rust-btn-run');
+        
+        if (runBtn.classList.contains('running')) return;
+        
+        runBtn.classList.add('running');
+        runBtn.disabled = true;
+        
+        // Remove any existing output
+        const existingOutput = container.querySelector('.rust-example-output');
+        if (existingOutput) existingOutput.remove();
+        
+        // Create output area
+        const output = createOutputArea();
+        container.appendChild(output);
+        
+        const statusSpan = output.querySelector('.rust-example-output-status');
+        const contentPre = output.querySelector('.rust-example-output-content');
+        
+        statusSpan.textContent = 'Running...';
+        statusSpan.className = 'rust-example-output-status';
+        
+        fetch(PLAYGROUND_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                channel: data.channel,
+                mode: 'debug',
+                edition: data.edition,
+                crateType: 'bin',
+                tests: false,
+                code: data.code,
+                backtrace: false
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error('Playground request failed: ' + response.status);
+            return response.json();
+        })
+        .then(function(result) {
+            displayResult(container, data, result, statusSpan, contentPre);
+        })
+        .catch(function(error) {
+            statusSpan.textContent = 'Error';
+            statusSpan.className = 'rust-example-output-status error';
+            contentPre.textContent = 'Failed to run: ' + error.message;
+        })
+        .finally(function() {
+            runBtn.classList.remove('running');
+            runBtn.disabled = false;
+        });
+    }
+    
+    function createOutputArea() {
+        const output = document.createElement('div');
+        output.className = 'rust-example-output';
+        output.innerHTML = 
+            '<div class="rust-example-output-header">' +
+                '<span class="rust-example-output-status"></span>' +
+                '<button class="rust-example-output-close" title="Close">×</button>' +
+            '</div>' +
+            '<pre class="rust-example-output-content"></pre>';
+        
+        output.querySelector('.rust-example-output-close').addEventListener('click', function() {
+            output.remove();
+        });
+        
+        return output;
+    }
+    
+    function displayResult(container, data, result, statusSpan, contentPre) {
+        const success = result.success;
+        let output = '';
+        
+        if (result.stderr) output += result.stderr;
+        if (result.stdout) {
+            if (output) output += '\\n';
+            output += result.stdout;
+        }
+        if (!output) output = success ? '(no output)' : '(compilation failed)';
+        
+        let statusText = '';
+        let statusClass = '';
+        
+        switch (data.expectedOutcome) {
+            case 'compile_fail':
+                if (!success) {
+                    statusText = data.expectedError && result.stderr && result.stderr.includes(data.expectedError)
+                        ? 'Compilation failed as expected (' + data.expectedError + ')'
+                        : 'Compilation failed as expected';
+                    statusClass = 'expected';
+                } else {
+                    statusText = 'Unexpected success (expected compile_fail)';
+                    statusClass = 'error';
+                }
+                break;
+            case 'should_panic':
+                if (success && ((result.stderr && result.stderr.includes('panicked')) || 
+                               (result.stdout && result.stdout.includes('panicked')))) {
+                    statusText = 'Panicked as expected';
+                    statusClass = 'expected';
+                } else if (!success) {
+                    statusText = 'Compilation failed';
+                    statusClass = 'error';
+                } else {
+                    statusText = 'Expected panic did not occur';
+                    statusClass = 'error';
+                }
+                break;
+            case 'no_run':
+                if (success) {
+                    statusText = 'Compiled successfully';
+                    statusClass = 'success';
+                    output = '(compilation successful - not executed)';
+                } else {
+                    statusText = 'Compilation failed';
+                    statusClass = 'error';
+                }
+                break;
+            default:
+                statusText = success ? 'Success' : 'Failed';
+                statusClass = success ? 'success' : 'error';
+        }
+        
+        statusSpan.textContent = statusText;
+        statusSpan.className = 'rust-example-output-status ' + statusClass;
+        
+        if (!success && data.expectedOutcome === 'success' && data.version) {
+            output += '\\n\\nℹ️ Note: This example targets Rust ' + data.version + 
+                     '. The playground uses the latest ' + data.channel + ' version.';
+        }
+        
+        contentPre.textContent = output;
+    }
+    
+    function handleToggleHidden(container, data) {
+        const toggleBtn = container.querySelector('.rust-btn-toggle-hidden');
+        const pre = container._preElement;
+        if (!pre) return;
+        
+        const isShowingHidden = toggleBtn.classList.contains('active');
+        
+        if (isShowingHidden) {
+            // Restore original Pygments-highlighted HTML (without hidden lines)
+            pre.innerHTML = container._originalHTML;
+            toggleBtn.classList.remove('active');
+            toggleBtn.title = 'Show hidden lines';
+            toggleBtn.setAttribute('aria-label', 'Show hidden lines');
+        } else {
+            // Show pre-highlighted full code with hidden lines marked
+            // This HTML was generated at build time by Pygments
+            if (data.fullCodeHighlighted) {
+                pre.innerHTML = data.fullCodeHighlighted;
+            }
+            toggleBtn.classList.add('active');
+            toggleBtn.title = 'Hide hidden lines';
+            toggleBtn.setAttribute('aria-label', 'Hide hidden lines');
+        }
+    }
+    
+    window.RustPlayground = {
+        initialize: initializeRustExamples
+    };
+})();
+'''
 
 
 def setup(app: Sphinx):
     """Setup the rust-example extension."""
     
-    # Register the directive
     app.add_directive('rust-example', RustExampleDirective)
     
-    # Configuration options
     app.add_config_value('rust_examples_show_hidden', False, 'env')
     app.add_config_value('rust_examples_prelude_file', None, 'env')
     
-    # Connect to build events
-    app.connect('build-finished', build_finished)
+    # Register static files
+    app.add_css_file('rust_playground.css')
+    app.add_js_file('rust_playground.js')
+    
+    # Write files on build finish
+    app.connect('build-finished', add_static_files)
     
     return {
         'version': '0.1',

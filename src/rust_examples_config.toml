@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
+
+# Configuration for Rust code examples in the documentation.
+# These defaults apply to all rust-example:: directives unless overridden.
+
+[defaults]
+# Default Rust edition for examples
+edition = "2021"
+
+# Default channel (stable, beta, nightly)
+channel = "stable"
+
+# Target Rust version (informational - playground always uses latest of channel)
+# Used to flag examples that may behave differently on the playground
+version = "1.85.0"
+
+[playground]
+# Base URL for the Rust Playground API
+api_url = "https://play.rust-lang.org"
+
+[warnings]
+# Show version mismatch warning if example version is this many minor versions
+# behind the configured default version. Set to 0 to always show, or a high
+# number to effectively disable.
+version_mismatch_threshold = 2
