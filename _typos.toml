@@ -8,3 +8,6 @@ extend-ignore-identifiers-re = [
   "bib_.*",
 ]
 
+[default.extend-words]
+# Allow domain-specific terms
+compilability = "compilability"
