@@ -17,7 +17,7 @@
 
    **Exception**
 
-   ``#[no_mangle]`` functions are guaranteed to have a single instance.
+   ``#[no_mangle]`` functions are guaranteed to have a single instance [RUST-REF-NO-MANGLE]_.
 
    .. rationale::
       :id: rat_kYiIiW8R2qD3
@@ -28,9 +28,11 @@
       Only ``#[no_mangle]`` functions are guaranteed to be instantiated a single time,
       but can cause undefined behavior if they share a symbol with other identifiers.
 
-      Avoid assumptions about low-level metadata (such as symbol addresses) unless explicitly guaranteed by the Ferrocene Language Specification (FLS).
+      Avoid assumptions about low-level metadata (such as symbol addresses) unless explicitly guaranteed by
+      the Ferrocene Language Specification [FLS]_.
       Function address identity is not guaranteed and must not be treated as stable.
-      Rust’s ``fn`` type is a zero-sized function item promoted to a function pointer, whose address is determined by the compiler backend.
+      Rust’s ``fn`` type is a zero-sized function item promoted to a function pointer [RUST-REF-FN-PTR]_,
+      whose address is determined by the compiler backend.
       When a function resides in a different crate or codegen-unit partitioning is enabled,
       the compiler may generate multiple distinct code instances for the same function or alter the address at which it is emitted.
 
@@ -51,7 +53,7 @@
 
          - Cross-crate inlining can produce multiple code instantiations
          - Codegen-unit separation can cause function emission in multiple codegen units
-         - Function implementations may be merged as an optimization. 
+         - Function implementations may be merged as an optimization [LLVM-LTO]_. 
            
          Functions that are equivalent based only on specific hardware semantics may be merged in the machine-specific backend.
          For example:
@@ -74,13 +76,27 @@
              }
          }
 
+         fn main() {
+             let mut x1 = 0i32;
+             let mut y1 = 42i32;
+             foo(&mut x1, &mut y1);
+             println!("foo: x1 = {}, y1 = {}", x1, y1);
+
+             let mut x2 = 0i32;
+             let mut y2 = 42i32;
+             bar(&mut x2, &mut y2);
+             println!("bar: x2 = {}, y2 = {}", x2, y2);
+         }
+
          These functions are deduplicated for specific backends and have the same address.
          This happened even though these two functions have different behavior in the abstract machine:
-         the ``foo`` function has undefined behavior if ``x`` and ``y`` alias, while the ``bar`` function doesn't.
+         the ``foo`` function has undefined behavior if ``x`` and ``y`` alias,
+         while the ``bar`` function doesn't.
 
          This behavior has resulted in real-world issues,
-         such as the bug reported in `rust-lang/rust#117047 <https://github.com/rust-lang/rust/issues/117047>`_,
-         where function pointer comparisons unexpectedly failed because the function in question was instantiated multiple times.
+         such as the bug reported in [RUST-ISSUE-117047]_,
+         where function pointer comparisons unexpectedly failed because the function in question was
+         instantiated multiple times.
 
          Violating this rule may cause:
 
@@ -88,9 +104,10 @@
          - Inappropriate branching: identity-based dispatch selecting wrong handler.
          - Security issues: adversary-controlled conditions bypassing function-based authorization/dispatch logic.
          - Nondeterministic behavior: correctness depending on build flags or incremental state.
-         - Test-only correctness: function pointer equality passing in debug builds but failing in release/link-time optimization builds.
+         - Test-only correctness: function pointer equality passing in debug builds but failing in
+         release/link-time optimization builds.
 
-         In short, dependence on function address stability introduces non-portable, build-profile-dependent behavior,
+         In summary, dependence on function address stability introduces non-portable, build-profile-dependent behavior,
          which is incompatible with high-integrity Rust.
 
    .. non_compliant_example::
@@ -333,3 +350,43 @@
              // and inlining is prohibited.
              f == important_handler
          }
+
+   .. bibliography::
+      :id: bib_UnionFieldValidity
+      :status: draft
+
+      .. list-table::
+         :header-rows: 0
+         :widths: auto
+         :class: bibliography-table
+
+         * - .. [RUST-ISSUE-117047]
+           - The Rust Project Developers. "Function pointer comparison fails unexpectedly."
+             *GitHub Issue #117047*, 2023.
+             https://github.com/rust-lang/rust/issues/117047.
+
+         * - .. [RUST-REF-NO-MANGLE]
+           - The Rust Project Developers. "The no_mangle Attribute." *The Rust Reference*, n.d.
+             https://doc.rust-lang.org/reference/abi.html#the-no_mangle-attribute.
+
+         * - .. [RUST-REF-FN-PTR]
+           - The Rust Project Developers. "Function Pointer Types." *The Rust Reference*, n.d.
+             https://doc.rust-lang.org/reference/types/function-pointer.html.
+
+         * - .. [FLS]
+           - Ferrocene Developers. "Ferrocene Language Specification." *Ferrocene*, n.d.
+             https://spec.ferrocene.dev/.
+
+         * - .. [LLVM-LTO]
+           - LLVM Project. "LLVM Link Time Optimization: Design and Implementation."
+             *LLVM Documentation*, n.d.
+             https://llvm.org/docs/LinkTimeOptimization.html.
+
+         * - .. [RUST-RFC-2603]
+           - The Rust Project Developers. "RFC 2603: Rust Symbol Name Mangling v0."
+             *Rust RFCs*, 2018.
+             https://rust-lang.github.io/rfcs/2603-rust-symbol-name-mangling-v0.html.
+
+         * - .. [RUSTONOMICON-FFI]
+           - The Rust Project Developers. "Foreign Function Interface." *The Rustonomicon*, n.d.
+             https://doc.rust-lang.org/nomicon/ffi.html.
