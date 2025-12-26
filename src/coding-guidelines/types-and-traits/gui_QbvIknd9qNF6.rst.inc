@@ -38,7 +38,7 @@
 
       Consequently, the following operations are unreliable for functions which are not ``#[no_mangle]``:
 
-      - Comparing function pointers for equality (``fn1 == fn2``) 1Code has comments. Press enter to view.
+      - Comparing function pointers for equality (``fn1 == fn2``) 
       - Assuming a unique function address
       - Using function pointers as identity keys (e.g., in maps, registries, matchers) 1Code has comments. Press enter to view.
       - Matching behavior based on function address unless you instruct the linker to put a (#[no_mangle]) function at a specific address
