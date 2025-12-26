@@ -60,33 +60,33 @@
 
           .. rust-example::
 
-         #[unsafe(no_mangle)]
-         fn foo(x: *mut i32, y: *mut i32) {
-             unsafe {
-                 let a = &mut *x;
-                 let b = &mut *y;
-                 *a = *b;
-             }
-         }
+            #[unsafe(no_mangle)]
+            fn foo(x: *mut i32, y: *mut i32) {
+                unsafe {
+                    let a = &mut *x;
+                    let b = &mut *y;
+                    *a = *b;
+                }
+            }
 
-         #[unsafe(no_mangle)]
-         fn bar(x: *mut i32, y: *mut i32) {
-             unsafe {
-                 x.write(y.read());
-             }
-         }
+            #[unsafe(no_mangle)]
+            fn bar(x: *mut i32, y: *mut i32) {
+                unsafe {
+                    x.write(y.read());
+                }
+            }
 
-         fn main() {
-             let mut x1 = 0i32;
-             let mut y1 = 42i32;
-             foo(&mut x1, &mut y1);
-             println!("foo: x1 = {}, y1 = {}", x1, y1);
+            fn main() {
+                let mut x1 = 0i32;
+                let mut y1 = 42i32;
+                foo(&mut x1, &mut y1);
+                println!("foo: x1 = {}, y1 = {}", x1, y1);
 
-             let mut x2 = 0i32;
-             let mut y2 = 42i32;
-             bar(&mut x2, &mut y2);
-             println!("bar: x2 = {}, y2 = {}", x2, y2);
-         }
+                let mut x2 = 0i32;
+                let mut y2 = 42i32;
+                bar(&mut x2, &mut y2);
+                println!("bar: x2 = {}, y2 = {}", x2, y2);
+            }
 
          These functions are deduplicated for specific backends and have the same address.
          This happened even though these two functions have different behavior in the abstract machine:
