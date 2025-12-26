@@ -74,7 +74,7 @@
              }
          }
 
-         For specific backends, That is, the two functions are deduplicated, and therefore have the same address.
+         These functions are deduplicated for specific backends and have the same address.
          This happened even though these two functions have different behavior in the abstract machine:
          the ``foo`` function has undefined behavior if ``x`` and ``y`` alias, while the ``bar`` function doesn't.
 
