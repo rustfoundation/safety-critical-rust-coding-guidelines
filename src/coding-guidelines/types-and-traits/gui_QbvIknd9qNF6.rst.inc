@@ -322,34 +322,26 @@
 
        .. rust-example::
 
-         // crate B
-         let mut handlers: Vec<fn()> = Vec::new();
+         fn handler() {
+             println!("handler called");
+         }
 
-         fn register(h: fn()) {
-             if !handlers.contains(&h) {
+         fn register(handlers: &mut Vec<fn()>, h: fn()) {
+             if !handlers.contains(&h) {  // noncompliant
                  handlers.push(h);
              }
          }
 
-         register(handler); // Error: may be inserted twice under some builds
-
-   .. compliant_example::
-      :id: compl_ex_oiqSSclTXmIk
-      :status: draft
-
-      This compliant example keeps identity-sensitive logic inside a single crate:
-
-       .. rust-example::
-
-         // crate A (single crate boundary)
-         #[inline(never)]
-         pub fn important_handler() {}
-
-         pub fn is_important(f: fn()) -> bool {
-             // Safe because identity and comparison are confined to one crate,
-             // and inlining is prohibited.
-             f == important_handler
+         async fn handler_loop() {
+             let mut handlers: Vec<fn()> = Vec::new();
+             // Handler may be registered multiple times
+             register(&mut handlers, handler);
          }
+
+         #[tokio::main]
+         async fn main() {
+             handler_loop().await;
+         } 
 
    .. bibliography::
       :id: bib_UnionFieldValidity
