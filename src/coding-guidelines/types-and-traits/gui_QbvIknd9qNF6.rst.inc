@@ -437,15 +437,11 @@
              }
          }
 
-         async fn handler_loop() {
+         fn main() {
              let mut handlers: Vec<fn()> = Vec::new();
              // Handler may be registered multiple times
              register(&mut handlers, handler);
          }
-
-         fn main() {
-             handler_loop().await;
-         } 
 
    .. bibliography::
       :id: bib_UnionFieldValidity
