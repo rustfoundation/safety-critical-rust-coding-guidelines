@@ -3,7 +3,7 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Do not depend on function pointer identity
+.. guideline:: Do not *directly* or *indirectly* compare function pointers
    :id: gui_QbvIknd9qNF6
    :category: required
    :status: draft
@@ -13,8 +13,113 @@
    :scope: system
    :tags: surprising-behavior
 
-   Do not rely on the equality or stable identity of function pointers.
+   Do not *directly* or *indirectly* compare function pointers.
+   
+   Direct Equality (``==``, ``!=``)
+   --------------------------------
+   
+   .. code-block:: rust
+   
+      if fn_ptr1 == fn_ptr2 { ... }
 
+   The following are all the ways function pointers can be indirectly compared:
+
+   Collection Membership
+   ---------------------
+   
+   .. code-block:: rust
+   
+      // Vec::contains
+      handlers.contains(&handler)
+   
+      // HashSet::contains / HashSet::insert (uses Hash + Eq)
+      let set: HashSet<fn()> = HashSet::new();
+      set.contains(&handler);
+   
+      // BTreeSet (uses Ord)
+      let set: BTreeSet<fn()> = BTreeSet::new();
+      set.contains(&handler);
+   
+   HashMap/BTreeMap Keys
+   ---------------------
+   
+   .. code-block:: rust
+   
+      // Using function pointers as map keys
+      let map: HashMap<fn(), &str> = HashMap::new();
+      map.get(&handler);
+      map.insert(handler, "name");
+   
+   Ordering Comparisons (``<``, ``>``, ``<=``, ``>=``)
+   ---------------------------------------------------
+   
+   .. code-block:: rust
+   
+      // Function pointers implement Ord
+      if fn_ptr1 < fn_ptr2 { ... }
+   
+   Sorting & Binary Search
+   -----------------------
+   
+   .. code-block:: rust
+   
+      let mut fns: Vec<fn()> = vec![a, b, c];
+      fns.sort();  // Uses Ord
+      fns.binary_search(&handler);  // Uses Ord
+   
+   Deduplication
+   -------------
+   
+   .. code-block:: rust
+   
+      fns.sort();
+      fns.dedup();  // Removes consecutive duplicates using PartialEq
+   
+   Iterator Methods
+   ----------------
+   
+   .. code-block:: rust
+   
+      handlers.iter().find(|&&f| f == handler);
+      handlers.iter().position(|&f| f == handler);
+      handlers.iter().any(|&f| f == handler);
+      handlers.iter().filter(|&&f| f == target);
+   
+   Pattern Matching
+   ----------------
+   
+   .. code-block:: rust
+   
+      match callback {
+          f if f == handler_a => { ... }
+          f if f == handler_b => { ... }
+          _ => { ... }
+      }
+   
+   Casting to ``usize``
+   --------------------
+   
+   .. code-block:: rust
+   
+      let addr1 = fn_ptr1 as usize;
+      let addr2 = fn_ptr2 as usize;
+      if addr1 == addr2 { ... }
+   
+   Assertion Macros
+   ----------------
+   
+   .. code-block:: rust
+   
+      assert_eq!(fn_ptr1, fn_ptr2);
+      debug_assert_ne!(fn_ptr1, fn_ptr2);
+   
+   ``matches!`` Macro
+   ------------------
+   
+   .. code-block:: rust
+   
+      matches!(callback, f if f == handler)
+   
    **Exception**
 
    ``#[no_mangle]`` functions are guaranteed to have a single instance [RUST-REF-NO-MANGLE]_.
@@ -338,8 +443,7 @@
              register(&mut handlers, handler);
          }
 
-         #[tokio::main]
-         async fn main() {
+         fn main() {
              handler_loop().await;
          } 
 
