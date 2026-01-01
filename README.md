@@ -1,5 +1,6 @@
 # Safety-Critical Rust Coding Guidelines
 
+
 Coding Guidelines for Safety Critical Rust developed by the [Safety Critical Rust Consortium][safety-critical-rust-consortium].
 
 [View the latest rendered guidelines online](https://coding-guidelines.arewesafetycriticalyet.org/)
