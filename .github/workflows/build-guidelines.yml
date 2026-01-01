@@ -20,8 +20,18 @@ jobs:
 
   build:
     needs: check_rust_examples
+    # Always run so that 'build' (the required status check) explicitly fails
+    # when check_rust_examples fails, rather than being skipped.
+    # Skipped jobs don't block merge queue, but failed jobs do.
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Fail if example checks failed
+        if: needs.check_rust_examples.result != 'success'
+        run: |
+          echo "::error::check_rust_examples workflow failed with result: ${{ needs.check_rust_examples.result }}"
+          echo "One or more Rust example checks did not pass. See the check_rust_examples job for details."
+          exit 1
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install uv
