@@ -100,6 +100,7 @@
 
          #[repr(u8)]
          #[derive(Copy, Clone)]
+         #[allow(dead_code)]
          enum Color {
              Red = 0,
              Green = 1,
