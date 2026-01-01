@@ -17,7 +17,7 @@
    Reading a union field whose bytes do not represent a valid value for the field's type is undefined behavior.
 
    Before accessing a union field, verify that that the union was either:
-   
+
    * last written through that field, or
    * written through a field whose bytes are valid when reinterpreted as the target field's type
 
@@ -56,6 +56,7 @@
       The value ``3`` is not a valid value of type ``bool`` (only ``0`` and ``1`` are valid).
 
       .. rust-example::
+         :miri: expect_ub
 
          union IntOrBool {
              i: u8,
@@ -64,7 +65,7 @@
 
          fn main() {
              let u = IntOrBool { i: 3 };
-             
+
              // Undefined behavior reading an invalid value from a union field of type 'bool'
              unsafe { u.b };  // Noncompliant
          }
@@ -76,6 +77,7 @@
       This noncompliant example reads an invalid Unicode value from a ``union`` field of type ``char`` .
 
       .. rust-example::
+         :miri:
 
          union IntOrChar {
              i: u32,
@@ -85,7 +87,7 @@
          fn main() {
              // '0xD800' is a surrogate and not a valid Unicode scalar value
              let u = IntOrChar { i: 0xD800 };
-             
+
              // Reading an invalid Unicode value from a union field of type 'char'
              unsafe { u.c };  // Noncompliant
          }
@@ -97,9 +99,11 @@
       This noncompliant example reads an invalid discriminant from a union field of 'Color' enumeration type.
 
       .. rust-example::
+         :miri: expect_ub
 
          #[repr(u8)]
          #[derive(Copy, Clone)]
+         #[allow(dead_code)]
          enum Color {
              Red = 0,
              Green = 1,
@@ -113,7 +117,7 @@
 
          fn main() {
              let u = IntOrColor { i: 42 };
-             
+
              // Undefined behavior reading an invalid discriminant from the 'Color' enumeration type
              unsafe { u.c };  // Noncompliant
          }
@@ -126,6 +130,7 @@
       A similar problem occurs when reading a misaligned pointer.
 
       .. rust-example::
+         :miri: expect_ub
 
          union PtrOrRef {
              p: *const i32,
@@ -134,7 +139,7 @@
 
          fn main() {
              let u = PtrOrRef { p: std::ptr::null() };
-             
+
              //  Undefined behavior reading a null value from a reference field of a union
              unsafe { u.r };  // Noncompliant
          }
@@ -146,6 +151,7 @@
       This compliant example tracks the active field explicitly to ensure valid reads.
 
       .. rust-example::
+         :miri:
 
          #[repr(C)]
          #[derive(Copy, Clone)]
@@ -153,20 +159,20 @@
              i: u8,
              b: bool,
          }
-         
+
          /// Tracks which field of the union is currently active.
          #[derive(Clone, Copy, PartialEq, Eq)]
          enum ActiveField {
              Int,
              Bool,
          }
-         
+
          /// A union wrapper that tracks the active field at runtime.
          pub struct IntOrBool {
              data: IntOrBoolData,
              active: ActiveField,
          }
-         
+
          impl IntOrBool {
              pub fn from_int(value: u8) -> Self {
                  Self {
@@ -174,24 +180,24 @@
                      active: ActiveField::Int,
                  }
              }
-         
+
              pub fn from_bool(value: bool) -> Self {
                  Self {
                      data: IntOrBoolData { b: value },
                      active: ActiveField::Bool,
                  }
              }
-         
+
              pub fn set_int(&mut self, value: u8) {
                  self.data.i = value;
                  self.active = ActiveField::Int;
              }
-         
+
              pub fn set_bool(&mut self, value: bool) {
                  self.data.b = value;
                  self.active = ActiveField::Bool;
              }
-         
+
              /// Returns the integer value if that field is active.
              pub fn as_int(&self) -> Option<u8> {
                  match self.active {
@@ -200,7 +206,7 @@
                      ActiveField::Bool => None,
                  }
              }
-         
+
              /// Returns the boolean value if that field is active.
              pub fn as_bool(&self) -> Option<bool> {
                  match self.active {
@@ -210,12 +216,12 @@
                  }
              }
          }
-         
+
          fn main() {
              let mut value = IntOrBool::from_bool(true);
              assert_eq!(value.as_bool(), Some(true));
              assert_eq!(value.as_int(), None);
-         
+
              value.set_int(42);
              assert_eq!(value.as_bool(), None);
              assert_eq!(value.as_int(), Some(42));
@@ -228,6 +234,7 @@
       This compliant example reads from the same field that was written.
 
       .. rust-example::
+         :miri:
 
          #[repr(C)]
          #[derive(Copy, Clone)]
@@ -235,27 +242,27 @@
              i: u32,
              bytes: [u8; 4],
          }
-         
+
          fn get_int() -> u32 {
              let u = IntBytes { i: 0x12345678 };
-         
+
              // SAFETY: All bit patterns are valid for [u8; 4]
              // Note: byte order depends on target endianness
              assert_eq!(unsafe { u.bytes }, 0x12345678_u32.to_ne_bytes()); // compliant
-         
+
              let u2 = IntBytes {
                  bytes: [0x11, 0x22, 0x33, 0x44],
              };
-         
+
              // SAFETY: All bit patterns are valid for 'u32'
              assert_eq!(unsafe { u2.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant
-             
+
              unsafe { u2.i } // compliant
          }
 
          fn main() {
             println!("{}", get_int());
-         }   
+         }
 
    .. compliant_example::
       :id: compl_ex_Jsxenev7lNf0
@@ -264,6 +271,7 @@
       This compliant example reinterprets the value as a different type where all bit patterns are valid.
 
       .. rust-example::
+         :miri:
 
          #[repr(C)]
          #[derive(Copy, Clone)]
@@ -281,7 +289,7 @@
              unsafe { u.bytes }  // compliant
          }
 
-         fn get_u32() -> u32 {         
+         fn get_u32() -> u32 {
              let u = IntBytes {
                  bytes: [0x11, 0x22, 0x33, 0x44],
              };
@@ -303,6 +311,7 @@
       This compliant example validates bytes before reading as a constrained type.
 
       .. rust-example::
+         :miri:
 
          #[repr(C)]
          union IntOrBool {
@@ -314,7 +323,7 @@
              // SAFETY: Reading as `u8` is always valid because all bit patterns
              // are valid for `u8`, regardless of which field was last written.
              let raw = unsafe { u.i }; // compliant
-         
+
              // Validate before interpreting as `bool` (only 0 and 1 are valid)
              match raw {
                  0 => Some(false),
@@ -326,7 +335,7 @@
          fn main() {
              let u1 = IntOrBool { i: 1 };
              let u2 = IntOrBool { i: 3 };
-         
+
              assert_eq!(try_read_bool(&u1), Some(true));
              assert_eq!(try_read_bool(&u2), None);
          }
@@ -334,21 +343,22 @@
    .. compliant_example::
       :id: compl_ex_4Z8tmqYLLjtw
       :status: draft
-      
+
       Complex example showing:
 
       * use of compile-time check for valid type using generics
       * way to fence between FFI-facing code and rest of safe Rust codebase
-      
+
       .. rust-example::
-      
+         :miri:
+
          use std::marker::PhantomData;
          use std::mem::size_of;
-         
+
          /// Marker types representing the active field.
          pub struct AsInt;
          pub struct AsBool;
-         
+
          /// A union type which can be used to interact across FFI boundary.
          #[repr(C)]
          #[derive(Copy, Clone)]
@@ -356,7 +366,7 @@
              pub i: u8,
              pub b: bool,
          }
-         
+
          /// Tag sent alongside the union from C code.
          #[repr(u8)]
          #[derive(Copy, Clone, PartialEq, Eq)]
@@ -364,7 +374,7 @@
              Int = 0,
              Bool = 1,
          }
-         
+
          /// C-compatible tagged union as it might arrive from FFI.
          #[repr(C)]
          #[derive(Copy, Clone)]
@@ -372,11 +382,11 @@
              pub tag: IntOrBoolTag,
              pub data: IntOrBoolData,
          }
-         
+
          // ============================================================================
          // Safe wrapper types for use in the rest of the Rust codebase
          // ============================================================================
-         
+
          /// A union wrapper where the type parameter statically tracks the active field.
          /// This is zero-cost: same size as the raw union.
          #[repr(C)]
