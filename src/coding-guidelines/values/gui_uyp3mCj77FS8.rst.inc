@@ -3,7 +3,7 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Do not read uninitialized memory as a typed value
+.. guideline:: Do not read uninitialized memory of any non-union type as a typed value
    :id: gui_uyp3mCj77FS8
    :category: mandatory
    :status: draft
@@ -13,15 +13,16 @@
    :scope: system
    :tags: undefined-behavior, unsafe
 
-   Do not read uninitialized memory of any non-union type as a typed value.
+   Do not read uninitialized memory of any non-union type as a typed value
+   :cite:`RUSTNOMICON_UNINIT`.
    This is sometimes referred to as *transmuting* or *read-at-type*. 
    Memory can remain uninitialized if it is not read as a type.
    
-   Reading from a union is covered by a separate rule, `Do not read from union fields that may contain uninitialized bytes
+   Reading from a union is covered by `Do not read from union fields that may contain uninitialized bytes
    <https://coding-guidelines.arewesafetycriticalyet.org/coding-guidelines/types-and-traits/index.html#gui_UnionPartialInit>`_.
 
-   Calling `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_ or
-   any of the following related functions is treated in the same manner as a typed read:
+   Calling `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_
+   :cite:`MAYBEUNINIT_DOC` or any of the following related functions is treated in the same manner as a typed read:
 
    * ``assume_init_drop``
    * ``assume_init_mut``
@@ -29,8 +30,8 @@
    * ``assume_init_ref``
    * ``array_assume_init``
 
-   Calling any of these function when on memory that is not yet fully initialized is undefined behavior.
-   The memory must be properly initialized according to the requirements of the variable’s type.
+   Calling any of these function on memory that is not yet fully initialized is undefined behavior :cite:`RUST_REF_BEHAVIOR`.
+   The memory must be properly initialized according to the requirements of the variable's type :cite:`UCG_VALIDITY`.
    For example, a variable of reference type must be aligned, non-null, and point to valid memory.
    Similarly, entirely uninitialized memory may have any content, while a ``bool`` must always be ``true`` or ``false``.
    Consequently, reading an uninitialized ``bool`` is undefined behavior.
@@ -39,8 +40,9 @@
       :id: rat_kjFRrhpS8Wu6
       :status: draft
 
-      Rust's memory model requires that all bytes must be initialized before being read as a typed value.
-      Reading uninitialized memory as a typed value is undefined behavior.
+      Rust's memory model requires that all bytes must be initialized before being read as a typed value :cite:`RUSTNOMICON_UNINIT` :cite:`FERROCENE_SPEC`.
+      Reading uninitialized memory as a typed value is undefined behavior :cite:`RUST_REF_BEHAVIOR`.
+      This guideline aligns with functional safety standards :cite:`ISO_26262` :cite:`IEC_61508` and secure coding practices :cite:`CERT_RUST`.
       
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db1
@@ -62,10 +64,10 @@
       :id: compl_ex_Ke869nSXuShV
       :status: draft
 
-      This compliant example creates an uninitialized allocation of type ``MaybeUninit<u64>``.
-      The code calls the ``write`` function to write the value 42 into the ``MaybeUninit``.
+      This compliant example creates an uninitialized variable ``x`` of type ``MaybeUninit<u64>``.
+      The code calls the ``write`` function to write the value 42 to ``x``.
       The call to ``assume_init`` asserts that the value is initialized and extracts the value of type ``u64``.
-      This is valid because the memory has been initialized by the call to ``write(42)``.
+      This call is compliant with this rule because the memory has been properly initialized by the call to ``write(42)``.
       This is the canonical safe pattern for using ``MaybeUninit``.
 
       .. rust-example::
@@ -84,9 +86,9 @@
       :status: draft
 
       This noncompliant example creates a pointer from uninitialized memory.
-      Not all bit patterns are valid pointers for all operations (e.g., provenance rules).
+      Not all bit patterns are valid pointers for all operations (e.g., provenance rules) :cite:`UCG_VALIDITY`.
       You cannot create a pointer from unspecified bytes.
-      Even a raw pointer type (e.g., ``*const T``) has validity rules.
+      Even a raw pointer type (e.g., ``*const T``) has validity rules :cite:`RUST_REF_BEHAVIOR`.
 
       .. rust-example::
 
@@ -101,9 +103,9 @@
       :status: draft
 
       This noncompliant example creates a reference from uninitialized memory.
-      Creating a reference from arbitrary or uninitialized bytes is undefined behavior.
-      References must be valid, aligned, dereferenceable, and non-null.
-      Uninitialized memory cannot satisfy these invariants.
+      Creating a reference from arbitrary or uninitialized bytes is undefined behavior :cite:`RUST_REF_BEHAVIOR`.
+      References must be valid, aligned, dereferenceable, and non-null :cite:`UCG_VALIDITY`.
+      Uninitialized memory cannot satisfy these requirements.
 
       .. rust-example::
 
@@ -119,19 +121,6 @@
       :status: draft
 
       This noncompliant example creates a reference from uninitialized memory.
-      The ``create_ref`` function has undefined behavior when creating a reference from a dangling pointer.
-      It creates uninitialized memory sized for a reference (``&u8``).
-      A reference is essentially a pointer (8 bytes on 64-bit systems).
-      ``&raw mut uninit`` retrieves a raw mutable pointer to the ``MaybeUninit``.
-      The ``.cast::<*const u8>()`` reinterprets it as a pointer to a raw pointer.
-      The call to ``.write(ptr::dangling())`` writes a dangling pointer value.
-      This creates a pointer which is non-null, aligned, but does not point to valid, initialized value.
-      The call to ``assume_init`` asserts the ``MaybeUninit<&u8>`` is a valid ``&u8`` reference
-      A reference (``&T``) has stricter requirements than a raw pointer.
-      Even though the bit pattern looks like a valid pointer,
-      the semantic requirements for a reference are violated.
-      The compiler is allowed to assume references always point to valid data,
-      so this can cause miscompilation.
 
       .. rust-example::
 
@@ -151,6 +140,19 @@
          fn main() {
              create_ref();
          }
+
+      The ``create_ref`` function has undefined behavior when creating a reference from a dangling pointer.
+      It creates uninitialized memory sized for a reference (``&u8``).
+      ``&raw mut uninit`` retrieves a raw mutable pointer to the ``MaybeUninit``.
+      The ``.cast::<*const u8>()`` reinterprets it as a pointer to a raw pointer.
+      The call to ``.write(ptr::dangling())`` writes a dangling pointer value.
+      This creates a non-null, aligned pointer that does not point to a valid, initialized value.
+      The call to ``assume_init`` asserts the ``MaybeUninit<&u8>`` is a valid ``&u8`` reference
+      A reference (``&T``) has stricter requirements than a raw pointer.
+      Even though the bit pattern looks like a valid pointer,
+      the semantic requirements for a reference are violated.
+      The compiler is allowed to assume references always point to valid data,
+      so this can cause miscompilation.
 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db5
@@ -222,3 +224,67 @@
              let s = unsafe { p.read_unaligned() }; // compliant
              println!("{:?}", s);
          }
+
+   .. bibliography::
+      :id: bib_LoopTerminate
+      :status: draft
+
+      .. list-table::
+         :header-rows: 0
+         :widths: auto
+         :class: bibliography-table
+
+     * - .. [DO-178C]
+       - | RTCA, Inc.
+         | "DO-178C: Software Considerations in Airborne Systems and Equipment Certification."
+         | https://store.accuristech.com/standards/rtca-do-178c?product_id=2200105
+
+     * - .. [RUSTNOMICON_UNINIT]
+       - | The Rust Project Developers
+         | "The Rustonomicon - Uninitialized Memory"
+         | https://doc.rust-lang.org/nomicon/uninitialized.html
+
+     * - .. [RUST_REF_BEHAVIOR]
+       - | The Rust Project Developers
+         | "The Rust Reference - Behavior considered undefined"
+         | https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+
+     * - .. [MAYBEUNINIT_DOC]
+       - | The Rust Project Developers
+         | "std::mem::MaybeUninit - Rust Standard Library Documentation"
+         | https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html
+
+     * - .. [FERROCENE_SPEC]
+       - | Ferrocene GmbH
+         | "Ferrocene Language Specification"
+         | https://spec.ferrocene.dev/
+
+     * - .. [MISRA_RUST]
+       - | MISRA Consortium Limited
+         | "MISRA Rust Guidelines (Draft)"
+         | https://misra.org.uk/
+
+     * - .. [ISO_26262]
+       - | International Organization for Standardization
+         | "ISO 26262 - Road vehicles - Functional safety"
+         | https://www.iso.org/standard/68383.html
+
+     * - .. [IEC_61508]
+       - | International Electrotechnical Commission
+         | "IEC 61508 - Functional Safety of Electrical/Electronic/Programmable Electronic Safety-related Systems"
+         | https://www.iec.ch/functional-safety
+
+     * - .. [RUST_SAFETY_CRITICAL_WG]
+       - | Rust Foundation
+         | "Rust Safety-Critical Consortium"
+         | https://github.com/rust-lang/safety-critical-consortium
+
+     * - .. [UCG_VALIDITY]
+       - | The Rust Project Developers
+         | "Unsafe Code Guidelines - Validity Invariants"
+         | https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant
+
+     * - .. [CERT_RUST]
+       - | Carnegie Mellon University Software Engineering Institute
+         | "SEI CERT Rust Coding Standard"
+         | https://wiki.sei.cmu.edu/confluence/display/rust
