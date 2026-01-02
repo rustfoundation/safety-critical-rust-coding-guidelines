@@ -225,7 +225,6 @@
              let s = unsafe { p.read_unaligned() }; // compliant
              println!("{:?}", s);
          }
-
    .. bibliography::
       :id: bib_WNCi5njUWLuY
       :status: draft
