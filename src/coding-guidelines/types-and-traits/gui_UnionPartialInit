@@ -62,9 +62,9 @@
         state of other fields. All fields must be considered uninitialized after 
         such an assignment.
 
-      The Rust memory model requires that all bytes be initialized before a typed 
-      read occurs. There is no exception for "partial" reads of composite types — 
-      the entire field must be valid.
+      Fields of a struct can be individually accessed using a raw pointer.
+      Reading the entire struct, or forming a reference to that struct,
+      requires that all fields be initialized before a typed read occurs.
 
       The sole exception is that unions work like C unions:
       any union field may be read, even if it was never written.
