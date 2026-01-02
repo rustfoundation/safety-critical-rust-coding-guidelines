@@ -13,8 +13,7 @@
    :scope: system
    :tags: undefined-behavior, unsafe
 
-   Do not read uninitialized memory of any non-union type as a typed value
-   :cite:`RUSTNOMICON_UNINIT`.
+   Do not read uninitialized memory of any non-union type as a typed value :cite:`gui_xK9pLm2nQR4t:RUSTNOMICON-UNINIT`.
    This is sometimes referred to as *transmuting* or *read-at-type*. 
    Memory can remain uninitialized if it is not read as a type.
    
@@ -22,7 +21,7 @@
    <https://coding-guidelines.arewesafetycriticalyet.org/coding-guidelines/types-and-traits/index.html#gui_UnionPartialInit>`_.
 
    Calling `assume_init <https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html#method.assume_init>`_
-   :cite:`MAYBEUNINIT_DOC` or any of the following related functions is treated in the same manner as a typed read:
+   :cite:`gui_aE3fNc6dWX1v:MAYBEUNINIT-DOC` or any of the following related functions is treated in the same manner as a typed read:
 
    * ``assume_init_drop``
    * ``assume_init_mut``
@@ -30,8 +29,8 @@
    * ``assume_init_ref``
    * ``array_assume_init``
 
-   Calling any of these function on memory that is not yet fully initialized is undefined behavior :cite:`RUST_REF_BEHAVIOR`.
-   The memory must be properly initialized according to the requirements of the variable's type :cite:`UCG_VALIDITY`.
+   Calling any of these function on memory that is not yet fully initialized is undefined behavior :cite:`gui_vB7sHj5wYZ8u:RUST-REF-BEHAVIOR`.
+   The memory must be properly initialized according to the requirements of the variable's type :cite:`gui_uZ0zDq8rST1b:UCG-VALIDITY`.
    For example, a variable of reference type must be aligned, non-null, and point to valid memory.
    Similarly, entirely uninitialized memory may have any content, while a ``bool`` must always be ``true`` or ``false``.
    Consequently, reading an uninitialized ``bool`` is undefined behavior.
@@ -40,10 +39,12 @@
       :id: rat_kjFRrhpS8Wu6
       :status: draft
 
-      Rust's memory model requires that all bytes must be initialized before being read as a typed value :cite:`RUSTNOMICON_UNINIT` :cite:`FERROCENE_SPEC`.
-      Reading uninitialized memory as a typed value is undefined behavior :cite:`RUST_REF_BEHAVIOR`.
-      This guideline aligns with functional safety standards :cite:`ISO_26262` :cite:`IEC_61508` and secure coding practices :cite:`CERT_RUST`.
-      
+      Rust's memory model requires that all bytes must be initialized before being read as a typed value
+      :cite:`gui_xK9pLm2nQR4t:RUSTNOMICON-UNINIT` :cite:`gui_kP8qTg4hUS2w:FERROCENE-SPEC`.
+      Reading uninitialized memory as a typed value is undefined behavior :cite:`gui_vB7sHj5wYZ8u:RUST-REF-BEHAVIOR`.
+      This guideline aligns with functional safety standards :cite:`gui_oT4tXk2lMN5y:ISO-26262`
+      :cite:`gui_qV6vZm4nOP7z:IEC-61508` and secure coding practices.
+
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db1
       :status: draft
@@ -86,9 +87,9 @@
       :status: draft
 
       This noncompliant example creates a pointer from uninitialized memory.
-      Not all bit patterns are valid pointers for all operations (e.g., provenance rules) :cite:`UCG_VALIDITY`.
+      Not all bit patterns are valid pointers for all operations (e.g., provenance rules) :cite:`gui_uZ0zDq8rST1b:UCG-VALIDITY`.
       You cannot create a pointer from unspecified bytes.
-      Even a raw pointer type (e.g., ``*const T``) has validity rules :cite:`RUST_REF_BEHAVIOR`.
+      Even a raw pointer type (e.g., ``*const T``) has validity rules `gui_vB7sHj5wYZ8u:RUST-REF-BEHAVIOR`.
 
       .. rust-example::
 
@@ -103,8 +104,8 @@
       :status: draft
 
       This noncompliant example creates a reference from uninitialized memory.
-      Creating a reference from arbitrary or uninitialized bytes is undefined behavior :cite:`RUST_REF_BEHAVIOR`.
-      References must be valid, aligned, dereferenceable, and non-null :cite:`UCG_VALIDITY`.
+      Creating a reference from arbitrary or uninitialized bytes is undefined behavior :cite:`gui_vB7sHj5wYZ8u:RUST-REF-BEHAVIOR`.
+      References must be valid, aligned, dereferenceable, and non-null :cite:`gui_uZ0zDq8rST1b:UCG-VALIDITY`.
       Uninitialized memory cannot satisfy these requirements.
 
       .. rust-example::
@@ -226,7 +227,7 @@
          }
 
    .. bibliography::
-      :id: bib_LoopTerminate
+      :id: bib_WNCi5njUWLuY
       :status: draft
 
       .. list-table::
@@ -234,55 +235,36 @@
          :widths: auto
          :class: bibliography-table
 
-     * - .. [DO-178C]
-       - | RTCA, Inc.
-         | "DO-178C: Software Considerations in Airborne Systems and Equipment Certification."
-         | https://store.accuristech.com/standards/rtca-do-178c?product_id=2200105
+         * - :bibentry:`gui_wB2bFs0tUV3c:DO-178C`
+           - RTCA, Inc. "DO-178C: Software Considerations in Airborne Systems and Equipment Certification." https://store.accuristech.com/standards/rtca-do-178c?product_id=2200105.
 
-     * - .. [RUSTNOMICON_UNINIT]
-       - | The Rust Project Developers
-         | "The Rustonomicon - Uninitialized Memory"
-         | https://doc.rust-lang.org/nomicon/uninitialized.html
+         * - :bibentry:`gui_xK9pLm2nQR4t:RUSTNOMICON-UNINIT`
+           - The Rust Project Developers. "The Rustonomicon - Uninitialized Memory." https://doc.rust-lang.org/nomicon/uninitialized.html.
 
-     * - .. [RUST_REF_BEHAVIOR]
-       - | The Rust Project Developers
-         | "The Rust Reference - Behavior considered undefined"
-         | https://doc.rust-lang.org/reference/behavior-considered-undefined.html
+         * - :bibentry:`gui_vB7sHj5wYZ8u:RUST-REF-BEHAVIOR`
+           - The Rust Project Developers. "The Rust Reference - Behavior considered undefined." https://doc.rust-lang.org/reference/behavior-considered-undefined.html.
 
-     * - .. [MAYBEUNINIT_DOC]
-       - | The Rust Project Developers
-         | "std::mem::MaybeUninit - Rust Standard Library Documentation"
-         | https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html
+         * - :bibentry:`gui_aE3fNc6dWX1v:MAYBEUNINIT-DOC`
+           - The Rust Project Developers. "std::mem::MaybeUninit - Rust Standard Library Documentation." https://doc.rust-lang.org/stable/std/mem/union.MaybeUninit.html.
 
-     * - .. [FERROCENE_SPEC]
-       - | Ferrocene GmbH
-         | "Ferrocene Language Specification"
-         | https://spec.ferrocene.dev/
+         * - :bibentry:`gui_kP8qTg4hUS2w:FERROCENE-SPEC`
+           - Ferrocene GmbH. "Ferrocene Language Specification." https://spec.ferrocene.dev/.
 
-     * - .. [MISRA_RUST]
-       - | MISRA Consortium Limited
-         | "MISRA Rust Guidelines (Draft)"
-         | https://misra.org.uk/
+         * - :bibentry:`gui_mR1rVi9jKL3x:MISRA-RUST`
+           - MISRA Consortium Limited. "MISRA Rust Guidelines (Draft)." https://misra.org.uk/.
 
-     * - .. [ISO_26262]
-       - | International Organization for Standardization
-         | "ISO 26262 - Road vehicles - Functional safety"
-         | https://www.iso.org/standard/68383.html
+         * - :bibentry:`gui_oT4tXk2lMN5y:ISO-26262`
+           - International Organization for Standardization. "ISO 26262 - Road vehicles - Functional safety." https://www.iso.org/standard/68383.html.
 
-     * - .. [IEC_61508]
-       - | International Electrotechnical Commission
-         | "IEC 61508 - Functional Safety of Electrical/Electronic/Programmable Electronic Safety-related Systems"
-         | https://www.iec.ch/functional-safety
+         * - :bibentry:`gui_qV6vZm4nOP7z:IEC-61508`
+           - International Electrotechnical Commission. "IEC 61508 - Functional Safety of Electrical/Electronic/Programmable Electronic Safety-related Systems." https://www.iec.ch/functional-safety.
 
-     * - .. [RUST_SAFETY_CRITICAL_WG]
-       - | Rust Foundation
-         | "Rust Safety-Critical Consortium"
-         | https://github.com/rust-lang/safety-critical-consortium
+         * - :bibentry:`gui_sX8xBo6pQR9a:RUST-SAFETY-CRITICAL-WG`
+           - Rust Foundation. "Rust Safety-Critical Consortium." https://github.com/rust-lang/safety-critical-consortium.
 
-     * - .. [UCG_VALIDITY]
-       - | The Rust Project Developers
-         | "Unsafe Code Guidelines - Validity Invariants"
-         | https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant
+         * - :bibentry:`gui_uZ0zDq8rST1b:UCG-VALIDITY`
+           - The Rust Project Developers. "Unsafe Code Guidelines - Validity Invariants." https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
+
 
      * - .. [CERT_RUST]
        - | Carnegie Mellon University Software Engineering Institute
