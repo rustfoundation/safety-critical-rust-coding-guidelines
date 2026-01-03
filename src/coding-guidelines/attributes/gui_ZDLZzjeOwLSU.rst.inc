@@ -45,14 +45,10 @@
             * Prevents accidental use of ``unsafe`` operations without conscious decision
             * Aligns with the principle of "defense in depth" in safety-critical systems
 
-        * Visibility
-
-            * Encouraging visibility discourages hiding unsafe operations inside safe-looking abstractions without proper encapsulation
-            * Macros that expand to unsafe code should preserve the ``unsafe`` token visibility
-
         * Static Analysis and Tooling
 
-            * Tools like ``cargo-geiger`` :cite:`gui_cD3eGh4iJk5l:CARGO-GEIGER`, ``unsafe-inspect``, and custom linters can automatically locate and count unsafe blocks
+            * Tools like ``cargo-geiger`` :cite:`gui_cD3eGh4iJk5l:CARGO-GEIGER`, ``unsafe-inspect``,
+              and custom linters can automatically locate and count unsafe blocks
             * Enables metrics like "unsafe density" for safety assessments
             * Supports qualification evidence required by certification standards
 
@@ -68,23 +64,43 @@
 
         The ``#[no_mangle]`` attribute is unsafe because it can be used to declare a 
         function identifier that conflicts with an existing symbol.
-        This noncompliant example declares an unmangled function named 'malloc'.
-        This identifier may conflict with the 'malloc' function from C,
-        if the C library is linked with the executable.
+        This noncompliant example declares an unmangled function named 'convert'.
+        This symbol may conflict with another 'convert' symbol defined in a different crate at link time,
+        resulting in undefined behavior.
+        It is even possible for an unmangled symbol to conflict with a mangled symbol.
 
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
-           :compile_fail:
+..           :compile_fail:
 
             // Undefined behavior by the linker or loader is possible 
-            // if another 'something' function is defined.
+            // if another 'convert' function is defined.
             #[no_mangle]
-            fn malloc() {}
+            fn convert() {}
 
             fn main() {
                 // Call the unmangled function
-                malloc();
+                convert();
+            }
+
+    .. compliant_example::
+        :id: compl_ex_wR1FEyLRKmrr
+        :status: draft
+
+        Rust Edition 2024 enforces that the ``no_mangle`` attribute requires an ``unsafe`` keyword,
+        as shown in this compliant example.
+
+        NOTE:  This code can still have undefined behavior if the 'convert' function symbol is define more than once.
+
+        .. rust-example::
+
+            #[unsafe(no_mangle)] // compliant.
+            fn convert() {}
+
+            fn main() {
+                // Call the no_mangle function (safe to call)
+                convert();
             }
 
     .. non_compliant_example::
@@ -99,7 +115,7 @@
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
-           :compile_fail:
+..           :compile_fail:
 
            use std::ffi;
 
@@ -121,6 +137,39 @@
                }
            }
 
+    .. compliant_example::
+        :id: compl_ex_wR1FEyLRKmrq
+        :status: draft
+
+        Rust Edition 2024 enforces that ``extern "C"`` blocks require an ``unsafe`` keyword,
+        as shown in this compliant example.
+
+        NOTE:  This code can still have undefined behavior if the declared 'malloc' function is incompatible with
+        the actual definition of the 'malloc' function.  To eliminate this undefined behavior, the declaration for
+        ``malloc`` used in this compliant example has been correct to accept one argument of type ``usize``.
+
+        .. rust-example::
+
+            use std::ffi;
+
+            unsafe extern "C" {
+                // Here the assumption is that malloc is the one defined by C's stdlib.h
+                // and that size_of::<usize>() == size_of::<size_t>()
+                fn malloc(size: usize) -> *mut ffi::c_void;
+                fn free(ptr: *mut ffi::c_void);
+            }
+
+            fn main() {
+                // Call the extern functions (requires unsafe block)
+                unsafe {
+                    let ptr = malloc(1024);
+                    if !ptr.is_null() {
+                        // Use the allocated memory...
+                        free(ptr);
+                    }
+                }
+            }
+
     .. non_compliant_example::
         :id: non_compl_ex_Hk3mNp5qRs7t
         :status: draft
@@ -129,7 +178,7 @@
         as they affect symbol resolution and memory layout at link time.
         Without the ``unsafe`` keyword, these hazards are not visible to reviewers or tools.
 
-        This noncompliant example has two problems.
+        This noncompliant example has two separate problems.
         First, it uses an ``#[export_name]`` attribute without an unsafe wrapper.
         This attribute controls the symbol name used during linking.
         If another symbol with the same name exists, it causes undefined behavior.
@@ -146,69 +195,12 @@
            :compile_fail:
 
             // Missing unsafe marker - noncompliant in Rust 2024
-            #[export_name = "custom_symbol"]
-            pub fn my_function() {}
+            #[export_name = "custom_symbol"] // error: unsafe attribute used without unsafe
+            pub fn my_function() {}  
 
             // Missing unsafe marker - noncompliant in Rust 2024
-            #[link_section = ".custom_section"]
+            #[link_section = ".custom_section"] // error: unsafe attribute used without unsafe
             static DATA: u32 = 42;
-
-    .. non_compliant_example::
-        :id: non_compl_ex_Jm4oQr6sUv8w
-        :status: draft
-
-        Macros that generate unsafe code without preserving the ``unsafe`` token visibility
-        obscure safety-critical code from auditors and static analysis tools.
-
-        .. rust-example::
-
-            // This macro hides the unsafe token from callers - noncompliant
-            macro_rules! hidden_unsafe_call {
-                ($ptr:expr) => {
-                    unsafe { *$ptr }
-                };
-            }
-
-            fn main() {
-                let x = 42;
-                let ptr = &x as *const i32;
-                // The unsafe operation is hidden from the caller
-                let val = hidden_unsafe_call!(ptr);
-            }
-
-    .. compliant_example::
-        :id: compl_ex_wR1FEyLRKmrq
-        :status: draft
-
-        Using at least Rust Edition 2024 enforces that these things that involve safety obligations require the ``unsafe`` token.
-
-        .. rust-example::
-
-            use std::ffi;
-
-            #[unsafe(no_mangle)]
-            fn something() {}
-
-            unsafe extern "C" {
-                // Here the assumption is that malloc is the one defined by C's stdlib.h
-                // and that size_of::<usize>() == size_of::<size_t>()
-                fn malloc(size: usize) -> *mut ffi::c_void;
-                fn free(ptr: *mut ffi::c_void);
-            }
-
-            fn main() {
-                // Call the no_mangle function (safe to call)
-                something();
-
-                // Call the extern functions (requires unsafe block)
-                unsafe {
-                    let ptr = malloc(1024);
-                    if !ptr.is_null() {
-                        // Use the allocated memory...
-                        free(ptr);
-                    }
-                }
-            }
 
     .. compliant_example::
         :id: compl_ex_xY2zAb3cDe4f
@@ -224,29 +216,6 @@
 
             #[unsafe(link_section = ".custom_section")]
             static DATA: u32 = 42;
-
-    .. compliant_example::
-        :id: compl_ex_gH5iJk6lMn7o
-        :status: draft
-
-        Macros that involve unsafe operations should require the caller to provide the ``unsafe``
-        token, preserving visibility for auditors and tools.
-
-        .. rust-example::
-
-            // This macro requires the caller to acknowledge the unsafe operation - compliant
-            macro_rules! unsafe_deref {
-                ($ptr:expr) => {
-                    *$ptr
-                };
-            }
-
-            fn main() {
-                let x = 42;
-                let ptr = &x as *const i32;
-                // The unsafe operation is visible at the call site
-                let val = unsafe { unsafe_deref!(ptr) };
-            }
 
     .. enforcement::
         :id: enf_pQ8rSt9uVw0x
