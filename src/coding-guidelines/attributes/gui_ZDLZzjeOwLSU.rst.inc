@@ -75,6 +75,7 @@
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
+           :compile_fail:
 
             // Undefined behavior by the linker or loader is possible 
             // if another 'something' function is defined.
@@ -98,26 +99,27 @@
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
+           :compile_fail:
 
-            use std::ffi;
+           use std::ffi;
 
-            extern "C" {
-                // If 'malloc' is otherwise defined with a 'usize' argument, the compiler
-                // may generate code for calls to this function using this incompatible declaration,
-                // resulting in undefined behavior.
-                fn malloc(size: f32) -> *mut ffi::c_void;
-            }
+           extern "C" {
+               // If 'malloc' is otherwise defined with a 'usize' argument, the compiler
+               // may generate code for calls to this function using this incompatible declaration,
+               // resulting in undefined behavior.
+               fn malloc(size: f32) -> *mut ffi::c_void;
+           }
 
-            fn main() {
-                // Call the extern "C" function (requires an 'unsafe' block)
-                unsafe {
-                    let ptr = malloc(1024.0);
-                    if !ptr.is_null() {
-                        // Use the allocated memory then free it with 'libc::free'
-                        println!("malloc returned: {:?}", ptr);
-                    }
-                }
-            }
+           fn main() {
+               // Call the extern "C" function (requires an 'unsafe' block)
+               unsafe {
+                   let ptr = malloc(1024.0);
+                   if !ptr.is_null() {
+                       // Use the allocated memory then free it with 'libc::free'
+                       println!("malloc returned: {:?}", ptr);
+                   }
+               }
+           }
 
     .. non_compliant_example::
         :id: non_compl_ex_Hk3mNp5qRs7t
