@@ -128,9 +128,22 @@
         The ``#[export_name]`` and ``#[link_section]`` attributes can cause undefined behavior if misused,
         as they affect symbol resolution and memory layout at link time.
         Without the ``unsafe`` keyword, these hazards are not visible to reviewers or tools.
+
+        This noncompliant example has two problems.
+        First, it uses an ``#[export_name]`` attribute without an unsafe wrapper.
+        This attribute controls the symbol name used during linking.
+        If another symbol with the same name exists, it causes undefined behavior.
+        Rust 2024 requires it to be marked ``unsafe``.
+
+        The second problem is that this noncompliant example uses a ``#[link_section]`` attribute without unsafe wrapper.
+        This attribute places the item in a specific linker section.
+        Incorrect section placement can cause undefined behavior
+        (e.g., placing mutable data in read-only sections, or interfering with special sections like ``.init``).
+
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
+           :compile_fail:
 
             // Missing unsafe marker - noncompliant in Rust 2024
             #[export_name = "custom_symbol"]
