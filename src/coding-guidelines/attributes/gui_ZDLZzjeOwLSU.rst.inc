@@ -1,7 +1,7 @@
 .. SPDX-License-Identifier: MIT OR Apache-2.0
    SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
-.. guideline:: Assure visibility of ``unsafe`` tokens in unsafe code
+.. guideline:: Assure visibility of ``unsafe`` keyword in unsafe code
     :id: gui_ZDLZzjeOwLSU
     :category: required
     :status: draft
@@ -11,97 +11,155 @@
     :scope: crate
     :tags: readability, reduce-human-error
 
-    Assure visibility of ``unsafe`` tokens in all locations where the compiler is aware an ``unsafe`` obligation extends to the code.
+    Mark all code that may violate safety guarantees with a visible ``unsafe`` keyword :cite:`gui_jK6lMn7oPq8r:RUST-REF-UNSAFE-KEYWORD`.
+    
+    The following constructs require explicit ``unsafe`` visibility:
 
-    In Rust Edition 2024 :cite:`gui_aB3cDe4fGh5i:RUST-EDITION-GUIDE`, several forms of code which involved explicit usage of ``unsafe`` tokens
-    were made mandatory in attributes and ``extern`` blocks :cite:`gui_jK6lMn7oPq8r:RUST-REF-UNSAFE-KEYWORD`.
-    Prior Rust editions did not require an ``unsafe`` in these locations.
-    Some cases involving ``unsafe`` attributes were still linted against in some previous Rust versions by the ``unsafe_code`` lint
-    :cite:`gui_sT9uVw0xYz1a:RUST-LINT-UNSAFE`,
-    after it was discovered they had safety concerns,
-    but due to backwards compatibility concerns they did not initially require use of a visible ``unsafe`` token.
-    Starting with Rust Edition 2024, the use ``unsafe`` is required in these contexts.
+    * ``extern`` blocks must be declared as ``unsafe extern``
+    * The ``#[no_mangle]`` attribute must be written as ``#[unsafe(no_mangle)]``
+    * The ``#[export_name]`` attribute must be written as ``#[unsafe(export_name)]``
+    * The ``#[link_section]`` attribute must be written as ``#[unsafe(link_section)]``
 
-    Rust 1.82  enabled use of ``unsafe`` around attributes: https://github.com/rust-lang/blog.rust-lang.org/blob/27e63bd0c2e68dd8b4eb06b67194cc4c2a9e84be/posts/2024-10-17-Rust-1.82.0.md#unsafe-attributes
+    .. note::
 
-    It also included unsafe extern on stable: https://github.com/rust-lang/blog.rust-lang.org/blob/main/content/Rust-1.82.0.md#safe-items-with-unsafe-extern
-
-   Unfortunately, it seems we never started warning about ``unsafe_code`` for two attributes, oddly enough: ``link`` and ``link_ordinal``.
-
-   I believe those attributes require themselves to be on ``extern "C"`` blocks, so they are implicitly covered by unsafe extern.
-
-   Each of the attributes referenced by this issue must be explicitly marked unsafe as well as ``extern "C" {}`` blocks: rust-lang/rust#82499
+       Starting with Rust Edition 2024, the use of ``unsafe`` is required in these contexts.
+       The ``#[link]`` and ``#[link_ordinal]`` attributes are implicitly covered by the
+       ``unsafe extern`` requirement, as they must appear on ``extern`` blocks.
+       See rust-lang/rust#82499 for the tracking issue on unsafe attributes.
 
     .. rationale::
         :id: rat_eQV3s9ggNegr
         :status: draft
 
         * Auditability and Review
-          * ``unsafe`` blocks create clear audit boundaries where reviewers can focus attention on code that may
-          violate safety guarantees :cite:`gui_bC2dEf3gHi4j:RUSTNOMICON-MEET-SAFE`
-         * Safety-critical standards like ISO 26262 :cite:`gui_kL5mNo6pQr7s:ISO-26262` and DO-178C :cite:`gui_tU8vWx9yZa0b:DO-178C` require traceability of hazardous operations
-         * Helps enumerate and document all places where safety requirements must be manually upheld
+
+            * ``unsafe`` blocks create clear audit boundaries where reviewers can focus on code that may violate Rust's safety guarantees :cite:`gui_bC2dEf3gHi4j:RUSTNOMICON-MEET-SAFE`
+            * Safety-critical standards like ISO 26262 :cite:`gui_kL5mNo6pQr7s:ISO-26262` and DO-178C :cite:`gui_tU8vWx9yZa0b:DO-178C` require traceability of hazardous operations
+            * Helps enumerate and document all places where safety requirements must be manually upheld
+            * Satisfies ISO 26262 Part 6, Table 1, objective 1c (use of language subsets)
+            * Satisfies DO-178C Section 6.3.4.f (source code traceability)
 
         * Explicit Acknowledgment of Responsibility
 
-          * The ``unsafe`` keyword signals that the programmer is taking responsibility for upholding invariants the compiler cannot verify
-          * Prevents accidental use of ``unsafe`` operations without conscious decision
-          * Aligns with the principle of "defense in depth" in safety-critical systems
+            * The ``unsafe`` keyword signals that the programmer is taking responsibility for upholding invariants the compiler cannot verify
+            * Prevents accidental use of ``unsafe`` operations without conscious decision
+            * Aligns with the principle of "defense in depth" in safety-critical systems
 
         * Visibility
 
-          * Encouraging visibility discourages hiding unsafe operations inside safe-looking abstractions without proper encapsulation
+            * Encouraging visibility discourages hiding unsafe operations inside safe-looking abstractions without proper encapsulation
+            * Macros that expand to unsafe code should preserve the ``unsafe`` token visibility
 
         * Static Analysis and Tooling
 
-          * Tools like ``cargo-geiger`` :cite:`gui_cD3eGh4iJk5l:CARGO-GEIGER`, ``unsafe-inspect``, and custom linters can automatically locate and count unsafe blocks
-          * Enables metrics like "unsafe density" for safety assessments
-          * Supports qualification evidence required by certification standards
+            * Tools like ``cargo-geiger`` :cite:`gui_cD3eGh4iJk5l:CARGO-GEIGER`, ``unsafe-inspect``, and custom linters can automatically locate and count unsafe blocks
+            * Enables metrics like "unsafe density" for safety assessments
+            * Supports qualification evidence required by certification standards
 
         * Traceability for Certification
 
-          * Safety-critical certifications require demonstrating that hazardous operations are identified and controlled
-          * Visible ``unsafe`` tokens provide direct linkage to safety cases and hazard analyses
-          * Facilitates the required documentation that each unsafe operation has been reviewed and justified
+            * Safety-critical certifications require demonstrating that hazardous operations are identified and controlled
+            * Visible ``unsafe`` tokens provide direct linkage to safety cases and hazard analyses
+            * Facilitates the required documentation that each unsafe operation has been reviewed and justified
+
+    .. non_compliant_example::
+        :id: non_compl_ex_FdmuPXGZr4EP
+        :status: draft
+
+        The ``#[no_mangle]`` attribute is unsafe because it can be used to declare a 
+        function identifier that conflicts with an existing symbol.
+        This noncompliant example declares an unmangled function named 'malloc'.
+        This identifier may conflict with the 'malloc' function from C,
+        if the C library is linked with the executable.
+
+        This noncompliant example requires Rust Edition 2021 or earlier to compile.
+
+        .. rust-example::
+
+            // Undefined behavior by the linker or loader is possible 
+            // if another 'something' function is defined.
+            #[no_mangle]
+            fn malloc() {}
+
+            fn main() {
+                // Call the unmangled function
+                malloc();
+            }
 
     .. non_compliant_example::
         :id: non_compl_ex_FdmuPXGZr4EO
         :status: draft
 
-        An ``extern`` block can cause undefined behavior if it is misdeclared :cite:`gui_jK6lMn7oPq8r:RUST-REF-UNSAFE-KEYWORD`.
-        This applies even if the definitions are not called, as the wrong definition may still prevail,
-        especially after linking is considered.
+        This noncompliant example misdeclares the ``malloc`` function in the ``extern "C"`` block
+        specifying the type of ``size`` parameter as ``f32`` instead of ``usize``.
+
+        An ``extern`` block is unsafe because undefined behavior can occur if types or functions are misdeclared.
+        This is true even if these types or functions are not used.
+        This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
 
             use std::ffi;
 
-            // If another function by this name is in the compiled object's namespace,
-            // Rust allows undefined behavior from the program linker or loader.
-            // An `unsafe` token is not required in Rust 2021, though it is linted as such.
-            #[no_mangle]
-            fn something() {}
-
             extern "C" {
-                // If malloc in the compiled object's namespace accepts a usize argument, 
-                // the compiler may generate code for calls to this function using this definition,
-                // thus the runtime behavior is undefined.
+                // If 'malloc' is otherwise defined with a 'usize' argument, the compiler
+                // may generate code for calls to this function using this incompatible declaration,
+                // resulting in undefined behavior.
                 fn malloc(size: f32) -> *mut ffi::c_void;
             }
 
             fn main() {
-                // Call the no_mangle function
-                something();
-
-                // Call the extern function (requires unsafe block)
+                // Call the extern "C" function (requires an 'unsafe' block)
                 unsafe {
                     let ptr = malloc(1024.0);
                     if !ptr.is_null() {
-                        // In a real program, we'd use the allocated memory here
-                        // and then free it with libc::free
+                        // Use the allocated memory then free it with 'libc::free'
                         println!("malloc returned: {:?}", ptr);
                     }
-                }       
+                }
+            }
+
+    .. non_compliant_example::
+        :id: non_compl_ex_Hk3mNp5qRs7t
+        :status: draft
+
+        The ``#[export_name]`` and ``#[link_section]`` attributes can cause undefined behavior if misused,
+        as they affect symbol resolution and memory layout at link time.
+        Without the ``unsafe`` keyword, these hazards are not visible to reviewers or tools.
+        This noncompliant example requires Rust Edition 2021 or earlier to compile.
+
+        .. rust-example::
+
+            // Missing unsafe marker - noncompliant in Rust 2024
+            #[export_name = "custom_symbol"]
+            pub fn my_function() {}
+
+            // Missing unsafe marker - noncompliant in Rust 2024
+            #[link_section = ".custom_section"]
+            static DATA: u32 = 42;
+
+    .. non_compliant_example::
+        :id: non_compl_ex_Jm4oQr6sUv8w
+        :status: draft
+
+        Macros that generate unsafe code without preserving the ``unsafe`` token visibility
+        obscure safety-critical code from auditors and static analysis tools.
+
+        .. rust-example::
+
+            // This macro hides the unsafe token from callers - noncompliant
+            macro_rules! hidden_unsafe_call {
+                ($ptr:expr) => {
+                    unsafe { *$ptr }
+                };
+            }
+
+            fn main() {
+                let x = 42;
+                let ptr = &x as *const i32;
+                // The unsafe operation is hidden from the caller
+                let val = hidden_unsafe_call!(ptr);
+            }
 
     .. compliant_example::
         :id: compl_ex_wR1FEyLRKmrq
@@ -122,6 +180,114 @@
                 fn malloc(size: usize) -> *mut ffi::c_void;
                 fn free(ptr: *mut ffi::c_void);
             }
+
+            fn main() {
+                // Call the no_mangle function (safe to call)
+                something();
+
+                // Call the extern functions (requires unsafe block)
+                unsafe {
+                    let ptr = malloc(1024);
+                    if !ptr.is_null() {
+                        // Use the allocated memory...
+                        free(ptr);
+                    }
+                }
+            }
+
+    .. compliant_example::
+        :id: compl_ex_xY2zAb3cDe4f
+        :status: draft
+
+        The ``#[export_name]`` and ``#[link_section]`` attributes must use the ``unsafe()`` wrapper
+        to make their safety implications visible.
+
+        .. rust-example::
+
+            #[unsafe(export_name = "custom_symbol")]
+            pub fn my_function() {}
+
+            #[unsafe(link_section = ".custom_section")]
+            static DATA: u32 = 42;
+
+    .. compliant_example::
+        :id: compl_ex_gH5iJk6lMn7o
+        :status: draft
+
+        Macros that involve unsafe operations should require the caller to provide the ``unsafe``
+        token, preserving visibility for auditors and tools.
+
+        .. rust-example::
+
+            // This macro requires the caller to acknowledge the unsafe operation - compliant
+            macro_rules! unsafe_deref {
+                ($ptr:expr) => {
+                    *$ptr
+                };
+            }
+
+            fn main() {
+                let x = 42;
+                let ptr = &x as *const i32;
+                // The unsafe operation is visible at the call site
+                let val = unsafe { unsafe_deref!(ptr) };
+            }
+
+    .. enforcement::
+        :id: enf_pQ8rSt9uVw0x
+        :status: draft
+
+        This guideline can be enforced through the following mechanisms:
+
+        * **Rust Edition 2024**: Migrating to Rust Edition 2024 makes violations of this guideline
+          compilation errors for ``extern`` blocks and unsafe attributes.
+
+        * **Compiler Lints**: Enable the following lints:
+
+            * ``#![deny(unsafe_code)]`` - Denies all unsafe code (use ``#[allow(unsafe_code)]`` for justified exceptions)
+            * ``#![deny(unsafe_op_in_unsafe_fn)]`` - Requires explicit unsafe blocks within unsafe functions
+            * ``#![warn(unsafe_attr_outside_unsafe)]`` - Warns about unsafe attributes without the ``unsafe()`` wrapper (pre-2024)
+
+        * **Static Analysis Tools**:
+
+            * ``cargo-geiger`` - Counts and reports unsafe code usage
+            * ``cargo-audit`` - Checks for known vulnerabilities in dependencies
+            * Custom Clippy lints for project-specific requirements
+
+        * **Code Review**: Manual review of all code containing ``unsafe`` tokens should be
+          part of the development process, with documented justification for each usage.
+
+    .. exceptions::
+        :id: exc_yZ1aAb2cDe3f
+        :status: draft
+
+        Deviations from this guideline may be permitted under the following conditions:
+
+        * **Legacy Code Migration**: When migrating pre-2024 code, a documented migration plan
+          with timeline for compliance is acceptable.
+
+        * **Third-Party Dependencies**: Dependencies not under project control that violate this
+          guideline must be documented in the safety case with risk assessment.
+
+        * **Performance-Critical Sections**: Where the ``unsafe`` wrapper syntax causes measurable
+          compilation overhead, document the deviation with benchmarks.
+
+        All deviations require:
+
+        1. Written justification documenting why the deviation is necessary
+        2. Risk assessment of the safety implications
+        3. Approval from the project's safety authority
+        4. Tracking in the project's deviation log
+
+    .. related_guidelines::
+        :id: rel_gH4iJk5lMn6o
+        :status: draft
+
+        * Minimize the scope of unsafe blocks
+        * Document safety invariants for all unsafe code with ``// SAFETY:`` comments
+        * Prefer safe abstractions over raw unsafe code
+        * Use ``#![forbid(unsafe_code)]`` at crate level where possible, with explicit exceptions
+
    .. bibliography::
       :id: bib_WNCi5njUWLuZ
       :status: draft
@@ -161,8 +327,8 @@
          * - :bibentry:`gui_dE2fGh3iJk4l:FERROCENE-SPEC`
            - Ferrocene GmbH. "Ferrocene Language Specification." https://spec.ferrocene.dev/.
 
-         * - :bibentry:`gui_0cuTYG8RVYjg:RUST-REF-UNION`
+         * - :bibentry:`gui_eF3gHi4jKl5m:RUST-REF-UNION`
            - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html.
 
-         * - :bibentry:`gui_0cuTYG8RVYjg:UCG-VALIDITY`
+         * - :bibentry:`gui_fG4hIj5kLm6n:UCG-VALIDITY`
            - Rust Unsafe Code Guidelines. "Validity and Safety Invariant." https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
