@@ -81,7 +81,7 @@
 
             fn main() {
                 // Call the unmangled function
-                convert();
+                convert()
             }
 
     .. compliant_example::
@@ -100,7 +100,7 @@
 
             fn main() {
                 // Call the no_mangle function (safe to call)
-                convert();
+                convert()
             }
 
     .. non_compliant_example::
@@ -194,13 +194,17 @@
         .. rust-example::
            :compile_fail:
 
-            // Missing unsafe marker - noncompliant in Rust 2024
-            #[export_name = "custom_symbol"] // error: unsafe attribute used without unsafe
-            pub fn my_function() {}  
+            // Collides with the C library 'printf' function
+            #[export_name = "printf"]  // noncompliant
 
             // Missing unsafe marker - noncompliant in Rust 2024
-            #[link_section = ".custom_section"] // error: unsafe attribute used without unsafe
-            static DATA: u32 = 42;
+            #[unsafe(link_section = ".init_array")] // noncompliant
+            static DATA: u32 = 42;  // Corrupts initialization table!
+
+            fn main() {
+                printf("Hello, World");
+                println!("DATA = {DATA}");
+            }
 
     .. compliant_example::
         :id: compl_ex_xY2zAb3cDe4f
@@ -211,11 +215,22 @@
 
         .. rust-example::
 
+            // SAFETY: 'custom_symbol' does not conflict with any other symbol
             #[unsafe(export_name = "custom_symbol")]
             pub fn my_function() {}
 
-            #[unsafe(link_section = ".custom_section")]
-            static DATA: u32 = 42;
+           // SAFETY: Placing data in a specific section for embedded systems
+           #[unsafe(link_section = ".noinit")]
+           static mut PERSISTENT_DATA: [u8; 256] = [0; 256];
+
+           //  SAFETY: Custom section for shared memory
+           #[unsafe(link_section = ".shared")]
+           static SHARED_BUFFER: [u8; 4096] = [0; 4096];
+
+           fn main() {
+               my_function();
+               println!("DATA = {DATA}");
+           }
 
     .. enforcement::
         :id: enf_pQ8rSt9uVw0x
@@ -240,28 +255,6 @@
 
         * **Code Review**: Manual review of all code containing ``unsafe`` tokens should be
           part of the development process, with documented justification for each usage.
-
-    .. exceptions::
-        :id: exc_yZ1aAb2cDe3f
-        :status: draft
-
-        Deviations from this guideline may be permitted under the following conditions:
-
-        * **Legacy Code Migration**: When migrating pre-2024 code, a documented migration plan
-          with timeline for compliance is acceptable.
-
-        * **Third-Party Dependencies**: Dependencies not under project control that violate this
-          guideline must be documented in the safety case with risk assessment.
-
-        * **Performance-Critical Sections**: Where the ``unsafe`` wrapper syntax causes measurable
-          compilation overhead, document the deviation with benchmarks.
-
-        All deviations require:
-
-        1. Written justification documenting why the deviation is necessary
-        2. Risk assessment of the safety implications
-        3. Approval from the project's safety authority
-        4. Tracking in the project's deviation log
 
     .. related_guidelines::
         :id: rel_gH4iJk5lMn6o
