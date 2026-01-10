@@ -3,53 +3,72 @@
 
 .. default-domain:: coding-guidelines
 
-Do not hide unsafe blocks within macro expansions
-=================================================
+Do not hide unsafe code in macros
+================================
 
-.. guideline:: Do not hide unsafe blocks within macro expansions
+.. guideline:: Do not hide unsafe code in macros
    :id: gui_FRLaMIMb4t3S
-   :category: required
+   :category: advisory
    :status: draft
-   :release: todo
+   :release: unclear-latest
    :fls: fls_4vjbkm4ceymk
-   :decidability: todo
-   :scope: todo
-   :tags: reduce-human-error
+   :decidability: decidable
+   :scope: module
+   :tags: safety, reduce-human-error
 
-   Description of the guideline goes here.
+   Do not hide unsafe code in macro definitions.
+   Macros that expand to unsafe code should preserve the ``unsafe`` token visibility.
 
    .. rationale::
-      :id: rat_WJubG7KuUDLW
+      :id: rat_s7ffMlPUFt77
       :status: draft
 
-      Explanation of why this guideline is important.
+      Macros that generate unsafe code obscure safety-critical code, making the code more difficult to review and audit.
 
    .. non_compliant_example::
-      :id: non_compl_ex_AyFnP0lJLHxi
+      :id: non_compl_ex_YNX7AnWENTu7
       :status: draft
 
-      Explanation of code example.
+      Macros that generate unsafe code without preserving the ``unsafe`` token visibility obscure safety-critical code.
+      This noncompliant example defines a ``deref_ptr`` macro that performs an unsafe pointer dereference.
 
       .. rust-example::
 
-        #[allow(dead_code)]
-        fn example_function() {
-            // Non-compliant implementation
+        // This macro hides the unsafe token from callers - noncompliant
+        macro_rules! deref_ptr {
+            ($ptr:expr) => {
+                unsafe { *$ptr }
+            };
         }
-        #
-        # fn main() {}
+
+        fn main() {
+            let x = 42;
+            let ptr = &x as *const i32;
+            // The unsafe operation is hidden from the caller
+            println!("val = {}", deref_ptr!(ptr));
+        }
 
    .. compliant_example::
-      :id: compl_ex_pO5gP1aj2v4F
+      :id: compl_ex_nBkfzueTWvTA
       :status: draft
 
-      Explanation of code example.
+      This compliant example requires the caller to wrap the macro invocation in an ``unsafe`` block,
+      making the use of unsafe code obvious at the call site.
+      Visibility can be further improved by prefixing the identifier for each unsafe macro with the string "unsafe_".
 
       .. rust-example::
 
-        #[allow(dead_code)]
-        fn example_function() {
-            // Compliant implementation
+        // This macro requires the caller to acknowledge the unsafe operation - compliant
+        macro_rules! unsafe_deref_ptr {
+            ($ptr:expr) => {
+                *$ptr
+            };
         }
-        #
-        # fn main() {}
+
+        fn main() {
+            let x = 42;
+            let ptr = &x as *const i32;
+            // The unsafe operation is visible at the call site
+            let val = unsafe { unsafe_deref_ptr!(ptr) };
+            println!("val = {}", val);
+        }
