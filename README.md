@@ -9,11 +9,12 @@ Check out the [coding guideline goals](GOALS.md).
 _Note_: Early, subject to changes.
 
 ## Table of Contents
+
 - [Building the coding guidelines](#building-the-coding-guidelines)
-   - [Running builds offline](#running-builds-offline)
-   - [Build breaking due to out-dated spec lock file](#build-breaking-due-to-out-dated-spec-lock-file)
-   - [Continuing work while on a feature branch](#continuing-work-while-on-a-feature-branch)
-   - [If you need to audit the difference](#if-you-need-to-audit-the-difference)
+  - [Running builds offline](#running-builds-offline)
+  - [Build breaking due to out-dated spec lock file](#build-breaking-due-to-out-dated-spec-lock-file)
+  - [Continuing work while on a feature branch](#continuing-work-while-on-a-feature-branch)
+  - [If you need to audit the difference](#if-you-need-to-audit-the-difference)
 - [Outline \& issue breakdown](#outline--issue-breakdown)
 - [Contributing](#contributing)
 - [Code of Conduct](#code-of-conduct)
@@ -34,11 +35,17 @@ On Linux-like systems:
    ./make.py
 ```
 
+On macOS systems:
+
+```shell
+   ./make.py
+```
+
 On Windows systems:
 
 ```shell
    uv run make.py
-``` 
+```
 
 By default, Sphinx uses incremental rebuilds to generate the content that
 changed since the last invocation. If you notice a problem with incremental
@@ -55,7 +62,6 @@ A machine-parseable artifact will be available at `build/html/needs.json`. (ToDo
 
 A record with checksums of the contents is available at `build/html/guidelines-ids.json`. Users of the coding guidelines can reference this file to determine if there have been changes to coding guidelines contents they should be aware of.
 
-
 ### Running builds offline
 
 If you're working without internet access or want to avoid reaching out to remote resources, you can pass the `--offline` flag:
@@ -67,7 +73,6 @@ If you're working without internet access or want to avoid reaching out to remot
 This prevents the build system from attempting to fetch remote resources, such as updates to the specification. Use this flag when you need reproducible or air-gapped builds.
 
 It is recommended to use `--offline` if you are running `make.py` frequently during development. The builder fetches data from [the Ferrocene Language Specification website](https://spec.ferrocene.dev/paragraph-ids.json), which may rate-limit repeated requests—leading to delays or failed builds. Using `--offline` can significantly improve build speed and avoid unnecessary network issues during iterative work.
-
 
 ### Build breaking due to out-dated spec lock file
 
@@ -138,8 +143,8 @@ Rust is primarily distributed under the terms of both the MIT license and the
 Apache License (Version 2.0), with documentation portions covered by the
 Creative Commons Attribution 4.0 International license..
 
-See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT), 
-[LICENSE-documentation](LICENSE-documentation), and 
+See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT),
+[LICENSE-documentation](LICENSE-documentation), and
 [COPYRIGHT](COPYRIGHT) for details.
 
 You can also read more under the Foundation's [intellectual property
