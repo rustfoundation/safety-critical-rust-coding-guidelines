@@ -232,7 +232,7 @@
                 }
                 break;
             case 'should_panic':
-                if (success && ((result.stderr && result.stderr.includes('panicked')) || 
+                if (!success && ((result.stderr && result.stderr.includes('panicked')) || 
                                (result.stdout && result.stdout.includes('panicked')))) {
                     statusText = 'Panicked as expected';
                     statusClass = 'expected';
