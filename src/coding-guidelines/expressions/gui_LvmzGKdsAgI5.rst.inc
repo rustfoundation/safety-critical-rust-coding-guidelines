@@ -92,7 +92,8 @@
         This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
         .. rust-example::
-
+            :should_panic:
+            
             fn main() {
                 let bits : u32 = 61;
                 let shifts = vec![-1, 4, 40];

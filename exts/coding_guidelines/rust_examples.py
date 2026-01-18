@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 class MiriValidationError(SphinxError):
     """Error raised when unsafe code is missing :miri: option."""
+
     category = "Miri Validation Error"
 
 
@@ -66,19 +67,30 @@ MIRI_MODES = {"check", "expect_ub", "skip"}
 MIRI_INCOMPATIBLE_OPTIONS = {"ignore", "compile_fail", "no_run"}
 
 # Warn mode values
-WARN_MODES = {"error", "allow"}  # error = fail on warnings (default), allow = permit warnings
+WARN_MODES = {
+    "error",
+    "allow",
+}  # error = fail on warnings (default), allow = permit warnings
 
 # Known directive options for rust-example (used for validation in sanitization)
 KNOWN_DIRECTIVE_OPTIONS = {
-    "ignore", "compile_fail", "should_panic", "no_run",
-    "miri", "warn", "edition", "channel", "version",
-    "show_hidden", "name"
+    "ignore",
+    "compile_fail",
+    "should_panic",
+    "no_run",
+    "miri",
+    "warn",
+    "edition",
+    "channel",
+    "version",
+    "show_hidden",
+    "name",
 }
 
 
 class RustExamplesConfig:
     """Configuration loaded from rust_examples_config.toml"""
-    
+
     def __init__(self):
         self.edition = "2021"
         self.channel = "stable"
@@ -90,53 +102,53 @@ class RustExamplesConfig:
         self.miri_timeout = 60
         # Warning settings
         self.warn_fail_on_warnings = True  # Fail on compiler warnings by default
-    
+
     @classmethod
     def load(cls, config_path: Path) -> "RustExamplesConfig":
         """
         Load configuration from TOML file.
-        
+
         Args:
             config_path: Path to the TOML configuration file
-            
+
         Returns:
             RustExamplesConfig instance
-            
+
         Raises:
             FileNotFoundError: If config file doesn't exist
             tomllib.TOMLDecodeError: If config file is invalid
         """
         config = cls()
-        
+
         if not config_path.exists():
             raise FileNotFoundError(f"Rust examples config not found: {config_path}")
-        
+
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
-        
+
         defaults = data.get("defaults", {})
         config.edition = defaults.get("edition", config.edition)
         config.channel = defaults.get("channel", config.channel)
         config.version = defaults.get("version", config.version)
-        
+
         playground = data.get("playground", {})
         config.playground_api_url = playground.get("api_url", config.playground_api_url)
-        
+
         warnings_section = data.get("warnings", {})
         config.version_mismatch_threshold = warnings_section.get(
-            "version_mismatch_threshold", 
-            config.version_mismatch_threshold
+            "version_mismatch_threshold", config.version_mismatch_threshold
         )
         config.warn_fail_on_warnings = warnings_section.get(
-            "fail_on_warnings",
-            config.warn_fail_on_warnings
+            "fail_on_warnings", config.warn_fail_on_warnings
         )
-        
+
         # Miri settings
         miri = data.get("miri", {})
-        config.miri_require_for_unsafe = miri.get("require_for_unsafe", config.miri_require_for_unsafe)
+        config.miri_require_for_unsafe = miri.get(
+            "require_for_unsafe", config.miri_require_for_unsafe
+        )
         config.miri_timeout = miri.get("timeout", config.miri_timeout)
-        
+
         return config
 
 
@@ -154,10 +166,10 @@ def version_diff(v1: str, v2: str) -> int:
     try:
         maj1, min1, _ = parse_version(v1)
         maj2, min2, _ = parse_version(v2)
-        
+
         if maj1 != maj2:
             return (maj2 - maj1) * 100 + (min2 - min1)
-        
+
         return min2 - min1
     except (ValueError, IndexError):
         return 0
@@ -175,15 +187,15 @@ def parse_compile_fail_error(value: str) -> Tuple[bool, Optional[str]]:
 def parse_miri_option(value: Optional[str]) -> Tuple[str, Optional[str]]:
     """
     Parse :miri: option value.
-    
+
     Args:
         value: The option value (empty string, "expect_ub", "skip", or future "expect_ub(pattern)")
-        
+
     Returns:
         (mode, pattern) where:
         - mode: "check" | "expect_ub" | "skip"
         - pattern: Optional UB pattern for future use (None for now)
-    
+
     Examples:
         None or "" -> ("check", None)
         "expect_ub" -> ("expect_ub", None)
@@ -192,20 +204,20 @@ def parse_miri_option(value: Optional[str]) -> Tuple[str, Optional[str]]:
     """
     if value is None or value.strip() == "":
         return ("check", None)
-    
+
     value = value.strip()
-    
+
     # Check for future pattern syntax: expect_ub(pattern)
     match = re.match(r"^expect_ub\(([^)]+)\)$", value)
     if match:
         return ("expect_ub", match.group(1))
-    
+
     if value == "expect_ub":
         return ("expect_ub", None)
-    
+
     if value == "skip":
         return ("skip", None)
-    
+
     # Unknown value - treat as check but log warning
     logger.warning(f"Unknown :miri: value '{value}', treating as 'check'")
     return ("check", None)
@@ -214,32 +226,32 @@ def parse_miri_option(value: Optional[str]) -> Tuple[str, Optional[str]]:
 def parse_warn_option(value: Optional[str], default_fail: bool = True) -> str:
     """
     Parse :warn: option value.
-    
+
     Args:
         value: The option value ("allow" or empty/None for default)
         default_fail: Whether to fail on warnings by default (from config)
-        
+
     Returns:
         "error" (fail on warnings) or "allow" (permit warnings)
-    
+
     Examples:
         None (no option) -> "error" if default_fail else "allow"
-        "" (flag present) -> "error"  
+        "" (flag present) -> "error"
         "allow" -> "allow"
     """
     if value is None:
         # Option not present - use default from config
         return "error" if default_fail else "allow"
-    
+
     value = value.strip().lower()
-    
+
     if value == "" or value == "error":
         # :warn: or :warn: error - fail on warnings
         return "error"
-    
+
     if value == "allow":
         return "allow"
-    
+
     # Unknown value - log warning and use default
     logger.warning(f"Unknown :warn: value '{value}', treating as 'error'")
     return "error"
@@ -248,71 +260,71 @@ def parse_warn_option(value: Optional[str], default_fail: bool = True) -> str:
 def contains_unsafe_keyword(code: str) -> bool:
     """
     Check if code contains the `unsafe` keyword outside of comments and strings.
-    
+
     This is a simplified tokenizer that handles:
     - Line comments (// ...)
     - Block comments (/* ... */)
     - String literals ("..." and r#"..."#)
     - Character literals ('...')
     - Raw strings (r"...", r#"..."#, etc.)
-    
+
     Args:
         code: Rust source code
-        
+
     Returns:
         True if `unsafe` keyword is found in code context
     """
     # States for the simple tokenizer
     i = 0
     length = len(code)
-    
+
     while i < length:
         # Skip line comments
-        if i < length - 1 and code[i:i+2] == '//':
-            while i < length and code[i] != '\n':
+        if i < length - 1 and code[i : i + 2] == "//":
+            while i < length and code[i] != "\n":
                 i += 1
             continue
-        
+
         # Skip block comments (handles nested)
-        if i < length - 1 and code[i:i+2] == '/*':
+        if i < length - 1 and code[i : i + 2] == "/*":
             i += 2
             depth = 1
             while i < length - 1 and depth > 0:
-                if code[i:i+2] == '/*':
+                if code[i : i + 2] == "/*":
                     depth += 1
                     i += 2
-                elif code[i:i+2] == '*/':
+                elif code[i : i + 2] == "*/":
                     depth -= 1
                     i += 2
                 else:
                     i += 1
             continue
-        
+
         # Skip raw strings: r"...", r#"..."#, r##"..."##, etc.
-        if code[i] == 'r' and i < length - 1:
+        if code[i] == "r" and i < length - 1:
             j = i + 1
             hash_count = 0
-            while j < length and code[j] == '#':
+            while j < length and code[j] == "#":
                 hash_count += 1
                 j += 1
             if j < length and code[j] == '"':
                 # Found raw string start
                 j += 1
                 # Find the matching end: "### with same number of hashes
-                end_pattern = '"' + '#' * hash_count
+                end_pattern = '"' + "#" * hash_count
                 while j < length:
-                    if code[j:j+len(end_pattern)] == end_pattern:
+                    if code[j : j + len(end_pattern)] == end_pattern:
                         j += len(end_pattern)
                         break
                     j += 1
                 i = j
                 continue
-        
+
         # Skip regular strings
         if code[i] == '"':
             i += 1
             while i < length:
-                if code[i] == '\\' and i < length - 1:
+                if code[i] == "\\" and i < length - 1:
                     i += 2  # Skip escaped character
                 elif code[i] == '"':
                     i += 1
@@ -320,7 +332,7 @@ def contains_unsafe_keyword(code: str) -> bool:
                 else:
                     i += 1
             continue
-        
+
         # Skip character literals
         if code[i] == "'":
             # Could be a char literal or a lifetime
@@ -328,7 +340,7 @@ def contains_unsafe_keyword(code: str) -> bool:
             # Lifetimes: 'a, 'static
             if i < length - 1:
                 j = i + 1
-                if j < length and code[j] == '\\':
+                if j < length and code[j] == "\\":
                     # Escaped char
                     j += 1
                     while j < length and code[j] != "'":
@@ -337,64 +349,70 @@ def contains_unsafe_keyword(code: str) -> bool:
                         j += 1
                     i = j
                     continue
-                elif j < length - 1 and code[j+1] == "'":
+                elif j < length - 1 and code[j + 1] == "'":
                     # Simple char like 'a'
                     i = j + 2
                     continue
                 # Otherwise it's a lifetime, continue normally
-        
+
         # Check for `unsafe` keyword
-        if code[i:i+6] == 'unsafe':
+        if code[i : i + 6] == "unsafe":
             # Make sure it's a word boundary (not part of another identifier)
-            before_ok = (i == 0 or not (code[i-1].isalnum() or code[i-1] == '_'))
+            before_ok = i == 0 or not (code[i - 1].isalnum() or code[i - 1] == "_")
             after_pos = i + 6
-            after_ok = (after_pos >= length or not (code[after_pos].isalnum() or code[after_pos] == '_'))
+            after_ok = after_pos >= length or not (
+                code[after_pos].isalnum() or code[after_pos] == "_"
+            )
             if before_ok and after_ok:
                 return True
-        
+
         i += 1
-    
+
     return False
 
 
-def process_hidden_lines(code: str, show_hidden: bool = False) -> Tuple[str, str, List[int]]:
+def process_hidden_lines(
+    code: str, show_hidden: bool = False
+) -> Tuple[str, str, List[int]]:
     """
     Process code to handle hidden lines (prefixed with `# `).
-    
+
     Args:
         code: The raw code with potential hidden line markers
         show_hidden: Whether to include hidden lines in rendered output
-        
+
     Returns:
         Tuple of (display_code, full_code_for_testing, hidden_line_numbers)
         hidden_line_numbers is 0-indexed list of lines that are hidden
     """
-    lines = code.split('\n')
+    lines = code.split("\n")
     display_lines = []
     full_lines = []
     hidden_line_numbers = []
-    
+
     for i, line in enumerate(lines):
-        if line.startswith('# ') or line == '#':
-            full_lines.append(line[2:] if line.startswith('# ') else '')
+        if line.startswith("# ") or line == "#":
+            full_lines.append(line[2:] if line.startswith("# ") else "")
             hidden_line_numbers.append(i)
             if show_hidden:
                 display_lines.append(line)
         else:
             display_lines.append(line)
             full_lines.append(line)
-    
-    return '\n'.join(display_lines), '\n'.join(full_lines), hidden_line_numbers
+
+    return "\n".join(display_lines), "\n".join(full_lines), hidden_line_numbers
 
 
-def highlight_code_with_hidden_lines(full_code: str, hidden_line_numbers: List[int]) -> str:
+def highlight_code_with_hidden_lines(
+    full_code: str, hidden_line_numbers: List[int]
+) -> str:
     """
     Highlight code using Pygments and wrap hidden lines with a marker class.
-    
+
     Args:
         full_code: The complete code (hidden lines already stripped of # prefix)
         hidden_line_numbers: 0-indexed list of which lines were hidden
-        
+
     Returns:
         HTML string with syntax highlighting and hidden lines wrapped
     """
@@ -403,12 +421,12 @@ def highlight_code_with_hidden_lines(full_code: str, hidden_line_numbers: List[i
     # Use a formatter that doesn't wrap in <pre> - we just want the highlighted spans
     formatter = HtmlFormatter(nowrap=True)
     highlighted = highlight(full_code, lexer, formatter)
-    
+
     # Now we need to wrap hidden lines with our marker class
     # Split by newlines, being careful to preserve the HTML structure
-    lines = highlighted.split('\n')
+    lines = highlighted.split("\n")
     hidden_set = set(hidden_line_numbers)
-    
+
     result_lines = []
     for i, line in enumerate(lines):
         if i in hidden_set:
@@ -416,39 +434,39 @@ def highlight_code_with_hidden_lines(full_code: str, hidden_line_numbers: List[i
             result_lines.append(f'<span class="rust-hidden-line">{line}</span>')
         else:
             result_lines.append(line)
-    
-    return '\n'.join(result_lines)
+
+    return "\n".join(result_lines)
 
 
 class RustExampleDirective(Directive):
     """
     A directive for Rust code examples with rustdoc-style attributes.
-    
+
     Usage:
         .. rust-example::
             :compile_fail: E0277
-            
+
             fn example() {
                 let x: i32 = "string"; // This fails
             }
-        
+
         .. rust-example::
             :ignore:
             :edition: 2018
             :channel: nightly
             :version: 1.79.0
-            
+
             # use std::collections::HashMap;
             # fn main() {
             let map = HashMap::new();
             # }
     """
-    
+
     has_content = True
     required_arguments = 0
     optional_arguments = 0
     final_argument_whitespace = True
-    
+
     option_spec = {
         # Rustdoc attributes
         "ignore": directives.flag,
@@ -468,98 +486,109 @@ class RustExampleDirective(Directive):
         # Metadata
         "name": directives.unchanged,
     }
-    
+
     def run(self) -> List[nodes.Node]:
         env = self.state.document.settings.env
-        
+
         # Load configuration (with fallback defaults)
-        config = getattr(env, 'rust_examples_config', None)
+        config = getattr(env, "rust_examples_config", None)
         if config is None:
             config_path = Path(env.app.confdir) / "rust_examples_config.toml"
             try:
                 config = RustExamplesConfig.load(config_path)
             except FileNotFoundError:
-                logger.warning(f"Rust examples config not found at {config_path}, using defaults")
+                logger.warning(
+                    f"Rust examples config not found at {config_path}, using defaults"
+                )
                 config = RustExamplesConfig()
             except Exception as e:
                 logger.error(f"Error loading rust examples config: {e}")
                 config = RustExamplesConfig()
             env.rust_examples_config = config
-        
+
         # Get source location early (needed for error messages)
         source, line = self.state_machine.get_source_and_line(self.lineno)
-        
+
         # Parse the code content
-        raw_code = '\n'.join(self.content)
-        
+        raw_code = "\n".join(self.content)
+
         # Sanitize content - detect and extract misplaced directive options
         # This handles RST indentation issues where Sphinx puts options into content
-        raw_code, extracted_options, raw_option_lines = sanitize_directive_content(raw_code)
-        
+        raw_code, extracted_options, raw_option_lines = sanitize_directive_content(
+            raw_code
+        )
+
         if extracted_options:
             # Log a detailed warning about the indentation issue
             opt_names = list(extracted_options.keys())
-            
+
             # Build informative message with context
             warning_parts = [
                 f"{source}:{line}: Found directive options in code content "
                 f"(RST indentation issue): {opt_names}.",
                 "These options were extracted and will be applied, but please fix the source file.",
-                "The code content should be indented at least as much as the options."
+                "The code content should be indented at least as much as the options.",
             ]
-            
+
             # Add specific context for version-related options
-            if 'version' in extracted_options:
-                extracted_version = extracted_options['version']
+            if "version" in extracted_options:
+                extracted_version = extracted_options["version"]
                 warning_parts.append(
                     f"Note: Extracted :version: {extracted_version} "
                     f"(config default: {config.version}, "
                     f"mismatch threshold: {config.version_mismatch_threshold} minor versions)"
                 )
-            
+
             logger.warning(" ".join(warning_parts))
-            
+
             # Merge extracted options into self.options
             # Sphinx-parsed options take precedence (they were properly formatted)
             for opt_name, opt_value in extracted_options.items():
                 if opt_name not in self.options:
                     # Handle flag-style options (empty value means flag is set)
-                    if opt_name in ('ignore', 'no_run', 'show_hidden') and opt_value == '':
+                    if (
+                        opt_name in ("ignore", "no_run", "show_hidden")
+                        and opt_value == ""
+                    ):
                         self.options[opt_name] = None  # Flag style
                     else:
                         self.options[opt_name] = opt_value
-        
+
         # Get configuration for showing hidden lines
-        show_hidden_global = getattr(env.config, 'rust_examples_show_hidden', False)
-        show_hidden = 'show_hidden' in self.options or show_hidden_global
-        
-        display_code, full_code, hidden_line_numbers = process_hidden_lines(raw_code, show_hidden)
-        
+        show_hidden_global = getattr(env.config, "rust_examples_show_hidden", False)
+        show_hidden = "show_hidden" in self.options or show_hidden_global
+
+        display_code, full_code, hidden_line_numbers = process_hidden_lines(
+            raw_code, show_hidden
+        )
+
         # Determine rustdoc attribute
         rustdoc_attr = None
         attr_value = None
-        
-        if 'ignore' in self.options:
-            rustdoc_attr = 'ignore'
-        elif 'compile_fail' in self.options:
-            rustdoc_attr = 'compile_fail'
-            _, attr_value = parse_compile_fail_error(self.options.get('compile_fail', ''))
-        elif 'should_panic' in self.options:
-            rustdoc_attr = 'should_panic'
-            attr_value = self.options.get('should_panic', None)
-            if attr_value in ('', None):
+
+        if "ignore" in self.options:
+            rustdoc_attr = "ignore"
+        elif "compile_fail" in self.options:
+            rustdoc_attr = "compile_fail"
+            _, attr_value = parse_compile_fail_error(
+                self.options.get("compile_fail", "")
+            )
+        elif "should_panic" in self.options:
+            rustdoc_attr = "should_panic"
+            attr_value = self.options.get("should_panic", None)
+            if attr_value in ("", None):
                 attr_value = None
-        elif 'no_run' in self.options:
-            rustdoc_attr = 'no_run'
-        
+        elif "no_run" in self.options:
+            rustdoc_attr = "no_run"
+
         # Parse Miri option
         miri_mode = None
         miri_pattern = None
-        has_miri_option = 'miri' in self.options
-        
+        has_miri_option = "miri" in self.options
+
         if has_miri_option:
-            miri_mode, miri_pattern = parse_miri_option(self.options.get('miri', ''))
-            
+            miri_mode, miri_pattern = parse_miri_option(self.options.get("miri", ""))
+
             # Validate: miri cannot be combined with ignore, compile_fail, or no_run
             if rustdoc_attr in MIRI_INCOMPATIBLE_OPTIONS:
                 logger.error(
@@ -574,38 +603,44 @@ class RustExampleDirective(Directive):
                 )
                 error_node += error_para
                 return [error_node]
-        
+
         # Check for unsafe code without miri option (build enforcement)
         # Note: The actual enforcement happens in check_miri_violations at consistency time
         # This warning provides immediate feedback during document processing
         code_has_unsafe = contains_unsafe_keyword(full_code)
-        require_miri_for_unsafe = getattr(env.config, 'rust_examples_require_miri_for_unsafe', 
-                                          config.miri_require_for_unsafe)
-        
+        require_miri_for_unsafe = getattr(
+            env.config,
+            "rust_examples_require_miri_for_unsafe",
+            config.miri_require_for_unsafe,
+        )
+
         if code_has_unsafe and not has_miri_option and require_miri_for_unsafe:
             logger.warning(
                 f"{source}:{line}: Example contains `unsafe` code but no :miri: option. "
                 f"Add :miri: (check for UB), :miri: expect_ub (if demonstrating UB), "
                 f"or :miri: skip (to opt out)."
             )
-        
+
         # Parse warn option
         # If :warn: is present, use its value; otherwise use config default
-        has_warn_option = 'warn' in self.options
-        default_fail_on_warnings = getattr(env.config, 'rust_examples_fail_on_warnings',
-                                           config.warn_fail_on_warnings)
-        
+        has_warn_option = "warn" in self.options
+        default_fail_on_warnings = getattr(
+            env.config, "rust_examples_fail_on_warnings", config.warn_fail_on_warnings
+        )
+
         if has_warn_option:
-            warn_mode = parse_warn_option(self.options.get('warn', ''), default_fail_on_warnings)
+            warn_mode = parse_warn_option(
+                self.options.get("warn", ""), default_fail_on_warnings
+            )
         else:
             # No :warn: option - use config default
             warn_mode = "error" if default_fail_on_warnings else "allow"
-        
+
         # Get toolchain options
-        edition = self.options.get('edition', config.edition)
-        channel = self.options.get('channel', config.channel)
-        version = self.options.get('version', config.version)
-        
+        edition = self.options.get("edition", config.edition)
+        channel = self.options.get("channel", config.channel)
+        version = self.options.get("version", config.version)
+
         # Determine expected outcome
         expected_outcome = "success"
         if rustdoc_attr == "compile_fail":
@@ -614,12 +649,14 @@ class RustExampleDirective(Directive):
             expected_outcome = "should_panic"
         elif rustdoc_attr == "no_run":
             expected_outcome = "no_run"
-        
+
         is_runnable = rustdoc_attr != "ignore"
         has_hidden_lines = len(hidden_line_numbers) > 0
-        version_mismatch = version_diff(version, config.version) >= config.version_mismatch_threshold
+        version_mismatch = (
+            version_diff(version, config.version) >= config.version_mismatch_threshold
+        )
         show_channel_badge = channel == "nightly"
-        
+
         # Build JSON data for JavaScript
         js_data = {
             "code": full_code,
@@ -633,104 +670,108 @@ class RustExampleDirective(Directive):
             "runnable": is_runnable,
             "hasHiddenLines": has_hidden_lines,
         }
-        
+
         # Add Miri data if miri option is set
         if miri_mode is not None:
             js_data["miri"] = {
                 "mode": miri_mode,
                 "pattern": miri_pattern,
             }
-        
+
         # Add warn mode
         js_data["warnMode"] = warn_mode
-        
+
         # If there are hidden lines, pre-generate the highlighted HTML for the full code
         if has_hidden_lines:
             js_data["fullCodeHighlighted"] = highlight_code_with_hidden_lines(
                 full_code, hidden_line_numbers
             )
-        
+
         # Create the outer container
         container = nodes.container()
-        container['classes'].append('rust-example-container')
-        
+        container["classes"].append("rust-example-container")
+
         # Determine if we need badges
         show_miri_badge = miri_mode is not None and miri_mode != "skip"
-        needs_badges = rustdoc_attr or show_channel_badge or version_mismatch or show_miri_badge
-        
+        needs_badges = (
+            rustdoc_attr or show_channel_badge or version_mismatch or show_miri_badge
+        )
+
         # Add badge container if needed
         if needs_badges:
             badge_container = nodes.container()
-            badge_container['classes'].append('rust-example-badges')
-            
+            badge_container["classes"].append("rust-example-badges")
+
             if rustdoc_attr:
                 badge = nodes.inline()
-                badge['classes'].append('rust-example-badge')
-                badge['classes'].append(f'rust-example-badge-{rustdoc_attr.replace("_", "-")}')
+                badge["classes"].append("rust-example-badge")
+                badge["classes"].append(
+                    f"rust-example-badge-{rustdoc_attr.replace('_', '-')}"
+                )
                 badge_text = rustdoc_attr.replace("_", " ")
                 if attr_value:
                     badge_text += f"({attr_value})"
                 badge += nodes.Text(badge_text)
                 badge_container += badge
-            
+
             # Miri badge
             if show_miri_badge:
                 badge = nodes.inline()
-                badge['classes'].append('rust-example-badge')
+                badge["classes"].append("rust-example-badge")
                 if miri_mode == "expect_ub":
-                    badge['classes'].append('rust-example-badge-miri-expect-ub')
-                    badge += nodes.Text('undefined behavior')
+                    badge["classes"].append("rust-example-badge-miri-expect-ub")
+                    badge += nodes.Text("undefined behavior")
                 else:
-                    badge['classes'].append('rust-example-badge-miri')
-                    badge += nodes.Text('miri')
+                    badge["classes"].append("rust-example-badge-miri")
+                    badge += nodes.Text("miri")
                 badge_container += badge
-            
+
             if show_channel_badge:
                 badge = nodes.inline()
-                badge['classes'].append('rust-example-badge')
-                badge['classes'].append('rust-example-badge-nightly')
-                badge += nodes.Text('nightly')
+                badge["classes"].append("rust-example-badge")
+                badge["classes"].append("rust-example-badge-nightly")
+                badge += nodes.Text("nightly")
                 badge_container += badge
-            
+
             if version_mismatch:
                 badge = nodes.inline()
-                badge['classes'].append('rust-example-badge')
-                badge['classes'].append('rust-example-badge-version')
-                badge += nodes.Text(f'Rust {version} ⚠️')
+                badge["classes"].append("rust-example-badge")
+                badge["classes"].append("rust-example-badge-version")
+                badge += nodes.Text(f"Rust {version} ⚠️")
                 badge_container += badge
-            
+
             container += badge_container
-        
+
         # Create the code block - Sphinx will syntax highlight this
         code_node = nodes.literal_block(display_code, display_code)
-        code_node['language'] = 'rust'
-        code_node['classes'].append('rust-example-code')
-        
+        code_node["language"] = "rust"
+        code_node["classes"].append("rust-example-code")
+
         # Store metadata on the code node for potential extraction
-        code_node['rustdoc_attr'] = rustdoc_attr
-        code_node['rustdoc_attr_value'] = attr_value
-        code_node['rustdoc_full_code'] = full_code
-        code_node['rustdoc_example_name'] = self.options.get('name', '')
-        code_node['rustdoc_edition'] = edition
-        code_node['rustdoc_channel'] = channel
-        code_node['rustdoc_version'] = version
-        code_node['rustdoc_miri_mode'] = miri_mode
-        code_node['rustdoc_miri_pattern'] = miri_pattern
-        code_node['rustdoc_warn_mode'] = warn_mode
-        code_node['source'] = source
-        code_node['line'] = line
-        
+        code_node["rustdoc_attr"] = rustdoc_attr
+        code_node["rustdoc_attr_value"] = attr_value
+        code_node["rustdoc_full_code"] = full_code
+        code_node["rustdoc_example_name"] = self.options.get("name", "")
+        code_node["rustdoc_edition"] = edition
+        code_node["rustdoc_channel"] = channel
+        code_node["rustdoc_version"] = version
+        code_node["rustdoc_miri_mode"] = miri_mode
+        code_node["rustdoc_miri_pattern"] = miri_pattern
+        code_node["rustdoc_warn_mode"] = warn_mode
+        code_node["source"] = source
+        code_node["line"] = line
+
         container += code_node
-        
+
         # Add a hidden element with the JSON data for JavaScript
         json_str = json.dumps(js_data)
         json_node = nodes.raw(
-            '',
+            "",
             f'<script type="application/json" class="rust-example-data">{json_str}</script>',
-            format='html'
+            format="html",
         )
         container += json_node
-        
+
         return [container]
 
 
@@ -738,13 +779,13 @@ def add_static_files(app: Sphinx, exception):
     """Write CSS and JS files when build finishes."""
     if exception is not None:
         return
-    
+
     # Write CSS
     css_path = os.path.join(app.outdir, "_static", "rust_playground.css")
     os.makedirs(os.path.dirname(css_path), exist_ok=True)
     with open(css_path, "w") as f:
         f.write(get_css_content())
-    
+
     # Write JS
     js_path = os.path.join(app.outdir, "_static", "rust_playground.js")
     with open(js_path, "w") as f:
@@ -753,7 +794,7 @@ def add_static_files(app: Sphinx, exception):
 
 def get_css_content() -> str:
     """Return the CSS content for rust playground styling."""
-    return '''\
+    return """\
 /* Rust Playground Interactive Examples */
 
 /* Container */
@@ -1054,12 +1095,12 @@ def get_css_content() -> str:
 
 .rust-example-output-status.miri-ub { color: #b02a37; }
 .rust-example-output-status.miri-ub::before { content: "☣️ "; }
-'''
+"""
 
 
 def get_js_content() -> str:
     """Return the JavaScript content for rust playground interactivity."""
-    return '''\
+    return """\
 /* Rust Playground Interactive Examples */
 (function() {
     'use strict';
@@ -1294,7 +1335,7 @@ def get_js_content() -> str:
                 }
                 break;
             case 'should_panic':
-                if (success && ((result.stderr && result.stderr.includes('panicked')) || 
+                if (!success && ((result.stderr && result.stderr.includes('panicked')) || 
                                (result.stdout && result.stdout.includes('panicked')))) {
                     statusText = 'Panicked as expected';
                     statusClass = 'expected';
@@ -1527,14 +1568,14 @@ def get_js_content() -> str:
         initialize: initializeRustExamples
     };
 })();
-'''
+"""
 
 
 def check_miri_violations(app, env):
     """
     Check for miri violations after all documents are read.
     Raises MiriValidationError if any unsafe code lacks :miri: option.
-    
+
     This scans all doctrees at consistency-check time rather than storing
     data during directive processing, ensuring parallel builds work correctly.
     """
@@ -1544,15 +1585,18 @@ def check_miri_violations(app, env):
         config = RustExamplesConfig.load(config_path)
     except FileNotFoundError:
         config = RustExamplesConfig()
-    
-    require_miri = getattr(app.config, 'rust_examples_require_miri_for_unsafe', 
-                           config.miri_require_for_unsafe)
-    
+
+    require_miri = getattr(
+        app.config,
+        "rust_examples_require_miri_for_unsafe",
+        config.miri_require_for_unsafe,
+    )
+
     if not require_miri:
         return
-    
+
     violations = []
-    
+
     # Iterate over all doctrees
     docnames = list(env.all_docs.keys())
     pbar = get_tqdm(
@@ -1561,35 +1605,33 @@ def check_miri_violations(app, env):
         bar_format=bar_format,
         unit="doc",
     )
-    
+
     for docname in pbar:
         try:
             doctree = env.get_doctree(docname)
         except Exception:
             continue
-        
+
         # Find all rust-example code blocks
         for node in doctree.traverse(nodes.literal_block):
-            if node.get('language') != 'rust':
+            if node.get("language") != "rust":
                 continue
-            if 'rust-example-code' not in node.get('classes', []):
+            if "rust-example-code" not in node.get("classes", []):
                 continue
-            
+
             # Check if this code has unsafe and no miri option
-            full_code = node.get('rustdoc_full_code', '')
-            miri_mode = node.get('rustdoc_miri_mode')
-            
+            full_code = node.get("rustdoc_full_code", "")
+            miri_mode = node.get("rustdoc_miri_mode")
+
             if full_code and contains_unsafe_keyword(full_code) and miri_mode is None:
-                source = node.get('source', docname)
-                line = node.get('line', 0)
+                source = node.get("source", docname)
+                line = node.get("line", 0)
                 violations.append(f"{source}:{line}")
-    
+
     pbar.close()
-    
+
     if violations:
-        error_msg = (
-            f"{len(violations)} example(s) contain `unsafe` code without :miri: option:\n\n"
-        )
+        error_msg = f"{len(violations)} example(s) contain `unsafe` code without :miri: option:\n\n"
         for loc in violations:
             error_msg += f"  • {loc}\n"
         error_msg += (
@@ -1607,30 +1649,30 @@ def check_miri_violations(app, env):
 
 def setup(app: Sphinx):
     """Setup the rust-example extension."""
-    
-    app.add_directive('rust-example', RustExampleDirective)
-    
-    app.add_config_value('rust_examples_show_hidden', False, 'env')
-    app.add_config_value('rust_examples_prelude_file', None, 'env')
-    
+
+    app.add_directive("rust-example", RustExampleDirective)
+
+    app.add_config_value("rust_examples_show_hidden", False, "env")
+    app.add_config_value("rust_examples_prelude_file", None, "env")
+
     # Miri configuration
-    app.add_config_value('rust_examples_require_miri_for_unsafe', True, 'env')
-    app.add_config_value('rust_examples_miri_timeout', 60, 'env')
-    
+    app.add_config_value("rust_examples_require_miri_for_unsafe", True, "env")
+    app.add_config_value("rust_examples_miri_timeout", 60, "env")
+
     # Warning configuration
-    app.add_config_value('rust_examples_fail_on_warnings', True, 'env')
-    
+    app.add_config_value("rust_examples_fail_on_warnings", True, "env")
+
     # Register static files
-    app.add_css_file('rust_playground.css')
-    app.add_js_file('rust_playground.js')
-    
+    app.add_css_file("rust_playground.css")
+    app.add_js_file("rust_playground.js")
+
     # Write files on build finish
-    app.connect('build-finished', add_static_files)
-    
+    app.connect("build-finished", add_static_files)
+
     # Check for miri violations after documents are read
-    app.connect('env-check-consistency', check_miri_violations)
-    
+    app.connect("env-check-consistency", check_miri_violations)
+
     return {
-        'version': '0.1',
-        'parallel_read_safe': True,
+        "version": "0.1",
+        "parallel_read_safe": True,
     }

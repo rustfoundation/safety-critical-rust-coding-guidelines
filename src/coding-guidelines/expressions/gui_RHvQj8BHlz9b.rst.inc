@@ -88,6 +88,7 @@
         This noncompliant example shifts by a negative value (-1) and also by greater than or equal to the number of bits that exist in the left operand (40):.
 
         .. rust-example::
+            :should_panic:
 
             fn main() {
                 let bits : u32 = 61;
@@ -102,7 +103,7 @@
         :id: non_compl_ex_mvkgTL3kulZ5 
         :status: draft
 
-        This noncompliant example test the value of ``sh`` to ensure the value of the right operand is negative or greater 
+        This noncompliant example tests the value of ``sh`` to ensure the value of the right operand is negative or greater 
         than or equal to the width of the left operand.
 
         .. rust-example::

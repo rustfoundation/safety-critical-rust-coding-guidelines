@@ -77,7 +77,7 @@
       This noncompliant example reads an invalid Unicode value from a ``union`` field of type ``char`` .
 
       .. rust-example::
-         :miri:
+         :miri: expect_ub
 
          union IntOrChar {
              i: u32,
