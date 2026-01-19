@@ -112,7 +112,8 @@ The extension validates bibliography entries during the build:
 2. **Guideline ID matching** - The guideline ID in roles must match the containing guideline
 3. **URL consistency** - Same URLs across guidelines must use identical citation keys and descriptions
 4. **Citation references** - Referenced citations must exist in the bibliography
-5. **URL accessibility** (optional) - URLs can be checked for validity
+5. **Unused citations** (optional) - Bibliography entries not cited in text can warn when enabled
+6. **URL accessibility** (optional) - URLs can be checked for validity
 
 Configuration Options
 ~~~~~~~~~~~~~~~~~~~~~
@@ -125,6 +126,7 @@ In ``conf.py``:
    bibliography_url_timeout = 10             # Timeout in seconds for URL checks
    bibliography_fail_on_broken = True        # Error vs warning for broken URLs
    bibliography_fail_on_inconsistent = True  # Error vs warning for inconsistent entries
+   bibliography_check_unused = False         # Warn on uncited bibliography entries
 
 Interactive Rust Examples
 =========================
@@ -431,6 +433,9 @@ proper roles instead:
 
 - **Standard library URLs** should use the ``:std:`` role
 - **External reference URLs** should be added to the bibliography and referenced with ``:cite:``
+
+Bibliography entries can include uncited background sources. When
+``bibliography_check_unused`` is enabled, uncited entries will emit warnings.
 
 **Example of what NOT to do:**
 
