@@ -323,10 +323,11 @@
              bytes: [u8; 4],
          }
 
-         # fn main() {
-         let u = U { bytes: [0xFF, 0xEE, 0xDD, 0xCC] };
-         println!("{}", unsafe { u.n });   // OK — all bit patterns valid for u32
-         # }
+         fn main() {
+             let u = U { bytes: [0xFF, 0xEE, 0xDD, 0xCC] };
+             println!("{}", unsafe { u.n });   // OK — all bit patterns valid for u32
+         }
+
    .. compliant_example::
       :id: compl_ex_V73XRTccrWky
       :status: draft
@@ -341,10 +342,10 @@
             y: f32,
          }
 
-         # fn main() {
-         let u = U { x: 123 }; // write to one field
-         println!("{}", unsafe { u.y }); // reading the other field is allowed
-         # }
+         fn main() {
+            let u = U { x: 123 }; // write to one field
+            println!("{}", unsafe { u.y }); // reading the other field is allowed
+         }
 
    .. non_compliant_example::
       :id: non_compl_ex_PMmuoYeT7HsG
@@ -363,10 +364,10 @@
              x: u8,
          }
 
-         # fn main() {
-         let u = U { x: 255 };        // 255 is not a valid bool representation
-         println!("{}", unsafe { u.b });      // UB — invalid bool
-         # }
+         fn main() {
+             let u = U { x: 255 };  // 255 is not a valid bool representation
+             println!("{}", unsafe { u.b });  // UB — invalid bool
+         }
 
    .. bibliography::
       :id: bib_GDGiC7wRBAYB
