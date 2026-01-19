@@ -270,6 +270,7 @@ def test_handle_comment_event_ignores_multiple_commands(
     reviewer_bot.handle_comment_event(state)
     assert len(captured_comments) == 1
     assert "Multiple bot commands" in captured_comments[0]["body"]
+    assert "/commands" in captured_comments[0]["body"]
 
 
 def test_handle_comment_event_ignores_commands_in_code_block(

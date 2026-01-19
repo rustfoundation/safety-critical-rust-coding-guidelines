@@ -1879,7 +1879,8 @@ def handle_comment_event(state: dict) -> bool:
 
     if command == "_multiple_commands":
         response = ("⚠️ Multiple bot commands in one comment are ignored. "
-                    "Please post a single command per comment.")
+                    "Please post a single command per comment. "
+                    f"For a list of commands, use `{BOT_MENTION} /commands`.")
         success = False
     # Handle each command
     elif command == "pass":
