@@ -1158,7 +1158,7 @@ def handle_commands_command() -> tuple[str, bool]:
     """
     return (f"ℹ️ **Available Commands**\n\n"
             f"**Pass or step away:**\n"
-            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue\n"
+            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue (current reviewer only)\n"
             f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n"
             f"- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n"
             f"**Assign reviewers:**\n"
