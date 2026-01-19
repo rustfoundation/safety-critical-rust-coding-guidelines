@@ -230,6 +230,9 @@ bibliography_fail_on_broken = True
 # Whether duplicate URLs should fail the build
 bibliography_fail_on_duplicates = True
 
+# Whether to warn about bibliography entries not cited in text
+bibliography_check_unused = False
+
 # -- Text content validation configuration -----------------------------------
 
 # Enable inline URL detection in guideline text

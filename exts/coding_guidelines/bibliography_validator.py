@@ -638,18 +638,19 @@ def validate_bibliography(app: Sphinx, env) -> None:
                         )
     
     # Check for unused citations
-    for key, guideline_ids in citation_definitions.items():
-        for gid in guideline_ids:
-            if key not in citation_references.get(gid, set()):
-                guideline = guidelines.get(gid)
-                if guideline:
-                    source_file = guideline.get("docname", "unknown")
-                    warnings.append(
-                        f"Unused citation in {source_file}:\n"
-                        f"  Citation: {key}\n"
-                        f"  Guideline: {gid}\n"
-                        f"  Action: Reference this citation in the guideline or remove it"
-                    )
+    if app.config.bibliography_check_unused:
+        for key, guideline_ids in citation_definitions.items():
+            for gid in guideline_ids:
+                if key not in citation_references.get(gid, set()):
+                    guideline = guidelines.get(gid)
+                    if guideline:
+                        source_file = guideline.get("docname", "unknown")
+                        warnings.append(
+                            f"Unused citation in {source_file}:\n"
+                            f"  Citation: {key}\n"
+                            f"  Guideline: {gid}\n"
+                            f"  Action: Reference this citation in the guideline or remove it"
+                        )
     
     # Report warnings
     for warning in warnings:
@@ -674,6 +675,7 @@ def setup(app: Sphinx):
     app.add_config_value('bibliography_url_timeout', 10, 'env')
     app.add_config_value('bibliography_fail_on_broken', True, 'env')
     app.add_config_value('bibliography_fail_on_inconsistent', True, 'env')
+    app.add_config_value('bibliography_check_unused', False, 'env')
     
     # Connect to the consistency check phase
     app.connect("env-check-consistency", validate_bibliography)
