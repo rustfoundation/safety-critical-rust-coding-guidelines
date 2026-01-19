@@ -723,45 +723,72 @@ Other commands:
 # ==============================================================================
 
 
+def strip_code_blocks(comment_body: str) -> str:
+    """Remove fenced, indented, and inline code blocks from text."""
+    sanitized = comment_body
+
+    def strip_fenced_blocks(text: str, fence: str) -> str:
+        pattern = re.compile(re.escape(fence) + r".*?" + re.escape(fence), re.DOTALL)
+        stripped = pattern.sub("", text)
+        last_fence = stripped.rfind(fence)
+        if last_fence != -1:
+            stripped = stripped[:last_fence]
+        return stripped
+
+    sanitized = strip_fenced_blocks(sanitized, "```")
+    sanitized = strip_fenced_blocks(sanitized, "~~~")
+    sanitized = re.sub(r"^(?: {4}|\t).*$", "", sanitized, flags=re.MULTILINE)
+    sanitized = re.sub(r"`[^`]*`", "", sanitized)
+
+    return sanitized
+
+
 def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
     """
     Parse a bot command from a comment body.
 
     Returns (command, args) or None if no command found.
-    
+
     Special return values:
+    - ("_multiple_commands", []) - Multiple commands found in a single comment
     - ("_malformed_known", [attempted_cmd]) - Missing / prefix on known command
     - ("_malformed_unknown", [attempted_word]) - Missing / prefix on unknown word
-    
+
     All commands must be prefixed with @guidelines-bot /<command>:
     - @guidelines-bot /pass [reason]
     - @guidelines-bot /r? @username (assign specific user)
     - @guidelines-bot /r? producers (assign next from queue)
     """
     # Look for @guidelines-bot /<command> pattern (correct syntax)
+    mention_pattern = rf"{re.escape(BOT_MENTION)}\s+/\S+"
     pattern = rf"{re.escape(BOT_MENTION)}\s+/(\S+)(.*)$"
+    matches = re.findall(mention_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
+
+    if len(matches) > 1:
+        return "_multiple_commands", []
+
     match = re.search(pattern, comment_body, re.IGNORECASE | re.MULTILINE)
 
     if not match:
         # Check for malformed command (missing / prefix)
         malformed_pattern = rf"{re.escape(BOT_MENTION)}\s+(\S+)"
         malformed_match = re.search(malformed_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
-        
+
         if malformed_match:
             attempted = malformed_match.group(1).lower()
             # Check if it looks like a command (not just random text after mention)
             # Ignore if it starts with common conversational words
-            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could", 
+            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could",
                             "would", "should", "please", "thanks", "thank", "hi", "hello", "hey"}
             if attempted in conversational:
                 return None
-            
+
             # Check if it's a known command without the /
             if attempted in COMMANDS or attempted in {"r?-user", "assign-from-queue"}:
                 return "_malformed_known", [attempted]
             else:
                 return "_malformed_unknown", [attempted]
-        
+
         return None
 
     command = match.group(1).lower()
@@ -840,9 +867,13 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     if not passed_reviewer:
         current_assignees = get_issue_assignees(issue_number)
         passed_reviewer = current_assignees[0] if current_assignees else None
-    
+
     if not passed_reviewer:
         return "❌ No reviewer is currently assigned to pass.", False
+
+    if passed_reviewer.lower() != comment_author.lower():
+        return "❌ Only the currently assigned reviewer can use `/pass`.", False
+
 
     # Check if this is the first pass on this issue (for messaging only)
     is_first_pass = len(issue_data["skipped"]) == 0
@@ -1127,7 +1158,7 @@ def handle_commands_command() -> tuple[str, bool]:
     """
     return (f"ℹ️ **Available Commands**\n\n"
             f"**Pass or step away:**\n"
-            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue\n"
+            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue (current reviewer only)\n"
             f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n"
             f"- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n"
             f"**Assign reviewers:**\n"
@@ -1833,7 +1864,8 @@ def handle_comment_event(state: dict) -> bool:
     activity_updated = update_reviewer_activity(state, issue_number, comment_author)
     
     # Parse for bot command
-    parsed = parse_command(comment_body)
+    sanitized_body = strip_code_blocks(comment_body)
+    parsed = parse_command(sanitized_body)
     if not parsed:
         # No bot command, but we may have updated activity
         return activity_updated
@@ -1845,8 +1877,13 @@ def handle_comment_event(state: dict) -> bool:
     success = False
     state_changed = False
 
+    if command == "_multiple_commands":
+        response = ("⚠️ Multiple bot commands in one comment are ignored. "
+                    "Please post a single command per comment. "
+                    f"For a list of commands, use `{BOT_MENTION} /commands`.")
+        success = False
     # Handle each command
-    if command == "pass":
+    elif command == "pass":
         reason = " ".join(args) if args else None
         response, success = handle_pass_command(state, issue_number, comment_author, reason)
         state_changed = success
@@ -1931,7 +1968,7 @@ def handle_comment_event(state: dict) -> bool:
         success = False
 
     # React to the command comment
-    if comment_id:
+    if comment_id and command != "_multiple_commands":
         add_reaction(int(comment_id), "eyes")
         if success:
             add_reaction(int(comment_id), "+1")
