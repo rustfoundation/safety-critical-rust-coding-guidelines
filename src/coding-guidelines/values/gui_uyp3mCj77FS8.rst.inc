@@ -54,12 +54,13 @@
 
       .. rust-example::
          :miri: expect_ub
+         :warn: allow
 
          use std::mem::MaybeUninit;
 
          fn main() {
              // Reading uninitialized memory as a typed value is undefined behavior
-             let x: u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
+             let _x: u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
          }
 
    .. compliant_example::
@@ -81,7 +82,7 @@
              let mut x = MaybeUninit::<u64>::uninit();
              x.write(42);
              // x is fully initialized
-             let val = unsafe { x.assume_init() }; // compliant
+             let _val = unsafe { x.assume_init() }; // compliant
          }
  
    .. non_compliant_example::
@@ -95,11 +96,12 @@
 
       .. rust-example::
          :miri: expect_ub
+         :warn: allow
 
          use std::mem::MaybeUninit;
 
          fn main() {
-             let p: *const u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
+             let _p: *const u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
          }
 
    .. non_compliant_example::
@@ -113,12 +115,13 @@
 
       .. rust-example::
          :miri: expect_ub
+         :warn: allow
 
          use std::mem::MaybeUninit;
 
          fn main() {
              // Reading an invalid reference is undefined behavior
-             let r: &u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
+             let _r: &u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
          }
 
    .. non_compliant_example::
@@ -183,9 +186,9 @@
          use std::mem::MaybeUninit;
 
          fn main() {
-             let mut arr: [MaybeUninit<u8>; 4] = unsafe { MaybeUninit::uninit().assume_init() };
+             let arr: [MaybeUninit<u8>; 4] = unsafe { MaybeUninit::uninit().assume_init() };
              // Undefined behavior constructing an array of 'u8' from uninitialized memory. 
-             let a = unsafe { std::mem::transmute::<_, [u8; 4]>(arr) }; // noncompliant
+             let _a = unsafe { std::mem::transmute::<_, [u8; 4]>(arr) }; // noncompliant
          }
 
    .. compliant_example::
