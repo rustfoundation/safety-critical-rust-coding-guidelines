@@ -1,13 +1,14 @@
 .. SPDX-License-Identifier: MIT OR Apache-2.0
-   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
+.. SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
 .. default-domain:: coding-guidelines
 
 .. guideline:: Do not read from union fields that may contain uninitialized bytes
-   :id: gui_UnionPartialInit
+   :id: gui_6JSM7YE7a1KR
    :category: required
    :status: draft
    :release: 1.85.0
+   :fls: fls_6lg0oaaopc26
    :decidability: undecidable
    :scope: expression
    :tags: unions, initialization, undefined-behavior
@@ -34,13 +35,13 @@
    reading an uninitialized bool field is disallowed because not all bit patterns are valid.
 
    .. rationale::
-      :id: rat_UnionPartialInitReason
+      :id: rat_fhrmX0yFIL0L
       :status: draft
 
       Unions in Rust allow multiple fields to share the same memory. When a union field 
       is a composite type (tuple, struct, array), writing to only some components leaves 
       the remaining bytes in an indeterminate state. Reading these uninitialized bytes 
-      is undefined behavior [RUST-REF-UB]_.
+      is undefined behavior :cite:`gui_6JSM7YE7a1KR:RUST-REF-UB`.
 
       This issue is particularly insidious because:
 
@@ -50,11 +51,11 @@
       * **Optimization interactions**: The compiler may merge, inline, or deduplicate 
         functions in ways that change which code paths execute. A function that fully 
         initializes a union may be merged with one that partially initializes it, 
-        causing UB to appear in previously-safe code paths [LLVM-MERGE]_.
+        causing UB to appear in previously-safe code paths :cite:`gui_6JSM7YE7a1KR:LLVM-MERGE`.
 
       * **Function pointer comparisons**: Relying on function pointer equality to 
-        select code paths is unreliable (see gui_FnPtrEquality). Combined with partial 
-        initialization, this can lead to UB being introduced through seemingly unrelated 
+        select code paths is unreliable. Combined with partial initialization,
+        this can lead to UB being introduced through seemingly unrelated
         optimizations.
 
       * **Reassignment resets initialization**: Assigning a new value to a union 
@@ -66,18 +67,22 @@
       Reading the entire struct, or forming a reference to that struct,
       requires that all fields be initialized before a typed read occurs.
 
-      The sole exception is that unions work like C unions:
-      any union field may be read, even if it was never written.
-      The resulting bytes must, however, form a valid representation for the field's type,
-      which is not guaranteed if the union contains arbitrary data.
+   The sole exception is that unions work like C unions:
+   any union field may be read, even if it was never written.
+   The resulting bytes must, however, form a valid representation for the field's type,
+   which is not guaranteed if the union contains arbitrary data.
+
+
 
    .. non_compliant_example::
-      :id: non_compl_ex_PartialInit1
+      :id: non_compl_ex_kJEoz8oh6Fig
       :status: draft
 
       This noncompliant example partially initializes a tuple field, leaving the second element uninitialized.
 
-      .. code-block:: rust
+      .. rust-example::
+         :miri: expect_ub
+         :warn: allow
 
          union MyMaybeUninit {
              uninit: (),
@@ -86,7 +91,7 @@
 
          fn write_first(a: &mut MyMaybeUninit) {
              *a = MyMaybeUninit { uninit: () };
-             unsafe { a.init.0 = 1; }  // Only initializes the first byte
+             a.init.0 = 1;  // Only initializes the first byte
          }
 
          fn main() {
@@ -98,86 +103,85 @@
          }
 
    .. non_compliant_example::
-      :id: non_compl_ex_PartialInit2
+      :id: non_compl_ex_gE095eyVJizR
       :status: draft
 
-      This noncompliant example assumes prior initialization is preserved after reassignment.
+   This noncompliant example assumes prior initialization is preserved after reassignment.
 
-      .. code-block:: rust
+   .. rust-example::
+      :miri: expect_ub
 
-         union Data {
-             raw: [u8; 4],
-             value: u32,
-         }
+      union Data {
+          uninit: (),
+          init: (u8, u8),
+      }
 
-         fn partial_update(d: &mut Data) {
-             // Reassignment invalidates all prior initialization
-             *d = Data { raw: [0; 4] };
-             
-             // Only update first two bytes
-             unsafe {
-                 d.raw[0] = 0xAB;
-                 d.raw[1] = 0xCD;
-             }
-         }
+      fn partial_update(d: &mut Data) {
+          // Reassignment invalidates all prior initialization
+          *d = Data { uninit: () };
+          
+          // Only update the first byte
+          d.init.0 = 0xAB;
+      }
 
-         fn main() {
-             let mut d = Data { value: 0xFFFFFFFF };
-             partial_update(&mut d);
-             
-             // 'raw[2]' and 'raw[3]' are uninitialized after reassignment
-             println!("{:?}", unsafe { d.raw });  // noncompliant
-         }
+      fn main() {
+          let mut d = Data { init: (0, 0) };
+          partial_update(&mut d);
+          
+          // 'init.1' is uninitialized after reassignment
+          println!("{}", unsafe { d.init.1 });  // noncompliant
+      }
+
 
    .. non_compliant_example::
-      :id: non_compl_ex_PartialInit3
+      :id: non_compl_ex_BAHKbKIgDFnY
       :status: draft
 
       This noncompliant example combines function pointer comparison with partial initialization,
       creating subtle undefined behavior that may only manifest after optimization.
 
-      .. code-block:: rust
+      Note: this example relies on optimizer behavior (function merging can make
+      pointer equality succeed). Miri runs without those optimizations, so the
+      UB path is not deterministic there.
+
+      .. rust-example::
+         :miri: skip
 
          union MyMaybeUninit {
              uninit: (),
              init: (u8, u8),
          }
 
-         #[no_mangle]
          fn write_first(a: &mut MyMaybeUninit) {
              *a = MyMaybeUninit { uninit: () };
-             unsafe { a.init.0 = 1; }
+             a.init.0 = 1;
          }
 
-         #[no_mangle]
          fn write_both(a: &mut MyMaybeUninit) {
              *a = MyMaybeUninit { uninit: () };
-             unsafe {
-                 a.init.0 = 1;
-                 a.init.1 = 2;
-             }
+             a.init.0 = 1;
+             a.init.1 = 2;
          }
 
          fn main() {
              let mut a = MyMaybeUninit { init: (0, 0) };
              
-             // Non-compliant: function pointer comparison is unreliable,
-             // and 'write_first' leaves 'a.init.'1 uninitialized
              if write_first as usize == write_both as usize {
                  write_first(&mut a);
              }
-             
+
              // UB if the branch was taken (functions may be merged by optimizer)
              println!("{}", unsafe { a.init.1 });  // noncompliant
          }
 
    .. compliant_example::
-      :id: compl_ex_FullInit1
+      :id: compl_ex_JAR0OI9S07kf
       :status: draft
 
       This compliant examples initializes all bytes of the field before reading.
 
-      .. code-block:: rust
+      .. rust-example::
+         :miri:
 
          union MyMaybeUninit {
              uninit: (),
@@ -186,10 +190,8 @@
 
          fn write_both(a: &mut MyMaybeUninit) {
              *a = MyMaybeUninit { uninit: () };
-             unsafe {
-                 a.init.0 = 1;
-                 a.init.1 = 2;  // Initialize all bytes
-             }
+             a.init.0 = 1;
+             a.init.1 = 2;  // Initialize all bytes
          }
 
          fn main() {
@@ -201,12 +203,13 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_FullInit2
+      :id: compl_ex_ko80pT9aS8Ge
       :status: draft
 
       This compliant example uses ``MaybeUninit`` with proper initialization patterns.
 
-      .. code-block:: rust
+      .. rust-example::
+         :miri:
 
          use std::mem::MaybeUninit;
 
@@ -228,12 +231,13 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_FullInit3
+      :id: compl_ex_xnanwe9eU5p5
       :status: draft
 
       This compliant example initializes through the composite field directly.
 
-      .. code-block:: rust
+      .. rust-example::
+         :miri:
 
          union Data {
              raw: [u8; 4],
@@ -242,7 +246,7 @@
 
          fn full_init(d: &mut Data) {
              //  Initialize entire field at once
-             *d = Data { raw: [0xAB, 0xCD, 0xEF, 0x12] }; 
+             *d = Data { raw: [0xAB, 0xCD, 0xEF, 0x12] };
          }
 
          fn main() {
@@ -254,18 +258,20 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_FullInit4
+      :id: compl_ex_gdh48eGNdS7e
       :status: draft
 
       This compliant solution avoids relying on function pointer comparisons.
 
-      .. code-block:: rust
+      .. rust-example::
+         :miri:
 
          union MyMaybeUninit {
              uninit: (),
              init: (u8, u8),
          }
 
+         #[allow(dead_code)]
          enum InitLevel {
              Partial,
              Full,
@@ -273,15 +279,13 @@
 
          fn write_first(a: &mut MyMaybeUninit) {
              *a = MyMaybeUninit { uninit: () };
-             unsafe { a.init.0 = 1; }
+             a.init.0 = 1;
          }
 
          fn write_both(a: &mut MyMaybeUninit) {
              *a = MyMaybeUninit { uninit: () };
-             unsafe {
-                 a.init.0 = 1;
-                 a.init.1 = 2;
-             }
+             a.init.0 = 1;
+             a.init.1 = 2;
          }
 
          fn main() {
@@ -303,13 +307,14 @@
          }
 
    .. compliant_example::
-      :id: compl_ex_Ke869nSXuShU
+      :id: compl_ex_EU7kO0DtkJxs
       :status: draft
 
       Types such as ``u8``, ``u16``, ``u32``, and ``i128`` allow all possible bit patterns.
       Provided the memory is initialized, there is no undefined behavior.
 
       .. rust-example::
+         :miri:
 
          union U {
              n: u32,
@@ -318,16 +323,16 @@
 
          # fn main() {
          let u = U { bytes: [0xFF, 0xEE, 0xDD, 0xCC] };
-         let n = unsafe { u.n };   // OK — all bit patterns valid for u32
+         println!("{}", unsafe { u.n });   // OK — all bit patterns valid for u32
          # }
-
- .. compliant_example::
-      :id: compl_ex_Ke869nSXuShT
+   .. compliant_example::
+      :id: compl_ex_V73XRTccrWky
       :status: draft
 
       The following code reads a union field:
 
       .. rust-example::
+         :miri:
 
          union U {
             x: u32,
@@ -336,11 +341,11 @@
 
          # fn main() {
          let u = U { x: 123 }; // write to one field
-         let f = unsafe { u.y }; // reading the other field is allowed
+         println!("{}", unsafe { u.y }); // reading the other field is allowed
          # }
 
    .. non_compliant_example::
-      :id: non_compl_ex_Qb5GqYTP6db3
+      :id: non_compl_ex_PMmuoYeT7HsG
       :status: draft
 
       Even though unions allow reads of any field, not all bit patterns are valid for a ``bool``.
@@ -349,6 +354,7 @@
       the resulting bytes must still be a valid bool.
 
       .. rust-example::
+         :miri: expect_ub
 
          union U {
              b: bool,
@@ -357,11 +363,11 @@
 
          # fn main() {
          let u = U { x: 255 };        // 255 is not a valid bool representation
-         let b = unsafe { u.b };      // UB — invalid bool
+         println!("{}", unsafe { u.b });      // UB — invalid bool
          # }
 
    .. bibliography::
-      :id: bib_UnionFieldValidity
+      :id: bib_GDGiC7wRBAYB
       :status: draft
 
       .. list-table::
@@ -369,20 +375,14 @@
          :widths: auto
          :class: bibliography-table
 
-         * - .. [RUST-REF-UB]
-           - The Rust Project Developers. "Behavior Considered Undefined." *The Rust 
-             Reference*, n.d. 
-             https://doc.rust-lang.org/reference/behavior-considered-undefined.html.
+         * - :bibentry:`gui_6JSM7YE7a1KR:RUST-REF-UB`
+           - The Rust Project Developers. "Behavior Considered Undefined." *The Rust Reference*, n.d. https://doc.rust-lang.org/reference/behavior-considered-undefined.html.
 
-         * - .. [RUST-REF-UNION]
-           - The Rust Project Developers. "Unions." *The Rust Reference*, n.d. 
-             https://doc.rust-lang.org/reference/items/unions.html.
+         * - :bibentry:`gui_6JSM7YE7a1KR:RUST-REF-UNION`
+           - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html.
 
-         * - .. [LLVM-MERGE]
-           - LLVM Project. "MergeFunctions Pass." *LLVM Documentation*, n.d. 
-             https://llvm.org/docs/MergeFunctions.html.
+         * - :bibentry:`gui_6JSM7YE7a1KR:LLVM-MERGE`
+           - LLVM Project. "MergeFunctions Pass." *LLVM Documentation*, n.d. https://llvm.org/docs/MergeFunctions.html.
 
-         * - .. [UCG-VALIDITY]
-           - Rust Unsafe Code Guidelines Working Group. "Validity and Safety 
-             Invariant." *Rust Unsafe Code Guidelines*, n.d. 
-             https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
+         * - :bibentry:`gui_6JSM7YE7a1KR:UCG-VALIDITY`
+           - Rust Unsafe Code Guidelines. "Validity and Safety Invariant." https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
