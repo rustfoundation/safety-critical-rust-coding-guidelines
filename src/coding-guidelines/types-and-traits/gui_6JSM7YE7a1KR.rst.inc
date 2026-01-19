@@ -13,9 +13,9 @@
    :scope: expression
    :tags: unions, initialization, undefined-behavior
 
-   Do not read from a union field unless all bytes of that field have been explicitly 
-   initialized. Partial initialization of a union's composite field leaves some bytes 
-   in an uninitialized state, and reading those bytes is undefined behavior.
+   Do not read from a union field unless all bytes of that field have been explicitly initialized.
+   Partial initialization of a union's composite field leaves some bytes in an uninitialized state,
+   and reading those bytes is undefined behavior.
 
    When working with unions:
    
@@ -38,30 +38,34 @@
       :id: rat_fhrmX0yFIL0L
       :status: draft
 
-      Unions in Rust allow multiple fields to share the same memory. When a union field 
-      is a composite type (tuple, struct, array), writing to only some components leaves 
-      the remaining bytes in an indeterminate state. Reading these uninitialized bytes 
-      is undefined behavior :cite:`gui_6JSM7YE7a1KR:RUST-REF-UB`.
+      Unions in Rust allow multiple fields to share the same memory.
+      When a union field is a composite type (tuple, struct, array),
+      writing to only some components leaves the remaining bytes in an indeterminate state.
+      Reading these uninitialized bytes is undefined behavior :cite:`gui_6JSM7YE7a1KR:RUST-REF-UB`.
 
       This issue is particularly insidious because:
 
       * **Silent data corruption**: The program may appear to work, reading stale or 
-        garbage values that happen to be "reasonable" in testing.
+        garbage values that happen to be *reasonable* in testing.
 
       * **Optimization interactions**: The compiler may merge, inline, or deduplicate 
-        functions in ways that change which code paths execute. A function that fully 
-        initializes a union may be merged with one that partially initializes it, 
+        functions in ways that change which code paths execute.
+        A function that fully initializes a union may be merged with one that partially initializes it, 
         causing UB to appear in previously-safe code paths :cite:`gui_6JSM7YE7a1KR:LLVM-MERGE`.
 
       * **Function pointer comparisons**: Relying on function pointer equality to 
-        select code paths is unreliable. Combined with partial initialization,
-        this can lead to UB being introduced through seemingly unrelated
-        optimizations.
+        select code paths is unreliable.
+        Combined with partial initialization,
+        this can lead to UB being introduced through seemingly unrelated optimizations.
 
       * **Reassignment resets initialization**: Assigning a new value to a union 
-        (e.g., ``*u = MyUnion { uninit: () }``) does not preserve the initialized 
-        state of other fields. All fields must be considered uninitialized after 
-        such an assignment.
+        (e.g., ``*u = MyUnion { uninit: () }``) does not preserve the initialized state of other fields.
+        All fields must be considered uninitialized after such an assignment.
+
+      * **Nested ``struct`` partial initialization**: When a union variant contains a 
+        ``struct``, initializing only one field of that ``struct`` leaves the remaining 
+        fields uninitialized.
+        The compiler does not warn about the uninitialized fields within the nested ``struct``. 
 
       Fields of a struct can be individually accessed using a raw pointer.
       Reading the entire struct, or forming a reference to that struct,
@@ -71,8 +75,6 @@
    any union field may be read, even if it was never written.
    The resulting bytes must, however, form a valid representation for the field's type,
    which is not guaranteed if the union contains arbitrary data.
-
-
 
    .. non_compliant_example::
       :id: non_compl_ex_kJEoz8oh6Fig
