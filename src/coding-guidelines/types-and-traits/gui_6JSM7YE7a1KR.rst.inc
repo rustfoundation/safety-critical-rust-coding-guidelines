@@ -263,7 +263,7 @@
       :id: compl_ex_gdh48eGNdS7e
       :status: draft
 
-      This compliant solution avoids relying on function pointer comparisons.
+      This compliant example avoids relying on function pointer comparisons.
 
       .. rust-example::
          :miri:
