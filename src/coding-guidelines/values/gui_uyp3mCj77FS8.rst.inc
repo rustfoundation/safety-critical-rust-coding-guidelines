@@ -81,7 +81,7 @@
          fn main() {
              let mut x = MaybeUninit::<u64>::uninit();
              x.write(42);
-             // x is fully initialized
+             // SAFETY: 'x' is fully initialized
              let _val = unsafe { x.assume_init() }; // compliant
          }
  
@@ -101,6 +101,7 @@
          use std::mem::MaybeUninit;
 
          fn main() {
+             // Undefined behavior creating a pointer from uninitialized memory
              let _p: *const u32 = unsafe { MaybeUninit::uninit().assume_init() }; // noncompliant
          }
 
@@ -135,7 +136,7 @@
 
       The code writes a dangling raw pointer into memory and then calls ``assume_init()``,
       asserting that this memory contains a valid reference.
-      But a dangling pointer is never a valid reference—even if you never dereference it.
+      However, a dangling pointer is never a valid reference—even if you never dereference it.
       The mere existence of an invalid reference is undefined behavior.
 
       .. rust-example::
@@ -157,19 +158,6 @@
          fn main() {
              create_ref();
          }
-
-      The ``create_ref`` function has undefined behavior when creating a reference from a dangling pointer.
-      It creates uninitialized memory sized for a reference (``&u8``).
-      ``&raw mut uninit`` retrieves a raw mutable pointer to the ``MaybeUninit``.
-      The ``.cast::<*const u8>()`` reinterprets it as a pointer to a raw pointer.
-      The call to ``.write(ptr::dangling())`` writes a dangling pointer value.
-      This creates a non-null, aligned pointer that does not point to a valid, initialized value.
-      The call to ``assume_init`` asserts the ``MaybeUninit<&u8>`` is a valid ``&u8`` reference
-      A reference (``&T``) has stricter requirements than a raw pointer.
-      Even though the bit pattern looks like a valid pointer,
-      the semantic requirements for a reference are violated.
-      The compiler is allowed to assume references always point to valid data,
-      so this can cause miscompilation.
 
    .. non_compliant_example::
       :id: non_compl_ex_Qb5GqYTP6db5
@@ -239,7 +227,7 @@
              buf[1] = 20; // writing padding is fine
 
              let p = buf.as_ptr() as *const S;
-             // All fields are initialized (padding doesn't matter)
+             //  SAFETY: All fields are initialized (padding doesn't matter)
              let s = unsafe { p.read_unaligned() }; // compliant
              println!("{:?}", s);
          }
