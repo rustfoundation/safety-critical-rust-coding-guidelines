@@ -128,7 +128,15 @@
       :id: non_compl_ex_Qb5GqYTP6db3
       :status: draft
 
-      This noncompliant example creates a reference from uninitialized memory.
+      This noncompliant example has undefined behavior because it creates an invalid reference.
+
+      The ``&u8`` reference has stricter validity requirements than the raw pointer ``*const u8``.
+      While ``ptr::dangling()`` produces a non-null, well-aligned pointer, it does not point to valid, allocated memory.
+
+      The code writes a dangling raw pointer into memory and then calls ``assume_init()``,
+      asserting that this memory contains a valid reference.
+      But a dangling pointer is never a valid reference—even if you never dereference it.
+      The mere existence of an invalid reference is undefined behavior.
 
       .. rust-example::
          :miri: expect_ub
