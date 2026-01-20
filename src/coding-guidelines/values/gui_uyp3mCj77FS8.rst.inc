@@ -204,7 +204,7 @@
 
       The variable ``buf`` is a fully, zero-initialized 8-byte buffer.
 
-      The first wo bytes of ``buf`` are overwritten.
+      The first two bytes of ``buf`` are overwritten.
       The byte buffer ``buf`` pointer is cast to a pointer to ``S``.
       The call to ``read_unaligned`` reads the ``struct`` without requiring alignment.
 
