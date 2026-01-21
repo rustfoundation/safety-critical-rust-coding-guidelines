@@ -118,22 +118,22 @@
           init: (u8, u8),
       }
 
-      fn partial_update(d: &mut Data) {
+      fn reassign(d: &mut Data) {
           // Reassignment invalidates all prior initialization
           *d = Data { uninit: () };
-          
-          // Only update the first byte
-          d.init.0 = 0xAB;
       }
 
-      fn main() {
+      fn foo() {
           let mut d = Data { init: (0, 0) };
-          partial_update(&mut d);
+          reassign(&mut d);
           
-          // 'init.1' is uninitialized after reassignment
+          // 'init' is uninitialized after reassignment
           println!("{}", unsafe { d.init.1 });  // noncompliant
       }
 
+      fn main() {
+          foo();
+      }
 
    .. non_compliant_example::
       :id: non_compl_ex_BAHKbKIgDFnY
