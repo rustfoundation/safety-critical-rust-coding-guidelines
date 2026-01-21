@@ -69,6 +69,7 @@
       :status: draft
 
       This compliant example creates an uninitialized variable ``x`` of type ``MaybeUninit<u64>``.
+      
       The code calls the ``write`` function to write the value 42 to ``x``.
       The call to ``assume_init`` asserts that the value is initialized and extracts the value of type ``u64``.
 
