@@ -116,8 +116,8 @@
       This noncompliant example creates a reference from uninitialized memory.
       
       Creating a reference from arbitrary or uninitialized bytes is undefined behavior :cite:`gui_uyp3mCj77FS8:RUST-REF-BEHAVIOR`.
-      References must be valid, aligned, dereferenceable, and non-null :cite:`gui_uyp3mCj77FS8:UCG-VALIDITY`.
-      Uninitialized memory cannot satisfy these requirements.
+
+      References must be valid, aligned, dereferenceable, and non-null :cite:`gui_uyp3mCj77FS8:UCG-VALIDITY`. Uninitialized memory cannot satisfy these requirements.
 
       .. rust-example::
          :miri: expect_ub
