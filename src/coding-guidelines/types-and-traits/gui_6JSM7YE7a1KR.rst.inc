@@ -62,7 +62,7 @@
         (e.g., ``*u = MyUnion { uninit: () }``) does not preserve the initialized state of other fields.
         All fields must be considered uninitialized after such an assignment.
 
-      * **Nested ``struct`` partial initialization**: When a union variant contains a 
+      * **Nested partial initialization**: When a union variant contains a 
         ``struct``, initializing only one field of that ``struct`` leaves the remaining 
         fields uninitialized.
         The compiler does not warn about the uninitialized fields within the nested ``struct``. 
