@@ -96,7 +96,8 @@
       This noncompliant example creates a pointer from uninitialized memory.
       
       Not all bit patterns are valid pointers for all operations (e.g., provenance rules) :cite:`gui_uyp3mCj77FS8:UCG-VALIDITY`.
-      Even a raw pointer type (e.g., ``*const T``) has validity rules :cite:`gui_uyp3mCj77FS8:RUST-REF-BEHAVIOR`.
+
+      As can be seen here, even the raw pointer type (``*const T``) has validity rules :cite:`gui_uyp3mCj77FS8:RUST-REF-BEHAVIOR`.
 
       .. rust-example::
          :miri: expect_ub
