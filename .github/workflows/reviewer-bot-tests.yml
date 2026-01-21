@@ -1,0 +1,34 @@
+name: Reviewer Bot Tests
+
+on:
+  push:
+    paths:
+      - 'scripts/reviewer_bot.py'
+      - 'scripts/*.py'
+      - '.github/workflows/reviewer-bot.yml'
+      - '.github/reviewer-bot-tests/**'
+      - 'pyproject.toml'
+  pull_request:
+    paths:
+      - 'scripts/reviewer_bot.py'
+      - 'scripts/*.py'
+      - '.github/workflows/reviewer-bot.yml'
+      - '.github/reviewer-bot-tests/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+jobs:
+  reviewer-bot-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run reviewer bot tests
+        run: uv run pytest .github/reviewer-bot-tests
