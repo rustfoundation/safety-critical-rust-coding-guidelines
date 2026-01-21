@@ -29,7 +29,7 @@
    * :std:`std::mem::MaybeUninit::assume_init_ref`
    * :std:`std::mem::MaybeUninit::array_assume_init`
 
-   Calling any of these function on memory that is not yet fully initialized is undefined behavior :cite:`gui_uyp3mCj77FS8:RUST-REF-BEHAVIOR`.
+   Calling any of these functions on memory that is not yet fully initialized is undefined behavior :cite:`gui_uyp3mCj77FS8:RUST-REF-BEHAVIOR`.
    The memory must be properly initialized according to the requirements of the variable's type :cite:`gui_uyp3mCj77FS8:UCG-VALIDITY`.
    For example, a variable of reference type must be aligned, non-null, and point to valid memory.
    Similarly, entirely uninitialized memory may have any content, while a ``bool`` must always be ``true`` or ``false``.
