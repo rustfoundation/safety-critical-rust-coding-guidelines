@@ -91,17 +91,16 @@
              init: (u8, u8),
          }
 
-         fn write_first(a: &mut MyMaybeUninit) {
-             *a = MyMaybeUninit { uninit: () };
-             a.init.0 = 1;  // Only initializes the first byte
+         fn foo() {
+             let mut a = MyMaybeUninit { uninit: () };
+             a.init.0 = 1; // Only initializes the first byte
+
+             // Undefined behavior reading uninitialized value
+             println!("{}", unsafe { a.init.1 }); // noncompliant
          }
 
          fn main() {
-             let mut a = MyMaybeUninit { init: (0, 0) };
-             write_first(&mut a);
-             
-             // Undefined behavior reading uninitialized value
-             println!("{}", unsafe { a.init.1 });  // noncompliant
+             foo();
          }
 
    .. non_compliant_example::
