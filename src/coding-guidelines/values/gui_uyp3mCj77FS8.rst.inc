@@ -23,11 +23,11 @@
    Calling :std:`std::mem::MaybeUninit::assume_init`
    :cite:`gui_uyp3mCj77FS8:MAYBEUNINIT-DOC` or any of the following related functions is treated in the same manner as a typed read:
 
-   * ``assume_init_drop``
-   * ``assume_init_mut``
-   * ``assume_init_read``
-   * ``assume_init_ref``
-   * ``array_assume_init``
+   * :std:`std::mem::MaybeUninit::assume_init_drop`
+   * :std:`std::mem::MaybeUninit::assume_init_mut`
+   * :std:`std::mem::MaybeUninit::assume_init_read`
+   * :std:`std::mem::MaybeUninit::assume_init_ref`
+   * :std:`std::mem::MaybeUninit::array_assume_init`
 
    Calling any of these function on memory that is not yet fully initialized is undefined behavior :cite:`gui_uyp3mCj77FS8:RUST-REF-BEHAVIOR`.
    The memory must be properly initialized according to the requirements of the variable's type :cite:`gui_uyp3mCj77FS8:UCG-VALIDITY`.
