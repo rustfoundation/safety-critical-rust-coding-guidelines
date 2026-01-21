@@ -73,7 +73,7 @@
       The code calls the ``write`` function to write the value 42 to ``x``.
       The call to ``assume_init`` asserts that the value is initialized and extracts the value of type ``u64``.
 
-      This call to ``assume_init`` is compliant with the rule because the memory of `x` has been properly initialized by the call to ``write(42)``.
+      This call to ``assume_init`` is compliant with this rule because the memory of `x` has been properly initialized by the call to ``write(42)``.
       
       This is the canonically safe pattern for using ``MaybeUninit``.
 
