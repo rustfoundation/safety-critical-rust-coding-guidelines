@@ -97,6 +97,22 @@ When the build breaks due to the difference a file is created here:
 
 which can be used to aid in auditing the differences.
 
+For a structured audit report (recommended), run:
+
+```shell
+   uv run python scripts/fls_audit.py
+```
+
+Reports are written to:
+
+```
+build/fls_audit/report.md
+build/fls_audit/report.json
+```
+
+Use `--summary-only` to print a console summary, or `--snapshot path/to/paragraph-ids.json`
+to audit offline data.
+
 Follow the below steps to ensure that the guidelines remain a representation of the FLS:
 
 1. Check if there are any guidelines currently affected, if no, go to 6.

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["uv_build>=0.9.27,<0.10.0"]
+build-backend = "uv_build"
+
 [project]
 name = "safety-critical-rust-coding-guidelines"
 version = "0.1.0"
@@ -21,6 +25,10 @@ members = ["builder"]
 
 [tool.uv.sources]
 builder = { workspace = true }
+
+[tool.uv.build-backend]
+module-root = "exts"
+module-name = "coding_guidelines"
 
 [tool.ruff]
 
