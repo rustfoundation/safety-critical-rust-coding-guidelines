@@ -110,7 +110,8 @@ For a full report:
 ```
 
 See `docs/fls-audit.md` for the full workflow, snapshots, advanced options, and
-the steps to rationalize and update `src/spec.lock`.
+the steps to rationalize and update `src/spec.lock`, including the
+rationalization checklist.
 
 ## Outline & issue breakdown
 
