@@ -40,11 +40,7 @@ import tomllib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Add scripts directory to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, script_dir)
-
-from rustdoc_utils import (
+from scripts.rustdoc_utils import (
     RustExample,
     TestResult,
     compile_single_example,

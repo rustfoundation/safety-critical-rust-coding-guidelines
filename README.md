@@ -103,6 +103,28 @@ For a structured audit report (recommended), run:
    uv run python scripts/fls_audit.py
 ```
 
+To capture before/after text diffs, create a baseline snapshot first, then compare:
+
+```shell
+   uv run python scripts/fls_audit.py --write-text-snapshot build/fls_audit/snapshots
+   uv run python scripts/fls_audit.py --baseline-text-snapshot build/fls_audit/snapshots/<snapshot>.json
+```
+
+By default, the audit tool uses the commit recorded in `src/spec.lock` as the
+baseline and the latest GitHub Pages deployment as the current commit. If the
+spec lock metadata is missing or you are multiple deployments behind, you can
+select the baseline explicitly:
+
+```shell
+   GITHUB_TOKEN=... uv run python scripts/fls_audit.py --baseline-deployment-offset 2
+   uv run python scripts/fls_audit.py --baseline-fls-commit <sha> --current-fls-commit <sha>
+```
+
+Listing deployment offsets requires GitHub API access. Set `GITHUB_TOKEN` (CI
+recommended) or provide explicit commits.
+
+The FLS repo is cached under `./.cache/fls-audit/` and is safe to delete.
+
 Reports are written to:
 
 ```
@@ -112,6 +134,15 @@ build/fls_audit/report.json
 
 Use `--summary-only` to print a console summary, or `--snapshot path/to/paragraph-ids.json`
 to audit offline data.
+
+The report groups changes into added/removed/modified/renumbered-only/header changes and
+includes a "New Paragraphs With Nearby Guidelines" section to highlight potential impact,
+plus a "Section Reordering" section for structural changes.
+
+The report also includes a "Potentially Relevant Guidelines (Heuristic)" section with
+top-3 guideline matches per new or changed paragraph.
+
+Use `--include-legacy-report` to append the legacy diff section to the report files.
 
 Follow the below steps to ensure that the guidelines remain a representation of the FLS:
 

@@ -45,6 +45,9 @@ def check_fls(app, env):
             for diff in differences:
                 error_message += f"  - {diff}\n"
             error_message += "\nPlease manually inspect FLS spec items whose checksums have changed as corresponding guidelines may need to account for these changes."
+            error_message += "\nTo review a structured audit report, run:"
+            error_message += "\n\tuv run python scripts/fls_audit.py"
+            error_message += "\nIf the audit tool reports missing baseline metadata, provide --baseline-fls-commit/--current-fls-commit or set GITHUB_TOKEN when using deployment offsets."
             error_message += "\nOnce resolved, you may run the following to update the local spec lock file:"
             error_message += "\n\t./make.py --update-spec-lock-file"
             logger.error(error_message)

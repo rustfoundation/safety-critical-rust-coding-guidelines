@@ -23,11 +23,7 @@ import tempfile
 from dataclasses import dataclass, field
 from typing import List, Set, Tuple
 
-# Add the scripts directory to Python path so we can import guideline_utils
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, script_dir)
-
-from guideline_utils import (
+from scripts.guideline_utils import (
     chapter_to_filename,
     collect_examples,
     extract_citation_references,
@@ -37,10 +33,7 @@ from guideline_utils import (
     normalize_md,
 )
 
-# Import bibliography parser
-parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
-sys.path.insert(0, parent_dir)
-from generate_guideline_templates import parse_bibliography_entries
+from scripts.common.guideline_templates import parse_bibliography_entries
 
 # SPDX header to prepend to guideline files
 GUIDELINE_FILE_HEADER = """\

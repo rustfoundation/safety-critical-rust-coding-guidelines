@@ -9,19 +9,13 @@ This module contains common functions used by:
 - generate-rst-comment.py (for generating preview comments)
 """
 
-import os
 import re
-import sys
 from pathlib import Path
 from textwrap import dedent, indent
 
 import pypandoc
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
-sys.path.append(parent_dir)
-
-from generate_guideline_templates import (
+from scripts.common.guideline_templates import (
     guideline_rst_template,
     issue_header_map,
     parse_bibliography_entries,

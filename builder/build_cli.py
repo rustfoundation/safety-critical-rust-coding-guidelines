@@ -9,6 +9,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ EXTRA_WATCH_DIRS = ["exts", "themes"]
 
 SPEC_CHECKSUM_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
+PAGES_BUILDS_URL = "https://api.github.com/repos/rust-lang/fls/pages/builds/latest"
 
 
 def build_docs(
@@ -116,26 +118,74 @@ def build_docs(
     return dest / builder
 
 
+def github_headers() -> dict[str, str]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    token = (
+        os.environ.get("GITHUB_TOKEN")
+        or os.environ.get("GH_TOKEN")
+        or os.environ.get("GITHUB_API_TOKEN")
+    )
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def fetch_pages_build():
+    try:
+        response = requests.get(PAGES_BUILDS_URL, headers=github_headers(), timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return None
+
+
+def extract_build_id(build: dict[str, str] | None) -> str:
+    if not build:
+        return ""
+    url = build.get("url", "")
+    if not url:
+        return ""
+    return url.rstrip("/").split("/")[-1]
+
+
 def update_spec_lockfile(spec_checksum_location, lockfile_location):
     try:
-        response = requests.get(spec_checksum_location, stream=True)
-
+        response = requests.get(spec_checksum_location, timeout=30)
         response.raise_for_status()
+        data = response.json()
 
-        with open(lockfile_location, "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    file.write(chunk)
+        previous_metadata = None
+        if lockfile_location.exists():
+            try:
+                with open(lockfile_location, "r", encoding="utf-8") as file:
+                    existing = json.load(file)
+                previous_metadata = existing.get("metadata")
+            except Exception:
+                previous_metadata = None
 
-        with open(lockfile_location, "r") as file:
-            data = json.load(file)
+        metadata = {"fls_source_url": spec_checksum_location}
+        build = fetch_pages_build()
+        if build:
+            metadata.update(
+                {
+                    "fls_deployed_commit": build.get("commit", ""),
+                    "fls_deployed_at": build.get("created_at", ""),
+                    "fls_pages_build_id": extract_build_id(build),
+                }
+            )
 
-        print("-- read in --")
+        if isinstance(previous_metadata, dict):
+            previous = dict(previous_metadata)
+            previous.pop("previous", None)
+            metadata["previous"] = previous
 
-        with open(lockfile_location, "w") as outfile:
+        data["metadata"] = metadata
+
+        with open(lockfile_location, "w", encoding="utf-8") as outfile:
             json.dump(data, outfile, indent=4, sort_keys=True)
-
-        print("-- wrote back out --")
 
         return True
 

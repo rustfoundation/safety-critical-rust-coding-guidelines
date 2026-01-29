@@ -5,6 +5,7 @@ requires-python = "==3.12.*"
 [manifest]
 members = [
     "builder",
+    "coding-guidelines-ext",
     "safety-critical-rust-coding-guidelines",
 ]
 
@@ -96,6 +97,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7e/d4/7ebdbd03970677812aac39c869717059dbb71a4cfc033ca6e5221787892c/click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2", size = 98188 },
 ]
+
+[[package]]
+name = "coding-guidelines-ext"
+version = "0.1.0"
+source = { editable = "exts" }
 
 [[package]]
 name = "colorama"
@@ -428,6 +434,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "builder" },
+    { name = "coding-guidelines-ext" },
     { name = "pypandoc" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -449,6 +456,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "builder", virtual = "builder" },
+    { name = "coding-guidelines-ext", editable = "exts" },
     { name = "pypandoc" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "requests", specifier = ">=2.32.4" },
