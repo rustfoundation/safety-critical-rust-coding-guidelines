@@ -140,7 +140,8 @@ includes a "New Paragraphs With Nearby Guidelines" section to highlight potentia
 plus a "Section Reordering" section for structural changes.
 
 The report also includes a "Potentially Relevant Guidelines (Heuristic)" section with
-top-3 guideline matches per new or changed paragraph.
+top-3 guideline matches per new or changed paragraph. Use
+`--include-heuristic-details` to show the match list in the report.
 
 Use `--include-legacy-report` to append the legacy diff section to the report files.
 

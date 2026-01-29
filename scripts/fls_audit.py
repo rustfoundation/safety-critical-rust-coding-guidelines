@@ -93,6 +93,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Include legacy diff output in Markdown and JSON",
     )
+    parser.add_argument(
+        "--include-heuristic-details",
+        action="store_true",
+        help="Include heuristic top-match details in the report",
+    )
     return parser.parse_args()
 
 
@@ -662,6 +667,7 @@ def build_markdown_report(
     current_commit: str | None,
     include_legacy: bool,
     relevance_entries: list[dict[str, Any]],
+    include_heuristic_details: bool,
 ) -> str:
     generated_at = datetime.now(timezone.utc).isoformat()
     lines: list[str] = []
@@ -705,29 +711,34 @@ def build_markdown_report(
     if not relevance_entries:
         lines.append("- None")
     else:
+        if not include_heuristic_details:
+            lines.append("Note: use `--include-heuristic-details` to show matches.")
         for entry in sorted(
             relevance_entries, key=lambda item: item["score"], reverse=True
         ):
             lines.append(
                 f"- {entry['fls_id']} ({entry['section_id']}) score {entry['score']} [{entry['kind']}]"
             )
-            if not entry["matches"]:
-                lines.append("  - No guideline matches")
-                continue
-            for match in entry["matches"]:
-                reason_parts = []
-                if match["same_section"]:
-                    reason_parts.append("same section")
-                elif match["same_chapter"]:
-                    reason_parts.append("same chapter")
-                if match["normative"]:
-                    reason_parts.append("normative language")
-                if match["overlap"]:
-                    reason_parts.append(f"overlap: {', '.join(match['overlap'])}")
-                reason = "; ".join(reason_parts) if reason_parts else "no signals"
-                lines.append(
-                    f"  - {match['guideline_id']}: {match['title']} (score {match['score']}; {reason})"
-                )
+            if include_heuristic_details:
+                if not entry["matches"]:
+                    lines.append("  - No guideline matches")
+                    continue
+                for match in entry["matches"]:
+                    reason_parts = []
+                    if match["same_section"]:
+                        reason_parts.append("same section")
+                    elif match["same_chapter"]:
+                        reason_parts.append("same chapter")
+                    if match["normative"]:
+                        reason_parts.append("normative language")
+                    if match["overlap"]:
+                        reason_parts.append(
+                            f"overlap: {', '.join(match['overlap'])}"
+                        )
+                    reason = "; ".join(reason_parts) if reason_parts else "no signals"
+                    lines.append(
+                        f"  - {match['guideline_id']}: {match['title']} (score {match['score']}; {reason})"
+                    )
     lines.append("")
 
     lines.append("## New Paragraphs With Nearby Guidelines")
@@ -1088,6 +1099,14 @@ def main() -> int:
     output_dir = resolve_output_dir(repo_root, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.include_heuristic_details:
+        relevance_report = relevance_entries
+    else:
+        relevance_report = [
+            {**{k: v for k, v in entry.items() if k != "matches"}, "matches": []}
+            for entry in relevance_entries
+        ]
+
     report = {
         "metadata": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1116,7 +1135,7 @@ def main() -> int:
             "removed": removed_texts,
             "content_diffs": content_diffs,
         },
-        "relevance": relevance_entries,
+        "relevance": relevance_report,
     }
     if args.include_legacy_report:
         report["detailed_lines"] = detailed_lines
@@ -1144,6 +1163,7 @@ def main() -> int:
         current_commit,
         args.include_legacy_report,
         relevance_entries,
+        args.include_heuristic_details,
     )
     markdown_path = output_dir / "report.md"
     markdown_path.write_text(markdown_report, encoding="utf-8")
