@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
-import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -24,8 +23,7 @@ from scripts.common import fls_repo, fls_rst
 DEFAULT_FLS_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 DEFAULT_SNAPSHOT_DIR = "build/fls_audit/snapshots"
 DEFAULT_CACHE_DIR = ".cache/fls-audit"
-PAGES_BUILDS_URL = "https://api.github.com/repos/rust-lang/fls/pages/builds"
-PAGES_LATEST_URL = "https://api.github.com/repos/rust-lang/fls/pages/builds/latest"
+PAGES_DEPLOYMENTS_URL = "https://api.github.com/repos/rust-lang/fls/deployments"
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,13 +72,13 @@ def parse_args() -> argparse.Namespace:
         "--baseline-deployment-offset",
         type=int,
         default=1,
-        help="Use the Nth prior Pages deployment as baseline (default: 1)",
+        help="Use the Nth prior deployment as baseline (default: 1)",
     )
     parser.add_argument(
         "--current-deployment-offset",
         type=int,
         default=0,
-        help="Use the Nth prior Pages deployment as current (default: 0)",
+        help="Use the Nth prior deployment as current (default: 0)",
     )
     parser.add_argument(
         "--fls-repo-cache-dir",
@@ -115,70 +113,79 @@ def fetch_json(url: str, session: requests.Session) -> dict[str, Any]:
     return response.json()
 
 
-def github_token() -> str | None:
-    return (
-        os.environ.get("GITHUB_TOKEN")
-        or os.environ.get("GH_TOKEN")
-        or os.environ.get("GITHUB_API_TOKEN")
-    )
-
-
-def github_headers(token: str | None = None) -> dict[str, str]:
+def github_headers() -> dict[str, str]:
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
     return headers
 
 
-def fetch_pages_latest(session: requests.Session) -> dict[str, Any]:
+def fetch_pages_deployments(
+    session: requests.Session,
+    per_page: int = 10,
+) -> list[dict[str, Any]]:
     response = session.get(
-        PAGES_LATEST_URL,
-        headers=github_headers(github_token()),
+        PAGES_DEPLOYMENTS_URL,
+        headers=github_headers(),
+        params={"environment": "github-pages", "per_page": str(per_page)},
         timeout=30,
     )
     response.raise_for_status()
-    return response.json()
+    data = response.json()
+    return data if isinstance(data, list) else []
 
 
-def fetch_pages_builds(session: requests.Session, per_page: int = 10) -> list[dict[str, Any]]:
-    token = github_token()
-    if not token:
-        raise RuntimeError(
-            "Listing Pages builds requires GITHUB_TOKEN; use --baseline-fls-commit "
-            "or set a token to use deployment offsets."
-        )
-    url = f"{PAGES_BUILDS_URL}?per_page={per_page}"
-    response = session.get(url, headers=github_headers(token), timeout=30)
+def fetch_deployment_status(
+    session: requests.Session,
+    statuses_url: str,
+) -> dict[str, Any] | None:
+    if not statuses_url:
+        return None
+    response = session.get(
+        f"{statuses_url}?per_page=1",
+        headers=github_headers(),
+        timeout=30,
+    )
     response.raise_for_status()
     data = response.json()
-    return [build for build in data if build.get("status") == "built"]
+    if isinstance(data, list) and data:
+        return data[0]
+    return None
 
 
-def select_pages_build(
-    builds: list[dict[str, Any]],
+def select_pages_deployment(
+    session: requests.Session,
     offset: int,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
     if offset < 0:
         raise RuntimeError("Deployment offset must be >= 0")
-    if offset >= len(builds):
-        raise RuntimeError(
-            f"Requested deployment offset {offset} but only {len(builds)} builds available"
+    deployments = fetch_pages_deployments(session, per_page=max(10, offset + 1))
+    if not deployments:
+        raise RuntimeError("No deployments available")
+    successful: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for deployment in deployments:
+        status = fetch_deployment_status(
+            session, deployment.get("statuses_url", "")
         )
-    return builds[offset]
+        if status and status.get("state") == "success":
+            successful.append((deployment, status))
+            if len(successful) > offset:
+                return successful[offset]
+    if offset >= len(deployments):
+        raise RuntimeError(
+            f"Requested deployment offset {offset} but only {len(deployments)} deployments available"
+        )
+    deployment = deployments[offset]
+    status = fetch_deployment_status(session, deployment.get("statuses_url", ""))
+    return deployment, status
 
 
-def resolve_pages_commit(session: requests.Session, offset: int) -> str:
-    if offset == 0:
-        build = fetch_pages_latest(session)
-    else:
-        builds = fetch_pages_builds(session, per_page=max(10, offset + 1))
-        build = select_pages_build(builds, offset)
-    commit = build.get("commit")
+def resolve_deployment_commit(session: requests.Session, offset: int) -> str:
+    deployment, _status = select_pages_deployment(session, offset)
+    commit = deployment.get("sha")
     if not commit:
-        raise RuntimeError("Pages build did not include a commit SHA.")
+        raise RuntimeError("Deployment did not include a commit SHA.")
     return commit
 
 
@@ -928,7 +935,7 @@ def main() -> int:
 
     if needs_current_commit and not current_commit:
         try:
-            current_commit = resolve_pages_commit(
+            current_commit = resolve_deployment_commit(
                 session, args.current_deployment_offset
             )
         except Exception as exc:
@@ -937,7 +944,7 @@ def main() -> int:
 
     if needs_baseline_commit and not baseline_commit:
         try:
-            baseline_commit = resolve_pages_commit(
+            baseline_commit = resolve_deployment_commit(
                 session, args.baseline_deployment_offset
             )
         except Exception as exc:

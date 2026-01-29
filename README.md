@@ -116,12 +116,9 @@ spec lock metadata is missing or you are multiple deployments behind, you can
 select the baseline explicitly:
 
 ```shell
-   GITHUB_TOKEN=... uv run python scripts/fls_audit.py --baseline-deployment-offset 2
+   uv run python scripts/fls_audit.py --baseline-deployment-offset 2
    uv run python scripts/fls_audit.py --baseline-fls-commit <sha> --current-fls-commit <sha>
 ```
-
-Listing deployment offsets requires GitHub API access. Set `GITHUB_TOKEN` (CI
-recommended) or provide explicit commits.
 
 The FLS repo is cached under `./.cache/fls-audit/` and is safe to delete.
 
