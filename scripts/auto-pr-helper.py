@@ -16,14 +16,9 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 
-# Add the scripts directory to Python path so we can import guideline_utils
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, script_dir)
-
-from guideline_utils import (
+from scripts.guideline_utils import (
     extract_form_fields,
     guideline_template,
     normalize_list_separation,

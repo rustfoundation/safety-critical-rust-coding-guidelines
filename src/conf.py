@@ -1,13 +1,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
-# -- Path setup --------------------------------------------------------------
-
-import os
-import sys
-
-sys.path.append(os.path.abspath("../exts"))
-
 # -- Project information -----------------------------------------------------
 
 project = "Safety-Critical Rust Coding Guidelines"

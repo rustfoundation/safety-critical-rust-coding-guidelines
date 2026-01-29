@@ -25,17 +25,12 @@ Usage:
 """
 
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Add scripts directory to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, script_dir)
-
-from rustdoc_utils import RustExample, compile_single_example
+from scripts.rustdoc_utils import RustExample, compile_single_example
 
 # Pattern to find code-block:: rust within the content
 # Use [ \t]* instead of \s* to avoid matching newlines
