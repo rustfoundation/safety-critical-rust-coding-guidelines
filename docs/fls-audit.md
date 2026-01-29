@@ -44,6 +44,13 @@ less -R build/fls_audit/report.ansi.md
 bat --style=plain --paging=always build/fls_audit/report.ansi.md
 ```
 
+## Performance note
+
+The audit parses only changed `.rst` files by default. If any ordering files
+(`.. toctree::` or `.. appendices::`, including `:glob:` patterns) change, the
+audit also parses the referenced files to keep header and reorder detection
+accurate.
+
 ## Baseline and current selection
 
 By default, the audit uses:

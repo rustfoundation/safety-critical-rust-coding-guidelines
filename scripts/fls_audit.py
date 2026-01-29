@@ -10,6 +10,7 @@ import argparse
 import difflib
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +25,10 @@ DEFAULT_FLS_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 DEFAULT_SNAPSHOT_DIR = "build/fls_audit/snapshots"
 DEFAULT_CACHE_DIR = ".cache/fls-audit"
 PAGES_DEPLOYMENTS_URL = "https://api.github.com/repos/rust-lang/fls/deployments"
+
+ORDERING_DIRECTIVE_RE = re.compile(r"^\s*\.\.\s+(toctree|appendices)::\s*$", re.IGNORECASE)
+OPTION_LINE_RE = re.compile(r"^\s*:[^:]+:\s*$")
+GLOB_CHARS = {"*", "?", "["}
 
 
 def parse_args() -> argparse.Namespace:
@@ -126,6 +131,162 @@ def fetch_json(url: str, session: requests.Session) -> dict[str, Any]:
     response = session.get(url, timeout=30)
     response.raise_for_status()
     return response.json()
+
+
+def list_changed_rst_files(
+    repo_dir: Path, baseline_commit: str, current_commit: str
+) -> set[Path]:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_dir),
+            "diff",
+            "--name-only",
+            f"{baseline_commit}..{current_commit}",
+            "--",
+            "src",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    changed: set[Path] = set()
+    for line in result.stdout.splitlines():
+        path = Path(line.strip())
+        if not path.parts or path.suffix != ".rst":
+            continue
+        if path.parts[0] != "src":
+            continue
+        changed.add(Path(*path.parts[1:]))
+    return changed
+
+
+def has_glob_chars(value: str) -> bool:
+    return any(char in value for char in GLOB_CHARS)
+
+
+def file_has_ordering_directive(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return any(ORDERING_DIRECTIVE_RE.match(line) for line in text.splitlines())
+
+
+def find_ordering_files(src_dir: Path) -> set[Path]:
+    ordering_files: set[Path] = set()
+    for path in src_dir.rglob("*.rst"):
+        if file_has_ordering_directive(path):
+            ordering_files.add(path)
+    return ordering_files
+
+
+def parse_ordering_entries(path: Path) -> list[tuple[str, bool]]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    entries: list[tuple[str, bool]] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not ORDERING_DIRECTIVE_RE.match(line):
+            index += 1
+            continue
+        indent = len(line) - len(line.lstrip())
+        glob_enabled = False
+        index += 1
+        while index < len(lines):
+            current = lines[index]
+            if not current.strip():
+                index += 1
+                continue
+            current_indent = len(current) - len(current.lstrip())
+            if current_indent <= indent:
+                break
+            stripped = current.strip()
+            if OPTION_LINE_RE.match(stripped):
+                if stripped.lower() == ":glob:":
+                    glob_enabled = True
+                index += 1
+                continue
+            if stripped.startswith(".."):
+                index += 1
+                continue
+            entries.append((stripped, glob_enabled))
+            index += 1
+        continue
+    return entries
+
+
+def resolve_ordering_entries(
+    ordering_file: Path, src_dir: Path
+) -> set[Path]:
+    entries = parse_ordering_entries(ordering_file)
+    resolved: set[Path] = set()
+    base_dir = ordering_file.parent
+    for entry, glob_enabled in entries:
+        candidate = entry.strip()
+        if not candidate:
+            continue
+        if "://" in candidate:
+            continue
+        if candidate == "self":
+            continue
+        entry_base = base_dir
+        if candidate.startswith("/"):
+            entry_base = src_dir
+            candidate = candidate.lstrip("/")
+        if glob_enabled or has_glob_chars(candidate):
+            pattern = candidate
+            if pattern.endswith("/"):
+                pattern += "*.rst"
+            elif not pattern.endswith(".rst"):
+                pattern += ".rst"
+            resolved.update(
+                path for path in entry_base.glob(pattern) if path.is_file()
+            )
+            continue
+        if not candidate.endswith(".rst"):
+            candidate += ".rst"
+        path = entry_base / candidate
+        if path.exists():
+            resolved.add(path)
+    return resolved
+
+
+def resolve_parse_paths(
+    repo_dir: Path,
+    baseline_worktree: Path,
+    current_worktree: Path,
+    baseline_commit: str,
+    current_commit: str,
+) -> tuple[set[Path], set[Path]]:
+    changed_rst = list_changed_rst_files(repo_dir, baseline_commit, current_commit)
+    baseline_src = baseline_worktree / "src"
+    current_src = current_worktree / "src"
+
+    baseline_parse = {baseline_src / path for path in changed_rst}
+    current_parse = {current_src / path for path in changed_rst}
+
+    ordering_files_baseline = {
+        path.relative_to(baseline_src) for path in find_ordering_files(baseline_src)
+    }
+    ordering_files_current = {
+        path.relative_to(current_src) for path in find_ordering_files(current_src)
+    }
+    ordering_changed = changed_rst & (ordering_files_baseline | ordering_files_current)
+
+    for relative_path in ordering_changed:
+        baseline_file = baseline_src / relative_path
+        current_file = current_src / relative_path
+        if baseline_file.exists():
+            baseline_parse.update(resolve_ordering_entries(baseline_file, baseline_src))
+        if current_file.exists():
+            current_parse.update(resolve_ordering_entries(current_file, current_src))
+
+    return baseline_parse, current_parse
 
 
 def github_headers() -> dict[str, str]:
@@ -987,6 +1148,12 @@ def main() -> int:
     current_texts: dict[str, str] = {}
     guideline_index = build_guideline_text_index(repo_root)
     delta_path: Path | None = None
+    baseline_worktree: Path | None = None
+    current_worktree: Path | None = None
+    baseline_sections: dict[str, fls_rst.SectionData] = {}
+    current_sections: dict[str, fls_rst.SectionData] = {}
+    parse_paths_baseline: set[Path] | None = None
+    parse_paths_current: set[Path] | None = None
 
     if not args.summary_only:
         cache_dir = resolve_cache_dir(repo_root, args.fls_repo_cache_dir)
@@ -1007,32 +1174,76 @@ def main() -> int:
                 baseline_worktree = fls_repo.ensure_worktree(
                     cache_dir, baseline_commit
                 )
-                baseline_paragraphs, baseline_sections = fls_rst.parse_spec(
-                    baseline_worktree / "src"
-                )
             except Exception as exc:
                 print(f"Failed to prepare baseline FLS repo: {exc}", file=sys.stderr)
                 return 1
-            baseline_texts = {
-                fls_id: data.text for fls_id, data in baseline_paragraphs.items()
-            }
-        else:
-            baseline_sections = {}
 
         if current_commit:
             try:
                 current_worktree = fls_repo.ensure_worktree(cache_dir, current_commit)
-                current_paragraphs, current_sections = fls_rst.parse_spec(
-                    current_worktree / "src"
-                )
             except Exception as exc:
                 print(f"Failed to prepare current FLS repo: {exc}", file=sys.stderr)
+                return 1
+
+        diff_has_texts = bool(
+            diff.get("added")
+            or diff.get("removed")
+            or any(
+                entry.get("content_changed") for entry in diff.get("changed", [])
+            )
+        )
+        if (
+            baseline_worktree
+            and current_worktree
+            and baseline_commit
+            and current_commit
+        ):
+            try:
+                repo_dir = fls_repo.ensure_repo(cache_dir)
+                parse_paths_baseline, parse_paths_current = resolve_parse_paths(
+                    repo_dir,
+                    baseline_worktree,
+                    current_worktree,
+                    baseline_commit,
+                    current_commit,
+                )
+            except Exception as exc:
+                print(
+                    f"Failed to compute changed files for selective parsing: {exc}",
+                    file=sys.stderr,
+                )
+                parse_paths_baseline = None
+                parse_paths_current = None
+
+        if diff_has_texts and parse_paths_current is not None and not parse_paths_current:
+            parse_paths_baseline = None
+            parse_paths_current = None
+
+        if baseline_worktree and not args.baseline_text_snapshot:
+            try:
+                baseline_paragraphs, baseline_sections = fls_rst.parse_spec(
+                    baseline_worktree / "src",
+                    parse_paths_baseline,
+                )
+            except Exception as exc:
+                print(f"Failed to parse baseline FLS spec: {exc}", file=sys.stderr)
+                return 1
+            baseline_texts = {
+                fls_id: data.text for fls_id, data in baseline_paragraphs.items()
+            }
+
+        if current_worktree:
+            try:
+                current_paragraphs, current_sections = fls_rst.parse_spec(
+                    current_worktree / "src",
+                    parse_paths_current,
+                )
+            except Exception as exc:
+                print(f"Failed to parse current FLS spec: {exc}", file=sys.stderr)
                 return 1
             current_texts = {
                 fls_id: data.text for fls_id, data in current_paragraphs.items()
             }
-        else:
-            current_sections = {}
 
         header_changes = detect_header_changes(baseline_sections, current_sections)
         section_reorders = detect_section_reorders(
