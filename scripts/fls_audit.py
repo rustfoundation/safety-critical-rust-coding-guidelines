@@ -10,6 +10,7 @@ import argparse
 import difflib
 import json
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,12 +19,16 @@ from typing import Any, Iterable
 import requests
 from coding_guidelines import fls_diff
 
-from scripts.common import fls_repo, fls_rst
+from scripts.common import delta_diff, fls_repo, fls_rst
 
 DEFAULT_FLS_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 DEFAULT_SNAPSHOT_DIR = "build/fls_audit/snapshots"
 DEFAULT_CACHE_DIR = ".cache/fls-audit"
 PAGES_DEPLOYMENTS_URL = "https://api.github.com/repos/rust-lang/fls/deployments"
+
+ORDERING_DIRECTIVE_RE = re.compile(r"^\s*\.\.\s+(toctree|appendices)::\s*$", re.IGNORECASE)
+OPTION_LINE_RE = re.compile(r"^\s*:[^:]+:\s*$")
+GLOB_CHARS = {"*", "?", "["}
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,6 +44,21 @@ def parse_args() -> argparse.Namespace:
         "--summary-only",
         action="store_true",
         help="Print a summary and skip writing report files",
+    )
+    parser.add_argument(
+        "--print-diffs",
+        action="store_true",
+        help="Print colored diffs to stdout when available",
+    )
+    parser.add_argument(
+        "--delta-path",
+        type=Path,
+        help="Path to a delta binary for colored diff output",
+    )
+    parser.add_argument(
+        "--no-delta",
+        action="store_true",
+        help="Disable delta usage and skip downloads",
     )
     parser.add_argument(
         "--fail-on-impact",
@@ -111,6 +131,162 @@ def fetch_json(url: str, session: requests.Session) -> dict[str, Any]:
     response = session.get(url, timeout=30)
     response.raise_for_status()
     return response.json()
+
+
+def list_changed_rst_files(
+    repo_dir: Path, baseline_commit: str, current_commit: str
+) -> set[Path]:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_dir),
+            "diff",
+            "--name-only",
+            f"{baseline_commit}..{current_commit}",
+            "--",
+            "src",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    changed: set[Path] = set()
+    for line in result.stdout.splitlines():
+        path = Path(line.strip())
+        if not path.parts or path.suffix != ".rst":
+            continue
+        if path.parts[0] != "src":
+            continue
+        changed.add(Path(*path.parts[1:]))
+    return changed
+
+
+def has_glob_chars(value: str) -> bool:
+    return any(char in value for char in GLOB_CHARS)
+
+
+def file_has_ordering_directive(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return any(ORDERING_DIRECTIVE_RE.match(line) for line in text.splitlines())
+
+
+def find_ordering_files(src_dir: Path) -> set[Path]:
+    ordering_files: set[Path] = set()
+    for path in src_dir.rglob("*.rst"):
+        if file_has_ordering_directive(path):
+            ordering_files.add(path)
+    return ordering_files
+
+
+def parse_ordering_entries(path: Path) -> list[tuple[str, bool]]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    entries: list[tuple[str, bool]] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not ORDERING_DIRECTIVE_RE.match(line):
+            index += 1
+            continue
+        indent = len(line) - len(line.lstrip())
+        glob_enabled = False
+        index += 1
+        while index < len(lines):
+            current = lines[index]
+            if not current.strip():
+                index += 1
+                continue
+            current_indent = len(current) - len(current.lstrip())
+            if current_indent <= indent:
+                break
+            stripped = current.strip()
+            if OPTION_LINE_RE.match(stripped):
+                if stripped.lower() == ":glob:":
+                    glob_enabled = True
+                index += 1
+                continue
+            if stripped.startswith(".."):
+                index += 1
+                continue
+            entries.append((stripped, glob_enabled))
+            index += 1
+        continue
+    return entries
+
+
+def resolve_ordering_entries(
+    ordering_file: Path, src_dir: Path
+) -> set[Path]:
+    entries = parse_ordering_entries(ordering_file)
+    resolved: set[Path] = set()
+    base_dir = ordering_file.parent
+    for entry, glob_enabled in entries:
+        candidate = entry.strip()
+        if not candidate:
+            continue
+        if "://" in candidate:
+            continue
+        if candidate == "self":
+            continue
+        entry_base = base_dir
+        if candidate.startswith("/"):
+            entry_base = src_dir
+            candidate = candidate.lstrip("/")
+        if glob_enabled or has_glob_chars(candidate):
+            pattern = candidate
+            if pattern.endswith("/"):
+                pattern += "*.rst"
+            elif not pattern.endswith(".rst"):
+                pattern += ".rst"
+            resolved.update(
+                path for path in entry_base.glob(pattern) if path.is_file()
+            )
+            continue
+        if not candidate.endswith(".rst"):
+            candidate += ".rst"
+        path = entry_base / candidate
+        if path.exists():
+            resolved.add(path)
+    return resolved
+
+
+def resolve_parse_paths(
+    repo_dir: Path,
+    baseline_worktree: Path,
+    current_worktree: Path,
+    baseline_commit: str,
+    current_commit: str,
+) -> tuple[set[Path], set[Path]]:
+    changed_rst = list_changed_rst_files(repo_dir, baseline_commit, current_commit)
+    baseline_src = baseline_worktree / "src"
+    current_src = current_worktree / "src"
+
+    baseline_parse = {baseline_src / path for path in changed_rst}
+    current_parse = {current_src / path for path in changed_rst}
+
+    ordering_files_baseline = {
+        path.relative_to(baseline_src) for path in find_ordering_files(baseline_src)
+    }
+    ordering_files_current = {
+        path.relative_to(current_src) for path in find_ordering_files(current_src)
+    }
+    ordering_changed = changed_rst & (ordering_files_baseline | ordering_files_current)
+
+    for relative_path in ordering_changed:
+        baseline_file = baseline_src / relative_path
+        current_file = current_src / relative_path
+        if baseline_file.exists():
+            baseline_parse.update(resolve_ordering_entries(baseline_file, baseline_src))
+        if current_file.exists():
+            current_parse.update(resolve_ordering_entries(current_file, current_src))
+
+    return baseline_parse, current_parse
 
 
 def github_headers() -> dict[str, str]:
@@ -623,8 +799,10 @@ def build_text_diffs(
     entries: list[dict[str, Any]],
     before_texts: dict[str, str],
     after_texts: dict[str, str],
-) -> list[dict[str, Any]]:
+    delta_path: Path | None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     diffs: list[dict[str, Any]] = []
+    warnings: list[str] = []
     for entry in entries:
         fls_id = entry["fls_id"]
         before = before_texts.get(fls_id, "")
@@ -638,6 +816,13 @@ def build_text_diffs(
                 lineterm="",
             )
         )
+        ansi_diff = None
+        if delta_path:
+            rendered, error = delta_diff.render_delta_diff(delta_path, diff_lines)
+            if error:
+                warnings.append(f"{fls_id}: {error}")
+            if rendered is not None:
+                ansi_diff = rendered.splitlines()
         note = None
         if before and after and before == after:
             note = "No visible text change (checksum changed)."
@@ -649,10 +834,11 @@ def build_text_diffs(
                 "before_text": before,
                 "after_text": after,
                 "diff": diff_lines,
+                "ansi_diff": ansi_diff,
                 "note": note,
             }
         )
-    return diffs
+    return diffs, warnings
 
 
 def build_markdown_report(
@@ -674,6 +860,8 @@ def build_markdown_report(
     include_legacy: bool,
     relevance_entries: list[dict[str, Any]],
     include_heuristic_details: bool,
+    diff_field: str = "diff",
+    fallback_diff_field: str | None = None,
 ) -> str:
     generated_at = datetime.now(timezone.utc).isoformat()
     lines: list[str] = []
@@ -776,7 +964,7 @@ def build_markdown_report(
             lines.append(f"- {fls_id} ({section_id}) {link}")
             text = added_texts.get(fls_id)
             if text:
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(text)
                 lines.append("  ```")
     lines.append("")
@@ -792,7 +980,7 @@ def build_markdown_report(
             lines.append(f"- {fls_id} ({section_id}) {link}")
             text = removed_texts.get(fls_id)
             if text:
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(text)
                 lines.append("  ```")
     lines.append("")
@@ -809,22 +997,25 @@ def build_markdown_report(
                 lines.append(f"  Note: {entry['note']}")
             if entry["before_text"]:
                 lines.append("  Before:")
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(entry["before_text"])
                 lines.append("  ```")
             else:
                 lines.append("  Before: (no baseline text)")
             if entry["after_text"]:
                 lines.append("  After:")
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(entry["after_text"])
                 lines.append("  ```")
             else:
                 lines.append("  After: (no current text)")
-            if entry["diff"]:
+            diff_lines = entry.get(diff_field) or []
+            if not diff_lines and fallback_diff_field:
+                diff_lines = entry.get(fallback_diff_field) or []
+            if diff_lines:
                 lines.append("  Diff:")
-                lines.append("  ```")
-                lines.extend(entry["diff"])
+                lines.append("  ```diff")
+                lines.extend(diff_lines)
                 lines.append("  ```")
     lines.append("")
 
@@ -872,7 +1063,7 @@ def build_markdown_report(
 
     if include_legacy:
         lines.append("## Detailed Differences (Legacy Format)")
-        lines.append("```")
+        lines.append("```text")
         lines.extend(detailed_lines or ["No differences detected."])
         lines.append("```")
         lines.append("")
@@ -956,40 +1147,103 @@ def main() -> int:
     baseline_texts: dict[str, str] = {}
     current_texts: dict[str, str] = {}
     guideline_index = build_guideline_text_index(repo_root)
+    delta_path: Path | None = None
+    baseline_worktree: Path | None = None
+    current_worktree: Path | None = None
+    baseline_sections: dict[str, fls_rst.SectionData] = {}
+    current_sections: dict[str, fls_rst.SectionData] = {}
+    parse_paths_baseline: set[Path] | None = None
+    parse_paths_current: set[Path] | None = None
 
     if not args.summary_only:
         cache_dir = resolve_cache_dir(repo_root, args.fls_repo_cache_dir)
+        try:
+            delta_path, delta_warning = delta_diff.resolve_delta_binary(
+                cache_dir,
+                session,
+                args.delta_path,
+                args.no_delta,
+            )
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        if delta_warning:
+            print(f"Delta: {delta_warning}", file=sys.stderr)
         if baseline_commit and not args.baseline_text_snapshot:
             try:
                 baseline_worktree = fls_repo.ensure_worktree(
                     cache_dir, baseline_commit
                 )
-                baseline_paragraphs, baseline_sections = fls_rst.parse_spec(
-                    baseline_worktree / "src"
-                )
             except Exception as exc:
                 print(f"Failed to prepare baseline FLS repo: {exc}", file=sys.stderr)
                 return 1
-            baseline_texts = {
-                fls_id: data.text for fls_id, data in baseline_paragraphs.items()
-            }
-        else:
-            baseline_sections = {}
 
         if current_commit:
             try:
                 current_worktree = fls_repo.ensure_worktree(cache_dir, current_commit)
-                current_paragraphs, current_sections = fls_rst.parse_spec(
-                    current_worktree / "src"
-                )
             except Exception as exc:
                 print(f"Failed to prepare current FLS repo: {exc}", file=sys.stderr)
+                return 1
+
+        diff_has_texts = bool(
+            diff.get("added")
+            or diff.get("removed")
+            or any(
+                entry.get("content_changed") for entry in diff.get("changed", [])
+            )
+        )
+        if (
+            baseline_worktree
+            and current_worktree
+            and baseline_commit
+            and current_commit
+        ):
+            try:
+                repo_dir = fls_repo.ensure_repo(cache_dir)
+                parse_paths_baseline, parse_paths_current = resolve_parse_paths(
+                    repo_dir,
+                    baseline_worktree,
+                    current_worktree,
+                    baseline_commit,
+                    current_commit,
+                )
+            except Exception as exc:
+                print(
+                    f"Failed to compute changed files for selective parsing: {exc}",
+                    file=sys.stderr,
+                )
+                parse_paths_baseline = None
+                parse_paths_current = None
+
+        if diff_has_texts and parse_paths_current is not None and not parse_paths_current:
+            parse_paths_baseline = None
+            parse_paths_current = None
+
+        if baseline_worktree and not args.baseline_text_snapshot:
+            try:
+                baseline_paragraphs, baseline_sections = fls_rst.parse_spec(
+                    baseline_worktree / "src",
+                    parse_paths_baseline,
+                )
+            except Exception as exc:
+                print(f"Failed to parse baseline FLS spec: {exc}", file=sys.stderr)
+                return 1
+            baseline_texts = {
+                fls_id: data.text for fls_id, data in baseline_paragraphs.items()
+            }
+
+        if current_worktree:
+            try:
+                current_paragraphs, current_sections = fls_rst.parse_spec(
+                    current_worktree / "src",
+                    parse_paths_current,
+                )
+            except Exception as exc:
+                print(f"Failed to parse current FLS spec: {exc}", file=sys.stderr)
                 return 1
             current_texts = {
                 fls_id: data.text for fls_id, data in current_paragraphs.items()
             }
-        else:
-            current_sections = {}
 
         header_changes = detect_header_changes(baseline_sections, current_sections)
         section_reorders = detect_section_reorders(
@@ -1053,9 +1307,30 @@ def main() -> int:
         fls_id: baseline_texts.get(fls_id, "") for fls_id in removed_ids
     }
     added_texts = {fls_id: current_texts.get(fls_id, "") for fls_id in added_ids}
-    content_diffs = build_text_diffs(
-        content_changed_entries, baseline_texts, current_texts
+    content_diffs, delta_warnings = build_text_diffs(
+        content_changed_entries,
+        baseline_texts,
+        current_texts,
+        delta_path,
     )
+    if delta_warnings:
+        for warning in delta_warnings:
+            print(f"Delta: {warning}", file=sys.stderr)
+    if args.print_diffs:
+        if not content_diffs:
+            print("No content diffs to print.")
+        else:
+            if delta_path is None and not args.no_delta:
+                print("Delta not available; printing unified diffs.", file=sys.stderr)
+            for entry in content_diffs:
+                header = f"{entry['fls_id']} ({entry['section_id']}) {entry['link']}"
+                print(f"Diff for {header}".rstrip())
+                diff_lines = entry.get("ansi_diff") or entry.get("diff") or []
+                if diff_lines:
+                    sys.stdout.write("\n".join(diff_lines) + "\n")
+                else:
+                    print("(no diff)")
+                print("")
 
     relevance_entries: list[dict[str, Any]] = []
     for entry in diff.get("added", []):
@@ -1113,6 +1388,11 @@ def main() -> int:
             for entry in relevance_entries
         ]
 
+    json_content_diffs = [
+        {k: v for k, v in entry.items() if k != "ansi_diff"}
+        for entry in content_diffs
+    ]
+
     report = {
         "metadata": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1139,7 +1419,7 @@ def main() -> int:
         "text": {
             "added": added_texts,
             "removed": removed_texts,
-            "content_diffs": content_diffs,
+            "content_diffs": json_content_diffs,
         },
         "relevance": relevance_report,
     }
@@ -1174,7 +1454,33 @@ def main() -> int:
     markdown_path = output_dir / "report.md"
     markdown_path.write_text(markdown_report, encoding="utf-8")
 
+    ansi_report = build_markdown_report(
+        diff,
+        affected_guidelines,
+        guideline_files,
+        detailed_lines,
+        counts,
+        header_changes,
+        section_reorders,
+        new_paragraph_assessments,
+        content_diffs,
+        added_texts,
+        removed_texts,
+        spec_lock_path,
+        live_source,
+        baseline_commit,
+        current_commit,
+        args.include_legacy_report,
+        relevance_entries,
+        args.include_heuristic_details,
+        diff_field="ansi_diff",
+        fallback_diff_field="diff",
+    )
+    ansi_path = output_dir / "report.ansi.md"
+    ansi_path.write_text(ansi_report, encoding="utf-8")
+
     print(f"Wrote report: {markdown_path}")
+    print(f"Wrote report: {ansi_path}")
     print(f"Wrote report: {report_path}")
 
     if args.fail_on_impact and affected_guidelines:

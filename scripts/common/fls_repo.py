@@ -16,7 +16,6 @@ def _run_git(repo_dir: Path, args: list[str]) -> None:
 def ensure_repo(cache_dir: Path, repo_url: str = FLS_REPO_URL) -> Path:
     repo_dir = cache_dir / "fls-repo"
     if repo_dir.exists():
-        _run_git(repo_dir, ["fetch", "--prune", "--tags", "origin"])
         return repo_dir
 
     cache_dir.mkdir(parents=True, exist_ok=True)

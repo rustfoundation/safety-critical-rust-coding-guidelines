@@ -40,6 +40,7 @@ concurrency:
 permissions:
   issues: write
   pull-requests: write
+  contents: write
 
 env:
   # Issue number where bot state is stored (create this issue first!)

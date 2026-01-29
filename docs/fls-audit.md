@@ -20,6 +20,36 @@ uv run python scripts/fls_audit.py
 
 - `build/fls_audit/report.json`
 - `build/fls_audit/report.md`
+- `build/fls_audit/report.ansi.md`
+
+## Colored diffs (delta)
+
+The audit tool can render ANSI-colored diffs using `delta`.
+When needed, it downloads a pinned delta release into `./.cache/fls-audit/tools/delta/`.
+If `delta` is unavailable, the ANSI report falls back to plain unified diffs.
+
+```shell
+uv run python scripts/fls_audit.py --print-diffs
+```
+
+Overrides and opt-out:
+
+- `--delta-path path/to/delta`
+- `--no-delta`
+
+View the ANSI report in a terminal:
+
+```shell
+less -R build/fls_audit/report.ansi.md
+bat --style=plain --paging=always build/fls_audit/report.ansi.md
+```
+
+## Performance note
+
+The audit parses only changed `.rst` files by default. If any ordering files
+(`.. toctree::` or `.. appendices::`, including `:glob:` patterns) change, the
+audit also parses the referenced files to keep header and reorder detection
+accurate.
 
 ## Baseline and current selection
 
@@ -77,7 +107,7 @@ uv run python scripts/fls_audit.py --include-legacy-report
 
 ## Cache
 
-The FLS repo is cached under `./.cache/fls-audit/` and is safe to delete.
+The FLS repo and delta binaries are cached under `./.cache/fls-audit/` and are safe to delete.
 
 ## Rationalization checklist
 

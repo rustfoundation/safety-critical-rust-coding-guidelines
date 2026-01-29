@@ -2,9 +2,9 @@
 """
 Reviewer Bot for Safety-Critical Rust Coding Guidelines
 
-This bot manages round-robin assignment of reviewers for coding guideline
-issues and PRs. It supports commands for passing reviews, vacations, and
-label management.
+This bot manages round-robin assignment of reviewers for coding guideline and
+FLS audit issues and PRs. It supports commands for passing reviews, vacations,
+and label management.
 
 All commands must be prefixed with @guidelines-bot /<command>:
 
@@ -37,6 +37,9 @@ All commands must be prefixed with @guidelines-bot /<command>:
   @guidelines-bot /label -label-name
     - Remove a label from the issue/PR
 
+  @guidelines-bot /accept-no-fls-changes
+    - Update spec.lock and open a PR when the audit reports no guideline impact
+
   @guidelines-bot /sync-members
     - Manually trigger sync of the queue with members.md
 
@@ -50,8 +53,10 @@ All commands must be prefixed with @guidelines-bot /<command>:
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import yaml
 
@@ -70,6 +75,8 @@ except ImportError:
 BOT_NAME = "guidelines-bot"
 BOT_MENTION = f"@{BOT_NAME}"
 CODING_GUIDELINE_LABEL = "coding guideline"
+FLS_AUDIT_LABEL = "fls-audit"
+REVIEW_LABELS = {CODING_GUIDELINE_LABEL, FLS_AUDIT_LABEL}
 # State is stored in a dedicated GitHub issue body (set via environment variable)
 STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
 # Members file is in the consortium repo, not this repo
@@ -89,6 +96,7 @@ COMMANDS = {
     "claim": "Claim this review for yourself",
     "r?": "Assign a reviewer (@username or 'producers')",
     "label": "Add/remove labels (+label-name or -label-name)",
+    "accept-no-fls-changes": "Update spec.lock and open PR for a clean audit",
     "sync-members": "Sync queue with members.md",
     "queue": "Show reviewer queue and who's next",
     "commands": "Show all available commands",
@@ -675,6 +683,41 @@ Other commands:
 """
 
 
+def get_fls_audit_guidance(reviewer: str, issue_author: str) -> str:
+    """Generate guidance text for an FLS audit issue reviewer."""
+    return f"""👋 Hey @{reviewer}! You've been assigned to review this FLS audit issue.
+
+## Your Role as Reviewer
+
+Please review the audit report in the issue body and determine whether any
+guideline changes are required.
+
+If the changes do **not** affect any guidelines:
+- Comment `{BOT_MENTION} /accept-no-fls-changes` to open a PR that updates `src/spec.lock`.
+
+If the changes **do** affect guidelines:
+- Open a PR with the necessary guideline updates and reference this issue.
+
+## Bot Commands
+
+If you need to pass this review:
+- `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
+- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
+- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
+
+To assign someone else:
+- `{BOT_MENTION} /r? @username` - Assign a specific reviewer
+- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue
+
+Other commands:
+- `{BOT_MENTION} /claim` - Claim this review for yourself
+- `{BOT_MENTION} /label +label-name` - Add a label
+- `{BOT_MENTION} /label -label-name` - Remove a label
+- `{BOT_MENTION} /queue` - Show reviewer queue
+- `{BOT_MENTION} /commands` - Show all available commands
+"""
+
+
 def get_pr_guidance(reviewer: str, pr_author: str) -> str:
     """Generate guidance text for a PR reviewer."""
     return f"""👋 Hey @{reviewer}! You've been assigned to review this coding guideline PR.
@@ -1089,6 +1132,182 @@ def handle_label_command(issue_number: int, label_string: str) -> tuple[str, boo
     return "\n".join(results), all_success
 
 
+def parse_issue_labels() -> list[str]:
+    labels_json = os.environ.get("ISSUE_LABELS", "[]")
+    try:
+        labels = json.loads(labels_json)
+    except json.JSONDecodeError:
+        labels = []
+    if not isinstance(labels, list):
+        return []
+    return [str(label) for label in labels]
+
+
+def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    if check and result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Command failed").strip())
+    return result
+
+
+def summarize_output(result: subprocess.CompletedProcess, limit: int = 20) -> str:
+    combined = "\n".join(
+        [line for line in [result.stdout, result.stderr] if line]
+    ).strip()
+    if not combined:
+        return ""
+    lines = combined.splitlines()
+    return "\n".join(lines[-limit:])
+
+
+def list_changed_files(repo_root: Path) -> list[str]:
+    result = run_command(["git", "status", "--porcelain"], cwd=repo_root)
+    files = []
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        path = line[3:]
+        if " -> " in path:
+            path = path.split(" -> ")[-1]
+        files.append(path)
+    return files
+
+
+def get_default_branch() -> str:
+    repo_info = github_api("GET", "")
+    if isinstance(repo_info, dict):
+        return repo_info.get("default_branch", "main")
+    return "main"
+
+
+def find_open_pr_for_branch(branch: str) -> dict | None:
+    owner = os.environ.get("REPO_OWNER", "")
+    if not owner:
+        return None
+    response = github_api("GET", f"pulls?state=open&head={owner}:{branch}")
+    if isinstance(response, list) and response:
+        if isinstance(response[0], dict):
+            return response[0]
+    return None
+
+
+def create_pull_request(branch: str, base: str, issue_number: int) -> dict | None:
+    existing = find_open_pr_for_branch(branch)
+    if existing:
+        return existing
+    title = "chore: update spec.lock (no guideline impact)"
+    body = (
+        "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n"
+        f"Closes #{issue_number}"
+    )
+    response = github_api(
+        "POST",
+        "pulls",
+        {
+            "title": title,
+            "head": branch,
+            "base": base,
+            "body": body,
+        },
+    )
+    if isinstance(response, dict):
+        return response
+    return None
+
+
+def handle_accept_no_fls_changes_command(issue_number: int, comment_author: str) -> tuple[str, bool]:
+    if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
+        return "❌ This command can only be used on issues, not PRs.", False
+
+    labels = parse_issue_labels()
+    if FLS_AUDIT_LABEL not in labels:
+        return "❌ This command is only available on issues labeled `fls-audit`.", False
+
+    if not check_user_permission(comment_author, "triage"):
+        return "❌ You must have triage permissions to run this command.", False
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if list_changed_files(repo_root):
+        return "❌ Working tree is not clean; refusing to update spec.lock.", False
+
+    audit_result = run_command(
+        ["uv", "run", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
+        cwd=repo_root,
+        check=False,
+    )
+    if audit_result.returncode == 2:
+        return (
+            "❌ The audit reports affected guidelines. Please review and open a PR with "
+            "the necessary guideline updates instead.",
+            False,
+        )
+    if audit_result.returncode != 0:
+        details = summarize_output(audit_result)
+        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
+        return (f"❌ Audit command failed.{detail_text}", False)
+
+    update_result = run_command(
+        ["uv", "run", "python", "./make.py", "--update-spec-lock-file"],
+        cwd=repo_root,
+        check=False,
+    )
+    if update_result.returncode != 0:
+        details = summarize_output(update_result)
+        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
+        return (f"❌ Failed to update spec.lock.{detail_text}", False)
+
+    changed_files = list_changed_files(repo_root)
+    if not changed_files:
+        return "✅ `src/spec.lock` is already up to date; no PR needed.", True
+
+    unexpected = {path for path in changed_files if path != "src/spec.lock"}
+    if unexpected:
+        paths = ", ".join(sorted(unexpected))
+        return (
+            "❌ Unexpected tracked file changes detected; refusing to open a PR. "
+            f"Please review: {paths}",
+            False,
+        )
+
+    branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    base_branch = get_default_branch()
+    branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
+    if run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
+        suffix = datetime.now(timezone.utc).strftime("%H%M%S")
+        branch_name = f"{branch_name}-{suffix}"
+
+    try:
+        run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
+        run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
+        run_command(
+            [
+                "git",
+                "-c",
+                "user.name=guidelines-bot",
+                "-c",
+                "user.email=guidelines-bot@users.noreply.github.com",
+                "commit",
+                "-m",
+                "chore: update spec.lock; no affected guidelines",
+            ],
+            cwd=repo_root,
+        )
+        run_command(["git", "push", "origin", branch_name], cwd=repo_root)
+    except RuntimeError as exc:
+        return (f"❌ Failed to create branch or push changes: {exc}", False)
+
+    pr = create_pull_request(branch_name, base_branch, issue_number)
+    if not pr or "html_url" not in pr:
+        return "❌ Failed to open a pull request for the spec.lock update.", False
+
+    return (f"✅ Opened PR {pr['html_url']}", True)
+
+
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
     """
     Handle the sync-members command - sync queue with members.md.
@@ -1165,11 +1384,12 @@ def handle_commands_command() -> tuple[str, bool]:
             f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
             f"- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n"
             f"- `{BOT_MENTION} /claim` - Claim this review for yourself\n\n"
-            f"**Other:**\n"
-            f"- `{BOT_MENTION} /label +label-name` - Add a label\n"
-            f"- `{BOT_MENTION} /label -label-name` - Remove a label\n"
-            f"- `{BOT_MENTION} /queue` - Show current queue status\n"
-            f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md"), True
+        f"**Other:**\n"
+        f"- `{BOT_MENTION} /label +label-name` - Add a label\n"
+        f"- `{BOT_MENTION} /label -label-name` - Remove a label\n"
+        f"- `{BOT_MENTION} /accept-no-fls-changes` - Update spec.lock and open a PR when no guidelines are impacted\n"
+        f"- `{BOT_MENTION} /queue` - Show current queue status\n"
+        f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md"), True
 
 
 def handle_claim_command(state: dict, issue_number: int,
@@ -1674,7 +1894,7 @@ _If you believe this is in error or have extenuating circumstances, please reach
 
 def handle_issue_or_pr_opened(state: dict) -> bool:
     """
-    Handle when an issue or PR is opened with the coding guideline label.
+    Handle when an issue or PR is opened with a review label.
 
     Returns True if we took action, False otherwise.
     """
@@ -1702,7 +1922,7 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
         print(f"Issue #{issue_number} already has reviewers/assignees: {current_assignees}")
         return False
 
-    # Check for coding guideline label
+    # Check for review labels
     labels_json = os.environ.get("ISSUE_LABELS", "[]")
     print(f"ISSUE_LABELS env: {labels_json}")
     try:
@@ -1711,8 +1931,11 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
         print("Failed to parse ISSUE_LABELS as JSON")
         labels = []
 
-    if CODING_GUIDELINE_LABEL not in labels:
-        print(f"Issue #{issue_number} does not have '{CODING_GUIDELINE_LABEL}' label (labels: {labels})")
+    if not any(label in REVIEW_LABELS for label in labels):
+        print(
+            f"Issue #{issue_number} does not have review labels {sorted(REVIEW_LABELS)} "
+            f"(labels: {labels})"
+        )
         return False
 
     # Get issue author to skip them
@@ -1741,6 +1964,8 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
     # Post guidance comment
     if is_pr:
         guidance = get_pr_guidance(reviewer, issue_author)
+    elif FLS_AUDIT_LABEL in labels:
+        guidance = get_fls_audit_guidance(reviewer, issue_author)
     else:
         guidance = get_issue_guidance(reviewer, issue_author)
 
@@ -1751,15 +1976,15 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
 
 def handle_labeled_event(state: dict) -> bool:
     """
-    Handle when an issue or PR is labeled with the coding guideline label.
+    Handle when an issue or PR is labeled with a review label.
 
     We already know from LABEL_NAME that the correct label was added,
     so we skip the label check that handle_issue_or_pr_opened does.
     """
     label_name = os.environ.get("LABEL_NAME", "")
 
-    if label_name != CODING_GUIDELINE_LABEL:
-        print(f"Label '{label_name}' is not '{CODING_GUIDELINE_LABEL}', skipping")
+    if label_name not in REVIEW_LABELS:
+        print(f"Label '{label_name}' is not a review label, skipping")
         return False
 
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
@@ -1813,6 +2038,8 @@ def handle_labeled_event(state: dict) -> bool:
     # Post guidance comment
     if is_pr:
         guidance = get_pr_guidance(reviewer, issue_author)
+    elif label_name == FLS_AUDIT_LABEL:
+        guidance = get_fls_audit_guidance(reviewer, issue_author)
     else:
         guidance = get_issue_guidance(reviewer, issue_author)
 
@@ -1910,6 +2137,9 @@ def handle_comment_event(state: dict) -> bool:
             # Then parse for +label and -label patterns
             full_arg = " ".join(args)
             response, success = handle_label_command(issue_number, full_arg)
+
+    elif command == "accept-no-fls-changes":
+        response, success = handle_accept_no_fls_changes_command(issue_number, comment_author)
 
     elif command == "sync-members":
         response, success = handle_sync_members_command(state)

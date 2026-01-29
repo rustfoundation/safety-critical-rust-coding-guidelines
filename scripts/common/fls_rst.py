@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from docutils import nodes
 from docutils.frontend import OptionParser
@@ -54,11 +54,27 @@ class SectionData:
     document_title: str
 
 
-def parse_spec(src_dir: Path) -> tuple[dict[str, ParagraphData], dict[str, SectionData]]:
+def parse_spec(
+    src_dir: Path, paths: Iterable[Path] | None = None
+) -> tuple[dict[str, ParagraphData], dict[str, SectionData]]:
     paragraphs: dict[str, ParagraphData] = {}
     sections: dict[str, SectionData] = {}
 
-    for path in sorted(src_dir.rglob("*.rst")):
+    if paths is None:
+        paths_to_parse = sorted(src_dir.rglob("*.rst"))
+    else:
+        resolved_paths = []
+        for path in paths:
+            candidate = path
+            if not candidate.is_absolute():
+                candidate = src_dir / candidate
+            if candidate.suffix != ".rst":
+                continue
+            if candidate.exists():
+                resolved_paths.append(candidate)
+        paths_to_parse = sorted(set(resolved_paths))
+
+    for path in paths_to_parse:
         document, document_title = parse_document(path)
         section_info = collect_sections(document, path.stem, document_title)
         sections.update(section_info)
