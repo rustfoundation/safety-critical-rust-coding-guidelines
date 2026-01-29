@@ -661,7 +661,7 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
    - Content written may be *incomplete*, but must not be *incorrect*
    - The `🧪 Code Example Test Results` section shows all example code compiles
 
-4. When ready, **add the `sign-off: create pr from issue` label** to signal the contributor should create a PR
+4. When ready, **add the `sign-off: create pr` label** to signal the contributor should create a PR
 
 ## Bot Commands
 
@@ -1090,9 +1090,9 @@ def handle_label_command(issue_number: int, label_string: str) -> tuple[str, boo
     """
     import re
     
-    # Find all +label and -label patterns
-    # Labels can contain spaces, colons, etc. - they end at the next +/- or end of string
-    pattern = r'([+-])([^+-]+)'
+    # Find +label and -label patterns where the operator starts a label token.
+    # Operators must be at the start or preceded by whitespace to avoid splitting on hyphens.
+    pattern = r'(?:(?<=^)|(?<=\s))([+-])(.+?)(?=\s[+-]|\s*$)'
     matches = re.findall(pattern, label_string)
     
     if not matches:

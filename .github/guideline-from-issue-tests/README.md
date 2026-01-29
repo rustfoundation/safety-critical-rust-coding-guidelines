@@ -1,6 +1,6 @@
-## How to Add and Document Tests in `auto-pr-tests`
+## How to Add and Document Tests in `guideline-from-issue-tests`
 
-The test script `scripts/auto-pr-helper.py` transforms an issue from JSON format into our `.rst` format.
+The test script `scripts/guideline-from-issue.py` transforms an issue from JSON format into our `.rst` format.
 
 This directory contains test issue files in JSON format along with their expected output snapshots. These tests are executed by the script `test_runner.py`.
 
@@ -14,7 +14,7 @@ This directory contains test issue files in JSON format along with their expecte
    Run the following command to generate the corresponding `.snapshot` file automatically:
 
    ```bash
-   cat .github/auto-pr-tests/test_issue_XX.json | uv run scripts/auto-pr-helper.py > .github/auto-pr-tests/test_issue_XX.snapshot
+   cat .github/guideline-from-issue-tests/test_issue_XX.json | uv run python scripts/guideline-from-issue.py > .github/guideline-from-issue-tests/test_issue_XX.snapshot
    ```
    It is better to run this command and manually verify the output, rather than creating the snapshot manually.
 3. **Add Test to the Test List**

@@ -30,7 +30,7 @@ def compare(issue_json_path: Path, snapshot_path: Path) -> bool:
     input_json = issue_json_path.read_text()
 
     result = subprocess.run(
-        ["uv", "run", "python", "scripts/auto-pr-helper.py"],
+        ["uv", "run", "python", "scripts/guideline-from-issue.py"],
         input=input_json.encode(),
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
@@ -61,23 +61,23 @@ def compare(issue_json_path: Path, snapshot_path: Path) -> bool:
 
 # to generate snapshot:
 # create or change the test_issue_xx file and then use this command after replacing XX with your test number:
-## `cat .github/auto-pr-tests/test_issue_XX.json | uv run python scripts/auto-pr-helper.py 2&>/dev/null > .github/auto-pr-tests/test_issue_0XX.snapshot`
+## `cat .github/guideline-from-issue-tests/test_issue_XX.json | uv run python scripts/guideline-from-issue.py 2&>/dev/null > .github/guideline-from-issue-tests/test_issue_0XX.snapshot`
 tests = {
     "test_01": (
-        Path(".github/auto-pr-tests/test_issue_01.json"),
-        Path(".github/auto-pr-tests/test_issue_01.snapshot"),
+        Path(".github/guideline-from-issue-tests/test_issue_01.json"),
+        Path(".github/guideline-from-issue-tests/test_issue_01.snapshot"),
     ),
     "test_02": (
-        Path(".github/auto-pr-tests/test_issue_02.json"),
-        Path(".github/auto-pr-tests/test_issue_02.snapshot"),
+        Path(".github/guideline-from-issue-tests/test_issue_02.json"),
+        Path(".github/guideline-from-issue-tests/test_issue_02.snapshot"),
     ),
     "test_03": (
-        Path(".github/auto-pr-tests/test_issue_03.json"),
-        Path(".github/auto-pr-tests/test_issue_03.snapshot"),
+        Path(".github/guideline-from-issue-tests/test_issue_03.json"),
+        Path(".github/guideline-from-issue-tests/test_issue_03.snapshot"),
     ),
     "test_04_bibliography": (
-        Path(".github/auto-pr-tests/test_issue_04.json"),
-        Path(".github/auto-pr-tests/test_issue_04.snapshot"),
+        Path(".github/guideline-from-issue-tests/test_issue_04.json"),
+        Path(".github/guideline-from-issue-tests/test_issue_04.snapshot"),
     ),
 }
 
