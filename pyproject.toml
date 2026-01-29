@@ -47,7 +47,7 @@ lint.ignore = [
     "E501",  # Ignore long lines, bc we use them frequently while composing .rst templates
     "W293",  # Ignore white spaces in blank lines
     "W291",  # Ignore Trailing white lines
-    "E402",  # Ignore "Imports must be at the top of the file" enforcement bc `auto-pr-helper.py` needs it
+    "E402",  # Ignore "Imports must be at the top of the file" enforcement bc `guideline-from-issue.py` needs it
     "C401",  # Ignore `Unnecessary generator` checks, further tests are needed in fls_checks.py
 ]
 
