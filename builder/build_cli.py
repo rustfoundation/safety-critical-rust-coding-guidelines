@@ -21,7 +21,7 @@ EXTRA_WATCH_DIRS = ["exts", "themes"]
 
 SPEC_CHECKSUM_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
-PAGES_BUILDS_URL = "https://api.github.com/repos/rust-lang/fls/pages/builds/latest"
+PAGES_DEPLOYMENTS_URL = "https://api.github.com/repos/rust-lang/fls/deployments"
 
 
 def build_docs(
@@ -133,22 +133,57 @@ def github_headers() -> dict[str, str]:
     return headers
 
 
-def fetch_pages_build():
+def fetch_pages_deployments(limit: int = 10) -> list[dict[str, str]]:
     try:
-        response = requests.get(PAGES_BUILDS_URL, headers=github_headers(), timeout=30)
+        response = requests.get(
+            PAGES_DEPLOYMENTS_URL,
+            headers=github_headers(),
+            params={"environment": "github-pages", "per_page": str(limit)},
+            timeout=30,
+        )
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def fetch_deployment_status(statuses_url: str) -> dict[str, str] | None:
+    if not statuses_url:
+        return None
+    try:
+        response = requests.get(
+            f"{statuses_url}?per_page=1", headers=github_headers(), timeout=30
+        )
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, list) and data:
+            return data[0]
+        return None
     except Exception:
         return None
 
 
-def extract_build_id(build: dict[str, str] | None) -> str:
-    if not build:
+def select_pages_deployment() -> tuple[dict[str, str] | None, dict[str, str] | None]:
+    deployments = fetch_pages_deployments()
+    for deployment in deployments:
+        status = fetch_deployment_status(deployment.get("statuses_url", ""))
+        if status and status.get("state") == "success":
+            return deployment, status
+    if deployments:
+        return deployments[0], fetch_deployment_status(
+            deployments[0].get("statuses_url", "")
+        )
+    return None, None
+
+
+def extract_deployment_id(deployment: dict[str, str] | None) -> str:
+    if not deployment:
         return ""
-    url = build.get("url", "")
-    if not url:
+    deployment_id = deployment.get("id")
+    if deployment_id is None:
         return ""
-    return url.rstrip("/").split("/")[-1]
+    return str(deployment_id)
 
 
 def update_spec_lockfile(spec_checksum_location, lockfile_location):
@@ -167,13 +202,16 @@ def update_spec_lockfile(spec_checksum_location, lockfile_location):
                 previous_metadata = None
 
         metadata = {"fls_source_url": spec_checksum_location}
-        build = fetch_pages_build()
-        if build:
+        deployment, status = select_pages_deployment()
+        if deployment:
             metadata.update(
                 {
-                    "fls_deployed_commit": build.get("commit", ""),
-                    "fls_deployed_at": build.get("created_at", ""),
-                    "fls_pages_build_id": extract_build_id(build),
+                    "fls_deployed_commit": deployment.get("sha", ""),
+                    "fls_deployed_at": (
+                        status.get("created_at", "") if status else ""
+                    )
+                    or deployment.get("created_at", ""),
+                    "fls_pages_deployment_id": extract_deployment_id(deployment),
                 }
             )
 
