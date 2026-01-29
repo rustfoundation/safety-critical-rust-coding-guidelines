@@ -333,6 +333,23 @@ def test_handle_comment_event_label_command(stub_api, captured_comments):
     assert "Added label" in captured_comments[0]["body"]
 
 
+def test_handle_comment_event_label_command_with_hyphen(stub_api, captured_comments, monkeypatch):
+    state = make_state()
+    os.environ["COMMENT_BODY"] = "@guidelines-bot /label +sign-off: create pr -sign-off: create pr"
+    os.environ["COMMENT_AUTHOR"] = "alice"
+    os.environ["ISSUE_NUMBER"] = "42"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_repo_labels",
+        lambda *args, **kwargs: {"sign-off: create pr"},
+    )
+    handled = reviewer_bot.handle_comment_event(state)
+    assert handled is False
+    assert len(captured_comments) == 1
+    assert "Added label `sign-off: create pr`" in captured_comments[0]["body"]
+    assert "Removed label `sign-off: create pr`" in captured_comments[0]["body"]
+
+
 def test_handle_comment_event_accept_no_fls_changes(stub_api, captured_comments, monkeypatch):
     state = make_state()
     os.environ["COMMENT_BODY"] = "@guidelines-bot /accept-no-fls-changes"

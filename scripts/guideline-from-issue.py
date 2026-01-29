@@ -10,8 +10,8 @@ It reads a GitHub issue's JSON data from standard input, parses its body
 into a formatted reStructuredText (.rst) guideline.
 
 Usage:
-    cat issue.json | uv run python scripts/auto-pr-helper.py
-    cat issue.json | uv run python scripts/auto-pr-helper.py --save
+    cat issue.json | uv run python scripts/guideline-from-issue.py
+    cat issue.json | uv run python scripts/guideline-from-issue.py --save
 """
 
 import argparse
@@ -36,8 +36,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    ## locally test with `cat scripts/test_issue_sample.json | python3 scripts/auto-pr-helper.py`
-    ## or use `curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/135 | uv run python scripts/auto-pr-helper.py`
+    ## locally test with `cat scripts/test_issue_sample.json | uv run python scripts/guideline-from-issue.py`
+    ## or use `curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/135 | uv run python scripts/guideline-from-issue.py`
 
     # Read json from stdin
     stdin_issue_json = sys.stdin.read()

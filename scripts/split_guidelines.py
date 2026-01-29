@@ -479,7 +479,7 @@ def main():
                 if old_file.exists():
                     print(f"     rm {old_file}")
         print("3. Build the documentation to verify: ./make.py")
-        print("4. Update any tooling (auto-pr-helper.py, etc.)")
+        print("4. Update any tooling (guideline-from-issue.py, etc.)")
     else:
         print("\n=== To apply changes ===")
         print("Run without --dry-run:")

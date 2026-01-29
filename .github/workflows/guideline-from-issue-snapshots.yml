@@ -1,13 +1,13 @@
-name: Snapshot Tests for auto-pr
+name: Guideline-from-Issue Snapshot Tests
 
 on:
   push:
     paths:
       - 'generate_guideline_templates.py'
-      - 'scripts/auto-pr-helper.py'
+      - 'scripts/guideline-from-issue.py'
       - 'scripts/guideline_utils.py'
       - 'scripts/generate-rst-comment.py'
-      - '.github/auto-pr-tests/**'
+      - '.github/guideline-from-issue-tests/**'
   workflow_dispatch:      # also allow manual runs
 
 jobs:
@@ -25,4 +25,4 @@ jobs:
 
       - name: Run snapshot tests
         run: |
-          uv run python .github/auto-pr-tests/test_runner.py
+          uv run python .github/guideline-from-issue-tests/test_runner.py
