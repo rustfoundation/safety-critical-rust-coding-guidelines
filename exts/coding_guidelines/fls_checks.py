@@ -9,8 +9,8 @@ import requests
 from sphinx.errors import SphinxError
 from sphinx_needs.data import SphinxNeedsData
 
-from .common import bar_format, get_tqdm, logger
 from . import fls_diff
+from .common import bar_format, get_tqdm, logger
 
 fls_paragraph_ids_url = "https://rust-lang.github.io/fls/paragraph-ids.json"
 

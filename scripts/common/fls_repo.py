@@ -6,7 +6,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-
 FLS_REPO_URL = "https://github.com/rust-lang/fls.git"
 
 

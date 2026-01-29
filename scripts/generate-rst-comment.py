@@ -23,6 +23,7 @@ import tempfile
 from dataclasses import dataclass, field
 from typing import List, Set, Tuple
 
+from scripts.common.guideline_templates import parse_bibliography_entries
 from scripts.guideline_utils import (
     chapter_to_filename,
     collect_examples,
@@ -32,8 +33,6 @@ from scripts.guideline_utils import (
     normalize_list_separation,
     normalize_md,
 )
-
-from scripts.common.guideline_templates import parse_bibliography_entries
 
 # SPDX header to prepend to guideline files
 GUIDELINE_FILE_HEADER = """\

@@ -16,7 +16,6 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 
 from scripts.guideline_utils import (

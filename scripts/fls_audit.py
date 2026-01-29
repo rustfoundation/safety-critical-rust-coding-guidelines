@@ -17,10 +17,9 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import requests
-
 from coding_guidelines import fls_diff
-from scripts.common import fls_repo, fls_rst
 
+from scripts.common import fls_repo, fls_rst
 
 DEFAULT_FLS_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 DEFAULT_SNAPSHOT_DIR = "build/fls_audit/snapshots"
