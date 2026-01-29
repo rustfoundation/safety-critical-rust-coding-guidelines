@@ -97,68 +97,20 @@ When the build breaks due to the difference a file is created here:
 
 which can be used to aid in auditing the differences.
 
-For a structured audit report (recommended), run:
+For a quick summary:
+
+```shell
+   uv run python scripts/fls_audit.py --summary-only
+```
+
+For a full report:
 
 ```shell
    uv run python scripts/fls_audit.py
 ```
 
-To capture before/after text diffs, create a baseline snapshot first, then compare:
-
-```shell
-   uv run python scripts/fls_audit.py --write-text-snapshot build/fls_audit/snapshots
-   uv run python scripts/fls_audit.py --baseline-text-snapshot build/fls_audit/snapshots/<snapshot>.json
-```
-
-By default, the audit tool uses the commit recorded in `src/spec.lock` as the
-baseline and the latest GitHub Pages deployment as the current commit. If the
-spec lock metadata is missing or you are multiple deployments behind, you can
-select the baseline explicitly:
-
-```shell
-   uv run python scripts/fls_audit.py --baseline-deployment-offset 2
-   uv run python scripts/fls_audit.py --baseline-fls-commit <sha> --current-fls-commit <sha>
-```
-
-The FLS repo is cached under `./.cache/fls-audit/` and is safe to delete.
-
-Reports are written to:
-
-```
-build/fls_audit/report.md
-build/fls_audit/report.json
-```
-
-Use `--summary-only` to print a console summary, or `--snapshot path/to/paragraph-ids.json`
-to audit offline data.
-
-The report groups changes into added/removed/modified/renumbered-only/header changes and
-includes a "New Paragraphs With Nearby Guidelines" section to highlight potential impact,
-plus a "Section Reordering" section for structural changes.
-
-The report also includes a "Potentially Relevant Guidelines (Heuristic)" section with
-top-3 guideline matches per new or changed paragraph. Use
-`--include-heuristic-details` to show the match list in the report.
-
-Use `--include-legacy-report` to append the legacy diff section to the report files.
-
-Follow the below steps to ensure that the guidelines remain a representation of the FLS:
-
-1. Check if there are any guidelines currently affected, if no, go to 6.
-2. For each affected guideline, audit the previous text and current text of the appropriate paragraph-id in the FLS
-3. If the prior and new text of that paragraph in the FLS does not effect the guideline, proceed back to 2. to the next affected guideline
-4. If the prior and new text of that paragraph do differ in the FLS, then a rationalization step is required
-   1. In the rationalization step, either yourself or another coding guidelines member must modify the guideline to comply with the new text
-5. If you any affected coding guidelines remain proceed back to 2. to the next affected guideline
-6. You are done
-
-Once you have completed the above steps, you will now update the local copy of the `spec.lock` file with the live version:
-
-```shell
-   ./make.py --update-spec-lock-file
-```
-
-Open a new PR with only the changes necessary to rationalize the guidelines with the new FLS text.
+See `docs/fls-audit.md` for the full workflow, snapshots, advanced options, and
+the steps to rationalize and update `src/spec.lock`.
 
 ## Outline & issue breakdown
 
