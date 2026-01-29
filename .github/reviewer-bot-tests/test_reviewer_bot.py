@@ -333,6 +333,22 @@ def test_handle_comment_event_label_command(stub_api, captured_comments):
     assert "Added label" in captured_comments[0]["body"]
 
 
+def test_handle_comment_event_accept_no_fls_changes(stub_api, captured_comments, monkeypatch):
+    state = make_state()
+    os.environ["COMMENT_BODY"] = "@guidelines-bot /accept-no-fls-changes"
+    os.environ["COMMENT_AUTHOR"] = "alice"
+    os.environ["ISSUE_NUMBER"] = "42"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "handle_accept_no_fls_changes_command",
+        lambda *args, **kwargs: ("ok", True),
+    )
+    handled = reviewer_bot.handle_comment_event(state)
+    assert handled is False
+    assert len(captured_comments) == 1
+    assert captured_comments[0]["body"] == "ok"
+
+
 def test_handle_comment_event_queue_command(stub_api, captured_comments):
     state = make_state()
     os.environ["COMMENT_BODY"] = "@guidelines-bot /queue"
@@ -462,6 +478,19 @@ def test_handle_issue_or_pr_opened_assigns_reviewer(stub_api, captured_comments,
     assert "assigned to review" in captured_comments[0]["body"]
 
 
+def test_handle_issue_or_pr_opened_assigns_reviewer_for_fls_audit(stub_api, captured_comments, monkeypatch):
+    state = make_state()
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["ISSUE_AUTHOR"] = "dana"
+    os.environ["ISSUE_LABELS"] = "[\"fls-audit\"]"
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
+    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
+    handled = reviewer_bot.handle_issue_or_pr_opened(state)
+    assert handled is True
+    assert len(captured_comments) == 1
+    assert "assigned to review" in captured_comments[0]["body"]
+
+
 def test_handle_issue_or_pr_opened_missing_label(stub_api, captured_comments, monkeypatch):
     state = make_state()
     os.environ["ISSUE_NUMBER"] = "42"
@@ -476,6 +505,19 @@ def test_handle_issue_or_pr_opened_missing_label(stub_api, captured_comments, mo
 def test_handle_labeled_event_assigns_reviewer(stub_api, captured_comments, monkeypatch):
     state = make_state()
     os.environ["LABEL_NAME"] = "coding guideline"
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["ISSUE_AUTHOR"] = "dana"
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
+    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
+    handled = reviewer_bot.handle_labeled_event(state)
+    assert handled is True
+    assert len(captured_comments) == 1
+    assert "assigned to review" in captured_comments[0]["body"]
+
+
+def test_handle_labeled_event_assigns_reviewer_for_fls_audit(stub_api, captured_comments, monkeypatch):
+    state = make_state()
+    os.environ["LABEL_NAME"] = "fls-audit"
     os.environ["ISSUE_NUMBER"] = "42"
     os.environ["ISSUE_AUTHOR"] = "dana"
     monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])

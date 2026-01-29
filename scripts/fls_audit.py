@@ -964,7 +964,7 @@ def build_markdown_report(
             lines.append(f"- {fls_id} ({section_id}) {link}")
             text = added_texts.get(fls_id)
             if text:
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(text)
                 lines.append("  ```")
     lines.append("")
@@ -980,7 +980,7 @@ def build_markdown_report(
             lines.append(f"- {fls_id} ({section_id}) {link}")
             text = removed_texts.get(fls_id)
             if text:
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(text)
                 lines.append("  ```")
     lines.append("")
@@ -997,14 +997,14 @@ def build_markdown_report(
                 lines.append(f"  Note: {entry['note']}")
             if entry["before_text"]:
                 lines.append("  Before:")
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(entry["before_text"])
                 lines.append("  ```")
             else:
                 lines.append("  Before: (no baseline text)")
             if entry["after_text"]:
                 lines.append("  After:")
-                lines.append("  ```")
+                lines.append("  ```text")
                 lines.append(entry["after_text"])
                 lines.append("  ```")
             else:
@@ -1014,7 +1014,7 @@ def build_markdown_report(
                 diff_lines = entry.get(fallback_diff_field) or []
             if diff_lines:
                 lines.append("  Diff:")
-                lines.append("  ```")
+                lines.append("  ```diff")
                 lines.extend(diff_lines)
                 lines.append("  ```")
     lines.append("")
@@ -1063,7 +1063,7 @@ def build_markdown_report(
 
     if include_legacy:
         lines.append("## Detailed Differences (Legacy Format)")
-        lines.append("```")
+        lines.append("```text")
         lines.extend(detailed_lines or ["No differences detected."])
         lines.append("```")
         lines.append("")
