@@ -18,7 +18,7 @@ from typing import Any, Iterable
 import requests
 from coding_guidelines import fls_diff
 
-from scripts.common import fls_repo, fls_rst
+from scripts.common import delta_diff, fls_repo, fls_rst
 
 DEFAULT_FLS_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 DEFAULT_SNAPSHOT_DIR = "build/fls_audit/snapshots"
@@ -39,6 +39,21 @@ def parse_args() -> argparse.Namespace:
         "--summary-only",
         action="store_true",
         help="Print a summary and skip writing report files",
+    )
+    parser.add_argument(
+        "--print-diffs",
+        action="store_true",
+        help="Print colored diffs to stdout when available",
+    )
+    parser.add_argument(
+        "--delta-path",
+        type=Path,
+        help="Path to a delta binary for colored diff output",
+    )
+    parser.add_argument(
+        "--no-delta",
+        action="store_true",
+        help="Disable delta usage and skip downloads",
     )
     parser.add_argument(
         "--fail-on-impact",
@@ -623,8 +638,10 @@ def build_text_diffs(
     entries: list[dict[str, Any]],
     before_texts: dict[str, str],
     after_texts: dict[str, str],
-) -> list[dict[str, Any]]:
+    delta_path: Path | None,
+) -> tuple[list[dict[str, Any]], list[str]]:
     diffs: list[dict[str, Any]] = []
+    warnings: list[str] = []
     for entry in entries:
         fls_id = entry["fls_id"]
         before = before_texts.get(fls_id, "")
@@ -638,6 +655,13 @@ def build_text_diffs(
                 lineterm="",
             )
         )
+        ansi_diff = None
+        if delta_path:
+            rendered, error = delta_diff.render_delta_diff(delta_path, diff_lines)
+            if error:
+                warnings.append(f"{fls_id}: {error}")
+            if rendered is not None:
+                ansi_diff = rendered.splitlines()
         note = None
         if before and after and before == after:
             note = "No visible text change (checksum changed)."
@@ -649,10 +673,11 @@ def build_text_diffs(
                 "before_text": before,
                 "after_text": after,
                 "diff": diff_lines,
+                "ansi_diff": ansi_diff,
                 "note": note,
             }
         )
-    return diffs
+    return diffs, warnings
 
 
 def build_markdown_report(
@@ -674,6 +699,8 @@ def build_markdown_report(
     include_legacy: bool,
     relevance_entries: list[dict[str, Any]],
     include_heuristic_details: bool,
+    diff_field: str = "diff",
+    fallback_diff_field: str | None = None,
 ) -> str:
     generated_at = datetime.now(timezone.utc).isoformat()
     lines: list[str] = []
@@ -821,10 +848,13 @@ def build_markdown_report(
                 lines.append("  ```")
             else:
                 lines.append("  After: (no current text)")
-            if entry["diff"]:
+            diff_lines = entry.get(diff_field) or []
+            if not diff_lines and fallback_diff_field:
+                diff_lines = entry.get(fallback_diff_field) or []
+            if diff_lines:
                 lines.append("  Diff:")
                 lines.append("  ```")
-                lines.extend(entry["diff"])
+                lines.extend(diff_lines)
                 lines.append("  ```")
     lines.append("")
 
@@ -956,9 +986,22 @@ def main() -> int:
     baseline_texts: dict[str, str] = {}
     current_texts: dict[str, str] = {}
     guideline_index = build_guideline_text_index(repo_root)
+    delta_path: Path | None = None
 
     if not args.summary_only:
         cache_dir = resolve_cache_dir(repo_root, args.fls_repo_cache_dir)
+        try:
+            delta_path, delta_warning = delta_diff.resolve_delta_binary(
+                cache_dir,
+                session,
+                args.delta_path,
+                args.no_delta,
+            )
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        if delta_warning:
+            print(f"Delta: {delta_warning}", file=sys.stderr)
         if baseline_commit and not args.baseline_text_snapshot:
             try:
                 baseline_worktree = fls_repo.ensure_worktree(
@@ -1053,9 +1096,30 @@ def main() -> int:
         fls_id: baseline_texts.get(fls_id, "") for fls_id in removed_ids
     }
     added_texts = {fls_id: current_texts.get(fls_id, "") for fls_id in added_ids}
-    content_diffs = build_text_diffs(
-        content_changed_entries, baseline_texts, current_texts
+    content_diffs, delta_warnings = build_text_diffs(
+        content_changed_entries,
+        baseline_texts,
+        current_texts,
+        delta_path,
     )
+    if delta_warnings:
+        for warning in delta_warnings:
+            print(f"Delta: {warning}", file=sys.stderr)
+    if args.print_diffs:
+        if not content_diffs:
+            print("No content diffs to print.")
+        else:
+            if delta_path is None and not args.no_delta:
+                print("Delta not available; printing unified diffs.", file=sys.stderr)
+            for entry in content_diffs:
+                header = f"{entry['fls_id']} ({entry['section_id']}) {entry['link']}"
+                print(f"Diff for {header}".rstrip())
+                diff_lines = entry.get("ansi_diff") or entry.get("diff") or []
+                if diff_lines:
+                    sys.stdout.write("\n".join(diff_lines) + "\n")
+                else:
+                    print("(no diff)")
+                print("")
 
     relevance_entries: list[dict[str, Any]] = []
     for entry in diff.get("added", []):
@@ -1113,6 +1177,11 @@ def main() -> int:
             for entry in relevance_entries
         ]
 
+    json_content_diffs = [
+        {k: v for k, v in entry.items() if k != "ansi_diff"}
+        for entry in content_diffs
+    ]
+
     report = {
         "metadata": {
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1139,7 +1208,7 @@ def main() -> int:
         "text": {
             "added": added_texts,
             "removed": removed_texts,
-            "content_diffs": content_diffs,
+            "content_diffs": json_content_diffs,
         },
         "relevance": relevance_report,
     }
@@ -1174,7 +1243,33 @@ def main() -> int:
     markdown_path = output_dir / "report.md"
     markdown_path.write_text(markdown_report, encoding="utf-8")
 
+    ansi_report = build_markdown_report(
+        diff,
+        affected_guidelines,
+        guideline_files,
+        detailed_lines,
+        counts,
+        header_changes,
+        section_reorders,
+        new_paragraph_assessments,
+        content_diffs,
+        added_texts,
+        removed_texts,
+        spec_lock_path,
+        live_source,
+        baseline_commit,
+        current_commit,
+        args.include_legacy_report,
+        relevance_entries,
+        args.include_heuristic_details,
+        diff_field="ansi_diff",
+        fallback_diff_field="diff",
+    )
+    ansi_path = output_dir / "report.ansi.md"
+    ansi_path.write_text(ansi_report, encoding="utf-8")
+
     print(f"Wrote report: {markdown_path}")
+    print(f"Wrote report: {ansi_path}")
     print(f"Wrote report: {report_path}")
 
     if args.fail_on_impact and affected_guidelines:
