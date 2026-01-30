@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Use strong types to differentiate between logically distinct values
+===================================================================
+
 .. guideline:: Use strong types to differentiate between logically distinct values
    :id: gui_xztNdXA2oFNC
    :category: advisory

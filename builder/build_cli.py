@@ -284,15 +284,18 @@ def main(root):
     )
     args = parser.parse_args()
 
+    debug = args.debug or args.verbose
+    builder = "linkcheck" if args.check_links else "xml" if args.xml else "html"
+
     if args.update_spec_lock_file:
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     build_docs(
         root,
-        "xml" if args.xml else "html",
+        builder,
         args.clear,
         args.serve,
-        args.debug,
+        debug,
         args.offline,
         not args.ignore_spec_lock_diff,
         args.validate_urls,

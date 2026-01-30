@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Names in a macro definition shall use a fully qualified path
+============================================================
+
 .. guideline:: Names in a macro definition shall use a fully qualified path
    :id: gui_SJMrWDYZ0dN4
    :category: required

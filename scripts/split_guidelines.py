@@ -10,13 +10,12 @@ This script:
 2. Extracts each guideline with its nested content (rationale, examples)
 3. Creates a subdirectory per chapter (e.g., expressions/)
 4. Writes each guideline to its own file (e.g., expressions/gui_xxx.rst)
-5. Generates a chapter index.rst that includes all guidelines
+5. Generates a chapter index.rst that lists guideline pages
 
-Design decisions for future Option 2 migration:
-- Each guideline file is self-contained (has its own default-domain, SPDX header)
+Design decisions for guideline page migration:
+- Each guideline file is self-contained (default-domain, SPDX header)
 - Files are named by guideline ID for stable URLs
-- Alphabetical ordering enables predictable merge conflict resolution
-- Chapter index only contains includes, no guideline content
+- Chapter index lists guideline pages instead of inlining them
 
 Usage:
     # Dry run - see what would happen
@@ -38,14 +37,10 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-# SPDX header to prepend to each generated file
-SPDX_HEADER = """\
-.. SPDX-License-Identifier: MIT OR Apache-2.0
-   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
-
-.. default-domain:: coding-guidelines
-
-"""
+from scripts.common.guideline_pages import (
+    build_guideline_page_content,
+    extract_guideline_title,
+)
 
 # Pattern to match guideline directive start
 GUIDELINE_PATTERN = re.compile(
@@ -124,17 +119,14 @@ def extract_guideline_content(content: str, start: int, end: int) -> str:
 
 def generate_chapter_index(chapter_name: str, chapter_title: str, guideline_ids: List[str], header_content: str = "") -> str:
     """
-    Generate the chapter index.rst content with includes.
+    Generate the chapter index.rst content with a toctree.
     
     Args:
         chapter_name: Directory name (e.g., "expressions")
         chapter_title: Display title (e.g., "Expressions")
-        guideline_ids: List of guideline IDs, will be sorted alphabetically
+        guideline_ids: List of guideline IDs (used to decide whether to add a toctree)
         header_content: Optional introductory content after the title
     """
-    # Sort IDs alphabetically for predictable ordering
-    sorted_ids = sorted(guideline_ids)
-    
     lines = [
         ".. SPDX-License-Identifier: MIT OR Apache-2.0",
         "   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors",
@@ -150,10 +142,17 @@ def generate_chapter_index(chapter_name: str, chapter_title: str, guideline_ids:
         lines.append(header_content)
         lines.append("")
     
-    # Add includes for each guideline (using .rst.inc extension)
-    for gid in sorted_ids:
-        lines.append(f".. include:: {gid}.rst.inc")
-    
+    if guideline_ids:
+        lines.extend([
+            ".. toctree::",
+            "   :maxdepth: 1",
+            "   :titlesonly:",
+            "   :glob:",
+            "",
+            "   gui_*",
+            "",
+        ])
+
     lines.append("")  # Trailing newline
     
     return "\n".join(lines)
@@ -241,20 +240,22 @@ def split_chapter(
     
     if dry_run:
         print(f"  Would create directory: {chapter_dir}")
-        print(f"  Would create {len(guidelines)} guideline files (.rst.inc)")
+        print(f"  Would create {len(guidelines)} guideline files (.rst)")
         print("  Would create index.rst")
         return len(guidelines), [g[0] for g in guidelines]
     
     # Create chapter directory
     chapter_dir.mkdir(parents=True, exist_ok=True)
     
-    # Write each guideline file (using .rst.inc extension to prevent Sphinx auto-discovery)
+    # Write each guideline file
     guideline_ids = []
     for gid, content in guidelines:
-        guideline_file = chapter_dir / f"{gid}.rst.inc"
-        full_content = SPDX_HEADER + content + "\n"
-        guideline_file.write_text(full_content)
+        guideline_file = chapter_dir / f"{gid}.rst"
         guideline_ids.append(gid)
+
+        guideline_title = extract_guideline_title(content) or f"Guideline {gid}"
+        full_content = build_guideline_page_content(guideline_title, content)
+        guideline_file.write_text(full_content)
         
         if verbose:
             print(f"  Created {guideline_file.name}")

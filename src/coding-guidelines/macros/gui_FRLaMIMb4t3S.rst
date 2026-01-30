@@ -3,26 +3,29 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Shall ensure complete hygiene of macros
-   :id: gui_8hs33nyp0ipX
-   :category: mandatory
+Do not hide unsafe blocks within macro expansions
+=================================================
+
+.. guideline:: Do not hide unsafe blocks within macro expansions
+   :id: gui_FRLaMIMb4t3S
+   :category: required
    :status: draft
    :release: todo
-   :fls: fls_xlfo7di0gsqz
-   :decidability: decidable
-   :scope: system
+   :fls: fls_4vjbkm4ceymk
+   :decidability: todo
+   :scope: todo
    :tags: reduce-human-error
 
    Description of the guideline goes here.
 
    .. rationale::
-      :id: rat_e9iS187skbHH
+      :id: rat_WJubG7KuUDLW
       :status: draft
 
       Explanation of why this guideline is important.
 
    .. non_compliant_example::
-      :id: non_compl_ex_lRt4LBen6Lkc
+      :id: non_compl_ex_AyFnP0lJLHxi
       :status: draft
 
       Explanation of code example.
@@ -37,7 +40,7 @@
         # fn main() {}
 
    .. compliant_example::
-      :id: compl_ex_GLP05s9c1g8N
+      :id: compl_ex_pO5gP1aj2v4F
       :status: draft
 
       Explanation of code example.

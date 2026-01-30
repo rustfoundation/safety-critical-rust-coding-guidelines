@@ -6,6 +6,7 @@ import random
 import re
 import string
 from textwrap import dedent, indent
+from typing import Optional
 
 # Configuration
 CHARS = string.ascii_letters + string.digits
@@ -252,7 +253,7 @@ def guideline_rst_template(
     rationale: str,
     non_compliant_examples: list,  # List of (prose, code) tuples
     compliant_examples: list,  # List of (prose, code) tuples
-    bibliography_entries: list = None,  # List of (key, author, title, url) tuples
+    bibliography_entries: Optional[list] = None,  # List of (key, author, title, url) tuples
 ) -> str:
     """
     Generate a .rst guideline entry from field values.
@@ -310,7 +311,7 @@ def guideline_rst_template(
 
     # Generate bibliography block if entries provided
     bibliography_block = ""
-    if bibliography_entries:
+    if bibliography_entries is not None and bibliography_entries:
         bibliography_id = generate_id("bib")
         bibliography_block = generate_bibliography_block(
             bibliography_id,

@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Procedural macros should not be used
+====================================
+
 .. guideline:: Procedural macros should not be used
    :id: gui_66FSqzD55VRZ
    :category: advisory

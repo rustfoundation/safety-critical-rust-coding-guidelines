@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Ensure reads of union fields produce valid values for the field's type
+======================================================================
+
 .. guideline:: Ensure reads of union fields produce valid values for the field's type
    :id: gui_0cuTYG8RVYjg
    :category: required
@@ -588,8 +591,7 @@
          :class: bibliography-table
 
          * - :bibentry:`gui_0cuTYG8RVYjg:RUST-REF-UNION`
-           - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html.
+           - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html
 
          * - :bibentry:`gui_0cuTYG8RVYjg:UCG-VALIDITY`
            - Rust Unsafe Code Guidelines. "Validity and Safety Invariant." https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
-

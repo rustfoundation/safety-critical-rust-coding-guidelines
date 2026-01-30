@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Shall not use Function-like Macros
+==================================
+
 .. guideline:: Shall not use Function-like Macros
    :id: gui_WJlWqgIxmE8P
    :category: mandatory

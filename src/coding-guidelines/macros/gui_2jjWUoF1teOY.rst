@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+A macro should not be used in place of a function
+=================================================
+
 .. guideline:: A macro should not be used in place of a function
    :id: gui_2jjWUoF1teOY
    :category: mandatory

@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+An integer shall not be converted to a pointer
+==============================================
+
 .. guideline:: An integer shall not be converted to a pointer
    :id: gui_PM8Vpf7lZ51U
    :category: <TODO>

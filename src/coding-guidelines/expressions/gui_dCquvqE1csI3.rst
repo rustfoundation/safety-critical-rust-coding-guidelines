@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Ensure that integer operations do not result in arithmetic overflow
+===================================================================
+
 .. guideline:: Ensure that integer operations do not result in arithmetic overflow
     :id: gui_dCquvqE1csI3
     :category: required
