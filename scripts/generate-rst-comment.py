@@ -618,16 +618,12 @@ Chapter Name Here <- chapter heading inside of `{chapter_index_file}`
     else:
         return "No guideline ID generated, failing!"
 
-    comment = f"""## 📋 RST Preview for Coding Guideline
-
-This is an automatically generated preview of your coding guideline in reStructuredText format.
-{file_instructions}
-
-{test_results_section}
-
-{bib_results_section}
-
-### 📝 How to Use This
+    header_section = (
+        "## 📋 RST Preview for Coding Guideline\n\n"
+        "This is an automatically generated preview of your coding guideline "
+        "in reStructuredText format."
+    )
+    how_to_use_section = f"""### 📝 How to Use This
 
 1. **Fork the repository** (if you haven't already) and clone it locally
 2. **Create a new branch** from `main`:
@@ -656,22 +652,31 @@ This is an automatically generated preview of your coding guideline in reStructu
    git commit -m "Add guideline: <your guideline title>"
    git push origin guideline/your-descriptive-branch-name
    ```
-8. **Open a Pull Request** against `main`
-
-<details>
+8. **Open a Pull Request** against `main`"""
+    rst_preview_section = f"""<details>
 <summary><strong>📄 Click to expand RST content</strong></summary>
 
 ```rst
 {full_rst_content}
 ```
 
-</details>
-
----
-<sub>🤖 This comment was automatically generated from the issue content. It will be updated when you edit the issue body.</sub>
-
-<!-- rst-preview-comment -->
-"""
+</details>"""
+    footer_section = (
+        "---\n"
+        "<sub>🤖 This comment was automatically generated from the issue "
+        "content. It will be updated when you edit the issue body.</sub>\n\n"
+        "<!-- rst-preview-comment -->"
+    )
+    sections = [
+        header_section,
+        test_results_section,
+        bib_results_section,
+        file_instructions.strip(),
+        how_to_use_section,
+        rst_preview_section,
+        footer_section,
+    ]
+    comment = "\n\n".join(section for section in sections if section)
     return comment
 
 
