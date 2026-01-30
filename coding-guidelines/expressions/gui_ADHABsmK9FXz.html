@@ -1,0 +1,364 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The ‘as’ operator should not be used with numeric operands &mdash; Safety-Critical Rust Coding Guidelines 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/rust_playground.css?v=a15f506b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/citation.css?v=569c3786" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/modern.css?v=803738c0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=558c75d0" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/rust_playground.js?v=acd109cb"></script>
+      <script src="../../_static/citation.js?v=1e6d5203"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview.bundle.js?v=18cd53c5"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview_loader.js?v=f7ff7e7d"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables.min.js?v=8a4aee21"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables_loader.js?v=a2cae175"></script>
+      <script src="../../_static/sphinx-needs/libs/html/sphinx_needs_collapse.js?v=dca66431"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Example guideline with bibliography (gui_Bib7x9KmPq2nL)" href="gui_Bib7x9KmPq2nL.html" />
+    <link rel="prev" title="Do not use an integer type as a divisor during integer division" href="gui_7y0GAMmtMhch.html" /> 
+<link rel="stylesheet" href="../../_static/fls_links.css" type="text/css" />
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Safety-Critical Rust Coding Guidelines
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/index.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Coding Guidelines</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../types-and-traits/index.html">Types and Traits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../patterns/index.html">Patterns</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Expressions</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="gui_7y0GAMmtMhch.html">Do not use an integer type as a divisor during integer division</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">The ‘as’ operator should not be used with numeric operands</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_Bib7x9KmPq2nL.html">Example guideline with bibliography (gui_Bib7x9KmPq2nL)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_Bob7x9KmPq2nL.html">Example guideline with bibliography (gui_Bob7x9KmPq2nL)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_HDnAZ7EZ4z6G.html">Avoid as underscore pointer casts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_LvmzGKdsAgI5.html">Avoid out-or-range shifts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_PM8Vpf7lZ51U.html">An integer shall not be converted to a pointer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_RHvQj8BHlz9b.html">Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_dCquvqE1csI3.html">Ensure that integer operations do not result in arithmetic overflow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_iv9yCMHRgpE0.html">An integer shall not be converted to an invalid pointer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_kMbiWbn8Z6g5.html">Do not divide by 0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../values/index.html">Values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../statements/index.html">Statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/index.html">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../associated-items/index.html">Associated Items</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../implementations/index.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../generics/index.html">Generics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../attributes/index.html">Attributes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../entities-and-resolution/index.html">Entities And Resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ownership-and-destruction/index.html">Ownership And Destruction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../exceptions-and-errors/index.html">Exceptions And Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../program-structure-and-compilation/index.html">Program Structure And Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../unsafety/index.html">Unsafety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../macros/index.html">Macros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ffi/index.html">Ffi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../inline-assembly/index.html">Inline Assembly</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../compliance/index.html">Compliance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../process/index.html">Process</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../appendices/index.html">Appendices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../retired-guidelines/index.html">Retired Guidelines</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Safety-Critical Rust Coding Guidelines</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Coding Guidelines</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Expressions</a></li>
+      <li class="breadcrumb-item active">The ‘as’ operator should not be used with numeric operands</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/coding-guidelines/expressions/gui_ADHABsmK9FXz.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="the-as-operator-should-not-be-used-with-numeric-operands">
+<h1>The ‘as’ operator should not be used with numeric operands<a class="headerlink" href="#the-as-operator-should-not-be-used-with-numeric-operands" title="Link to this heading"></a></h1>
+<div class="need_container docutils container" id="SNCB-b3051822">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_ADHABsmK9FXz">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">The 'as' operator should not be used with numeric operands</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_ADHABsmK9FXz" title="gui_ADHABsmK9FXz">gui_ADHABsmK9FXz</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">subset</span><span class="needs_spacer">, </span><span class="needs_data">reduce-human-error</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">advisory</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/expressions.html#fls_otaxe9okhdr1" class="fls-id">fls_otaxe9okhdr1</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">module</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">&lt;TODO&gt;</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_v56bjjcveLxQ" title="gui_ADHABsmK9FXz">rat_v56bjjcveLxQ</a>, <a class="reference internal" href="#non_compl_ex_hzGUYoMnK59w" title="gui_ADHABsmK9FXz">non_compl_ex_hzGUYoMnK59w</a>, <a class="reference internal" href="#compl_ex_uilHTIOgxD37" title="gui_ADHABsmK9FXz">compl_ex_uilHTIOgxD37</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>The binary operator <code class="docutils literal notranslate"><span class="pre">as</span></code> should not be used with:</p>
+<ul class="simple">
+<li><p>a numeric type, including all supported integer, floating, and machine-dependent arithmetic types; or</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bool</span></code>; or</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">char</span></code></p></li>
+</ul>
+<p>as either the right operand or the type of the left operand.</p>
+<p><strong>Exception:</strong> <code class="docutils literal notranslate"><span class="pre">as</span></code> may be used with <code class="docutils literal notranslate"><span class="pre">usize</span></code> as the right operand and an expression of raw pointer
+type as the left operand.</p>
+<div class="need_container docutils container" id="SNCB-05ae89f8">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_v56bjjcveLxQ">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_v56bjjcveLxQ" title="rat_v56bjjcveLxQ">rat_v56bjjcveLxQ</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_ADHABsmK9FXz" title="rat_v56bjjcveLxQ">gui_ADHABsmK9FXz</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Although the conversions performed by <code class="docutils literal notranslate"><span class="pre">as</span></code> between numeric types are all well-defined, <code class="docutils literal notranslate"><span class="pre">as</span></code> coerces
+the value to fit in the destination type, which may result in unexpected data loss if the value needs to
+be truncated, rounded, or produce a nearest possible non-equal value.</p>
+<p>Although some conversions are lossless, others are not symmetrical. Instead of relying on either a defined
+lossy behaviour or risking loss of precision, the code can communicate intent by using <code class="docutils literal notranslate"><span class="pre">Into</span></code> or <code class="docutils literal notranslate"><span class="pre">From</span></code>
+and <code class="docutils literal notranslate"><span class="pre">TryInto</span></code> or <code class="docutils literal notranslate"><span class="pre">TryFrom</span></code> to signal which conversions are intended to perfectly preserve the original
+value, and which are intended to be fallible. The latter cannot be used from const functions, indicating
+that these should avoid using fallible conversions.</p>
+<p>A pointer-to-address cast does not lose value, but will be truncated unless the destination type is large
+enough to hold the address value. The <code class="docutils literal notranslate"><span class="pre">usize</span></code> type is guaranteed to be wide enough for this purpose.</p>
+<p>A pointer-to-address cast is not symmetrical because the resulting pointer may not point to a valid object,
+may not point to an object of the right type, or may not be properly aligned.
+If a conversion in this direction is needed, <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Amem%3A%3Atransmute"><code class="docutils literal notranslate"><span class="pre">std::mem::transmute</span></code></a> will communicate the intent to perform
+an unsafe operation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-1c598176">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_hzGUYoMnK59w">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_hzGUYoMnK59w" title="non_compl_ex_hzGUYoMnK59w">non_compl_ex_hzGUYoMnK59w</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_ADHABsmK9FXz" title="non_compl_ex_hzGUYoMnK59w">gui_ADHABsmK9FXz</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p><code class="docutils literal notranslate"><span class="pre">as</span></code> used here can change the value range or lose precision.
+Even when it doesn’t, nothing enforces the correct behaviour or communicates whether
+we intend to allow lossy conversions, or only expect valid conversions.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">f1</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">_z</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="n">w</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">char</span><span class="p">;</span><span class="w">           </span><span class="c1">// non-compliant</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - changes value range, converting negative values</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">i64</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - could use .into()</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f32</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - lossy</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f64</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - could use .into()</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">f32</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - lossy</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_g</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">e</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">i64</span><span class="p">;</span><span class="w">            </span><span class="c1">// non-compliant - lossy despite object size</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p1</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">b</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_a1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">usize</span><span class="p">;</span><span class="w">        </span><span class="c1">// compliant by exception</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_a2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u16</span><span class="p">;</span><span class="w">          </span><span class="c1">// non-compliant - may lose address range</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_a3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u64</span><span class="p">;</span><span class="w">          </span><span class="c1">// non-compliant - use usize to indicate intent</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">usize</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_p2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// non-compliant - prefer transmute</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u16</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_p3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a2</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="p">;</span><span class="w">  </span><span class="c1">// non-compliant (and most likely not in a valid address range)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn f1(x: u16, y: i32, _z: u64, w: u8) {\n  let _a = w as char;           // non-compliant\n  let _b = y as u32;            // non-compliant - changes value range, converting negative values\n  let _c = x as i64;            // non-compliant - could use .into()\n\n  let d = y as f32;            // non-compliant - lossy\n  let e = d as f64;            // non-compliant - could use .into()\n  let _f = e as f32;            // non-compliant - lossy\n\n  let _g = e as i64;            // non-compliant - lossy despite object size\n\n  let b: u32 = 0;\n  let p1: * const u32 = &b;\n  let _a1 = p1 as usize;        // compliant by exception\n  let _a2 = p1 as u16;          // non-compliant - may lose address range\n  let _a3 = p1 as u64;          // non-compliant - use usize to indicate intent\n\n  let a1 = p1 as usize;\n  let _p2 = a1 as * const u32;  // non-compliant - prefer transmute\n  let a2 = p1 as u16;\n  let _p3 = a2 as * const u32;  // non-compliant (and most likely not in a valid address range)\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn f1(x: u16, y: i32, _z: u64, w: u8) {\n  let _a = w as char;           // non-compliant\n  let _b = y as u32;            // non-compliant - changes value range, converting negative values\n  let _c = x as i64;            // non-compliant - could use .into()\n\n  let d = y as f32;            // non-compliant - lossy\n  let e = d as f64;            // non-compliant - could use .into()\n  let _f = e as f32;            // non-compliant - lossy\n\n  let _g = e as i64;            // non-compliant - lossy despite object size\n\n  let b: u32 = 0;\n  let p1: * const u32 = &b;\n  let _a1 = p1 as usize;        // compliant by exception\n  let _a2 = p1 as u16;          // non-compliant - may lose address range\n  let _a3 = p1 as u64;          // non-compliant - use usize to indicate intent\n\n  let a1 = p1 as usize;\n  let _p2 = a1 as * const u32;  // non-compliant - prefer transmute\n  let a2 = p1 as u16;\n  let _p3 = a2 as * const u32;  // non-compliant (and most likely not in a valid address range)\n}", "hiddenLineNumbers": [23, 24], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">f1</span><span class=\"p\">(</span><span class=\"n\">x</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u16</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">y</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">_z</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u64</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">w</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u8</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_a</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">w</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">char</span><span class=\"p\">;</span><span class=\"w\">           </span><span class=\"c1\">// non-compliant</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_b</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">y</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"p\">;</span><span class=\"w\">            </span><span class=\"c1\">// non-compliant - changes value range, converting negative values</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_c</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">x</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"p\">;</span><span class=\"w\">            </span><span class=\"c1\">// non-compliant - could use .into()</span>\n\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">d</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">y</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">f32</span><span class=\"p\">;</span><span class=\"w\">            </span><span class=\"c1\">// non-compliant - lossy</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">e</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">d</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">f64</span><span class=\"p\">;</span><span class=\"w\">            </span><span class=\"c1\">// non-compliant - could use .into()</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_f</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">e</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">f32</span><span class=\"p\">;</span><span class=\"w\">            </span><span class=\"c1\">// non-compliant - lossy</span>\n\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_g</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">e</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"p\">;</span><span class=\"w\">            </span><span class=\"c1\">// non-compliant - lossy despite object size</span>\n\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"p\">;</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"o\">*</span><span class=\"w\"> </span><span class=\"k\">const</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"o\">&amp;</span><span class=\"n\">b</span><span class=\"p\">;</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_a1</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">usize</span><span class=\"p\">;</span><span class=\"w\">        </span><span class=\"c1\">// compliant by exception</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_a2</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">u16</span><span class=\"p\">;</span><span class=\"w\">          </span><span class=\"c1\">// non-compliant - may lose address range</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_a3</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">u64</span><span class=\"p\">;</span><span class=\"w\">          </span><span class=\"c1\">// non-compliant - use usize to indicate intent</span>\n\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">a1</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">usize</span><span class=\"p\">;</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_p2</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">a1</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"o\">*</span><span class=\"w\"> </span><span class=\"k\">const</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"p\">;</span><span class=\"w\">  </span><span class=\"c1\">// non-compliant - prefer transmute</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">a2</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">u16</span><span class=\"p\">;</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_p3</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">a2</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"o\">*</span><span class=\"w\"> </span><span class=\"k\">const</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"p\">;</span><span class=\"w\">  </span><span class=\"c1\">// non-compliant (and most likely not in a valid address range)</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-40ef1c64">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_uilHTIOgxD37">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_uilHTIOgxD37" title="compl_ex_uilHTIOgxD37">compl_ex_uilHTIOgxD37</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_ADHABsmK9FXz" title="compl_ex_uilHTIOgxD37">gui_ADHABsmK9FXz</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Valid conversions that are guaranteed to preserve exact values can be communicated
+better with <code class="docutils literal notranslate"><span class="pre">into()</span></code> or <code class="docutils literal notranslate"><span class="pre">from()</span></code>.
+Valid conversions that risk losing value, where doing so would be an error, can
+communicate this and include an error check, with <code class="docutils literal notranslate"><span class="pre">try_into</span></code> or <code class="docutils literal notranslate"><span class="pre">try_from</span></code>.
+Other forms of conversion may find <code class="docutils literal notranslate"><span class="pre">transmute</span></code> better communicates their intent.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri">miri</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">convert</span><span class="p">::</span><span class="n">TryInto</span><span class="p">;</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">f2</span><span class="p">(</span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">u16</span><span class="p">,</span><span class="w"> </span><span class="n">y</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">_z</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="n">w</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_a</span><span class="p">:</span><span class="w"> </span><span class="kt">char</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">into</span><span class="p">();</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_b</span><span class="p">:</span><span class="w"> </span><span class="nb">Result</span><span class="w"> </span><span class="o">&lt;</span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="p">.</span><span class="n">try_into</span><span class="p">();</span><span class="w"> </span><span class="c1">// produce an error on range clip</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_c</span><span class="p">:</span><span class="w"> </span><span class="kt">i64</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">.</span><span class="n">into</span><span class="p">();</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">f32</span><span class="p">::</span><span class="n">from</span><span class="p">(</span><span class="n">x</span><span class="p">);</span><span class="w">  </span><span class="c1">// u16 is within range, u32 is not</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_e</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">f64</span><span class="p">::</span><span class="n">from</span><span class="p">(</span><span class="n">d</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// let f = f32::from(e); // no From exists</span>
+
+<span class="w">  </span><span class="c1">// let g = ...            // no From exists</span>
+
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">h</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">p1</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">h</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">a1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p1</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">usize</span><span class="p">;</span><span class="w">     </span><span class="c1">// (compliant)</span>
+
+<span class="w">  </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_a2</span><span class="p">:</span><span class="w"> </span><span class="kt">usize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">p1</span><span class="p">);</span><span class="w">  </span><span class="c1">// OK</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_a3</span><span class="p">:</span><span class="w"> </span><span class="kt">u64</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">p1</span><span class="p">);</span><span class="w">  </span><span class="c1">// OK, size is checked</span>
+<span class="w">    </span><span class="c1">// let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes</span>
+
+<span class="w">    </span><span class="cp">#[allow(integer_to_ptr_transmutes)]</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_p2</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">a1</span><span class="p">);</span><span class="w"> </span><span class="c1">// OK</span>
+<span class="w">    </span><span class="cp">#[allow(integer_to_ptr_transmutes)]</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_p3</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">a1</span><span class="p">);</span><span class="w"> </span><span class="c1">// OK</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// does something entirely different,</span>
+<span class="w">    </span><span class="c1">// reinterpreting the bits of z as the IEEE bit pattern of a double</span>
+<span class="w">    </span><span class="c1">// precision object, rather than converting the integer value</span>
+<span class="w">    </span><span class="cp">#[allow(unnecessary_transmutes)]</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">_f1</span><span class="p">:</span><span class="w"> </span><span class="kt">f64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">(</span><span class="n">_z</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "use std::convert::TryInto;\n\n#[allow(dead_code)]\nfn f2(x: u16, y: i32, _z: u64, w: u8) {\n  let _a: char            = w.into();\n  let _b: Result <u32, _> = y.try_into(); // produce an error on range clip\n  let _c: i64             = x.into();\n\n  let d = f32::from(x);  // u16 is within range, u32 is not\n  let _e = f64::from(d);\n  // let f = f32::from(e); // no From exists\n\n  // let g = ...            // no From exists\n\n  let h: u32 = 0;\n  let p1: * const u32 = &h;\n  let a1 = p1 as usize;     // (compliant)\n\n  unsafe {\n    let _a2: usize = std::mem::transmute(p1);  // OK\n    let _a3: u64   = std::mem::transmute(p1);  // OK, size is checked\n    // let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes\n\n    #[allow(integer_to_ptr_transmutes)]\n    let _p2: * const u32 = std::mem::transmute(a1); // OK\n    #[allow(integer_to_ptr_transmutes)]\n    let _p3: * const u32 = std::mem::transmute(a1); // OK\n  }\n\n  unsafe {\n    // does something entirely different,\n    // reinterpreting the bits of z as the IEEE bit pattern of a double\n    // precision object, rather than converting the integer value\n    #[allow(unnecessary_transmutes)]\n    let _f1: f64 = std::mem::transmute(_z);\n  }\n}\n\nfn main() {}", "displayCode": "use std::convert::TryInto;\n\n#[allow(dead_code)]\nfn f2(x: u16, y: i32, _z: u64, w: u8) {\n  let _a: char            = w.into();\n  let _b: Result <u32, _> = y.try_into(); // produce an error on range clip\n  let _c: i64             = x.into();\n\n  let d = f32::from(x);  // u16 is within range, u32 is not\n  let _e = f64::from(d);\n  // let f = f32::from(e); // no From exists\n\n  // let g = ...            // no From exists\n\n  let h: u32 = 0;\n  let p1: * const u32 = &h;\n  let a1 = p1 as usize;     // (compliant)\n\n  unsafe {\n    let _a2: usize = std::mem::transmute(p1);  // OK\n    let _a3: u64   = std::mem::transmute(p1);  // OK, size is checked\n    // let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes\n\n    #[allow(integer_to_ptr_transmutes)]\n    let _p2: * const u32 = std::mem::transmute(a1); // OK\n    #[allow(integer_to_ptr_transmutes)]\n    let _p3: * const u32 = std::mem::transmute(a1); // OK\n  }\n\n  unsafe {\n    // does something entirely different,\n    // reinterpreting the bits of z as the IEEE bit pattern of a double\n    // precision object, rather than converting the integer value\n    #[allow(unnecessary_transmutes)]\n    let _f1: f64 = std::mem::transmute(_z);\n  }\n}", "hiddenLineNumbers": [37, 38], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "miri": {"mode": "check", "pattern": null}, "warnMode": "error", "fullCodeHighlighted": "<span class=\"k\">use</span><span class=\"w\"> </span><span class=\"n\">std</span><span class=\"p\">::</span><span class=\"n\">convert</span><span class=\"p\">::</span><span class=\"n\">TryInto</span><span class=\"p\">;</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">f2</span><span class=\"p\">(</span><span class=\"n\">x</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u16</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">y</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">_z</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u64</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">w</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u8</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">char</span><span class=\"w\">            </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">w</span><span class=\"p\">.</span><span class=\"n\">into</span><span class=\"p\">();</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"kt\">u32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">_</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">y</span><span class=\"p\">.</span><span class=\"n\">try_into</span><span class=\"p\">();</span><span class=\"w\"> </span><span class=\"c1\">// produce an error on range clip</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_c</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"w\">             </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">x</span><span class=\"p\">.</span><span class=\"n\">into</span><span class=\"p\">();</span>\n\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">d</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"kt\">f32</span><span class=\"p\">::</span><span class=\"n\">from</span><span class=\"p\">(</span><span class=\"n\">x</span><span class=\"p\">);</span><span class=\"w\">  </span><span class=\"c1\">// u16 is within range, u32 is not</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_e</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"kt\">f64</span><span class=\"p\">::</span><span class=\"n\">from</span><span class=\"p\">(</span><span class=\"n\">d</span><span class=\"p\">);</span>\n<span class=\"w\">  </span><span class=\"c1\">// let f = f32::from(e); // no From exists</span>\n\n<span class=\"w\">  </span><span class=\"c1\">// let g = ...            // no From exists</span>\n\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">h</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"p\">;</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"o\">*</span><span class=\"w\"> </span><span class=\"k\">const</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"o\">&amp;</span><span class=\"n\">h</span><span class=\"p\">;</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">a1</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">p1</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"kt\">usize</span><span class=\"p\">;</span><span class=\"w\">     </span><span class=\"c1\">// (compliant)</span>\n\n<span class=\"w\">  </span><span class=\"k\">unsafe</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_a2</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">usize</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">std</span><span class=\"p\">::</span><span class=\"n\">mem</span><span class=\"p\">::</span><span class=\"n\">transmute</span><span class=\"p\">(</span><span class=\"n\">p1</span><span class=\"p\">);</span><span class=\"w\">  </span><span class=\"c1\">// OK</span>\n<span class=\"w\">    </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_a3</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u64</span><span class=\"w\">   </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">std</span><span class=\"p\">::</span><span class=\"n\">mem</span><span class=\"p\">::</span><span class=\"n\">transmute</span><span class=\"p\">(</span><span class=\"n\">p1</span><span class=\"p\">);</span><span class=\"w\">  </span><span class=\"c1\">// OK, size is checked</span>\n<span class=\"w\">    </span><span class=\"c1\">// let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes</span>\n\n<span class=\"w\">    </span><span class=\"cp\">#[allow(integer_to_ptr_transmutes)]</span>\n<span class=\"w\">    </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_p2</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"o\">*</span><span class=\"w\"> </span><span class=\"k\">const</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">std</span><span class=\"p\">::</span><span class=\"n\">mem</span><span class=\"p\">::</span><span class=\"n\">transmute</span><span class=\"p\">(</span><span class=\"n\">a1</span><span class=\"p\">);</span><span class=\"w\"> </span><span class=\"c1\">// OK</span>\n<span class=\"w\">    </span><span class=\"cp\">#[allow(integer_to_ptr_transmutes)]</span>\n<span class=\"w\">    </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_p3</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"o\">*</span><span class=\"w\"> </span><span class=\"k\">const</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">std</span><span class=\"p\">::</span><span class=\"n\">mem</span><span class=\"p\">::</span><span class=\"n\">transmute</span><span class=\"p\">(</span><span class=\"n\">a1</span><span class=\"p\">);</span><span class=\"w\"> </span><span class=\"c1\">// OK</span>\n<span class=\"w\">  </span><span class=\"p\">}</span>\n\n<span class=\"w\">  </span><span class=\"k\">unsafe</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"c1\">// does something entirely different,</span>\n<span class=\"w\">    </span><span class=\"c1\">// reinterpreting the bits of z as the IEEE bit pattern of a double</span>\n<span class=\"w\">    </span><span class=\"c1\">// precision object, rather than converting the integer value</span>\n<span class=\"w\">    </span><span class=\"cp\">#[allow(unnecessary_transmutes)]</span>\n<span class=\"w\">    </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_f1</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">f64</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">std</span><span class=\"p\">::</span><span class=\"n\">mem</span><span class=\"p\">::</span><span class=\"n\">transmute</span><span class=\"p\">(</span><span class=\"n\">_z</span><span class=\"p\">);</span>\n<span class=\"w\">  </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gui_7y0GAMmtMhch.html" class="btn btn-neutral float-left" title="Do not use an integer type as a divisor during integer division" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gui_Bib7x9KmPq2nL.html" class="btn btn-neutral float-right" title="Example guideline with bibliography (gui_Bib7x9KmPq2nL)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Contributors to Coding Guidelines Subcommittee.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+        This site is powered through <a href="https://www.netlify.com">Netlify</a>.
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

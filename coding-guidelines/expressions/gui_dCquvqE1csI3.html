@@ -1,0 +1,685 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ensure that integer operations do not result in arithmetic overflow &mdash; Safety-Critical Rust Coding Guidelines 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/rust_playground.css?v=a15f506b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/citation.css?v=569c3786" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/modern.css?v=803738c0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=558c75d0" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/rust_playground.js?v=acd109cb"></script>
+      <script src="../../_static/citation.js?v=1e6d5203"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview.bundle.js?v=18cd53c5"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview_loader.js?v=f7ff7e7d"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables.min.js?v=8a4aee21"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables_loader.js?v=a2cae175"></script>
+      <script src="../../_static/sphinx-needs/libs/html/sphinx_needs_collapse.js?v=dca66431"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="An integer shall not be converted to an invalid pointer" href="gui_iv9yCMHRgpE0.html" />
+    <link rel="prev" title="Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand" href="gui_RHvQj8BHlz9b.html" /> 
+<link rel="stylesheet" href="../../_static/fls_links.css" type="text/css" />
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Safety-Critical Rust Coding Guidelines
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/index.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Coding Guidelines</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../types-and-traits/index.html">Types and Traits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../patterns/index.html">Patterns</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Expressions</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="gui_7y0GAMmtMhch.html">Do not use an integer type as a divisor during integer division</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_ADHABsmK9FXz.html">The ‘as’ operator should not be used with numeric operands</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_Bib7x9KmPq2nL.html">Example guideline with bibliography (gui_Bib7x9KmPq2nL)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_Bob7x9KmPq2nL.html">Example guideline with bibliography (gui_Bob7x9KmPq2nL)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_HDnAZ7EZ4z6G.html">Avoid as underscore pointer casts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_LvmzGKdsAgI5.html">Avoid out-or-range shifts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_PM8Vpf7lZ51U.html">An integer shall not be converted to a pointer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_RHvQj8BHlz9b.html">Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Ensure that integer operations do not result in arithmetic overflow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_iv9yCMHRgpE0.html">An integer shall not be converted to an invalid pointer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_kMbiWbn8Z6g5.html">Do not divide by 0</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../values/index.html">Values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../statements/index.html">Statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/index.html">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../associated-items/index.html">Associated Items</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../implementations/index.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../generics/index.html">Generics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../attributes/index.html">Attributes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../entities-and-resolution/index.html">Entities And Resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ownership-and-destruction/index.html">Ownership And Destruction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../exceptions-and-errors/index.html">Exceptions And Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../program-structure-and-compilation/index.html">Program Structure And Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../unsafety/index.html">Unsafety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../macros/index.html">Macros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ffi/index.html">Ffi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../inline-assembly/index.html">Inline Assembly</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../compliance/index.html">Compliance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../process/index.html">Process</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../appendices/index.html">Appendices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../retired-guidelines/index.html">Retired Guidelines</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Safety-Critical Rust Coding Guidelines</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Coding Guidelines</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Expressions</a></li>
+      <li class="breadcrumb-item active">Ensure that integer operations do not result in arithmetic overflow</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/coding-guidelines/expressions/gui_dCquvqE1csI3.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ensure-that-integer-operations-do-not-result-in-arithmetic-overflow">
+<h1>Ensure that integer operations do not result in arithmetic overflow<a class="headerlink" href="#ensure-that-integer-operations-do-not-result-in-arithmetic-overflow" title="Link to this heading"></a></h1>
+<div class="need_container docutils container" id="SNCB-747e6430">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_dCquvqE1csI3">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">Ensure that integer operations do not result in arithmetic overflow</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_dCquvqE1csI3" title="gui_dCquvqE1csI3">gui_dCquvqE1csI3</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">security</span><span class="needs_spacer">, </span><span class="needs_data">performance</span><span class="needs_spacer">, </span><span class="needs_data">numerics</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">required</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/expressions.html#fls_oFIRXBPXu6Zv" class="fls-id">fls_oFIRXBPXu6Zv</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">decidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">system</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">1.0 - latest</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_LvrS1jTCXEOk" title="gui_dCquvqE1csI3">rat_LvrS1jTCXEOk</a>, <a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0N" title="gui_dCquvqE1csI3">non_compl_ex_cCh2RQUXeH0N</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4b_1" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4b_1</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4c" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4c</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4b</a>, <a class="reference internal" href="#compl_ex_BhUHiRB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BhUHiRB4kc4b</a>, <a class="reference internal" href="#compl_ex_BgUHiSB4kc4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiSB4kc4b</a>, <a class="reference internal" href="#compl_ex_BgUHiSB4kd4b" title="gui_dCquvqE1csI3">compl_ex_BgUHiSB4kd4b</a>, <a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0O" title="gui_dCquvqE1csI3">non_compl_ex_cCh2RQUXeH0O</a>, <a class="reference internal" href="#compl_ex_BgUHiRB4kc4d" title="gui_dCquvqE1csI3">compl_ex_BgUHiRB4kc4d</a>, <a class="reference internal" href="#bib_dCquvqE1csI3" title="gui_dCquvqE1csI3">bib_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Eliminate arithmetic overflow <a class="citation-ref reference internal" href="#cite-gui_dCquvqE1csI3-FLS-ARITHMETIC-OVERFLOW">[FLS-ARITHMETIC-OVERFLOW]</a> of both signed and unsigned integer types.
+Any wraparound behavior must be explicitly specified to ensure the same behavior in both debug and release modes.</p>
+<p>This rule applies to the following primitive types:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">i8</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i16</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i32</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i64</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">i128</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u8</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u16</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u32</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u64</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">u128</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">usize</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">isize</span></code></p></li>
+</ul>
+<div class="need_container docutils container" id="SNCB-335d3986">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_LvrS1jTCXEOk">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_LvrS1jTCXEOk" title="rat_LvrS1jTCXEOk">rat_LvrS1jTCXEOk</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="rat_LvrS1jTCXEOk">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Eliminate arithmetic overflow to avoid runtime panics and unexpected wraparound behavior.
+Arithmetic overflow will panic in debug mode, but wraparound in release mode, resulting in inconsistent behavior.
+Use explicit <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> or
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> semantics where these behaviors are intentional.
+Range checking can be used to eliminate the possibility of arithmetic overflow.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-3be591fe">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_cCh2RQUXeH0N">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0N" title="non_compl_ex_cCh2RQUXeH0N">non_compl_ex_cCh2RQUXeH0N</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="non_compl_ex_cCh2RQUXeH0N">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant code example can result in arithmetic overflow during the addition of the signed operands <code class="docutils literal notranslate"><span class="pre">si_a</span></code> and <code class="docutils literal notranslate"><span class="pre">si_b</span></code>:</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">let</span><span class="w"> </span><span class="n">_sum</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">si_b</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// ...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn add(si_a: i32, si_b: i32) {\n  let _sum: i32 = si_a + si_b;\n  // ...\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn add(si_a: i32, si_b: i32) {\n  let _sum: i32 = si_a + si_b;\n  // ...\n}", "hiddenLineNumbers": [5, 6], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">add</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">  </span><span class=\"kd\">let</span><span class=\"w\"> </span><span class=\"n\">_sum</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">+</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">;</span>\n<span class=\"w\">  </span><span class=\"c1\">// ...</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-ea8a6a35">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4b_1">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_BgUHiRB4kc4b_1" title="compl_ex_BgUHiRB4kc4b_1">compl_ex_BgUHiRB4kc4b_1</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="compl_ex_BgUHiRB4kc4b_1">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant solution ensures that the addition operation cannot result in arithmetic overflow,
+based on the maximum range of a signed 32-bit integer.
+Functions such as
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Aoverflowing_add"><code class="docutils literal notranslate"><span class="pre">u32::overflowing_add</span></code></a>,
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Aoverflowing_sub"><code class="docutils literal notranslate"><span class="pre">u32::overflowing_sub</span></code></a>, and
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=u32%3A%3Aoverflowing_mul"><code class="docutils literal notranslate"><span class="pre">u32::overflowing_mul</span></code></a>
+can also be used to detect overflow.
+Code that invoked these functions would typically further restrict the range of possible values,
+based on the anticipated range of the inputs.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">ArithmeticError</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">Overflow</span><span class="p">,</span><span class="w"> </span><span class="n">DivisionByZero</span><span class="w"> </span><span class="p">}</span>
+<span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="kt">i32</span><span class="p">::{</span><span class="n">MAX</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">INT_MAX</span><span class="p">,</span><span class="w"> </span><span class="n">MIN</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">INT_MIN</span><span class="p">};</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">ArithmeticError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">si_b</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">INT_MAX</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">si_b</span><span class="p">)</span>
+<span class="w">        </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">si_b</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">INT_MIN</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">si_b</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">ArithmeticError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">si_a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">si_b</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">sub</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">ArithmeticError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">si_b</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">INT_MAX</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">si_b</span><span class="p">)</span>
+<span class="w">        </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">si_b</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">INT_MIN</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">si_b</span><span class="p">)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">ArithmeticError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">si_a</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">si_b</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">mul</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">ArithmeticError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">si_b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">Ok</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Detect overflow before performing multiplication</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">si_a</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">si_b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">INT_MIN</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">si_b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">INT_MIN</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">ArithmeticError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">si_a</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">si_b</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">INT_MAX</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">si_b</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">INT_MIN</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">si_a</span><span class="p">))</span>
+<span class="w">        </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">si_a</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">si_b</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">INT_MIN</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">si_b</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">INT_MAX</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">si_a</span><span class="p">))</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">ArithmeticError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">si_a</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">si_b</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[derive(Debug)]\n#[allow(dead_code)]\nenum ArithmeticError { Overflow, DivisionByZero }\nuse std::i32::{MAX as INT_MAX, MIN as INT_MIN};\n\n#[allow(dead_code)]\nfn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    if (si_b > 0 && si_a > INT_MAX - si_b)\n        || (si_b < 0 && si_a < INT_MIN - si_b)\n    {\n        Err(ArithmeticError::Overflow)\n    } else {\n        Ok(si_a + si_b)\n    }\n}\n\n#[allow(dead_code)]\nfn sub(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    if (si_b < 0 && si_a > INT_MAX + si_b)\n        || (si_b > 0 && si_a < INT_MIN + si_b)\n    {\n        Err(ArithmeticError::Overflow)\n    } else {\n        Ok(si_a - si_b)\n    }\n}\n\n#[allow(dead_code)]\nfn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    if si_a == 0 || si_b == 0 {\n        return Ok(0);\n    }\n\n    // Detect overflow before performing multiplication\n    if (si_a == -1 && si_b == INT_MIN) || (si_b == -1 && si_a == INT_MIN) {\n        Err(ArithmeticError::Overflow)\n    } else if (si_a > 0 && (si_b > INT_MAX / si_a || si_b < INT_MIN / si_a))\n        || (si_a < 0 && (si_b > INT_MIN / si_a || si_b < INT_MAX / si_a))\n    {\n        Err(ArithmeticError::Overflow)\n    } else {\n        Ok(si_a * si_b)\n    }\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nenum ArithmeticError { Overflow, DivisionByZero }\nuse std::i32::{MAX as INT_MAX, MIN as INT_MIN};\n\n#[allow(dead_code)]\nfn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    if (si_b > 0 && si_a > INT_MAX - si_b)\n        || (si_b < 0 && si_a < INT_MIN - si_b)\n    {\n        Err(ArithmeticError::Overflow)\n    } else {\n        Ok(si_a + si_b)\n    }\n}\n\n#[allow(dead_code)]\nfn sub(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    if (si_b < 0 && si_a > INT_MAX + si_b)\n        || (si_b > 0 && si_a < INT_MIN + si_b)\n    {\n        Err(ArithmeticError::Overflow)\n    } else {\n        Ok(si_a - si_b)\n    }\n}\n\n#[allow(dead_code)]\nfn mul(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    if si_a == 0 || si_b == 0 {\n        return Ok(0);\n    }\n\n    // Detect overflow before performing multiplication\n    if (si_a == -1 && si_b == INT_MIN) || (si_b == -1 && si_a == INT_MIN) {\n        Err(ArithmeticError::Overflow)\n    } else if (si_a > 0 && (si_b > INT_MAX / si_a || si_b < INT_MIN / si_a))\n        || (si_a < 0 && (si_b > INT_MIN / si_a || si_b < INT_MAX / si_a))\n    {\n        Err(ArithmeticError::Overflow)\n    } else {\n        Ok(si_a * si_b)\n    }\n}", "hiddenLineNumbers": [0, 44, 45], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"rust-hidden-line\"><span class=\"cp\">#[derive(Debug)]</span></span>\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">enum</span><span class=\"w\"> </span><span class=\"nc\">ArithmeticError</span><span class=\"w\"> </span><span class=\"p\">{</span><span class=\"w\"> </span><span class=\"n\">Overflow</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">DivisionByZero</span><span class=\"w\"> </span><span class=\"p\">}</span>\n<span class=\"k\">use</span><span class=\"w\"> </span><span class=\"n\">std</span><span class=\"p\">::</span><span class=\"kt\">i32</span><span class=\"p\">::{</span><span class=\"n\">MAX</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"n\">INT_MAX</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">MIN</span><span class=\"w\"> </span><span class=\"k\">as</span><span class=\"w\"> </span><span class=\"n\">INT_MIN</span><span class=\"p\">};</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">add</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">ArithmeticError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"n\">INT_MAX</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">)</span>\n<span class=\"w\">        </span><span class=\"o\">||</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"w\"> </span><span class=\"n\">INT_MIN</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Err</span><span class=\"p\">(</span><span class=\"n\">ArithmeticError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span><span class=\"w\"> </span><span class=\"k\">else</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Ok</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">+</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">sub</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">ArithmeticError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"n\">INT_MAX</span><span class=\"w\"> </span><span class=\"o\">+</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">)</span>\n<span class=\"w\">        </span><span class=\"o\">||</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"w\"> </span><span class=\"n\">INT_MIN</span><span class=\"w\"> </span><span class=\"o\">+</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Err</span><span class=\"p\">(</span><span class=\"n\">ArithmeticError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span><span class=\"w\"> </span><span class=\"k\">else</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Ok</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">mul</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">ArithmeticError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"o\">||</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"k\">return</span><span class=\"w\"> </span><span class=\"nb\">Ok</span><span class=\"p\">(</span><span class=\"mi\">0</span><span class=\"p\">);</span>\n<span class=\"w\">    </span><span class=\"p\">}</span>\n\n<span class=\"w\">    </span><span class=\"c1\">// Detect overflow before performing multiplication</span>\n<span class=\"w\">    </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"mi\">1</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"n\">INT_MIN</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"o\">||</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"mi\">1</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"n\">INT_MIN</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Err</span><span class=\"p\">(</span><span class=\"n\">ArithmeticError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span><span class=\"w\"> </span><span class=\"k\">else</span><span class=\"w\"> </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"n\">INT_MAX</span><span class=\"w\"> </span><span class=\"o\">/</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">||</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"w\"> </span><span class=\"n\">INT_MIN</span><span class=\"w\"> </span><span class=\"o\">/</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"p\">))</span>\n<span class=\"w\">        </span><span class=\"o\">||</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"n\">INT_MIN</span><span class=\"w\"> </span><span class=\"o\">/</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">||</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"w\"> </span><span class=\"o\">&lt;</span><span class=\"w\"> </span><span class=\"n\">INT_MAX</span><span class=\"w\"> </span><span class=\"o\">/</span><span class=\"w\"> </span><span class=\"n\">si_a</span><span class=\"p\">))</span>\n<span class=\"w\">    </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Err</span><span class=\"p\">(</span><span class=\"n\">ArithmeticError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span><span class=\"w\"> </span><span class=\"k\">else</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Ok</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"w\"> </span><span class=\"o\">*</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-f2caddc0">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4c">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_BgUHiRB4kc4c" title="compl_ex_BgUHiRB4kc4c">compl_ex_BgUHiRB4kc4c</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="compl_ex_BgUHiRB4kc4c">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example uses safe checked addition instead of manual bounds checks.
+Checked functions can reduce readability when complex arithmetic expressions are needed.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">ArithmeticError</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">Overflow</span><span class="p">,</span><span class="w"> </span><span class="n">DivisionByZero</span><span class="w"> </span><span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">ArithmeticError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">si_a</span><span class="p">.</span><span class="n">checked_add</span><span class="p">(</span><span class="n">si_b</span><span class="p">).</span><span class="n">ok_or</span><span class="p">(</span><span class="n">ArithmeticError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">sub</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">ArithmeticError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">checked_sub</span><span class="p">(</span><span class="n">b</span><span class="p">).</span><span class="n">ok_or</span><span class="p">(</span><span class="n">ArithmeticError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">mul</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">ArithmeticError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">checked_mul</span><span class="p">(</span><span class="n">b</span><span class="p">).</span><span class="n">ok_or</span><span class="p">(</span><span class="n">ArithmeticError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[derive(Debug)]\n#[allow(dead_code)]\nenum ArithmeticError { Overflow, DivisionByZero }\n\n#[allow(dead_code)]\nfn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    si_a.checked_add(si_b).ok_or(ArithmeticError::Overflow)\n}\n\n#[allow(dead_code)]\nfn sub(a: i32, b: i32) -> Result<i32, ArithmeticError> {\n    a.checked_sub(b).ok_or(ArithmeticError::Overflow)\n}\n\n#[allow(dead_code)]\nfn mul(a: i32, b: i32) -> Result<i32, ArithmeticError> {\n    a.checked_mul(b).ok_or(ArithmeticError::Overflow)\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nenum ArithmeticError { Overflow, DivisionByZero }\n\n#[allow(dead_code)]\nfn add(si_a: i32, si_b: i32) -> Result<i32, ArithmeticError> {\n    si_a.checked_add(si_b).ok_or(ArithmeticError::Overflow)\n}\n\n#[allow(dead_code)]\nfn sub(a: i32, b: i32) -> Result<i32, ArithmeticError> {\n    a.checked_sub(b).ok_or(ArithmeticError::Overflow)\n}\n\n#[allow(dead_code)]\nfn mul(a: i32, b: i32) -> Result<i32, ArithmeticError> {\n    a.checked_mul(b).ok_or(ArithmeticError::Overflow)\n}", "hiddenLineNumbers": [0, 18, 19], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"rust-hidden-line\"><span class=\"cp\">#[derive(Debug)]</span></span>\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">enum</span><span class=\"w\"> </span><span class=\"nc\">ArithmeticError</span><span class=\"w\"> </span><span class=\"p\">{</span><span class=\"w\"> </span><span class=\"n\">Overflow</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">DivisionByZero</span><span class=\"w\"> </span><span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">add</span><span class=\"p\">(</span><span class=\"n\">si_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">si_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">ArithmeticError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">si_a</span><span class=\"p\">.</span><span class=\"n\">checked_add</span><span class=\"p\">(</span><span class=\"n\">si_b</span><span class=\"p\">).</span><span class=\"n\">ok_or</span><span class=\"p\">(</span><span class=\"n\">ArithmeticError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">sub</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">ArithmeticError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">checked_sub</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">).</span><span class=\"n\">ok_or</span><span class=\"p\">(</span><span class=\"n\">ArithmeticError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">mul</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">ArithmeticError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">checked_mul</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">).</span><span class=\"n\">ok_or</span><span class=\"p\">(</span><span class=\"n\">ArithmeticError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-f3644544">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4b">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_BgUHiRB4kc4b" title="compl_ex_BgUHiRB4kc4b">compl_ex_BgUHiRB4kc4b</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="compl_ex_BgUHiRB4kc4b">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Wrapping behavior must be explicitly requested. This compliant example uses wrapping functions.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">wrapping_add</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">sub</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">wrapping_sub</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">mul</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">wrapping_mul</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn add(a: i32, b: i32) -> i32 {\n    a.wrapping_add(b)\n}\n\n#[allow(dead_code)]\nfn sub(a: i32, b: i32) -> i32 {\n    a.wrapping_sub(b)\n}\n\n#[allow(dead_code)]\nfn mul(a: i32, b: i32) -> i32 {\n    a.wrapping_mul(b)\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn add(a: i32, b: i32) -> i32 {\n    a.wrapping_add(b)\n}\n\n#[allow(dead_code)]\nfn sub(a: i32, b: i32) -> i32 {\n    a.wrapping_sub(b)\n}\n\n#[allow(dead_code)]\nfn mul(a: i32, b: i32) -> i32 {\n    a.wrapping_mul(b)\n}", "hiddenLineNumbers": [14, 15], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">add</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">wrapping_add</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">sub</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">wrapping_sub</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">mul</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">wrapping_mul</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-9fc611ae">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BhUHiRB4kc4b">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_BhUHiRB4kc4b" title="compl_ex_BhUHiRB4kc4b">compl_ex_BhUHiRB4kc4b</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="compl_ex_BhUHiRB4kc4b">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Wrapping behavior call also be achieved using the <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> type as in this compliant solution.
+The <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> type is a <code class="docutils literal notranslate"><span class="pre">struct</span></code> found in the <code class="docutils literal notranslate"><span class="pre">core::num</span></code> module that explicitly enables two’s complement
+wrapping arithmetic for the inner type <code class="docutils literal notranslate"><span class="pre">T</span></code> (which must be an integer or <code class="docutils literal notranslate"><span class="pre">usize/isize</span></code>).
+The <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3AWrapping"><code class="docutils literal notranslate"><span class="pre">std::num::Wrapping</span></code></a> type provides a consistent way to force wrapping behavior in all build modes,
+which is useful in specific scenarios like implementing cryptography or hash functions where wrapping arithmetic is the intended behavior.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">num</span><span class="p">::</span><span class="n">Wrapping</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">si_a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">si_b</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">sub</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">si_a</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">si_b</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">mul</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Wrapping</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">si_a</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">si_b</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Wrapping</span><span class="p">(</span><span class="kt">i32</span><span class="p">::</span><span class="n">MAX</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">si_b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Wrapping</span><span class="p">(</span><span class="kt">i32</span><span class="p">::</span><span class="n">MAX</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{} + {} = {}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">si_a</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">,</span><span class="w"> </span><span class="n">add</span><span class="p">(</span><span class="n">si_a</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "use std::num::Wrapping;\n\nfn add(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {\n    si_a + si_b\n}\n\n#[allow(dead_code)]\nfn sub(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {\n    si_a - si_b\n}\n\n#[allow(dead_code)]\nfn mul(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {\n    si_a * si_b\n}\n\nfn main() {\n    let si_a = Wrapping(i32::MAX);\n    let si_b = Wrapping(i32::MAX);\n    println!(\"{} + {} = {}\", si_a, si_b, add(si_a, si_b))\n}", "displayCode": "use std::num::Wrapping;\n\nfn add(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {\n    si_a + si_b\n}\n\n#[allow(dead_code)]\nfn sub(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {\n    si_a - si_b\n}\n\n#[allow(dead_code)]\nfn mul(si_a: Wrapping<i32>, si_b: Wrapping<i32>) -> Wrapping<i32> {\n    si_a * si_b\n}\n\nfn main() {\n    let si_a = Wrapping(i32::MAX);\n    let si_b = Wrapping(i32::MAX);\n    println!(\"{} + {} = {}\", si_a, si_b, add(si_a, si_b))\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-bfa13f52">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiSB4kc4b">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_BgUHiSB4kc4b" title="compl_ex_BgUHiSB4kc4b">compl_ex_BgUHiSB4kc4b</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="compl_ex_BgUHiSB4kc4b">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Saturation semantics means that instead of wrapping around or resulting in an error,
+any result that falls outside the valid range of the integer type is clamped:</p>
+<ul class="simple">
+<li><p>To the maximum value, if the result were to be greater than the maximum value, or</p></li>
+<li><p>To the minimum value, if the result were to be smaller than the minimum,</p></li>
+</ul>
+<p>Saturation semantics always conform to this rule because they ensure that integer operations do not result in arithmetic overflow.
+This compliant solution shows how to use saturating functions to provide saturation semantics for some basic arithmetic operations.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">saturating_add</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">sub</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">saturating_sub</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">mul</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">i32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">a</span><span class="p">.</span><span class="n">saturating_mul</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[allow(dead_code)]\nfn add(a: i32, b: i32) -> i32 {\n    a.saturating_add(b)\n}\n\n#[allow(dead_code)]\nfn sub(a: i32, b: i32) -> i32 {\n    a.saturating_sub(b)\n}\n\n#[allow(dead_code)]\nfn mul(a: i32, b: i32) -> i32 {\n    a.saturating_mul(b)\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nfn add(a: i32, b: i32) -> i32 {\n    a.saturating_add(b)\n}\n\n#[allow(dead_code)]\nfn sub(a: i32, b: i32) -> i32 {\n    a.saturating_sub(b)\n}\n\n#[allow(dead_code)]\nfn mul(a: i32, b: i32) -> i32 {\n    a.saturating_mul(b)\n}", "hiddenLineNumbers": [14, 15], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">add</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">saturating_add</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">sub</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">saturating_sub</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">mul</span><span class=\"p\">(</span><span class=\"n\">a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"kt\">i32</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"n\">a</span><span class=\"p\">.</span><span class=\"n\">saturating_mul</span><span class=\"p\">(</span><span class=\"n\">b</span><span class=\"p\">)</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-7c872c16">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiSB4kd4b">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_BgUHiSB4kd4b" title="compl_ex_BgUHiSB4kd4b">compl_ex_BgUHiSB4kd4b</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="compl_ex_BgUHiSB4kd4b">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p><a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> is a wrapper type in Rust’s <code class="docutils literal notranslate"><span class="pre">core</span></code> library that makes arithmetic operations on the wrapped value perform saturating arithmetic instead of wrapping, panicking, or overflowing.
+<a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> is useful when you have a section of code or a data type where all arithmetic must be saturating.
+This compliant solution uses the <a class="std-ref reference external" href="https://doc.rust-lang.org/stable/std/?search=std%3A%3Anum%3A%3ASaturating"><code class="docutils literal notranslate"><span class="pre">std::num::Saturating</span></code></a> type to define several functions that perform basic integer operations using saturation semantics.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">num</span><span class="p">::</span><span class="n">Saturating</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">si_a</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">si_b</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">sub</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">si_a</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">si_b</span>
+<span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">mul</span><span class="p">(</span><span class="n">si_a</span><span class="p">:</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">:</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Saturating</span><span class="o">&lt;</span><span class="kt">i32</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">si_a</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">si_b</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">si_a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Saturating</span><span class="p">(</span><span class="kt">i32</span><span class="p">::</span><span class="n">MAX</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">si_b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Saturating</span><span class="p">(</span><span class="kt">i32</span><span class="p">::</span><span class="n">MAX</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{} + {} = {}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">si_a</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">,</span><span class="w"> </span><span class="n">add</span><span class="p">(</span><span class="n">si_a</span><span class="p">,</span><span class="w"> </span><span class="n">si_b</span><span class="p">))</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "use std::num::Saturating;\n\nfn add(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {\n    si_a + si_b\n}\n\n#[allow(dead_code)]\nfn sub(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {\n    si_a - si_b\n}\n\n#[allow(dead_code)]\nfn mul(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {\n    si_a * si_b\n}\n\nfn main() {\n    let si_a = Saturating(i32::MAX);\n    let si_b = Saturating(i32::MAX);\n    println!(\"{} + {} = {}\", si_a, si_b, add(si_a, si_b))\n}", "displayCode": "use std::num::Saturating;\n\nfn add(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {\n    si_a + si_b\n}\n\n#[allow(dead_code)]\nfn sub(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {\n    si_a - si_b\n}\n\n#[allow(dead_code)]\nfn mul(si_a: Saturating<i32>, si_b: Saturating<i32>) -> Saturating<i32> {\n    si_a * si_b\n}\n\nfn main() {\n    let si_a = Saturating(i32::MAX);\n    let si_b = Saturating(i32::MAX);\n    println!(\"{} + {} = {}\", si_a, si_b, add(si_a, si_b))\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-1964f318">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_cCh2RQUXeH0O">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_cCh2RQUXeH0O" title="non_compl_ex_cCh2RQUXeH0O">non_compl_ex_cCh2RQUXeH0O</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="non_compl_ex_cCh2RQUXeH0O">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant code example example prevents divide-by-zero errors, but does not prevent arithmetic overflow.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">DivError</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">DivisionByZero</span><span class="p">,</span><span class="w"> </span><span class="n">Overflow</span><span class="w"> </span><span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">div</span><span class="p">(</span><span class="n">s_a</span><span class="p">:</span><span class="w"> </span><span class="kt">i64</span><span class="p">,</span><span class="w"> </span><span class="n">s_b</span><span class="p">:</span><span class="w"> </span><span class="kt">i64</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i64</span><span class="p">,</span><span class="w"> </span><span class="n">DivError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">s_b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">DivError</span><span class="p">::</span><span class="n">DivisionByZero</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">s_a</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">s_b</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[derive(Debug)]\n#[allow(dead_code)]\nenum DivError { DivisionByZero, Overflow }\n\n#[allow(dead_code)]\nfn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {\n    if s_b == 0 {\n        Err(DivError::DivisionByZero)\n    } else {\n        Ok(s_a / s_b)\n    }\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nenum DivError { DivisionByZero, Overflow }\n\n#[allow(dead_code)]\nfn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {\n    if s_b == 0 {\n        Err(DivError::DivisionByZero)\n    } else {\n        Ok(s_a / s_b)\n    }\n}", "hiddenLineNumbers": [0, 12, 13], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"rust-hidden-line\"><span class=\"cp\">#[derive(Debug)]</span></span>\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">enum</span><span class=\"w\"> </span><span class=\"nc\">DivError</span><span class=\"w\"> </span><span class=\"p\">{</span><span class=\"w\"> </span><span class=\"n\">DivisionByZero</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">Overflow</span><span class=\"w\"> </span><span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">div</span><span class=\"p\">(</span><span class=\"n\">s_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">s_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i64</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">DivError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"n\">s_b</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Err</span><span class=\"p\">(</span><span class=\"n\">DivError</span><span class=\"p\">::</span><span class=\"n\">DivisionByZero</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span><span class=\"w\"> </span><span class=\"k\">else</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Ok</span><span class=\"p\">(</span><span class=\"n\">s_a</span><span class=\"w\"> </span><span class=\"o\">/</span><span class=\"w\"> </span><span class=\"n\">s_b</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-d0f45ad6">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_BgUHiRB4kc4d">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_BgUHiRB4kc4d" title="compl_ex_BgUHiRB4kc4d">compl_ex_BgUHiRB4kc4d</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="compl_ex_BgUHiRB4kc4d">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant solution eliminates the possibility of both divide-by-zero errors and arithmetic overflow:</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[allow(dead_code)]</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">DivError</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">DivisionByZero</span><span class="p">,</span><span class="w"> </span><span class="n">Overflow</span><span class="w"> </span><span class="p">}</span>
+
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">div</span><span class="p">(</span><span class="n">s_a</span><span class="p">:</span><span class="w"> </span><span class="kt">i64</span><span class="p">,</span><span class="w"> </span><span class="n">s_b</span><span class="p">:</span><span class="w"> </span><span class="kt">i64</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">i64</span><span class="p">,</span><span class="w"> </span><span class="n">DivError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">s_b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">DivError</span><span class="p">::</span><span class="n">DivisionByZero</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">s_a</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kt">i64</span><span class="p">::</span><span class="n">MIN</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">s_b</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Err</span><span class="p">(</span><span class="n">DivError</span><span class="p">::</span><span class="n">Overflow</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">s_a</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">s_b</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[derive(Debug)]\n#[allow(dead_code)]\nenum DivError { DivisionByZero, Overflow }\n\n#[allow(dead_code)]\nfn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {\n    if s_b == 0 {\n        Err(DivError::DivisionByZero)\n    } else if s_a == i64::MIN && s_b == -1 {\n        Err(DivError::Overflow)\n    } else {\n        Ok(s_a / s_b)\n    }\n}\n\nfn main() {}", "displayCode": "#[allow(dead_code)]\nenum DivError { DivisionByZero, Overflow }\n\n#[allow(dead_code)]\nfn div(s_a: i64, s_b: i64) -> Result<i64, DivError> {\n    if s_b == 0 {\n        Err(DivError::DivisionByZero)\n    } else if s_a == i64::MIN && s_b == -1 {\n        Err(DivError::Overflow)\n    } else {\n        Ok(s_a / s_b)\n    }\n}", "hiddenLineNumbers": [0, 14, 15], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"rust-hidden-line\"><span class=\"cp\">#[derive(Debug)]</span></span>\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">enum</span><span class=\"w\"> </span><span class=\"nc\">DivError</span><span class=\"w\"> </span><span class=\"p\">{</span><span class=\"w\"> </span><span class=\"n\">DivisionByZero</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">Overflow</span><span class=\"w\"> </span><span class=\"p\">}</span>\n\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">div</span><span class=\"p\">(</span><span class=\"n\">s_a</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">s_b</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nb\">Result</span><span class=\"o\">&lt;</span><span class=\"kt\">i64</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">DivError</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"n\">s_b</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"mi\">0</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Err</span><span class=\"p\">(</span><span class=\"n\">DivError</span><span class=\"p\">::</span><span class=\"n\">DivisionByZero</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span><span class=\"w\"> </span><span class=\"k\">else</span><span class=\"w\"> </span><span class=\"k\">if</span><span class=\"w\"> </span><span class=\"n\">s_a</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"kt\">i64</span><span class=\"p\">::</span><span class=\"n\">MIN</span><span class=\"w\"> </span><span class=\"o\">&amp;&amp;</span><span class=\"w\"> </span><span class=\"n\">s_b</span><span class=\"w\"> </span><span class=\"o\">==</span><span class=\"w\"> </span><span class=\"o\">-</span><span class=\"mi\">1</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Err</span><span class=\"p\">(</span><span class=\"n\">DivError</span><span class=\"p\">::</span><span class=\"n\">Overflow</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span><span class=\"w\"> </span><span class=\"k\">else</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">        </span><span class=\"nb\">Ok</span><span class=\"p\">(</span><span class=\"n\">s_a</span><span class=\"w\"> </span><span class=\"o\">/</span><span class=\"w\"> </span><span class=\"n\">s_b</span><span class=\"p\">)</span>\n<span class=\"w\">    </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-efc84702">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_dCquvqE1csI3">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bibliography</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bib_dCquvqE1csI3" title="bib_dCquvqE1csI3">bib_dCquvqE1csI3</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_dCquvqE1csI3" title="bib_dCquvqE1csI3">gui_dCquvqE1csI3</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><table class="bibliography-table docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_dCquvqE1csI3-FLS-ARITHMETIC-OVERFLOW"></span><strong class="bibentry-key">[FLS-ARITHMETIC-OVERFLOW]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_dCquvqE1csI3-FLS-ARITHMETIC-OVERFLOW')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust FLS. “Expressions - Arithmetic Overflow.” <a class="reference external" href="https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow">https://rust-lang.github.io/fls/expressions.html#arithmetic-overflow</a></p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gui_RHvQj8BHlz9b.html" class="btn btn-neutral float-left" title="Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gui_iv9yCMHRgpE0.html" class="btn btn-neutral float-right" title="An integer shall not be converted to an invalid pointer" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Contributors to Coding Guidelines Subcommittee.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+        This site is powered through <a href="https://www.netlify.com">Netlify</a>.
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

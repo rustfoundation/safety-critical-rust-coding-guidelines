@@ -1,0 +1,963 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ensure reads of union fields produce valid values for the field’s type &mdash; Safety-Critical Rust Coding Guidelines 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/rust_playground.css?v=a15f506b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/citation.css?v=569c3786" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-data-viewer/jsonview.bundle.css?v=f6ef2277" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/libs/html/datatables.min.css?v=4b4fd840" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_toggle.css?v=5c6620df" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/needstable.css?v=5e1b6797" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_core.css?v=f5b60a78" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_links.css?v=2150a916" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/common_css/need_style.css?v=92936fa5" />
+      <link rel="stylesheet" type="text/css" href="../../_static/sphinx-needs/modern.css?v=803738c0" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=558c75d0" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/rust_playground.js?v=acd109cb"></script>
+      <script src="../../_static/citation.js?v=1e6d5203"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview.bundle.js?v=18cd53c5"></script>
+      <script src="../../_static/sphinx-data-viewer/jsonview_loader.js?v=f7ff7e7d"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables.min.js?v=8a4aee21"></script>
+      <script src="../../_static/sphinx-needs/libs/html/datatables_loader.js?v=a2cae175"></script>
+      <script src="../../_static/sphinx-needs/libs/html/sphinx_needs_collapse.js?v=dca66431"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Use strong types to differentiate between logically distinct values" href="gui_xztNdXA2oFNC.html" />
+    <link rel="prev" title="Types and Traits" href="index.html" /> 
+<link rel="stylesheet" href="../../_static/fls_links.css" type="text/css" />
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Safety-Critical Rust Coding Guidelines
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/index.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Coding Guidelines</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Types and Traits</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Ensure reads of union fields produce valid values for the field’s type</a></li>
+<li class="toctree-l3"><a class="reference internal" href="gui_xztNdXA2oFNC.html">Use strong types to differentiate between logically distinct values</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../patterns/index.html">Patterns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../expressions/index.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../values/index.html">Values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../statements/index.html">Statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/index.html">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../associated-items/index.html">Associated Items</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../implementations/index.html">Implementations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../generics/index.html">Generics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../attributes/index.html">Attributes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../entities-and-resolution/index.html">Entities And Resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ownership-and-destruction/index.html">Ownership And Destruction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../exceptions-and-errors/index.html">Exceptions And Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../program-structure-and-compilation/index.html">Program Structure And Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../unsafety/index.html">Unsafety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../macros/index.html">Macros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ffi/index.html">Ffi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../inline-assembly/index.html">Inline Assembly</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../compliance/index.html">Compliance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../process/index.html">Process</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../appendices/index.html">Appendices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../retired-guidelines/index.html">Retired Guidelines</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Safety-Critical Rust Coding Guidelines</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Coding Guidelines</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Types and Traits</a></li>
+      <li class="breadcrumb-item active">Ensure reads of union fields produce valid values for the field’s type</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/coding-guidelines/types-and-traits/gui_0cuTYG8RVYjg.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ensure-reads-of-union-fields-produce-valid-values-for-the-field-s-type">
+<h1>Ensure reads of union fields produce valid values for the field’s type<a class="headerlink" href="#ensure-reads-of-union-fields-produce-valid-values-for-the-field-s-type" title="Link to this heading"></a></h1>
+<div class="need_container docutils container" id="SNCB-024711b5">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_0cuTYG8RVYjg">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Guideline</span></span>: </span><strong><span><span class="needs_title"><span class="needs_data">Ensure reads of union fields produce valid values for the field's type</span></span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="gui_0cuTYG8RVYjg">gui_0cuTYG8RVYjg</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+<div class="line"><span class="needs_tags"><span class="needs_label">tags: </span><span class="needs_data_container"><span class="needs_data">defect</span><span class="needs_spacer">, </span><span class="needs_data">safety</span><span class="needs_spacer">, </span><span class="needs_data">undefined-behavior</span></span></span></div>
+<div class="line"><span class="needs_category"><span class="needs_label">category: </span><span class="needs_data">required</span></span></div>
+<div class="line"><span class="needs_fls"><span class="needs_label">fls: </span><span class="needs_data"><a href="https://rust-lang.github.io/fls/expressions.html#fls_oFIRXBPXu6Zv" class="fls-id">fls_oFIRXBPXu6Zv</a></span></span></div>
+<div class="line"><span class="needs_decidability"><span class="needs_label">decidability: </span><span class="needs_data">undecidable</span></span></div>
+<div class="line"><span class="needs_scope"><span class="needs_label">scope: </span><span class="needs_data">system</span></span></div>
+<div class="line"><span class="needs_release"><span class="needs_label">release: </span><span class="needs_data">unknown</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">child needs: <span class="parent_needs"><span><a class="reference internal" href="#rat_8QeimyAvM7cH" title="gui_0cuTYG8RVYjg">rat_8QeimyAvM7cH</a>, <a class="reference internal" href="#non_compl_ex_ecHYRXb4Ncpu" title="gui_0cuTYG8RVYjg">non_compl_ex_ecHYRXb4Ncpu</a>, <a class="reference internal" href="#non_compl_ex_8bloNOcsLEKX" title="gui_0cuTYG8RVYjg">non_compl_ex_8bloNOcsLEKX</a>, <a class="reference internal" href="#non_compl_ex_PsJAB4WglRZl" title="gui_0cuTYG8RVYjg">non_compl_ex_PsJAB4WglRZl</a>, <a class="reference internal" href="#non_compl_ex_aEx4HnDD8xIp" title="gui_0cuTYG8RVYjg">non_compl_ex_aEx4HnDD8xIp</a>, <a class="reference internal" href="#compl_ex_x27meeLDMZNI" title="gui_0cuTYG8RVYjg">compl_ex_x27meeLDMZNI</a>, <a class="reference internal" href="#compl_ex_Y7xaYuD2xdmq" title="gui_0cuTYG8RVYjg">compl_ex_Y7xaYuD2xdmq</a>, <a class="reference internal" href="#compl_ex_Jsxenev7lNf0" title="gui_0cuTYG8RVYjg">compl_ex_Jsxenev7lNf0</a>, <a class="reference internal" href="#compl_ex_vIITtPAeKHrp" title="gui_0cuTYG8RVYjg">compl_ex_vIITtPAeKHrp</a>, <a class="reference internal" href="#compl_ex_4Z8tmqYLLjtw" title="gui_0cuTYG8RVYjg">compl_ex_4Z8tmqYLLjtw</a>, <a class="reference internal" href="#bib_WNCi5njUWLuZ" title="gui_0cuTYG8RVYjg">bib_WNCi5njUWLuZ</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Ensure that the underlying bytes constitute a valid value for that field’s type when reading from a union field.
+Reading a union field whose bytes do not represent a valid value for the field’s type is undefined behavior.</p>
+<p>Before accessing a union field, verify that that the union was either:</p>
+<ul class="simple">
+<li><p>last written through that field, or</p></li>
+<li><p>written through a field whose bytes are valid when reinterpreted as the target field’s type</p></li>
+</ul>
+<p>If the active field is uncertain, use explicit validity checks.</p>
+<div class="need_container docutils container" id="SNCB-03c5ac36">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_8QeimyAvM7cH">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Rationale</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#rat_8QeimyAvM7cH" title="rat_8QeimyAvM7cH">rat_8QeimyAvM7cH</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="rat_8QeimyAvM7cH">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Similar to C, unions allow multiple fields to occupy the same memory.
+Unlike enumeration types, unions do not track which field is currently active.
+You must ensure that when a field is read that
+the underlying bytes are valid for that field’s type <a class="citation-ref reference internal" href="#cite-gui_0cuTYG8RVYjg-RUST-REF-UNION">[RUST-REF-UNION]</a>.</p>
+<p>Every type has a <em>validity invariant</em> — a set of constraints that all values of
+that type must satisfy <a class="citation-ref reference internal" href="#cite-gui_0cuTYG8RVYjg-UCG-VALIDITY">[UCG-VALIDITY]</a>.
+Reading a union field performs a <em>typed read</em>,
+which asserts that the bytes are valid for the target type.</p>
+<p>Examples of validity requirements for common types:</p>
+<ul class="simple">
+<li><p><strong>bool</strong>: Must be <code class="docutils literal notranslate"><span class="pre">0</span></code> (false) or <code class="docutils literal notranslate"><span class="pre">1</span></code> (true). Any other value (e.g., <code class="docutils literal notranslate"><span class="pre">3</span></code>) is invalid.</p></li>
+<li><p><strong>char</strong>: Must be a valid Unicode scalar value (<code class="docutils literal notranslate"><span class="pre">0x0</span></code> to <code class="docutils literal notranslate"><span class="pre">0xD7FF</span></code> or <code class="docutils literal notranslate"><span class="pre">0xE000</span></code> to <code class="docutils literal notranslate"><span class="pre">0x10FFFF</span></code>).</p></li>
+<li><p><strong>References</strong>: Must be non-null and properly aligned.</p></li>
+<li><p><strong>Enums</strong>: Must hold a valid discriminant value.</p></li>
+<li><p><strong>Floating point</strong>: All bit patterns are valid for the <code class="docutils literal notranslate"><span class="pre">f32</span></code> or <code class="docutils literal notranslate"><span class="pre">f64</span></code> types.</p></li>
+<li><p><strong>Integers</strong>: All bit patterns are valid for integer types.</p></li>
+</ul>
+<p>Reading an invalid value is undefined behavior.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-e0ad70db">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_ecHYRXb4Ncpu">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_ecHYRXb4Ncpu" title="non_compl_ex_ecHYRXb4Ncpu">non_compl_ex_ecHYRXb4Ncpu</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="non_compl_ex_ecHYRXb4Ncpu">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example reads an invalid bit pattern from a Boolean union field.
+The value <code class="docutils literal notranslate"><span class="pre">3</span></code> is not a valid value of type <code class="docutils literal notranslate"><span class="pre">bool</span></code> (only <code class="docutils literal notranslate"><span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">1</span></code> are valid).</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri-expect-ub">undefined behavior</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">union</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span>
+<span class="w">    </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// Undefined behavior reading an invalid value from a union field of type &#39;bool&#39;</span>
+<span class="w">    </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">b</span><span class="w"> </span><span class="p">};</span><span class="w">  </span><span class="c1">// Noncompliant</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "union IntOrBool {\n    i: u8,\n    b: bool,\n}\n\nfn main() {\n    let u = IntOrBool { i: 3 };\n\n    // Undefined behavior reading an invalid value from a union field of type 'bool'\n    unsafe { u.b };  // Noncompliant\n}", "displayCode": "union IntOrBool {\n    i: u8,\n    b: bool,\n}\n\nfn main() {\n    let u = IntOrBool { i: 3 };\n\n    // Undefined behavior reading an invalid value from a union field of type 'bool'\n    unsafe { u.b };  // Noncompliant\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "expect_ub", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-829fc1db">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_8bloNOcsLEKX">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_8bloNOcsLEKX" title="non_compl_ex_8bloNOcsLEKX">non_compl_ex_8bloNOcsLEKX</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="non_compl_ex_8bloNOcsLEKX">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example reads an invalid Unicode value from a <code class="docutils literal notranslate"><span class="pre">union</span></code> field of type <code class="docutils literal notranslate"><span class="pre">char</span></code> .</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri-expect-ub">undefined behavior</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">union</span><span class="w"> </span><span class="nc">IntOrChar</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<span class="w">    </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="kt">char</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// &#39;0xD800&#39; is a surrogate and not a valid Unicode scalar value</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrChar</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="mh">0xD800</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// Reading an invalid Unicode value from a union field of type &#39;char&#39;</span>
+<span class="w">    </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">c</span><span class="w"> </span><span class="p">};</span><span class="w">  </span><span class="c1">// Noncompliant</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "union IntOrChar {\n    i: u32,\n    c: char,\n}\n\nfn main() {\n    // '0xD800' is a surrogate and not a valid Unicode scalar value\n    let u = IntOrChar { i: 0xD800 };\n\n    // Reading an invalid Unicode value from a union field of type 'char'\n    unsafe { u.c };  // Noncompliant\n}", "displayCode": "union IntOrChar {\n    i: u32,\n    c: char,\n}\n\nfn main() {\n    // '0xD800' is a surrogate and not a valid Unicode scalar value\n    let u = IntOrChar { i: 0xD800 };\n\n    // Reading an invalid Unicode value from a union field of type 'char'\n    unsafe { u.c };  // Noncompliant\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "expect_ub", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-7256c7b9">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_PsJAB4WglRZl">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_PsJAB4WglRZl" title="non_compl_ex_PsJAB4WglRZl">non_compl_ex_PsJAB4WglRZl</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="non_compl_ex_PsJAB4WglRZl">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example reads an invalid discriminant from a union field of ‘Color’ enumeration type.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri-expect-ub">undefined behavior</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[repr(u8)]</span>
+<span class="cp">#[derive(Copy, Clone)]</span>
+<span class="cp">#[allow(dead_code)]</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">Color</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Red</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Green</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Blue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">union</span><span class="w"> </span><span class="nc">IntOrColor</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span>
+<span class="w">    </span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="nc">Color</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrColor</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// Undefined behavior reading an invalid discriminant from the &#39;Color&#39; enumeration type</span>
+<span class="w">    </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">c</span><span class="w"> </span><span class="p">};</span><span class="w">  </span><span class="c1">// Noncompliant</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[repr(u8)]\n#[derive(Copy, Clone)]\n#[allow(dead_code)]\nenum Color {\n    Red = 0,\n    Green = 1,\n    Blue = 2,\n}\n\nunion IntOrColor {\n    i: u8,\n    c: Color,\n}\n\nfn main() {\n    let u = IntOrColor { i: 42 };\n\n    // Undefined behavior reading an invalid discriminant from the 'Color' enumeration type\n    unsafe { u.c };  // Noncompliant\n}", "displayCode": "#[repr(u8)]\n#[derive(Copy, Clone)]\n#[allow(dead_code)]\nenum Color {\n    Red = 0,\n    Green = 1,\n    Blue = 2,\n}\n\nunion IntOrColor {\n    i: u8,\n    c: Color,\n}\n\nfn main() {\n    let u = IntOrColor { i: 42 };\n\n    // Undefined behavior reading an invalid discriminant from the 'Color' enumeration type\n    unsafe { u.c };  // Noncompliant\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "expect_ub", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-ea0ee10b">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_aEx4HnDD8xIp">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Non-Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#non_compl_ex_aEx4HnDD8xIp" title="non_compl_ex_aEx4HnDD8xIp">non_compl_ex_aEx4HnDD8xIp</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="non_compl_ex_aEx4HnDD8xIp">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This noncompliant example reads a reference from a union containing a null pointer.
+A similar problem occurs when reading a misaligned pointer.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri-expect-ub">undefined behavior</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">union</span><span class="w"> </span><span class="nc">PtrOrRef</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="k">const</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span>
+<span class="w">    </span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">&#39;</span><span class="nb">static</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PtrOrRef</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="nc">std</span><span class="p">::</span><span class="n">ptr</span><span class="p">::</span><span class="n">null</span><span class="p">()</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">//  Undefined behavior reading a null value from a reference field of a union</span>
+<span class="w">    </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">r</span><span class="w"> </span><span class="p">};</span><span class="w">  </span><span class="c1">// Noncompliant</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "union PtrOrRef {\n    p: *const i32,\n    r: &'static i32,\n}\n\nfn main() {\n    let u = PtrOrRef { p: std::ptr::null() };\n\n    //  Undefined behavior reading a null value from a reference field of a union\n    unsafe { u.r };  // Noncompliant\n}", "displayCode": "union PtrOrRef {\n    p: *const i32,\n    r: &'static i32,\n}\n\nfn main() {\n    let u = PtrOrRef { p: std::ptr::null() };\n\n    //  Undefined behavior reading a null value from a reference field of a union\n    unsafe { u.r };  // Noncompliant\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "expect_ub", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-7954aca9">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_x27meeLDMZNI">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_x27meeLDMZNI" title="compl_ex_x27meeLDMZNI">compl_ex_x27meeLDMZNI</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="compl_ex_x27meeLDMZNI">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example tracks the active field explicitly to ensure valid reads.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri">miri</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[repr(C)]</span>
+<span class="cp">#[derive(Copy, Clone)]</span>
+<span class="k">union</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span>
+<span class="w">    </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="sd">/// Tracks which field of the union is currently active.</span>
+<span class="cp">#[derive(Clone, Copy, PartialEq, Eq)]</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">ActiveField</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Int</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Bool</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="sd">/// A union wrapper that tracks the active field at runtime.</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="p">,</span>
+<span class="w">    </span><span class="n">active</span><span class="p">:</span><span class="w"> </span><span class="nc">ActiveField</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="n">IntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">from_int</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="bp">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="nc">value</span><span class="w"> </span><span class="p">},</span>
+<span class="w">            </span><span class="n">active</span><span class="p">:</span><span class="w"> </span><span class="nc">ActiveField</span><span class="p">::</span><span class="n">Int</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">from_bool</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="bp">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">value</span><span class="w"> </span><span class="p">},</span>
+<span class="w">            </span><span class="n">active</span><span class="p">:</span><span class="w"> </span><span class="nc">ActiveField</span><span class="p">::</span><span class="n">Bool</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">set_int</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="w">        </span><span class="bp">self</span><span class="p">.</span><span class="n">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveField</span><span class="p">::</span><span class="n">Int</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">set_bool</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="w">        </span><span class="bp">self</span><span class="p">.</span><span class="n">active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveField</span><span class="p">::</span><span class="n">Bool</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="sd">/// Returns the integer value if that field is active.</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">as_int</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">match</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">active</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// SAFETY: We only read `i` when we know it was last written as `i`</span>
+<span class="w">            </span><span class="n">ActiveField</span><span class="p">::</span><span class="n">Int</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">}),</span><span class="w"> </span><span class="c1">// compliant</span>
+<span class="w">            </span><span class="n">ActiveField</span><span class="p">::</span><span class="n">Bool</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="sd">/// Returns the boolean value if that field is active.</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">as_bool</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">match</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">active</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// SAFETY: We only read `b` when we know it was last written as `b`</span>
+<span class="w">            </span><span class="n">ActiveField</span><span class="p">::</span><span class="n">Bool</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">b</span><span class="w"> </span><span class="p">}),</span><span class="w"> </span><span class="c1">// compliant</span>
+<span class="w">            </span><span class="n">ActiveField</span><span class="p">::</span><span class="n">Int</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="p">::</span><span class="n">from_bool</span><span class="p">(</span><span class="kc">true</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">value</span><span class="p">.</span><span class="n">as_bool</span><span class="p">(),</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="kc">true</span><span class="p">));</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">value</span><span class="p">.</span><span class="n">as_int</span><span class="p">(),</span><span class="w"> </span><span class="nb">None</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">value</span><span class="p">.</span><span class="n">set_int</span><span class="p">(</span><span class="mi">42</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">value</span><span class="p">.</span><span class="n">as_bool</span><span class="p">(),</span><span class="w"> </span><span class="nb">None</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">value</span><span class="p">.</span><span class="n">as_int</span><span class="p">(),</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="mi">42</span><span class="p">));</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[repr(C)]\n#[derive(Copy, Clone)]\nunion IntOrBoolData {\n    i: u8,\n    b: bool,\n}\n\n/// Tracks which field of the union is currently active.\n#[derive(Clone, Copy, PartialEq, Eq)]\nenum ActiveField {\n    Int,\n    Bool,\n}\n\n/// A union wrapper that tracks the active field at runtime.\npub struct IntOrBool {\n    data: IntOrBoolData,\n    active: ActiveField,\n}\n\nimpl IntOrBool {\n    pub fn from_int(value: u8) -> Self {\n        Self {\n            data: IntOrBoolData { i: value },\n            active: ActiveField::Int,\n        }\n    }\n\n    pub fn from_bool(value: bool) -> Self {\n        Self {\n            data: IntOrBoolData { b: value },\n            active: ActiveField::Bool,\n        }\n    }\n\n    pub fn set_int(&mut self, value: u8) {\n        self.data.i = value;\n        self.active = ActiveField::Int;\n    }\n\n    pub fn set_bool(&mut self, value: bool) {\n        self.data.b = value;\n        self.active = ActiveField::Bool;\n    }\n\n    /// Returns the integer value if that field is active.\n    pub fn as_int(&self) -> Option<u8> {\n        match self.active {\n            // SAFETY: We only read `i` when we know it was last written as `i`\n            ActiveField::Int => Some(unsafe { self.data.i }), // compliant\n            ActiveField::Bool => None,\n        }\n    }\n\n    /// Returns the boolean value if that field is active.\n    pub fn as_bool(&self) -> Option<bool> {\n        match self.active {\n            // SAFETY: We only read `b` when we know it was last written as `b`\n            ActiveField::Bool => Some(unsafe { self.data.b }), // compliant\n            ActiveField::Int => None,\n        }\n    }\n}\n\nfn main() {\n    let mut value = IntOrBool::from_bool(true);\n    assert_eq!(value.as_bool(), Some(true));\n    assert_eq!(value.as_int(), None);\n\n    value.set_int(42);\n    assert_eq!(value.as_bool(), None);\n    assert_eq!(value.as_int(), Some(42));\n}", "displayCode": "#[repr(C)]\n#[derive(Copy, Clone)]\nunion IntOrBoolData {\n    i: u8,\n    b: bool,\n}\n\n/// Tracks which field of the union is currently active.\n#[derive(Clone, Copy, PartialEq, Eq)]\nenum ActiveField {\n    Int,\n    Bool,\n}\n\n/// A union wrapper that tracks the active field at runtime.\npub struct IntOrBool {\n    data: IntOrBoolData,\n    active: ActiveField,\n}\n\nimpl IntOrBool {\n    pub fn from_int(value: u8) -> Self {\n        Self {\n            data: IntOrBoolData { i: value },\n            active: ActiveField::Int,\n        }\n    }\n\n    pub fn from_bool(value: bool) -> Self {\n        Self {\n            data: IntOrBoolData { b: value },\n            active: ActiveField::Bool,\n        }\n    }\n\n    pub fn set_int(&mut self, value: u8) {\n        self.data.i = value;\n        self.active = ActiveField::Int;\n    }\n\n    pub fn set_bool(&mut self, value: bool) {\n        self.data.b = value;\n        self.active = ActiveField::Bool;\n    }\n\n    /// Returns the integer value if that field is active.\n    pub fn as_int(&self) -> Option<u8> {\n        match self.active {\n            // SAFETY: We only read `i` when we know it was last written as `i`\n            ActiveField::Int => Some(unsafe { self.data.i }), // compliant\n            ActiveField::Bool => None,\n        }\n    }\n\n    /// Returns the boolean value if that field is active.\n    pub fn as_bool(&self) -> Option<bool> {\n        match self.active {\n            // SAFETY: We only read `b` when we know it was last written as `b`\n            ActiveField::Bool => Some(unsafe { self.data.b }), // compliant\n            ActiveField::Int => None,\n        }\n    }\n}\n\nfn main() {\n    let mut value = IntOrBool::from_bool(true);\n    assert_eq!(value.as_bool(), Some(true));\n    assert_eq!(value.as_int(), None);\n\n    value.set_int(42);\n    assert_eq!(value.as_bool(), None);\n    assert_eq!(value.as_int(), Some(42));\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "check", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-fa90e9e9">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Y7xaYuD2xdmq">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_Y7xaYuD2xdmq" title="compl_ex_Y7xaYuD2xdmq">compl_ex_Y7xaYuD2xdmq</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="compl_ex_Y7xaYuD2xdmq">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example reads from the same field that was written.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri">miri</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[repr(C)]</span>
+<span class="cp">#[derive(Copy, Clone)]</span>
+<span class="k">union</span><span class="w"> </span><span class="nc">IntBytes</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<span class="w">    </span><span class="n">bytes</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="kt">u8</span><span class="p">;</span><span class="w"> </span><span class="mi">4</span><span class="p">],</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">get_int</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntBytes</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="mh">0x12345678</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// SAFETY: All bit patterns are valid for [u8; 4]</span>
+<span class="w">    </span><span class="c1">// Note: byte order depends on target endianness</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">bytes</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="mh">0x12345678_</span><span class="k">u32</span><span class="p">.</span><span class="n">to_ne_bytes</span><span class="p">());</span><span class="w"> </span><span class="c1">// compliant</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntBytes</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">bytes</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mh">0x11</span><span class="p">,</span><span class="w"> </span><span class="mh">0x22</span><span class="p">,</span><span class="w"> </span><span class="mh">0x33</span><span class="p">,</span><span class="w"> </span><span class="mh">0x44</span><span class="p">],</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// SAFETY: All bit patterns are valid for &#39;u32&#39;</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u2</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="kt">u32</span><span class="p">::</span><span class="n">from_ne_bytes</span><span class="p">([</span><span class="mh">0x11</span><span class="p">,</span><span class="w"> </span><span class="mh">0x22</span><span class="p">,</span><span class="w"> </span><span class="mh">0x33</span><span class="p">,</span><span class="w"> </span><span class="mh">0x44</span><span class="p">]));</span><span class="w"> </span><span class="c1">// compliant</span>
+
+<span class="w">    </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u2</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="c1">// compliant</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">get_int</span><span class="p">());</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[repr(C)]\n#[derive(Copy, Clone)]\nunion IntBytes {\n    i: u32,\n    bytes: [u8; 4],\n}\n\nfn get_int() -> u32 {\n    let u = IntBytes { i: 0x12345678 };\n\n    // SAFETY: All bit patterns are valid for [u8; 4]\n    // Note: byte order depends on target endianness\n    assert_eq!(unsafe { u.bytes }, 0x12345678_u32.to_ne_bytes()); // compliant\n\n    let u2 = IntBytes {\n        bytes: [0x11, 0x22, 0x33, 0x44],\n    };\n\n    // SAFETY: All bit patterns are valid for 'u32'\n    assert_eq!(unsafe { u2.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant\n\n    unsafe { u2.i } // compliant\n}\n\nfn main() {\n   println!(\"{}\", get_int());\n}", "displayCode": "#[repr(C)]\n#[derive(Copy, Clone)]\nunion IntBytes {\n    i: u32,\n    bytes: [u8; 4],\n}\n\nfn get_int() -> u32 {\n    let u = IntBytes { i: 0x12345678 };\n\n    // SAFETY: All bit patterns are valid for [u8; 4]\n    // Note: byte order depends on target endianness\n    assert_eq!(unsafe { u.bytes }, 0x12345678_u32.to_ne_bytes()); // compliant\n\n    let u2 = IntBytes {\n        bytes: [0x11, 0x22, 0x33, 0x44],\n    };\n\n    // SAFETY: All bit patterns are valid for 'u32'\n    assert_eq!(unsafe { u2.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant\n\n    unsafe { u2.i } // compliant\n}\n\nfn main() {\n   println!(\"{}\", get_int());\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "check", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-84ebf1d4">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_Jsxenev7lNf0">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_Jsxenev7lNf0" title="compl_ex_Jsxenev7lNf0">compl_ex_Jsxenev7lNf0</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="compl_ex_Jsxenev7lNf0">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example reinterprets the value as a different type where all bit patterns are valid.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri">miri</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[repr(C)]</span>
+<span class="cp">#[derive(Copy, Clone)]</span>
+<span class="k">union</span><span class="w"> </span><span class="nc">IntBytes</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
+<span class="w">    </span><span class="n">bytes</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="kt">u8</span><span class="p">;</span><span class="w"> </span><span class="mi">4</span><span class="p">],</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">get_bytes</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="p">[</span><span class="kt">u8</span><span class="p">;</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntBytes</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="mh">0x12345678</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// SAFETY: All bit patterns are valid for &#39;[u8; 4]&#39;</span>
+<span class="w">    </span><span class="c1">// Note: byte order depends on target endianness</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">bytes</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="mh">0x12345678_</span><span class="k">u32</span><span class="p">.</span><span class="n">to_ne_bytes</span><span class="p">());</span><span class="w"> </span><span class="c1">// compliant</span>
+<span class="w">    </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">bytes</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// compliant</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">get_u32</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntBytes</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">bytes</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mh">0x11</span><span class="p">,</span><span class="w"> </span><span class="mh">0x22</span><span class="p">,</span><span class="w"> </span><span class="mh">0x33</span><span class="p">,</span><span class="w"> </span><span class="mh">0x44</span><span class="p">],</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="c1">// SAFETY: All bit patterns are valid for &#39;u32&#39;</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="kt">u32</span><span class="p">::</span><span class="n">from_ne_bytes</span><span class="p">([</span><span class="mh">0x11</span><span class="p">,</span><span class="w"> </span><span class="mh">0x22</span><span class="p">,</span><span class="w"> </span><span class="mh">0x33</span><span class="p">,</span><span class="w"> </span><span class="mh">0x44</span><span class="p">]));</span><span class="w"> </span><span class="c1">// compliant</span>
+<span class="w">    </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// compliant</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{:#04x?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">get_bytes</span><span class="p">());</span>
+<span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">get_u32</span><span class="p">());</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[repr(C)]\n#[derive(Copy, Clone)]\nunion IntBytes {\n    i: u32,\n    bytes: [u8; 4],\n}\n\nfn get_bytes() -> [u8; 4] {\n    let u = IntBytes { i: 0x12345678 };\n\n    // SAFETY: All bit patterns are valid for '[u8; 4]'\n    // Note: byte order depends on target endianness\n    assert_eq!(unsafe { u.bytes }, 0x12345678_u32.to_ne_bytes()); // compliant\n    unsafe { u.bytes }  // compliant\n}\n\nfn get_u32() -> u32 {\n    let u = IntBytes {\n        bytes: [0x11, 0x22, 0x33, 0x44],\n    };\n\n    // SAFETY: All bit patterns are valid for 'u32'\n    assert_eq!(unsafe { u.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant\n    unsafe { u.i }  // compliant\n}\n\nfn main() {\n    println!(\"{:#04x?}\", get_bytes());\n    println!(\"{}\", get_u32());\n}", "displayCode": "#[repr(C)]\n#[derive(Copy, Clone)]\nunion IntBytes {\n    i: u32,\n    bytes: [u8; 4],\n}\n\nfn get_bytes() -> [u8; 4] {\n    let u = IntBytes { i: 0x12345678 };\n\n    // SAFETY: All bit patterns are valid for '[u8; 4]'\n    // Note: byte order depends on target endianness\n    assert_eq!(unsafe { u.bytes }, 0x12345678_u32.to_ne_bytes()); // compliant\n    unsafe { u.bytes }  // compliant\n}\n\nfn get_u32() -> u32 {\n    let u = IntBytes {\n        bytes: [0x11, 0x22, 0x33, 0x44],\n    };\n\n    // SAFETY: All bit patterns are valid for 'u32'\n    assert_eq!(unsafe { u.i }, u32::from_ne_bytes([0x11, 0x22, 0x33, 0x44])); // compliant\n    unsafe { u.i }  // compliant\n}\n\nfn main() {\n    println!(\"{:#04x?}\", get_bytes());\n    println!(\"{}\", get_u32());\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "check", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-28fa9d87">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_vIITtPAeKHrp">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_vIITtPAeKHrp" title="compl_ex_vIITtPAeKHrp">compl_ex_vIITtPAeKHrp</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="compl_ex_vIITtPAeKHrp">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>This compliant example validates bytes before reading as a constrained type.</p>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri">miri</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="cp">#[repr(C)]</span>
+<span class="k">union</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span>
+<span class="w">    </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">try_read_bool</span><span class="p">(</span><span class="n">u</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">IntOrBool</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// SAFETY: Reading as `u8` is always valid because all bit patterns</span>
+<span class="w">    </span><span class="c1">// are valid for `u8`, regardless of which field was last written.</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">};</span><span class="w"> </span><span class="c1">// compliant</span>
+
+<span class="w">    </span><span class="c1">// Validate before interpreting as `bool` (only 0 and 1 are valid)</span>
+<span class="w">    </span><span class="k">match</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="mi">0</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="kc">false</span><span class="p">),</span>
+<span class="w">        </span><span class="mi">1</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="kc">true</span><span class="p">),</span>
+<span class="w">        </span><span class="n">_</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="c1">// compliant</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">};</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">u2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">};</span>
+
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">try_read_bool</span><span class="p">(</span><span class="o">&amp;</span><span class="n">u1</span><span class="p">),</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="kc">true</span><span class="p">));</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">try_read_bool</span><span class="p">(</span><span class="o">&amp;</span><span class="n">u2</span><span class="p">),</span><span class="w"> </span><span class="nb">None</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "#[repr(C)]\nunion IntOrBool {\n    i: u8,\n    b: bool,\n}\n\nfn try_read_bool(u: &IntOrBool) -> Option<bool> {\n    // SAFETY: Reading as `u8` is always valid because all bit patterns\n    // are valid for `u8`, regardless of which field was last written.\n    let raw = unsafe { u.i }; // compliant\n\n    // Validate before interpreting as `bool` (only 0 and 1 are valid)\n    match raw {\n        0 => Some(false),\n        1 => Some(true),\n        _ => None,\n    } // compliant\n}\n\nfn main() {\n    let u1 = IntOrBool { i: 1 };\n    let u2 = IntOrBool { i: 3 };\n\n    assert_eq!(try_read_bool(&u1), Some(true));\n    assert_eq!(try_read_bool(&u2), None);\n}", "displayCode": "#[repr(C)]\nunion IntOrBool {\n    i: u8,\n    b: bool,\n}\n\nfn try_read_bool(u: &IntOrBool) -> Option<bool> {\n    // SAFETY: Reading as `u8` is always valid because all bit patterns\n    // are valid for `u8`, regardless of which field was last written.\n    let raw = unsafe { u.i }; // compliant\n\n    // Validate before interpreting as `bool` (only 0 and 1 are valid)\n    match raw {\n        0 => Some(false),\n        1 => Some(true),\n        _ => None,\n    } // compliant\n}\n\nfn main() {\n    let u1 = IntOrBool { i: 1 };\n    let u2 = IntOrBool { i: 3 };\n\n    assert_eq!(try_read_bool(&u1), Some(true));\n    assert_eq!(try_read_bool(&u2), None);\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "check", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-9e9c607d">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_4Z8tmqYLLjtw">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Compliant Example</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#compl_ex_4Z8tmqYLLjtw" title="compl_ex_4Z8tmqYLLjtw">compl_ex_4Z8tmqYLLjtw</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="compl_ex_4Z8tmqYLLjtw">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><p>Complex example showing:</p>
+<ul class="simple">
+<li><p>use of compile-time check for valid type using generics</p></li>
+<li><p>way to fence between FFI-facing code and rest of safe Rust codebase</p></li>
+</ul>
+<div class="rust-example-container docutils container">
+<div class="rust-example-badges docutils container">
+<span class="rust-example-badge rust-example-badge-miri">miri</span></div>
+<div class="rust-example-code highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">marker</span><span class="p">::</span><span class="n">PhantomData</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">size_of</span><span class="p">;</span>
+
+<span class="sd">/// Marker types representing the active field.</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">AsInt</span><span class="p">;</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">AsBool</span><span class="p">;</span>
+
+<span class="sd">/// A union type which can be used to interact across FFI boundary.</span>
+<span class="cp">#[repr(C)]</span>
+<span class="cp">#[derive(Copy, Clone)]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">union</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">,</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="sd">/// Tag sent alongside the union from C code.</span>
+<span class="cp">#[repr(u8)]</span>
+<span class="cp">#[derive(Copy, Clone, PartialEq, Eq)]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="nc">IntOrBoolTag</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Int</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Bool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="sd">/// C-compatible tagged union as it might arrive from FFI.</span>
+<span class="cp">#[repr(C)]</span>
+<span class="cp">#[derive(Copy, Clone)]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">tag</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolTag</span><span class="p">,</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="c1">// ============================================================================</span>
+<span class="c1">// Safe wrapper types for use in the rest of the Rust codebase</span>
+<span class="c1">// ============================================================================</span>
+
+<span class="sd">/// A union wrapper where the type parameter statically tracks the active field.</span>
+<span class="sd">/// This is zero-cost: same size as the raw union.</span>
+<span class="cp">#[repr(C)]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="p">,</span>
+<span class="w">    </span><span class="n">_marker</span><span class="p">:</span><span class="w"> </span><span class="nc">PhantomData</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsInt</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">from_int</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="bp">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="nc">value</span><span class="w"> </span><span class="p">},</span>
+<span class="w">            </span><span class="n">_marker</span><span class="p">:</span><span class="w"> </span><span class="nc">PhantomData</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u8</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// SAFETY: Type parameter `AsInt` guarantees the integer field is active</span>
+<span class="w">        </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="sd">/// Convert to boolean representation.</span>
+<span class="w">    </span><span class="sd">/// Only valid when the integer value is 0 or 1.</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">try_into_bool</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsBool</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">match</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">get</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="mi">0</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">IntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">self</span><span class="p">.</span><span class="n">get</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">},</span>
+<span class="w">                </span><span class="n">_marker</span><span class="p">:</span><span class="w"> </span><span class="nc">PhantomData</span><span class="p">,</span>
+<span class="w">            </span><span class="p">}),</span>
+<span class="w">            </span><span class="n">_</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsBool</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">from_bool</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="kt">bool</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="bp">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">value</span><span class="w"> </span><span class="p">},</span>
+<span class="w">            </span><span class="n">_marker</span><span class="p">:</span><span class="w"> </span><span class="nc">PhantomData</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// SAFETY: Type parameter `AsBool` guarantees the boolean field is active</span>
+<span class="w">        </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">b</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="sd">/// Convert to integer representation. Always valid since bool is a subset of u8.</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">into_int</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="o">&lt;</span><span class="n">AsInt</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">IntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">self</span><span class="p">.</span><span class="n">data</span><span class="p">,</span>
+<span class="w">            </span><span class="n">_marker</span><span class="p">:</span><span class="w"> </span><span class="nc">PhantomData</span><span class="p">,</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// ============================================================================</span>
+<span class="c1">// FFI boundary: convert from C representation to safe Rust types</span>
+<span class="c1">// ============================================================================</span>
+
+<span class="sd">/// Result of converting a C tagged union to a safe Rust type.</span>
+<span class="sd">/// The caller must handle both variants, ensuring type safety.</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="nc">SafeIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Int</span><span class="p">(</span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsInt</span><span class="o">&gt;</span><span class="p">),</span>
+<span class="w">    </span><span class="n">Bool</span><span class="p">(</span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsBool</span><span class="o">&gt;</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="n">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="sd">/// Convert from C representation to safe Rust type at the FFI boundary.</span>
+<span class="w">    </span><span class="sd">/// After this point, all code uses the type-safe wrappers.</span>
+<span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">into_safe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">SafeIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">match</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">tag</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">IntOrBoolTag</span><span class="p">::</span><span class="n">Int</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// SAFETY: Tag guarantees integer field is active</span>
+<span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">};</span>
+<span class="w">                </span><span class="n">SafeIntOrBool</span><span class="p">::</span><span class="n">Int</span><span class="p">(</span><span class="n">IntOrBool</span><span class="p">::</span><span class="n">from_int</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">            </span><span class="n">IntOrBoolTag</span><span class="p">::</span><span class="n">Bool</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// SAFETY: Tag guarantees boolean field is active</span>
+<span class="w">                </span><span class="kd">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">b</span><span class="w"> </span><span class="p">};</span>
+<span class="w">                </span><span class="n">SafeIntOrBool</span><span class="p">::</span><span class="n">Bool</span><span class="p">(</span><span class="n">IntOrBool</span><span class="p">::</span><span class="n">from_bool</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// ============================================================================</span>
+<span class="c1">// FFI boundary: convert from safe Rust types back to C representation</span>
+<span class="c1">// ============================================================================</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="nb">From</span><span class="o">&lt;</span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsInt</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">from</span><span class="p">(</span><span class="n">val</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="o">&lt;</span><span class="n">AsInt</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">tag</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolTag</span><span class="p">::</span><span class="n">Int</span><span class="p">,</span>
+<span class="w">            </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">i</span><span class="p">:</span><span class="w"> </span><span class="nc">val</span><span class="p">.</span><span class="n">get</span><span class="p">()</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">impl</span><span class="w"> </span><span class="nb">From</span><span class="o">&lt;</span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsBool</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">from</span><span class="p">(</span><span class="n">val</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="o">&lt;</span><span class="n">AsBool</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Self</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">tag</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolTag</span><span class="p">::</span><span class="n">Bool</span><span class="p">,</span>
+<span class="w">            </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">val</span><span class="p">.</span><span class="n">get</span><span class="p">()</span><span class="w"> </span><span class="p">},</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// ============================================================================</span>
+<span class="c1">// Example: application code that uses the safe types</span>
+<span class="c1">// ============================================================================</span>
+
+<span class="sd">/// Process a boolean value. This function can ONLY receive IntOrBool&lt;AsBool&gt;,</span>
+<span class="sd">/// so there&#39;s no possibility of reading invalid bool bytes.</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">process_bool</span><span class="p">(</span><span class="n">val</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="o">&lt;</span><span class="n">AsBool</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kp">&amp;</span><span class="o">&#39;</span><span class="nb">static</span><span class="w"> </span><span class="kt">str</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">val</span><span class="p">.</span><span class="n">get</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;yes&quot;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s">&quot;no&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="sd">/// Process an integer value.</span>
+<span class="k">fn</span><span class="w"> </span><span class="nf">process_int</span><span class="p">(</span><span class="n">val</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBool</span><span class="o">&lt;</span><span class="n">AsInt</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u8</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">val</span><span class="p">.</span><span class="n">get</span><span class="p">().</span><span class="n">saturating_mul</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="c1">// Simulated FFI functions that would normally be defined in C.</span>
+<span class="c1">// In real code, these would be `extern &quot;C&quot;` declarations linked to a C library.</span>
+
+<span class="sd">/// Simulated C function that &quot;receives&quot; data from C.</span>
+<span class="k">extern</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">receive_from_ffi</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">CIntOrBool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">tag</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolTag</span><span class="p">::</span><span class="n">Bool</span><span class="p">,</span>
+<span class="w">        </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">IntOrBoolData</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">b</span><span class="p">:</span><span class="w"> </span><span class="nc">true</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="sd">/// Simulated C function that &quot;sends&quot; data to C.</span>
+<span class="k">extern</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">send_to_ffi</span><span class="p">(</span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nc">CIntOrBool</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// In real code, this would be implemented in C</span>
+<span class="w">    </span><span class="k">match</span><span class="w"> </span><span class="n">data</span><span class="p">.</span><span class="n">tag</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">IntOrBoolTag</span><span class="p">::</span><span class="n">Int</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">data</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">i</span><span class="w"> </span><span class="p">};</span>
+<span class="w">            </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="mi">84</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">IntOrBoolTag</span><span class="p">::</span><span class="n">Bool</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="n">b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">data</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">b</span><span class="w"> </span><span class="p">};</span>
+<span class="w">            </span><span class="fm">assert!</span><span class="p">(</span><span class="n">b</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Prove zero-cost: PhantomData adds no size</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">size_of</span><span class="p">::</span><span class="o">&lt;</span><span class="n">IntOrBoolData</span><span class="o">&gt;</span><span class="p">(),</span><span class="w"> </span><span class="n">size_of</span><span class="p">::</span><span class="o">&lt;</span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsInt</span><span class="o">&gt;&gt;</span><span class="p">());</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">size_of</span><span class="p">::</span><span class="o">&lt;</span><span class="n">IntOrBoolData</span><span class="o">&gt;</span><span class="p">(),</span><span class="w"> </span><span class="n">size_of</span><span class="p">::</span><span class="o">&lt;</span><span class="n">IntOrBool</span><span class="o">&lt;</span><span class="n">AsBool</span><span class="o">&gt;&gt;</span><span class="p">());</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">size_of</span><span class="p">::</span><span class="o">&lt;</span><span class="n">IntOrBoolData</span><span class="o">&gt;</span><span class="p">(),</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"> </span><span class="c1">// Just one byte</span>
+
+<span class="w">    </span><span class="c1">// === FFI boundary: receive from C ===</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">from_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">receive_from_ffi</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">safe_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">from_c</span><span class="p">.</span><span class="n">into_safe</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// === Application code: fully type-safe, no unsafe ===</span>
+<span class="w">    </span><span class="k">match</span><span class="w"> </span><span class="n">safe_value</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">SafeIntOrBool</span><span class="p">::</span><span class="n">Bool</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Can only call process_bool with IntOrBool&lt;AsBool&gt;</span>
+<span class="w">            </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">process_bool</span><span class="p">(</span><span class="n">b</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;yes&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">SafeIntOrBool</span><span class="p">::</span><span class="n">Int</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Can only call process_int with IntOrBool&lt;AsInt&gt;</span>
+<span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="n">_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">process_int</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// === Type-safe conversions within Rust ===</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">int_val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="p">::</span><span class="n">from_int</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Cannot pass IntOrBool&lt;AsInt&gt; to process_bool - won&#39;t compile:</span>
+<span class="w">    </span><span class="c1">// process_bool(int_val); // Error: expected IntOrBool&lt;AsBool&gt;, found IntOrBool&lt;AsInt&gt;</span>
+
+<span class="w">    </span><span class="c1">// Must explicitly convert, which validates the value</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">bool_val</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">int_val</span><span class="p">.</span><span class="n">try_into_bool</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">process_bool</span><span class="p">(</span><span class="n">bool_val</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;yes&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Invalid conversion is caught at the conversion point</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">int_val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="p">::</span><span class="n">from_int</span><span class="p">(</span><span class="mi">42</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert!</span><span class="p">(</span><span class="n">int_val</span><span class="p">.</span><span class="n">try_into_bool</span><span class="p">().</span><span class="n">is_none</span><span class="p">());</span><span class="w"> </span><span class="c1">// 42 is not a valid bool</span>
+
+<span class="w">    </span><span class="c1">// === FFI boundary: send back to C ===</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">int_val</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="p">::</span><span class="n">from_int</span><span class="p">(</span><span class="mi">42</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">doubled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IntOrBool</span><span class="p">::</span><span class="n">from_int</span><span class="p">(</span><span class="n">process_int</span><span class="p">(</span><span class="n">int_val</span><span class="p">));</span>
+<span class="w">    </span><span class="n">send_to_ffi</span><span class="p">(</span><span class="n">doubled</span><span class="p">.</span><span class="n">into</span><span class="p">());</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<script type="application/json" class="rust-example-data">{"code": "use std::marker::PhantomData;\nuse std::mem::size_of;\n\n/// Marker types representing the active field.\npub struct AsInt;\npub struct AsBool;\n\n/// A union type which can be used to interact across FFI boundary.\n#[repr(C)]\n#[derive(Copy, Clone)]\npub union IntOrBoolData {\n    pub i: u8,\n    pub b: bool,\n}\n\n/// Tag sent alongside the union from C code.\n#[repr(u8)]\n#[derive(Copy, Clone, PartialEq, Eq)]\npub enum IntOrBoolTag {\n    Int = 0,\n    Bool = 1,\n}\n\n/// C-compatible tagged union as it might arrive from FFI.\n#[repr(C)]\n#[derive(Copy, Clone)]\npub struct CIntOrBool {\n    pub tag: IntOrBoolTag,\n    pub data: IntOrBoolData,\n}\n\n// ============================================================================\n// Safe wrapper types for use in the rest of the Rust codebase\n// ============================================================================\n\n/// A union wrapper where the type parameter statically tracks the active field.\n/// This is zero-cost: same size as the raw union.\n#[repr(C)]\npub struct IntOrBool<T> {\n    data: IntOrBoolData,\n    _marker: PhantomData<T>,\n}\n\nimpl IntOrBool<AsInt> {\n    pub fn from_int(value: u8) -> Self {\n        Self {\n            data: IntOrBoolData { i: value },\n            _marker: PhantomData,\n        }\n    }\n\n    pub fn get(&self) -> u8 {\n        // SAFETY: Type parameter `AsInt` guarantees the integer field is active\n        unsafe { self.data.i }\n    }\n\n    /// Convert to boolean representation.\n    /// Only valid when the integer value is 0 or 1.\n    pub fn try_into_bool(self) -> Option<IntOrBool<AsBool>> {\n        match self.get() {\n            0 | 1 => Some(IntOrBool {\n                data: IntOrBoolData { b: self.get() == 1 },\n                _marker: PhantomData,\n            }),\n            _ => None,\n        }\n    }\n}\n\nimpl IntOrBool<AsBool> {\n    pub fn from_bool(value: bool) -> Self {\n        Self {\n            data: IntOrBoolData { b: value },\n            _marker: PhantomData,\n        }\n    }\n\n    pub fn get(&self) -> bool {\n        // SAFETY: Type parameter `AsBool` guarantees the boolean field is active\n        unsafe { self.data.b }\n    }\n\n    /// Convert to integer representation. Always valid since bool is a subset of u8.\n    pub fn into_int(self) -> IntOrBool<AsInt> {\n        IntOrBool {\n            data: self.data,\n            _marker: PhantomData,\n        }\n    }\n}\n\n// ============================================================================\n// FFI boundary: convert from C representation to safe Rust types\n// ============================================================================\n\n/// Result of converting a C tagged union to a safe Rust type.\n/// The caller must handle both variants, ensuring type safety.\npub enum SafeIntOrBool {\n    Int(IntOrBool<AsInt>),\n    Bool(IntOrBool<AsBool>),\n}\n\nimpl CIntOrBool {\n    /// Convert from C representation to safe Rust type at the FFI boundary.\n    /// After this point, all code uses the type-safe wrappers.\n    pub fn into_safe(self) -> SafeIntOrBool {\n        match self.tag {\n            IntOrBoolTag::Int => {\n                // SAFETY: Tag guarantees integer field is active\n                let value = unsafe { self.data.i };\n                SafeIntOrBool::Int(IntOrBool::from_int(value))\n            }\n            IntOrBoolTag::Bool => {\n                // SAFETY: Tag guarantees boolean field is active\n                let value = unsafe { self.data.b };\n                SafeIntOrBool::Bool(IntOrBool::from_bool(value))\n            }\n        }\n    }\n}\n\n// ============================================================================\n// FFI boundary: convert from safe Rust types back to C representation\n// ============================================================================\n\nimpl From<IntOrBool<AsInt>> for CIntOrBool {\n    fn from(val: IntOrBool<AsInt>) -> Self {\n        CIntOrBool {\n            tag: IntOrBoolTag::Int,\n            data: IntOrBoolData { i: val.get() },\n        }\n    }\n}\n\nimpl From<IntOrBool<AsBool>> for CIntOrBool {\n    fn from(val: IntOrBool<AsBool>) -> Self {\n        CIntOrBool {\n            tag: IntOrBoolTag::Bool,\n            data: IntOrBoolData { b: val.get() },\n        }\n    }\n}\n\n// ============================================================================\n// Example: application code that uses the safe types\n// ============================================================================\n\n/// Process a boolean value. This function can ONLY receive IntOrBool<AsBool>,\n/// so there's no possibility of reading invalid bool bytes.\nfn process_bool(val: IntOrBool<AsBool>) -> &'static str {\n    if val.get() { \"yes\" } else { \"no\" }\n}\n\n/// Process an integer value.\nfn process_int(val: IntOrBool<AsInt>) -> u8 {\n    val.get().saturating_mul(2)\n}\n\n// Simulated FFI functions that would normally be defined in C.\n// In real code, these would be `extern \"C\"` declarations linked to a C library.\n\n/// Simulated C function that \"receives\" data from C.\nextern \"C\" fn receive_from_ffi() -> CIntOrBool {\n    CIntOrBool {\n        tag: IntOrBoolTag::Bool,\n        data: IntOrBoolData { b: true },\n    }\n}\n\n/// Simulated C function that \"sends\" data to C.\nextern \"C\" fn send_to_ffi(data: CIntOrBool) {\n    // In real code, this would be implemented in C\n    match data.tag {\n        IntOrBoolTag::Int => {\n            let i = unsafe { data.data.i };\n            assert_eq!(i, 84);\n        }\n        IntOrBoolTag::Bool => {\n            let b = unsafe { data.data.b };\n            assert!(b);\n        }\n    }\n}\n\nfn main() {\n    // Prove zero-cost: PhantomData adds no size\n    assert_eq!(size_of::<IntOrBoolData>(), size_of::<IntOrBool<AsInt>>());\n    assert_eq!(size_of::<IntOrBoolData>(), size_of::<IntOrBool<AsBool>>());\n    assert_eq!(size_of::<IntOrBoolData>(), 1); // Just one byte\n\n    // === FFI boundary: receive from C ===\n    let from_c = receive_from_ffi();\n    let safe_value = from_c.into_safe();\n\n    // === Application code: fully type-safe, no unsafe ===\n    match safe_value {\n        SafeIntOrBool::Bool(b) => {\n            // Can only call process_bool with IntOrBool<AsBool>\n            assert_eq!(process_bool(b), \"yes\");\n        }\n        SafeIntOrBool::Int(i) => {\n            // Can only call process_int with IntOrBool<AsInt>\n            let _ = process_int(i);\n        }\n    }\n\n    // === Type-safe conversions within Rust ===\n    let int_val = IntOrBool::from_int(1);\n\n    // Cannot pass IntOrBool<AsInt> to process_bool - won't compile:\n    // process_bool(int_val); // Error: expected IntOrBool<AsBool>, found IntOrBool<AsInt>\n\n    // Must explicitly convert, which validates the value\n    if let Some(bool_val) = int_val.try_into_bool() {\n        assert_eq!(process_bool(bool_val), \"yes\");\n    }\n\n    // Invalid conversion is caught at the conversion point\n    let int_val = IntOrBool::from_int(42);\n    assert!(int_val.try_into_bool().is_none()); // 42 is not a valid bool\n\n    // === FFI boundary: send back to C ===\n    let int_val = IntOrBool::from_int(42);\n    let doubled = IntOrBool::from_int(process_int(int_val));\n    send_to_ffi(doubled.into());\n}", "displayCode": "use std::marker::PhantomData;\nuse std::mem::size_of;\n\n/// Marker types representing the active field.\npub struct AsInt;\npub struct AsBool;\n\n/// A union type which can be used to interact across FFI boundary.\n#[repr(C)]\n#[derive(Copy, Clone)]\npub union IntOrBoolData {\n    pub i: u8,\n    pub b: bool,\n}\n\n/// Tag sent alongside the union from C code.\n#[repr(u8)]\n#[derive(Copy, Clone, PartialEq, Eq)]\npub enum IntOrBoolTag {\n    Int = 0,\n    Bool = 1,\n}\n\n/// C-compatible tagged union as it might arrive from FFI.\n#[repr(C)]\n#[derive(Copy, Clone)]\npub struct CIntOrBool {\n    pub tag: IntOrBoolTag,\n    pub data: IntOrBoolData,\n}\n\n// ============================================================================\n// Safe wrapper types for use in the rest of the Rust codebase\n// ============================================================================\n\n/// A union wrapper where the type parameter statically tracks the active field.\n/// This is zero-cost: same size as the raw union.\n#[repr(C)]\npub struct IntOrBool<T> {\n    data: IntOrBoolData,\n    _marker: PhantomData<T>,\n}\n\nimpl IntOrBool<AsInt> {\n    pub fn from_int(value: u8) -> Self {\n        Self {\n            data: IntOrBoolData { i: value },\n            _marker: PhantomData,\n        }\n    }\n\n    pub fn get(&self) -> u8 {\n        // SAFETY: Type parameter `AsInt` guarantees the integer field is active\n        unsafe { self.data.i }\n    }\n\n    /// Convert to boolean representation.\n    /// Only valid when the integer value is 0 or 1.\n    pub fn try_into_bool(self) -> Option<IntOrBool<AsBool>> {\n        match self.get() {\n            0 | 1 => Some(IntOrBool {\n                data: IntOrBoolData { b: self.get() == 1 },\n                _marker: PhantomData,\n            }),\n            _ => None,\n        }\n    }\n}\n\nimpl IntOrBool<AsBool> {\n    pub fn from_bool(value: bool) -> Self {\n        Self {\n            data: IntOrBoolData { b: value },\n            _marker: PhantomData,\n        }\n    }\n\n    pub fn get(&self) -> bool {\n        // SAFETY: Type parameter `AsBool` guarantees the boolean field is active\n        unsafe { self.data.b }\n    }\n\n    /// Convert to integer representation. Always valid since bool is a subset of u8.\n    pub fn into_int(self) -> IntOrBool<AsInt> {\n        IntOrBool {\n            data: self.data,\n            _marker: PhantomData,\n        }\n    }\n}\n\n// ============================================================================\n// FFI boundary: convert from C representation to safe Rust types\n// ============================================================================\n\n/// Result of converting a C tagged union to a safe Rust type.\n/// The caller must handle both variants, ensuring type safety.\npub enum SafeIntOrBool {\n    Int(IntOrBool<AsInt>),\n    Bool(IntOrBool<AsBool>),\n}\n\nimpl CIntOrBool {\n    /// Convert from C representation to safe Rust type at the FFI boundary.\n    /// After this point, all code uses the type-safe wrappers.\n    pub fn into_safe(self) -> SafeIntOrBool {\n        match self.tag {\n            IntOrBoolTag::Int => {\n                // SAFETY: Tag guarantees integer field is active\n                let value = unsafe { self.data.i };\n                SafeIntOrBool::Int(IntOrBool::from_int(value))\n            }\n            IntOrBoolTag::Bool => {\n                // SAFETY: Tag guarantees boolean field is active\n                let value = unsafe { self.data.b };\n                SafeIntOrBool::Bool(IntOrBool::from_bool(value))\n            }\n        }\n    }\n}\n\n// ============================================================================\n// FFI boundary: convert from safe Rust types back to C representation\n// ============================================================================\n\nimpl From<IntOrBool<AsInt>> for CIntOrBool {\n    fn from(val: IntOrBool<AsInt>) -> Self {\n        CIntOrBool {\n            tag: IntOrBoolTag::Int,\n            data: IntOrBoolData { i: val.get() },\n        }\n    }\n}\n\nimpl From<IntOrBool<AsBool>> for CIntOrBool {\n    fn from(val: IntOrBool<AsBool>) -> Self {\n        CIntOrBool {\n            tag: IntOrBoolTag::Bool,\n            data: IntOrBoolData { b: val.get() },\n        }\n    }\n}\n\n// ============================================================================\n// Example: application code that uses the safe types\n// ============================================================================\n\n/// Process a boolean value. This function can ONLY receive IntOrBool<AsBool>,\n/// so there's no possibility of reading invalid bool bytes.\nfn process_bool(val: IntOrBool<AsBool>) -> &'static str {\n    if val.get() { \"yes\" } else { \"no\" }\n}\n\n/// Process an integer value.\nfn process_int(val: IntOrBool<AsInt>) -> u8 {\n    val.get().saturating_mul(2)\n}\n\n// Simulated FFI functions that would normally be defined in C.\n// In real code, these would be `extern \"C\"` declarations linked to a C library.\n\n/// Simulated C function that \"receives\" data from C.\nextern \"C\" fn receive_from_ffi() -> CIntOrBool {\n    CIntOrBool {\n        tag: IntOrBoolTag::Bool,\n        data: IntOrBoolData { b: true },\n    }\n}\n\n/// Simulated C function that \"sends\" data to C.\nextern \"C\" fn send_to_ffi(data: CIntOrBool) {\n    // In real code, this would be implemented in C\n    match data.tag {\n        IntOrBoolTag::Int => {\n            let i = unsafe { data.data.i };\n            assert_eq!(i, 84);\n        }\n        IntOrBoolTag::Bool => {\n            let b = unsafe { data.data.b };\n            assert!(b);\n        }\n    }\n}\n\nfn main() {\n    // Prove zero-cost: PhantomData adds no size\n    assert_eq!(size_of::<IntOrBoolData>(), size_of::<IntOrBool<AsInt>>());\n    assert_eq!(size_of::<IntOrBoolData>(), size_of::<IntOrBool<AsBool>>());\n    assert_eq!(size_of::<IntOrBoolData>(), 1); // Just one byte\n\n    // === FFI boundary: receive from C ===\n    let from_c = receive_from_ffi();\n    let safe_value = from_c.into_safe();\n\n    // === Application code: fully type-safe, no unsafe ===\n    match safe_value {\n        SafeIntOrBool::Bool(b) => {\n            // Can only call process_bool with IntOrBool<AsBool>\n            assert_eq!(process_bool(b), \"yes\");\n        }\n        SafeIntOrBool::Int(i) => {\n            // Can only call process_int with IntOrBool<AsInt>\n            let _ = process_int(i);\n        }\n    }\n\n    // === Type-safe conversions within Rust ===\n    let int_val = IntOrBool::from_int(1);\n\n    // Cannot pass IntOrBool<AsInt> to process_bool - won't compile:\n    // process_bool(int_val); // Error: expected IntOrBool<AsBool>, found IntOrBool<AsInt>\n\n    // Must explicitly convert, which validates the value\n    if let Some(bool_val) = int_val.try_into_bool() {\n        assert_eq!(process_bool(bool_val), \"yes\");\n    }\n\n    // Invalid conversion is caught at the conversion point\n    let int_val = IntOrBool::from_int(42);\n    assert!(int_val.try_into_bool().is_none()); // 42 is not a valid bool\n\n    // === FFI boundary: send back to C ===\n    let int_val = IntOrBool::from_int(42);\n    let doubled = IntOrBool::from_int(process_int(int_val));\n    send_to_ffi(doubled.into());\n}", "hiddenLineNumbers": [], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": false, "miri": {"mode": "check", "pattern": null}, "warnMode": "error"}</script></div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="need_container docutils container" id="SNCB-7bcf91af">
+<table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_WNCi5njUWLuZ">
+<tbody>
+<tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
+<div class="line"><span><span class="needs_type_name"><span class="needs_data">Bibliography</span></span>: </span><strong><span></span></strong><span> <span class="needs-id"><a class="reference internal" href="#bib_WNCi5njUWLuZ" title="bib_WNCi5njUWLuZ">bib_WNCi5njUWLuZ</a></span>  <span class="needs needs_collapse" id="target__show__meta"><span class="needs collapsed"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-down-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg></span><span class="needs visible collapse_is_hidden"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right-circle"><circle cx="12" cy="12" r="10"></circle><polyline points="12 16 16 12 12 8"></polyline><line x1="8" y1="12" x2="16" y2="12"></line></svg></span></span> </span></div>
+</div>
+</td>
+</tr>
+<tr class="need meta row-even"><td class="need meta"><div class="needs_meta line-block">
+<div class="line"><span><span><div class="line"><span class="needs_status"><span class="needs_label">status: </span><span class="needs_data">draft</span></span></div>
+</span></span></div>
+<div class="line"><span><div class="line">parent needs: <span class="parent_needs"><span><a class="reference internal" href="#gui_0cuTYG8RVYjg" title="bib_WNCi5njUWLuZ">gui_0cuTYG8RVYjg</a></span></span></div>
+</span></div>
+</div>
+</td>
+</tr>
+<tr class="need content row-odd"><td class="need content" colspan="1"><table class="bibliography-table docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><span class="target" id="cite-gui_0cuTYG8RVYjg-RUST-REF-UNION"></span><strong class="bibentry-key">[RUST-REF-UNION]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_0cuTYG8RVYjg-RUST-REF-UNION')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>The Rust Reference. “Unions.” <a class="reference external" href="https://doc.rust-lang.org/reference/items/unions.html">https://doc.rust-lang.org/reference/items/unions.html</a></p></td>
+</tr>
+<tr class="row-even"><td><p><span class="target" id="cite-gui_0cuTYG8RVYjg-UCG-VALIDITY"></span><strong class="bibentry-key">[UCG-VALIDITY]</strong><a href="javascript:void(0)" onclick="citationGoBack('cite-gui_0cuTYG8RVYjg-UCG-VALIDITY')" class="bibentry-back" title="Return to citation">↩</a></p></td>
+<td><p>Rust Unsafe Code Guidelines. “Validity and Safety Invariant.” <a class="reference external" href="https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant">https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant</a>.</p></td>
+</tr>
+</tbody>
+</table>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Types and Traits" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="gui_xztNdXA2oFNC.html" class="btn btn-neutral float-right" title="Use strong types to differentiate between logically distinct values" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Contributors to Coding Guidelines Subcommittee.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+  
+        This site is powered through <a href="https://www.netlify.com">Netlify</a>.
+
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

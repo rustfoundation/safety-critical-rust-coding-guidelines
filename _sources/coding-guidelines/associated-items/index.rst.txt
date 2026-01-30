@@ -6,4 +6,9 @@
 Associated Items
 ================
 
-.. include:: gui_ot2Zt3dd6of1.rst.inc
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*

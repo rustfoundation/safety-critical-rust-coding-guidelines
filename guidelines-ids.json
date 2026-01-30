@@ -5,52 +5,52 @@
       "link": "coding-guidelines/types-and-traits/index.html",
       "guidelines": [
         {
-          "id": "gui_xztNdXA2oFNC",
-          "title": "Use strong types to differentiate between logically distinct values",
-          "link": "coding-guidelines/types-and-traits/index.html#gui_xztNdXA2oFNC",
-          "checksum": "ae6b2091e888f12f405ee77a2febc6e84cf362d1c32507e26110d805e5dcb5ad",
-          "rationale": {
-            "id": "rat_kYiIiW8R2qD2",
-            "link": "coding-guidelines/types-and-traits/index.html#rat_kYiIiW8R2qD2",
-            "checksum": "3f17c93db59b8aad68bce68f962befb16e58f686f5b5220c7b12135bc624ecbb"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_PO5TyFsRTlWv",
-            "link": "coding-guidelines/types-and-traits/index.html#non_compl_ex_PO5TyFsRTlWv",
-            "checksum": "bbb8463135909e0c46e832b84a58d3cb81ef8ae4078f8901c172f04a46975753"
-          },
-          "compliant_example": {
-            "id": "compl_ex_WTe7GoPu5Ez1",
-            "link": "coding-guidelines/types-and-traits/index.html#compl_ex_WTe7GoPu5Ez1",
-            "checksum": "506806e69b15a031a1f6b62add1cca182869241a339ab020868877ce64971d99"
-          },
-          "bibliography": null
-        },
-        {
           "id": "gui_0cuTYG8RVYjg",
           "title": "Ensure reads of union fields produce valid values for the field's type",
-          "link": "coding-guidelines/types-and-traits/index.html#gui_0cuTYG8RVYjg",
-          "checksum": "eff5e3986b02b0f863605ae44dd03f8f674233c0bf415684a6714bca65c87327",
+          "link": "coding-guidelines/types-and-traits/gui_0cuTYG8RVYjg.html#gui_0cuTYG8RVYjg",
+          "checksum": "bef98889ec28516af7c8460cc7da49340477184a44229a04fbf632b61099a35d",
           "rationale": {
             "id": "rat_8QeimyAvM7cH",
-            "link": "coding-guidelines/types-and-traits/index.html#rat_8QeimyAvM7cH",
-            "checksum": "ff52f9346ae749439c7baa6469849945771e3ff8d767d403f71870eae3151b66"
+            "link": "coding-guidelines/types-and-traits/gui_0cuTYG8RVYjg.html#rat_8QeimyAvM7cH",
+            "checksum": "e9b732c7a93f5d34300a9d31fc8f324fe261776611c9dc638099fc8d5c29a5f9"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_aEx4HnDD8xIp",
-            "link": "coding-guidelines/types-and-traits/index.html#non_compl_ex_aEx4HnDD8xIp",
-            "checksum": "66dbc9cf8823c620af38af34550a95a2cb50a8888b76b971fe2563d3dfd5d149"
+            "link": "coding-guidelines/types-and-traits/gui_0cuTYG8RVYjg.html#non_compl_ex_aEx4HnDD8xIp",
+            "checksum": "ae6f585ebf5c98ac534cb83d27b1485b041d65d2b5effa6bc3ca3abc04e6dc4c"
           },
           "compliant_example": {
             "id": "compl_ex_4Z8tmqYLLjtw",
-            "link": "coding-guidelines/types-and-traits/index.html#compl_ex_4Z8tmqYLLjtw",
-            "checksum": "f953991cb88db0b84faba75c76d009b20e26c29d8eb34af807bce0c520b77915"
+            "link": "coding-guidelines/types-and-traits/gui_0cuTYG8RVYjg.html#compl_ex_4Z8tmqYLLjtw",
+            "checksum": "3de6b41026e882dfc61162237185f802ca18148ae7f3f224b5e78f9ff256cb64"
           },
           "bibliography": {
             "id": "bib_WNCi5njUWLuZ",
-            "link": "coding-guidelines/types-and-traits/index.html#bib_WNCi5njUWLuZ",
-            "checksum": "565766218fd853bba1919c240221435d2208e786860cd821aa3d7860ef866fb7"
+            "link": "coding-guidelines/types-and-traits/gui_0cuTYG8RVYjg.html#bib_WNCi5njUWLuZ",
+            "checksum": "da076bea5d89ecbc99f57913ad6f6a6d3cbc989ecc2734602d5b3b68ca94b5ac"
           }
+        },
+        {
+          "id": "gui_xztNdXA2oFNC",
+          "title": "Use strong types to differentiate between logically distinct values",
+          "link": "coding-guidelines/types-and-traits/gui_xztNdXA2oFNC.html#gui_xztNdXA2oFNC",
+          "checksum": "60d84742859eb49c1cd30c0fe4ef058d4ae2a43a03dcebd60833ac3e547deb91",
+          "rationale": {
+            "id": "rat_kYiIiW8R2qD2",
+            "link": "coding-guidelines/types-and-traits/gui_xztNdXA2oFNC.html#rat_kYiIiW8R2qD2",
+            "checksum": "4e75f13b2c06a8bbb8ebe0a4f9882f62aa4e4336c6ad613103081ced6c27fd11"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_PO5TyFsRTlWv",
+            "link": "coding-guidelines/types-and-traits/gui_xztNdXA2oFNC.html#non_compl_ex_PO5TyFsRTlWv",
+            "checksum": "992361415a0a8ad7703a45930e36d485fb4714b79f2b3a162614e8569c6127fd"
+          },
+          "compliant_example": {
+            "id": "compl_ex_WTe7GoPu5Ez1",
+            "link": "coding-guidelines/types-and-traits/gui_xztNdXA2oFNC.html#compl_ex_WTe7GoPu5Ez1",
+            "checksum": "81e5e1f68f84b5f243a8702273c6988d62a925628c1e07e7448a07327dd63155"
+          },
+          "bibliography": null
         }
       ]
     },
@@ -61,220 +61,220 @@
         {
           "id": "gui_13XWp3mb0g2P",
           "title": "Attribute macros shall not be used",
-          "link": "coding-guidelines/macros/index.html#gui_13XWp3mb0g2P",
-          "checksum": "4b235a5060e46ba43872c56472173a90dc842066c259f003d7ad4ceff5328fdc",
+          "link": "coding-guidelines/macros/gui_13XWp3mb0g2P.html#gui_13XWp3mb0g2P",
+          "checksum": "16750d6556a8c7c7a3806058e1793ae4023784d471b88f3f249cfe3742eab19d",
           "rationale": {
             "id": "rat_X8uCF5yx7Mpo",
-            "link": "coding-guidelines/macros/index.html#rat_X8uCF5yx7Mpo",
-            "checksum": "73b5c7dce2fe65117023505ac9f5075d4fcb7eb682819ee3de75005670f5c0e3"
+            "link": "coding-guidelines/macros/gui_13XWp3mb0g2P.html#rat_X8uCF5yx7Mpo",
+            "checksum": "bf87f7550ecd069026d573b45147a21adf988e52d441b8b7f74b016d28bf2fd7"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_eW374waRPbeL",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_eW374waRPbeL",
-            "checksum": "774230f1ac4f727430f784102c8c320fd407eccd9db72a78296f78a1afe979f4"
+            "link": "coding-guidelines/macros/gui_13XWp3mb0g2P.html#non_compl_ex_eW374waRPbeL",
+            "checksum": "071d20f62e234d94d35da076f8c51cfdef474988d132d662eca7d94842243e17"
           },
           "compliant_example": {
             "id": "compl_ex_Mg8ePOgbGJeW",
-            "link": "coding-guidelines/macros/index.html#compl_ex_Mg8ePOgbGJeW",
-            "checksum": "5e96d1a799ff0c03a454d6c8368035450e9f6716c6d7ab05743a1a05354053f8"
+            "link": "coding-guidelines/macros/gui_13XWp3mb0g2P.html#compl_ex_Mg8ePOgbGJeW",
+            "checksum": "a61862930abbd026c1d4c37a3daef53d1d8d9051488619d682689f0a37ddb548"
           },
           "bibliography": null
         },
         {
           "id": "gui_2jjWUoF1teOY",
           "title": "A macro should not be used in place of a function",
-          "link": "coding-guidelines/macros/index.html#gui_2jjWUoF1teOY",
-          "checksum": "d5a3446d90a48ce0cec1a6cef6b98175680785987aa73937e31396488f831ac5",
+          "link": "coding-guidelines/macros/gui_2jjWUoF1teOY.html#gui_2jjWUoF1teOY",
+          "checksum": "48f5f5246f37a6a9fea7a8dd7ba01093ee63ea9377fe7ace80cc33d14b1638f7",
           "rationale": {
             "id": "rat_M9bp23ctkzQ7",
-            "link": "coding-guidelines/macros/index.html#rat_M9bp23ctkzQ7",
-            "checksum": "8076e46f61c0f7984c905bf9c7038462e121b533dcac3855daa9f833e0c21eb5"
+            "link": "coding-guidelines/macros/gui_2jjWUoF1teOY.html#rat_M9bp23ctkzQ7",
+            "checksum": "9487774bee6723b8796c510d7bed35e86618aec72c6957c032a4d848c315fdd7"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_TZgk2vG42t2r",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_TZgk2vG42t2r",
-            "checksum": "a140f572305162ce40d50c51150bbd17bc0b8b71a48e19ffd4b928f9cbea8929"
+            "link": "coding-guidelines/macros/gui_2jjWUoF1teOY.html#non_compl_ex_TZgk2vG42t2r",
+            "checksum": "fcc8af7b7fb7c676fa3daecae75b0f94437d199d124c8aea86b5af4ce07437fe"
           },
           "compliant_example": {
             "id": "compl_ex_iPTgzrvO7qr3",
-            "link": "coding-guidelines/macros/index.html#compl_ex_iPTgzrvO7qr3",
-            "checksum": "fa51683ac13ca7a6a791ee1b7708afd62661588ca2c32001b137978c321f98fd"
+            "link": "coding-guidelines/macros/gui_2jjWUoF1teOY.html#compl_ex_iPTgzrvO7qr3",
+            "checksum": "32ce8de60c7da02e010cfc32219de6c9b1e8f5eb5eff62165ce30d60def683fd"
           },
           "bibliography": null
         },
         {
           "id": "gui_66FSqzD55VRZ",
           "title": "Procedural macros should not be used",
-          "link": "coding-guidelines/macros/index.html#gui_66FSqzD55VRZ",
-          "checksum": "20c0a5b7c96620bb94d168417af3164cda3dc450a635bee834fa1880d4e4fc66",
+          "link": "coding-guidelines/macros/gui_66FSqzD55VRZ.html#gui_66FSqzD55VRZ",
+          "checksum": "61097fd9d4e41c40545d11b029a26167d92a15a50cb4799d58ce63eb4b92e4f3",
           "rationale": {
             "id": "rat_AmCavSymv3Ev",
-            "link": "coding-guidelines/macros/index.html#rat_AmCavSymv3Ev",
-            "checksum": "b1ee7796f6b757e9a1e0b309df4d0a0be9b7bd64e8d820a21d9af5c0437a5181"
+            "link": "coding-guidelines/macros/gui_66FSqzD55VRZ.html#rat_AmCavSymv3Ev",
+            "checksum": "5ae443011ae731446c3c03e639c7dd91103d985147db736f6be3b9e27b7c192f"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_pJhVZW6a1HP9",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_pJhVZW6a1HP9",
-            "checksum": "693909fb9cbdf166a7b69b82e12665de53b8b55157aadc1843bf329ea5b09f7b"
+            "link": "coding-guidelines/macros/gui_66FSqzD55VRZ.html#non_compl_ex_pJhVZW6a1HP9",
+            "checksum": "8cb1b7baa66bcdf6b828e0b91da7b09aaa6e0156b7064e679d77b564d5044ca3"
           },
           "compliant_example": {
             "id": "compl_ex_4VFyucETB7C3",
-            "link": "coding-guidelines/macros/index.html#compl_ex_4VFyucETB7C3",
-            "checksum": "7dcfb8268b290e2c568c0e44c3c2c240e964922488aa54a8b94d48a01828bc47"
+            "link": "coding-guidelines/macros/gui_66FSqzD55VRZ.html#compl_ex_4VFyucETB7C3",
+            "checksum": "51f5291e913a07eef6cf6bd3eeeb456402e23b5b1c723dde0fa53fe83007988b"
           },
           "bibliography": null
         },
         {
           "id": "gui_8hs33nyp0ipX",
           "title": "Shall ensure complete hygiene of macros",
-          "link": "coding-guidelines/macros/index.html#gui_8hs33nyp0ipX",
-          "checksum": "af12a97b6cc4370016f5bd79907536d3032e085423144638d7f00446c5fac82f",
+          "link": "coding-guidelines/macros/gui_8hs33nyp0ipX.html#gui_8hs33nyp0ipX",
+          "checksum": "d2abc95416fd13fa7760046bb15fe2e32143fe5818d5666555ce90bff3798b9c",
           "rationale": {
             "id": "rat_e9iS187skbHH",
-            "link": "coding-guidelines/macros/index.html#rat_e9iS187skbHH",
-            "checksum": "e39900b2d59175e7905b21e5b37ba5810ae2e70888616684d595d8cc50a3410e"
+            "link": "coding-guidelines/macros/gui_8hs33nyp0ipX.html#rat_e9iS187skbHH",
+            "checksum": "666d1f1677d998f9fdf938a6412540b6f1737cf67e43d94d3567c710824b2740"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_lRt4LBen6Lkc",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_lRt4LBen6Lkc",
-            "checksum": "4af322c3aec8a9fe90d43f6c5e2b61e0d7e45c8989dee576edb313cd16bada29"
+            "link": "coding-guidelines/macros/gui_8hs33nyp0ipX.html#non_compl_ex_lRt4LBen6Lkc",
+            "checksum": "fb22cb449b691863d4c05504b35dadcc36d1e6a99e8db539ae9b07d994a8bb37"
           },
           "compliant_example": {
             "id": "compl_ex_GLP05s9c1g8N",
-            "link": "coding-guidelines/macros/index.html#compl_ex_GLP05s9c1g8N",
-            "checksum": "f4f67e80546d93e00152b3649a4244ee86fca0f5d56025f3746ff45c7bc122ff"
+            "link": "coding-guidelines/macros/gui_8hs33nyp0ipX.html#compl_ex_GLP05s9c1g8N",
+            "checksum": "cea1a971086377b215ca600a11c5f5375651a4ac1fb5abce97314162ff88d54d"
           },
           "bibliography": null
         },
         {
           "id": "gui_FRLaMIMb4t3S",
           "title": "Do not hide unsafe blocks within macro expansions",
-          "link": "coding-guidelines/macros/index.html#gui_FRLaMIMb4t3S",
-          "checksum": "4970dfa064ad4c8932201311905981d836a8d41ec3f8e3cb4bdec3c292ea43c5",
+          "link": "coding-guidelines/macros/gui_FRLaMIMb4t3S.html#gui_FRLaMIMb4t3S",
+          "checksum": "2194c1bd0a5e6d961f27ed73407adc7948d9d53dabda83616cbd674bf6ce4b19",
           "rationale": {
             "id": "rat_WJubG7KuUDLW",
-            "link": "coding-guidelines/macros/index.html#rat_WJubG7KuUDLW",
-            "checksum": "b71c4d7fafb57748af1371c20228814e3d8b15decfcd584886fc6787a45357cb"
+            "link": "coding-guidelines/macros/gui_FRLaMIMb4t3S.html#rat_WJubG7KuUDLW",
+            "checksum": "97519df9b1b702f21dd21290d34db54357d55981a7750059356a7df8e030e040"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_AyFnP0lJLHxi",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_AyFnP0lJLHxi",
-            "checksum": "d4b5f741c8585e1b0e90f7473b203d4e224ec5b433708cfbace88d0246bf4bdd"
+            "link": "coding-guidelines/macros/gui_FRLaMIMb4t3S.html#non_compl_ex_AyFnP0lJLHxi",
+            "checksum": "c9db5e5da7c682759b633778b9e1b01a35a5edf2039660a053eeaebf9ba80cef"
           },
           "compliant_example": {
             "id": "compl_ex_pO5gP1aj2v4F",
-            "link": "coding-guidelines/macros/index.html#compl_ex_pO5gP1aj2v4F",
-            "checksum": "0227779a2f32cb15ea8d109e848e792c993a0c03969c0c24ee369c03beb0c42a"
+            "link": "coding-guidelines/macros/gui_FRLaMIMb4t3S.html#compl_ex_pO5gP1aj2v4F",
+            "checksum": "916bf5e51e78e3d3238daa43bf424ec79141c377b3729ce74e9080cd2aa999b6"
           },
           "bibliography": null
         },
         {
           "id": "gui_SJMrWDYZ0dN4",
           "title": "Names in a macro definition shall use a fully qualified path",
-          "link": "coding-guidelines/macros/index.html#gui_SJMrWDYZ0dN4",
-          "checksum": "3b339fadc1e5b3404906f8ff0d49eda916b046ee326e3c2cbb037e6c4de2064c",
+          "link": "coding-guidelines/macros/gui_SJMrWDYZ0dN4.html#gui_SJMrWDYZ0dN4",
+          "checksum": "8da0b5b371303d2db60d9b6329e75eb50d0573ec8bc7629d9c1712aa8af0af87",
           "rationale": {
             "id": "rat_VRNXaxmW1l2s",
-            "link": "coding-guidelines/macros/index.html#rat_VRNXaxmW1l2s",
-            "checksum": "205597f4d0f663ca9207fdecf083015049082df2d6ff3160b602c145d0e9bf9c"
+            "link": "coding-guidelines/macros/gui_SJMrWDYZ0dN4.html#rat_VRNXaxmW1l2s",
+            "checksum": "a4fe3549bc322bc3ddd954ddec8fd8e478ca63fb00e5bff9b7545d1c10ab6278"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_m2XR1ihTbCQS",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_m2XR1ihTbCQS",
-            "checksum": "42f045bdafb368fcf7c1cb70c25757411004177ffcfda8236458cea4f3a7ad2a"
+            "link": "coding-guidelines/macros/gui_SJMrWDYZ0dN4.html#non_compl_ex_m2XR1ihTbCQS",
+            "checksum": "ba44282b66a1d7ad2c81a18d2068cbc979f3ffee950b4147803a739b56b84b52"
           },
           "compliant_example": {
             "id": "compl_ex_xyaShvxL9JAM",
-            "link": "coding-guidelines/macros/index.html#compl_ex_xyaShvxL9JAM",
-            "checksum": "e415d52bdddd41b1d2abe7e14f978bd87e15f11fef52e2b3e796dc7dbe0ab589"
+            "link": "coding-guidelines/macros/gui_SJMrWDYZ0dN4.html#compl_ex_xyaShvxL9JAM",
+            "checksum": "d2cef39216d2037f21427551096b6d0a79b5d5df8a32ca1b662b535b04437dec"
           },
           "bibliography": null
         },
         {
           "id": "gui_WJlWqgIxmE8P",
           "title": "Shall not use Function-like Macros",
-          "link": "coding-guidelines/macros/index.html#gui_WJlWqgIxmE8P",
-          "checksum": "fe1c17a51d8584a281fdaa993fa1553567c28ea0a9f77b4d65c3528d8b615f68",
+          "link": "coding-guidelines/macros/gui_WJlWqgIxmE8P.html#gui_WJlWqgIxmE8P",
+          "checksum": "efea39b9ab61402d8abd39fd0a7d5a4f61b25e14de5db6c84424983414ca796c",
           "rationale": {
             "id": "rat_C8RRidiVzhRj",
-            "link": "coding-guidelines/macros/index.html#rat_C8RRidiVzhRj",
-            "checksum": "d7da4fec30d44208d5bff5514763d9bc5698d7f8add5bd8e1a33ed4acbcf0907"
+            "link": "coding-guidelines/macros/gui_WJlWqgIxmE8P.html#rat_C8RRidiVzhRj",
+            "checksum": "d7054cb308a08deb8e7374c2bfc93d456485a197a553e1b5edbd5d3f8728c45b"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_TjRiRkmBY6wG",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_TjRiRkmBY6wG",
-            "checksum": "fee8f34f116f8afaa5b4c49e7fa583a1234dd9cfcb6cc6f3adb4d996071af56e"
+            "link": "coding-guidelines/macros/gui_WJlWqgIxmE8P.html#non_compl_ex_TjRiRkmBY6wG",
+            "checksum": "f75ec444cac414256d3f3ff570e653687f7f242eb48d8d9f74520571a6c601c8"
           },
           "compliant_example": {
             "id": "compl_ex_AEKEOYhBWPMl",
-            "link": "coding-guidelines/macros/index.html#compl_ex_AEKEOYhBWPMl",
-            "checksum": "93a0734af0d958be28de396f736a9e01bf506960193237b2dad431a0a3689650"
+            "link": "coding-guidelines/macros/gui_WJlWqgIxmE8P.html#compl_ex_AEKEOYhBWPMl",
+            "checksum": "b9acd96bb5210ee66f35769f417ae9f279570588808dcf49f5ef68f7ef16d05d"
           },
           "bibliography": null
         },
         {
           "id": "gui_a1mHfjgKk4Xr",
           "title": "Shall not invoke macros",
-          "link": "coding-guidelines/macros/index.html#gui_a1mHfjgKk4Xr",
-          "checksum": "6a1e11d530726e979ec2d716235d11d0a1d398a1bb0e501bb724c1d238f242e4",
+          "link": "coding-guidelines/macros/gui_a1mHfjgKk4Xr.html#gui_a1mHfjgKk4Xr",
+          "checksum": "aae9c325bcb982421b5ccd7905fef60f11a7ab7492b0590d11f612108e1ea78a",
           "rationale": {
             "id": "rat_62mSorNF05kD",
-            "link": "coding-guidelines/macros/index.html#rat_62mSorNF05kD",
-            "checksum": "a3484d63006901fa7e1b199d5b56d2d597a4d55667a629bb184fafc1017274c1"
+            "link": "coding-guidelines/macros/gui_a1mHfjgKk4Xr.html#rat_62mSorNF05kD",
+            "checksum": "85c097cd4164cfb37c9a1a640eeac192dd81bf412a3f3773cacbac424e8451ba"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_hP5KLhqQfDcd",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_hP5KLhqQfDcd",
-            "checksum": "936448d62b205c1fe2d6598bf5a4f6397d900e2f463e1b8592e3704323329b30"
+            "link": "coding-guidelines/macros/gui_a1mHfjgKk4Xr.html#non_compl_ex_hP5KLhqQfDcd",
+            "checksum": "14f5bbcbb0fbdbc490757fc54d78ad934d0fbfe45033dc9709826b55782bc925"
           },
           "compliant_example": {
             "id": "compl_ex_ti7GWHCOhUvT",
-            "link": "coding-guidelines/macros/index.html#compl_ex_ti7GWHCOhUvT",
-            "checksum": "ffe2167a3f7762dfbc140601fbb1905d8992a1d2f480271f96f37f1a5cd28b37"
+            "link": "coding-guidelines/macros/gui_a1mHfjgKk4Xr.html#compl_ex_ti7GWHCOhUvT",
+            "checksum": "b65a8d62e1997e349c89e9145a086f5d95396c1d721822023615ecaba2667c84"
           },
           "bibliography": null
         },
         {
           "id": "gui_h0uG1C9ZjryA",
           "title": "Shall not use Declarative Macros",
-          "link": "coding-guidelines/macros/index.html#gui_h0uG1C9ZjryA",
-          "checksum": "e6ab4eb2b6f3e8739d13b0d24eecfe5c4290e0a7aa9aaeea99df82549fea3d36",
+          "link": "coding-guidelines/macros/gui_h0uG1C9ZjryA.html#gui_h0uG1C9ZjryA",
+          "checksum": "ed87894aa9154535a711f78fafe01d7e6ec3258fe1f37c30b74b81c753e22021",
           "rationale": {
             "id": "rat_U3AEUPyaUhcb",
-            "link": "coding-guidelines/macros/index.html#rat_U3AEUPyaUhcb",
-            "checksum": "93a1ed689f9c5ad0f141691891245b94ee4b11680b7d0396fad1f790ee20f2d3"
+            "link": "coding-guidelines/macros/gui_h0uG1C9ZjryA.html#rat_U3AEUPyaUhcb",
+            "checksum": "bc69775c99f2172ad3cac1a41d44c19dbb345d58ca3cdbd0eb1be1d1e95c1e37"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_Gb4zimei8cNI",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_Gb4zimei8cNI",
-            "checksum": "834774650eeb43f29ea051e5663da61b0a7d44f8595c25edc7c717563808512d"
+            "link": "coding-guidelines/macros/gui_h0uG1C9ZjryA.html#non_compl_ex_Gb4zimei8cNI",
+            "checksum": "8ea051058ca214df39807ed0994b232a00d22e3347a1c055956bd8b312e63ac8"
           },
           "compliant_example": {
             "id": "compl_ex_Pw7YCh4Iv47Z",
-            "link": "coding-guidelines/macros/index.html#compl_ex_Pw7YCh4Iv47Z",
-            "checksum": "9d26b0bcbb164d482e9aa169cfa0fa0a85ae471c6aaf7ff3d498f11d97c24dc5"
+            "link": "coding-guidelines/macros/gui_h0uG1C9ZjryA.html#compl_ex_Pw7YCh4Iv47Z",
+            "checksum": "ab20d62fa0d2b6d45fd3ff8e72d6a8e2bdb657ab6b00ffa9cfea7ccd7631ee15"
           },
           "bibliography": null
         },
         {
           "id": "gui_uuDOArzyO3Qw",
           "title": "Shall not write code that expands macros",
-          "link": "coding-guidelines/macros/index.html#gui_uuDOArzyO3Qw",
-          "checksum": "aa751103f7bb79e3a627354523eaac045b1a8dcbd03021921628463a35c0b5ec",
+          "link": "coding-guidelines/macros/gui_uuDOArzyO3Qw.html#gui_uuDOArzyO3Qw",
+          "checksum": "a8106e6d98456f1591d5a1824e1d155d74a2fb21c196a29aaeca670b3aa0e5d6",
           "rationale": {
             "id": "rat_dNgSvC0SZ3JJ",
-            "link": "coding-guidelines/macros/index.html#rat_dNgSvC0SZ3JJ",
-            "checksum": "7fb5d7dbadd2f179d7ade6b779aef4fe997cc2813c4767aef9062d40c7312b67"
+            "link": "coding-guidelines/macros/gui_uuDOArzyO3Qw.html#rat_dNgSvC0SZ3JJ",
+            "checksum": "75aa008cac739b2e72b97b3036f140091ee7bba73ab3fa892708e4eb61337cd6"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_g9j8shyGM2Rh",
-            "link": "coding-guidelines/macros/index.html#non_compl_ex_g9j8shyGM2Rh",
-            "checksum": "65d05d2508823aeee55f1a6ce231716564fcfee57c4db2f3af222eae7f087f86"
+            "link": "coding-guidelines/macros/gui_uuDOArzyO3Qw.html#non_compl_ex_g9j8shyGM2Rh",
+            "checksum": "d0eb1d8fc349dbfc8bb84ef463071400f63a658b32dcfd4a275c89aac818aa9e"
           },
           "compliant_example": {
             "id": "compl_ex_cFPg6y7upNdl",
-            "link": "coding-guidelines/macros/index.html#compl_ex_cFPg6y7upNdl",
-            "checksum": "932102ac1f11306943d324254bfe68fe2cdc3c69da9efc1d2c352bf9e5798d88"
+            "link": "coding-guidelines/macros/gui_uuDOArzyO3Qw.html#compl_ex_cFPg6y7upNdl",
+            "checksum": "80ab333a9daaf1bc6c8b4d3f95f345d10a0449b6377c7850a61518378bf61bd7"
           },
           "bibliography": null
         }
@@ -287,27 +287,27 @@
         {
           "id": "gui_ot2Zt3dd6of1",
           "title": "Recursive function are not allowed",
-          "link": "coding-guidelines/associated-items/index.html#gui_ot2Zt3dd6of1",
-          "checksum": "4c2562213c1bfe7f17426813512182f9e5443137b2c07c590241b4036cc3c9c6",
+          "link": "coding-guidelines/associated-items/gui_ot2Zt3dd6of1.html#gui_ot2Zt3dd6of1",
+          "checksum": "2fc9ea683cf3d0d5b28daaef90048c87efb567f587c892388300b8769fb9f3ed",
           "rationale": {
             "id": "rat_gvoKeVSKK8fD",
-            "link": "coding-guidelines/associated-items/index.html#rat_gvoKeVSKK8fD",
-            "checksum": "ea67615bea1f1e8d7c977edfe0df35c445a66ce6d226c52ce3d35479f97258ec"
+            "link": "coding-guidelines/associated-items/gui_ot2Zt3dd6of1.html#rat_gvoKeVSKK8fD",
+            "checksum": "66f9b052bff0a00c67a7da96a97e34cb8e5a9fb45e665b6467c7fa161a81bd97"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_MxqhjfkStJJy",
-            "link": "coding-guidelines/associated-items/index.html#non_compl_ex_MxqhjfkStJJy",
-            "checksum": "a68702c7b5c2d84ab276f5f176f601d5276cf8279fbb7aa3981fa130d393a9d4"
+            "link": "coding-guidelines/associated-items/gui_ot2Zt3dd6of1.html#non_compl_ex_MxqhjfkStJJy",
+            "checksum": "aab5df3748a5099ea22ddfd198987d74167a6ed2583ed792aa633e4576452134"
           },
           "compliant_example": {
             "id": "compl_ex_9pK3h65rfceO",
-            "link": "coding-guidelines/associated-items/index.html#compl_ex_9pK3h65rfceO",
-            "checksum": "bae809353caef7467c2e4971273bf0026e0972d9c2f1fabaaf8030ebbcbbe604"
+            "link": "coding-guidelines/associated-items/gui_ot2Zt3dd6of1.html#compl_ex_9pK3h65rfceO",
+            "checksum": "54cc98084e4fbd37acc0d885623696290b6cfcd4d1114a818f6f4bc823687f75"
           },
           "bibliography": {
             "id": "bib_ot2Zt3dd6of1",
-            "link": "coding-guidelines/associated-items/index.html#bib_ot2Zt3dd6of1",
-            "checksum": "b12bbb51bf54a966ddc153e0fd8415f0b3cab7ead0f2c41bc223086d1180866a"
+            "link": "coding-guidelines/associated-items/gui_ot2Zt3dd6of1.html#bib_ot2Zt3dd6of1",
+            "checksum": "5db964370ea4d11be2a294903d6961bdc4616cb2181513ece45cd8329230fbaf"
           }
         }
       ]
@@ -319,271 +319,271 @@
         {
           "id": "gui_7y0GAMmtMhch",
           "title": "Do not use an integer type as a divisor during integer division",
-          "link": "coding-guidelines/expressions/index.html#gui_7y0GAMmtMhch",
-          "checksum": "a8c7dd2fd0a14ccc05e95aa48d24a67339eaa392e4a5807e65b9a21ffd79c997",
+          "link": "coding-guidelines/expressions/gui_7y0GAMmtMhch.html#gui_7y0GAMmtMhch",
+          "checksum": "ad010ae213c9c0f253d8f0d97264b9accbd440c387f230edfb68436a4dade425",
           "rationale": {
             "id": "rat_vLFlPWSCHRje",
-            "link": "coding-guidelines/expressions/index.html#rat_vLFlPWSCHRje",
-            "checksum": "97cdf11258b1c8af9535f2ea83d79a1043cec9569d80db8c8e165b1990797d4d"
+            "link": "coding-guidelines/expressions/gui_7y0GAMmtMhch.html#rat_vLFlPWSCHRje",
+            "checksum": "efc17fa7c2e6f38a7d988f98aa9c2aeaaebfe8cf9d79e9ea1ab75996fe1e9ff1"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_0XeioBrgfh5z",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_0XeioBrgfh5z",
-            "checksum": "778a41de7fc65dba07b4a9f06a4df263a9165e0216f48c4d953b35ca4da95d64"
+            "link": "coding-guidelines/expressions/gui_7y0GAMmtMhch.html#non_compl_ex_0XeioBrgfh5z",
+            "checksum": "18f8ca9600227b4cd44482a7af39c726bf0a598ab863bbe3d652f22942ec1f78"
           },
           "compliant_example": {
             "id": "compl_ex_k1CD6xoZxhXc",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_k1CD6xoZxhXc",
-            "checksum": "1f630cbe27e85e286e7bc31b6bfbee995d36e5c3af7542c29a5bdc37431888c1"
+            "link": "coding-guidelines/expressions/gui_7y0GAMmtMhch.html#compl_ex_k1CD6xoZxhXc",
+            "checksum": "41158730b3d72d2dd94d349c9319bdb1c2d1255b64afa0ddd74db6aaf001d455"
           },
           "bibliography": {
             "id": "bib_7y0GAMmtMhch",
-            "link": "coding-guidelines/expressions/index.html#bib_7y0GAMmtMhch",
-            "checksum": "e74f0366ec9471c51bcb57282d0d1153a90e94142930f5eb64e24d08dea9a70a"
+            "link": "coding-guidelines/expressions/gui_7y0GAMmtMhch.html#bib_7y0GAMmtMhch",
+            "checksum": "3bdbb0efe635cdd13af70fcd44ee72769fa5d2ec6841b7112bbf6d6de8c44099"
           }
         },
         {
           "id": "gui_ADHABsmK9FXz",
           "title": "The 'as' operator should not be used with numeric operands",
-          "link": "coding-guidelines/expressions/index.html#gui_ADHABsmK9FXz",
-          "checksum": "94bb9db57d78d8de260090f53e42d9224bc1e25d886b0eb98dc96b030e2966b6",
+          "link": "coding-guidelines/expressions/gui_ADHABsmK9FXz.html#gui_ADHABsmK9FXz",
+          "checksum": "e390c8ce13daf379d27bf67038d26d10a9ef5805d5cbcfc418d98c60060d5851",
           "rationale": {
             "id": "rat_v56bjjcveLxQ",
-            "link": "coding-guidelines/expressions/index.html#rat_v56bjjcveLxQ",
-            "checksum": "b8226acee24c077dd593c530053cd0e509a6a55520785c927e774f091c7a9acd"
+            "link": "coding-guidelines/expressions/gui_ADHABsmK9FXz.html#rat_v56bjjcveLxQ",
+            "checksum": "96358594b1c8208b0d3fb3a279afe4e87904afd4ba6a6711f836570c8e546154"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_hzGUYoMnK59w",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_hzGUYoMnK59w",
-            "checksum": "3711b10124641628481abe812fb09156fb0806a1819c38a7f913493f53d9912d"
+            "link": "coding-guidelines/expressions/gui_ADHABsmK9FXz.html#non_compl_ex_hzGUYoMnK59w",
+            "checksum": "6a2dedd83aeb7b001cfa9016d36c1e5beedb77b18c588401af52b3ad5d446fb4"
           },
           "compliant_example": {
             "id": "compl_ex_uilHTIOgxD37",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_uilHTIOgxD37",
-            "checksum": "14583e76f8c85b11de46eba4f26b7cd4673a565f1deb223298b14fcfffc8d297"
+            "link": "coding-guidelines/expressions/gui_ADHABsmK9FXz.html#compl_ex_uilHTIOgxD37",
+            "checksum": "ef6586f4e5a8fa7894a905e16170397a1129b040ec2868a36959045cc24795cd"
           },
           "bibliography": null
         },
         {
+          "id": "gui_Bib7x9KmPq2nL",
+          "title": "Example guideline with bibliography",
+          "link": "coding-guidelines/expressions/gui_Bib7x9KmPq2nL.html#gui_Bib7x9KmPq2nL",
+          "checksum": "7161462f2ea408f5e28f3461571cd54e64e6211ce773711deeb34ba8261084d0",
+          "rationale": {
+            "id": "rat_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bib7x9KmPq2nL.html#rat_Bib7x9KmPq2nL",
+            "checksum": "6c1e117a2969969ad8481ef5a504b66c3e616879f38124d8c375e48625213206"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bib7x9KmPq2nL.html#non_compl_ex_Bib7x9KmPq2nL",
+            "checksum": "34b534b8494182324693739072b09fd1a41f9cec72904c8ad6f8fce1a5afcc76"
+          },
+          "compliant_example": {
+            "id": "compl_ex_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bib7x9KmPq2nL.html#compl_ex_Bib7x9KmPq2nL",
+            "checksum": "0af7bddfc36a2b172df4e0e61c400af88ec20664022c7915dce97b8df44818f2"
+          },
+          "bibliography": {
+            "id": "bib_Bib7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bib7x9KmPq2nL.html#bib_Bib7x9KmPq2nL",
+            "checksum": "795a76f73eca738e820028a3fcb92d7a5800c7a9dd0239e7a00e3d7c7d6fe3fd"
+          }
+        },
+        {
+          "id": "gui_Bob7x9KmPq2nL",
+          "title": "Example guideline with bibliography",
+          "link": "coding-guidelines/expressions/gui_Bob7x9KmPq2nL.html#gui_Bob7x9KmPq2nL",
+          "checksum": "8b39f954a1dbac5d640ced8277b04820cd5dc70b9a11ba8541c78ea413c5b38d",
+          "rationale": {
+            "id": "rat_Bob7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bob7x9KmPq2nL.html#rat_Bob7x9KmPq2nL",
+            "checksum": "df42859b654ac72d474106b3b4df1e08d0e27655f479ae5cd23cedbcfcd0d079"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_Bob7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bob7x9KmPq2nL.html#non_compl_ex_Bob7x9KmPq2nL",
+            "checksum": "a1f1a6268cc788d7c971b84f8b20def496ed98a9b4e0826acf8ad1c7783aa5d1"
+          },
+          "compliant_example": {
+            "id": "compl_ex_Bob7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bob7x9KmPq2nL.html#compl_ex_Bob7x9KmPq2nL",
+            "checksum": "57649e073a480d8e1de086cadfc9c8a32826f86fc9b55b38fdb284cdea71fb3d"
+          },
+          "bibliography": {
+            "id": "bib_Bob7x9KmPq2nL",
+            "link": "coding-guidelines/expressions/gui_Bob7x9KmPq2nL.html#bib_Bob7x9KmPq2nL",
+            "checksum": "4876f42c64dc23c4b52b59b92bb364343a28175dbb26ae93444c93dff552d270"
+          }
+        },
+        {
           "id": "gui_HDnAZ7EZ4z6G",
           "title": "Avoid as underscore pointer casts",
-          "link": "coding-guidelines/expressions/index.html#gui_HDnAZ7EZ4z6G",
-          "checksum": "f340e70f7799e8854df1e5c913093dd33ad75391d0158cd8efe9bc712bf00acd",
+          "link": "coding-guidelines/expressions/gui_HDnAZ7EZ4z6G.html#gui_HDnAZ7EZ4z6G",
+          "checksum": "a26e157345561c10f3beddb62d0a2e7b2ae073fdac27fa87497cb73453097005",
           "rationale": {
             "id": "rat_h8LdJQ1MNKu9",
-            "link": "coding-guidelines/expressions/index.html#rat_h8LdJQ1MNKu9",
-            "checksum": "95f1b39b55dce8aa2664a006e6994c43278322681af305460c1a34b38a4c07ad"
+            "link": "coding-guidelines/expressions/gui_HDnAZ7EZ4z6G.html#rat_h8LdJQ1MNKu9",
+            "checksum": "da8b8e0bf95aeed4bb6767cbb0d1975f5757406a0c3c4ae6ce54056c391073a0"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_V37Pl103aUW4",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_V37Pl103aUW4",
-            "checksum": "d4a8f594a10353ecae4433e45880717c6cfe31eaabb3c53d0ff91f7d13558134"
+            "link": "coding-guidelines/expressions/gui_HDnAZ7EZ4z6G.html#non_compl_ex_V37Pl103aUW4",
+            "checksum": "5562d3d8224b83415c517495a92f0cd6d656a861e39c94e6262b41cb0d3c213b"
           },
           "compliant_example": {
             "id": "compl_ex_W08ckDrkOhkt",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_W08ckDrkOhkt",
-            "checksum": "b5234f7d1c208ee88ba187c93b4231f939ecd01709511a89dba574937cc47db0"
+            "link": "coding-guidelines/expressions/gui_HDnAZ7EZ4z6G.html#compl_ex_W08ckDrkOhkt",
+            "checksum": "f351565160e4dd565d582d44b1c4d17eb68a7a41aea0c65153b1bf31ab512870"
           },
           "bibliography": null
         },
         {
           "id": "gui_LvmzGKdsAgI5",
           "title": "Avoid out-or-range shifts",
-          "link": "coding-guidelines/expressions/index.html#gui_LvmzGKdsAgI5",
-          "checksum": "8f1f193ac8c476ff7cf03cfd11f7e3d02ed2e3152aeefeddd4f5f32637b9634a",
+          "link": "coding-guidelines/expressions/gui_LvmzGKdsAgI5.html#gui_LvmzGKdsAgI5",
+          "checksum": "149d414d9fd595e2de44454f0b8bfbecbd31ba22762959aa9e0c5ac668e9bb83",
           "rationale": {
             "id": "rat_tVkDl6gOqz25",
-            "link": "coding-guidelines/expressions/index.html#rat_tVkDl6gOqz25",
-            "checksum": "7a192a19a20a6d98e23ac1324471a312e862b9b2244c0e3acc94ca6ae8d2f48e"
+            "link": "coding-guidelines/expressions/gui_LvmzGKdsAgI5.html#rat_tVkDl6gOqz25",
+            "checksum": "8928af47b761d26a47077136b6ae3ea041d7eaa6939bddf9b2ecdd919f235c57"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_KLiDMsCesLx7",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_KLiDMsCesLx7",
-            "checksum": "f316e9d5e3a959a9f1fee8ccc79509679f720e8129874c5efd977846f1a88c2a"
+            "link": "coding-guidelines/expressions/gui_LvmzGKdsAgI5.html#non_compl_ex_KLiDMsCesLx7",
+            "checksum": "753d2cce55c71f913d4a39728f57901c6771b5962fb11d350e93c73dd0e597df"
           },
           "compliant_example": {
             "id": "compl_ex_Ux1WqHbGKV74",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_Ux1WqHbGKV74",
-            "checksum": "a52f2e0acab0a255c3431c7d28e1e6bcb946df203bd05d11e640dfba8518e361"
+            "link": "coding-guidelines/expressions/gui_LvmzGKdsAgI5.html#compl_ex_Ux1WqHbGKV74",
+            "checksum": "972948a7a33ad92ac31ec631cf07c5dcb01979f1d6f7f090cbd9133a1ab48c97"
           },
           "bibliography": {
             "id": "bib_LvmzGKdsAgI5",
-            "link": "coding-guidelines/expressions/index.html#bib_LvmzGKdsAgI5",
-            "checksum": "cf9a18ad8a910ee46d925cb1783df5a3f994c1685e345d3c1a234c2a14674f3b"
+            "link": "coding-guidelines/expressions/gui_LvmzGKdsAgI5.html#bib_LvmzGKdsAgI5",
+            "checksum": "5bfaa4e995852fdb05a4173e79ac8578a7bddaf3088ff24372edc432967af89a"
           }
         },
         {
           "id": "gui_PM8Vpf7lZ51U",
           "title": "An integer shall not be converted to a pointer",
-          "link": "coding-guidelines/expressions/index.html#gui_PM8Vpf7lZ51U",
-          "checksum": "de303cfc23e421caae65f83e0a0b958208ae4efb6dd9f29ba4c5d0b2bd3d54b9",
+          "link": "coding-guidelines/expressions/gui_PM8Vpf7lZ51U.html#gui_PM8Vpf7lZ51U",
+          "checksum": "dbfcc20355419ae88cfed8ad42f0d2d44fd68865bd268820933305a4bb471396",
           "rationale": {
             "id": "rat_YqhEiWTj9z6L",
-            "link": "coding-guidelines/expressions/index.html#rat_YqhEiWTj9z6L",
-            "checksum": "5820cf879d289c1c3ac184cda352ec51b75cb9380351c8b1eeddfd37ad88dc4d"
+            "link": "coding-guidelines/expressions/gui_PM8Vpf7lZ51U.html#rat_YqhEiWTj9z6L",
+            "checksum": "ac6375f619252e3e5b0aa18cdd0b4e43c500edd6efbdb8626943b4b8a7558e01"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_0ydPk7VENSrA",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_0ydPk7VENSrA",
-            "checksum": "58b5cf5d93cff233931edb0c7c55f0894f7a6355473ac25a03e19e1e042f1b16"
+            "link": "coding-guidelines/expressions/gui_PM8Vpf7lZ51U.html#non_compl_ex_0ydPk7VENSrA",
+            "checksum": "a133591a06bea13783b220b14708ec97a947d731f5fdbf09e241d922fb4f3205"
           },
           "compliant_example": {
             "id": "compl_ex_oneKuF52yzrx",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_oneKuF52yzrx",
-            "checksum": "8cb37ea110c9aee1a7b946c567d4410b8cb4063c31939f85bd7c8d1990c5cfdf"
+            "link": "coding-guidelines/expressions/gui_PM8Vpf7lZ51U.html#compl_ex_oneKuF52yzrx",
+            "checksum": "d9a8c2ee03c68b15fa926d550d58ecf3cc974a3c0fbaac3816f215bf62ae4f1f"
           },
           "bibliography": null
         },
         {
           "id": "gui_RHvQj8BHlz9b",
           "title": "Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand",
-          "link": "coding-guidelines/expressions/index.html#gui_RHvQj8BHlz9b",
-          "checksum": "b0c5e0a9883b405eb90c5f2c3d8d4ad0a2d141b940869605faee6a7173191932",
+          "link": "coding-guidelines/expressions/gui_RHvQj8BHlz9b.html#gui_RHvQj8BHlz9b",
+          "checksum": "ed970e7d6ffaba1f4532704d394ee227e9fceb3c4614fda06d73e6d6edd4801b",
           "rationale": {
             "id": "rat_3MpR8QfHodGT",
-            "link": "coding-guidelines/expressions/index.html#rat_3MpR8QfHodGT",
-            "checksum": "706bca4659fb217135ed8954462b02c9affc6e2d6a3b12389c4e743d4ebdcdb1"
+            "link": "coding-guidelines/expressions/gui_RHvQj8BHlz9b.html#rat_3MpR8QfHodGT",
+            "checksum": "85daf66ca44959a441449e0b42b86b84a4d0b9f74093b59bcad81184c382d7c1"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_O9FZuazu3Lcp",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_O9FZuazu3Lcp",
-            "checksum": "4c42eb7610cf0844371110a3412ecb1ab5ef4614880efb64e8b2315f39c53325"
+            "link": "coding-guidelines/expressions/gui_RHvQj8BHlz9b.html#non_compl_ex_O9FZuazu3Lcp",
+            "checksum": "315a567ef944ea57b604b7f603bbc97309c7eb5209b9d683afc647c459118281"
           },
           "compliant_example": {
             "id": "compl_ex_xpPQqYeEPGIo",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_xpPQqYeEPGIo",
-            "checksum": "31521dc16a0a08ccf7e0aa854a1ce8f6e0bbfdb59a2835d5015426ac22156de8"
+            "link": "coding-guidelines/expressions/gui_RHvQj8BHlz9b.html#compl_ex_xpPQqYeEPGIo",
+            "checksum": "a34a1a77c93cd0dd5b3a97b0b0542a681079ce25a922adc7803e6778e5773d55"
           },
           "bibliography": {
             "id": "bib_RHvQj8BHlz9b",
-            "link": "coding-guidelines/expressions/index.html#bib_RHvQj8BHlz9b",
-            "checksum": "458c699eaf1e226f1d497dccbfd829bc37aa9784a7d6ca75039129a81b276f0b"
+            "link": "coding-guidelines/expressions/gui_RHvQj8BHlz9b.html#bib_RHvQj8BHlz9b",
+            "checksum": "8c0a0ceb986a34edfb604b3d7d6cf0a2e1975c038ec78bb75e5b5a56662c60ce"
           }
         },
         {
           "id": "gui_dCquvqE1csI3",
           "title": "Ensure that integer operations do not result in arithmetic overflow",
-          "link": "coding-guidelines/expressions/index.html#gui_dCquvqE1csI3",
-          "checksum": "23c948607eedd28d4fdce080a5e98ed1a1e1ff323a1f93cb5ec4dca8b2664fde",
+          "link": "coding-guidelines/expressions/gui_dCquvqE1csI3.html#gui_dCquvqE1csI3",
+          "checksum": "3ab52de88c275a80a56d91fb6378c789e647ad13e2afb780e28a6f380151c533",
           "rationale": {
             "id": "rat_LvrS1jTCXEOk",
-            "link": "coding-guidelines/expressions/index.html#rat_LvrS1jTCXEOk",
-            "checksum": "458c7c22e24dafe918df90aaaa9d776629dce7e30b5949c3fcc7284e1bf0fd42"
+            "link": "coding-guidelines/expressions/gui_dCquvqE1csI3.html#rat_LvrS1jTCXEOk",
+            "checksum": "02afa609476159343bde52e1662dc10c93345ec2beb941c358764e5fa1501b4c"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_cCh2RQUXeH0O",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_cCh2RQUXeH0O",
-            "checksum": "6781a2b79bccc421b13ab3aa2a85e6d19c90cf8ed8b66c29a9dcae912d244c4f"
+            "link": "coding-guidelines/expressions/gui_dCquvqE1csI3.html#non_compl_ex_cCh2RQUXeH0O",
+            "checksum": "38ec0081379fa61f5f342a3a0da921d34f987aec723da51c391b83a9158c7633"
           },
           "compliant_example": {
             "id": "compl_ex_BgUHiRB4kc4d",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_BgUHiRB4kc4d",
-            "checksum": "a523a2b81bcfec82986551e5cfb407df9d86252a186df073b0f3706a2a89bb7f"
+            "link": "coding-guidelines/expressions/gui_dCquvqE1csI3.html#compl_ex_BgUHiRB4kc4d",
+            "checksum": "a3d76fe982ac889492365709fc3af67bf26bd9cd67ed7bcb1b632d9649bad79f"
           },
           "bibliography": {
             "id": "bib_dCquvqE1csI3",
-            "link": "coding-guidelines/expressions/index.html#bib_dCquvqE1csI3",
-            "checksum": "dfda1ccacde0629c214e663f61df35c10a0d4a55a89a9b0373e6064287538b83"
+            "link": "coding-guidelines/expressions/gui_dCquvqE1csI3.html#bib_dCquvqE1csI3",
+            "checksum": "a6614dad77e8bd4883133ae6d046816314a866895770d3eae756899af58ac396"
           }
         },
         {
           "id": "gui_iv9yCMHRgpE0",
           "title": "An integer shall not be converted to an invalid pointer",
-          "link": "coding-guidelines/expressions/index.html#gui_iv9yCMHRgpE0",
-          "checksum": "a650bd2fdcb8d35b898301384049f830891e9c51acc942ceb9148529f4e8f29a",
+          "link": "coding-guidelines/expressions/gui_iv9yCMHRgpE0.html#gui_iv9yCMHRgpE0",
+          "checksum": "a06181a44de198c4683ebdc63305e8566435369238759e80c8cc26f6e2f28cc2",
           "rationale": {
             "id": "rat_OhxKm751axKw",
-            "link": "coding-guidelines/expressions/index.html#rat_OhxKm751axKw",
-            "checksum": "8b0b2171f01c3ccff62e49da1fcdedeb3b3af7c462af3b395aecfebe3eb7ddee"
+            "link": "coding-guidelines/expressions/gui_iv9yCMHRgpE0.html#rat_OhxKm751axKw",
+            "checksum": "5d181a611a7809d252638d114c6db41ccb7a0d8d32190fbe93270d8d440fe51c"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_CkytKjRQezfQ",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_CkytKjRQezfQ",
-            "checksum": "223c54f94af9454e13cf6e6da09f013064b681dd4e5bb84641310185e0ecb030"
+            "link": "coding-guidelines/expressions/gui_iv9yCMHRgpE0.html#non_compl_ex_CkytKjRQezfQ",
+            "checksum": "23cc6642a2e0a7c96f91ea8b09c615534aa1f7f25423f5730c3c5df0be574d00"
           },
           "compliant_example": {
             "id": "compl_ex_oBoluiKSvREu",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_oBoluiKSvREu",
-            "checksum": "d6b065ab07bd9d6c3f1edf88d7bb6aef796e9c4593c46a1e7b817913efde70b0"
+            "link": "coding-guidelines/expressions/gui_iv9yCMHRgpE0.html#compl_ex_oBoluiKSvREu",
+            "checksum": "7a08e400c5dd7bd85facea5d6655833ad1c44da5fdb67b3331adb7751616fac4"
           },
           "bibliography": null
         },
         {
           "id": "gui_kMbiWbn8Z6g5",
           "title": "Do not divide by 0",
-          "link": "coding-guidelines/expressions/index.html#gui_kMbiWbn8Z6g5",
-          "checksum": "d1e0581b8d1563ab6abcb51eca060b0bfc50986d8d2ab69afa6eeb3caa5d5ab9",
+          "link": "coding-guidelines/expressions/gui_kMbiWbn8Z6g5.html#gui_kMbiWbn8Z6g5",
+          "checksum": "d0928c1cf565494679551bc0d816ae07ce6c9efc4ba1b069c6605e42cdf718e9",
           "rationale": {
             "id": "rat_h84NjY2tLSBW",
-            "link": "coding-guidelines/expressions/index.html#rat_h84NjY2tLSBW",
-            "checksum": "e1bc266e94540336135cdfbf061776d4fa77aa32770d408e454c55209037a0f8"
+            "link": "coding-guidelines/expressions/gui_kMbiWbn8Z6g5.html#rat_h84NjY2tLSBW",
+            "checksum": "4d6bf8d5c16af673c66a329941aacd4511644f1eb54d1c4db1f55b564f49c5c8"
           },
           "non_compliant_example": {
             "id": "non_compl_ex_LLs3vY8aGz0F",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_LLs3vY8aGz0F",
-            "checksum": "e5bba8a008b9c13603c945d2166d6c66b9dda13d483028da3ba4996f82fd8ac5"
+            "link": "coding-guidelines/expressions/gui_kMbiWbn8Z6g5.html#non_compl_ex_LLs3vY8aGz0F",
+            "checksum": "26f61e8b0d0103a203ad0cc7d242c764fcfeaf212d26e555979f80c29f047d8a"
           },
           "compliant_example": {
             "id": "compl_ex_Ri9pP5Ch3kcc",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_Ri9pP5Ch3kcc",
-            "checksum": "7d67a3d8eea36d102d0959ae86b1fecae02a3f8a00f9fcac614c60fd5d46101d"
+            "link": "coding-guidelines/expressions/gui_kMbiWbn8Z6g5.html#compl_ex_Ri9pP5Ch3kcc",
+            "checksum": "1dd7a1249fb93f0ce6b93a384dd16806c31be328541c5eca6fa90685745ff5b2"
           },
           "bibliography": {
             "id": "bib_kMbiWbn8Z6g5",
-            "link": "coding-guidelines/expressions/index.html#bib_kMbiWbn8Z6g5",
-            "checksum": "fe0492ad8b14ffc1956e163c24ed070c9fa9bb62d323a5ebc2faece9b2b09fa6"
-          }
-        },
-        {
-          "id": "gui_Bib7x9KmPq2nL",
-          "title": "Example guideline with bibliography",
-          "link": "coding-guidelines/expressions/index.html#gui_Bib7x9KmPq2nL",
-          "checksum": "7a89f11c9e20e74a6bf005c8489956e8da633a10113e1f2baf394c093f4a107d",
-          "rationale": {
-            "id": "rat_Bib7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#rat_Bib7x9KmPq2nL",
-            "checksum": "5b8b382b70e23ebb3a9aa61a24a0fd08cd1110c7ea6a0aa3b51508b5ec1740fc"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_Bib7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_Bib7x9KmPq2nL",
-            "checksum": "48206267b9dc36ee5538d925b25969e26b164bd306f90d7887b14f5e0fe2bc77"
-          },
-          "compliant_example": {
-            "id": "compl_ex_Bib7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_Bib7x9KmPq2nL",
-            "checksum": "351fae0b912ae5f8284faff635b57e061576e0ee2322ba0d5891b716a1d9474e"
-          },
-          "bibliography": {
-            "id": "bib_Bib7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#bib_Bib7x9KmPq2nL",
-            "checksum": "ab20a46f145d2aadb9dbcc8a5d8d8800f87ce7a244401cac4ac7101e3c170bab"
-          }
-        },
-        {
-          "id": "gui_Bob7x9KmPq2nL",
-          "title": "Example guideline with bibliography",
-          "link": "coding-guidelines/expressions/index.html#gui_Bob7x9KmPq2nL",
-          "checksum": "6039e36db96b5c73858c3a4630b703d44094b4ed90e25e532e1f61cf32a2aeee",
-          "rationale": {
-            "id": "rat_Bob7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#rat_Bob7x9KmPq2nL",
-            "checksum": "dc8d5a132495c1f91a6dbe08953249017a5595a4925d74972c1fe52ad9ea2486"
-          },
-          "non_compliant_example": {
-            "id": "non_compl_ex_Bob7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#non_compl_ex_Bob7x9KmPq2nL",
-            "checksum": "e1ad2eb8e2b47df0fd3e81080a933a9d911a2ed21df3587e19455660aa37b8bb"
-          },
-          "compliant_example": {
-            "id": "compl_ex_Bob7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#compl_ex_Bob7x9KmPq2nL",
-            "checksum": "d48c9ec6fc5602eab60f23a78079c88b69d0466d30e9d0b5c5c0d5b1bdb93297"
-          },
-          "bibliography": {
-            "id": "bib_Bob7x9KmPq2nL",
-            "link": "coding-guidelines/expressions/index.html#bib_Bob7x9KmPq2nL",
-            "checksum": "be7520c8c354403d5f9ade9e9e955742cae4f334cb56e2f8e51da850c660f8e6"
+            "link": "coding-guidelines/expressions/gui_kMbiWbn8Z6g5.html#bib_kMbiWbn8Z6g5",
+            "checksum": "9a7725d1c11d3dc790401e4354eb626f192ec0fee6624a0195006a9526e63553"
           }
         }
       ]
