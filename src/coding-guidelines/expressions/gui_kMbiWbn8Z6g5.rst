@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Do not divide by 0
+==================
+
 .. guideline:: Do not divide by 0
    :id: gui_kMbiWbn8Z6g5
    :category: required

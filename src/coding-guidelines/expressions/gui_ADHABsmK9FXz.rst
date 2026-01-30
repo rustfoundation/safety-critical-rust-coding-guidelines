@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+The 'as' operator should not be used with numeric operands
+==========================================================
+
 .. guideline:: The 'as' operator should not be used with numeric operands
    :id: gui_ADHABsmK9FXz
    :category: advisory

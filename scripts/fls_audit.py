@@ -413,7 +413,6 @@ def scan_guideline_references(
 ) -> dict[str, list[dict[str, str]]]:
     fls_to_guidelines: dict[str, list[dict[str, str]]] = {}
     file_paths = set(src_dir.rglob("*.rst"))
-    file_paths.update(src_dir.rglob("*.rst.inc"))
     for path in sorted(file_paths):
         collect_guidelines_from_file(path, repo_root, fls_to_guidelines)
     return fls_to_guidelines
@@ -535,7 +534,6 @@ def build_guideline_text_index(
 ) -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
     file_paths = set((repo_root / "src").rglob("*.rst"))
-    file_paths.update((repo_root / "src").rglob("*.rst.inc"))
 
     current_id: str | None = None
     current_title = ""

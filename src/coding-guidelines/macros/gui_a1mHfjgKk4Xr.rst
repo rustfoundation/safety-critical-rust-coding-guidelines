@@ -3,12 +3,15 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Shall not write code that expands macros
-   :id: gui_uuDOArzyO3Qw
+Shall not invoke macros
+=======================
+
+.. guideline:: Shall not invoke macros
+   :id: gui_a1mHfjgKk4Xr
    :category: mandatory
    :status: draft
    :release: todo
-   :fls: fls_wjldgtio5o75
+   :fls: fls_vnvt40pa48n8
    :decidability: decidable
    :scope: system
    :tags: reduce-human-error
@@ -16,13 +19,13 @@
    Description of the guideline goes here.
 
    .. rationale::
-      :id: rat_dNgSvC0SZ3JJ
+      :id: rat_62mSorNF05kD
       :status: draft
 
       Explanation of why this guideline is important.
 
    .. non_compliant_example::
-      :id: non_compl_ex_g9j8shyGM2Rh
+      :id: non_compl_ex_hP5KLhqQfDcd
       :status: draft
 
       Explanation of code example.
@@ -37,7 +40,7 @@
         # fn main() {}
 
    .. compliant_example::
-      :id: compl_ex_cFPg6y7upNdl
+      :id: compl_ex_ti7GWHCOhUvT
       :status: draft
 
       Explanation of code example.

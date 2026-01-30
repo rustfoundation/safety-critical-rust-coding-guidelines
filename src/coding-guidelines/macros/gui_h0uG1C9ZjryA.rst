@@ -3,12 +3,15 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Shall not invoke macros
-   :id: gui_a1mHfjgKk4Xr
+Shall not use Declarative Macros
+================================
+
+.. guideline:: Shall not use Declarative Macros
+   :id: gui_h0uG1C9ZjryA
    :category: mandatory
    :status: draft
    :release: todo
-   :fls: fls_vnvt40pa48n8
+   :fls: fls_xa7lp0zg1ol2
    :decidability: decidable
    :scope: system
    :tags: reduce-human-error
@@ -16,13 +19,13 @@
    Description of the guideline goes here.
 
    .. rationale::
-      :id: rat_62mSorNF05kD
+      :id: rat_U3AEUPyaUhcb
       :status: draft
 
       Explanation of why this guideline is important.
 
    .. non_compliant_example::
-      :id: non_compl_ex_hP5KLhqQfDcd
+      :id: non_compl_ex_Gb4zimei8cNI
       :status: draft
 
       Explanation of code example.
@@ -37,10 +40,10 @@
         # fn main() {}
 
    .. compliant_example::
-      :id: compl_ex_ti7GWHCOhUvT
+      :id: compl_ex_Pw7YCh4Iv47Z
       :status: draft
 
-      Explanation of code example.
+      Explanation of code example
 
       .. rust-example::
 

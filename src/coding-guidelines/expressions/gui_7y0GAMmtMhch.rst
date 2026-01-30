@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Do not use an integer type as a divisor during integer division
+===============================================================
+
 .. guideline:: Do not use an integer type as a divisor during integer division
    :id: gui_7y0GAMmtMhch
    :category: advisory

@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Avoid as underscore pointer casts
+=================================
+
 .. guideline:: Avoid as underscore pointer casts
    :id: gui_HDnAZ7EZ4z6G
    :category: required

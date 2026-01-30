@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand
+==================================================================================================================
+
 .. guideline:: Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand
     :id: gui_RHvQj8BHlz9b 
     :category: advisory

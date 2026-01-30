@@ -3,26 +3,29 @@
 
 .. default-domain:: coding-guidelines
 
-.. guideline:: Do not hide unsafe blocks within macro expansions
-   :id: gui_FRLaMIMb4t3S
-   :category: required
+Shall not write code that expands macros
+========================================
+
+.. guideline:: Shall not write code that expands macros
+   :id: gui_uuDOArzyO3Qw
+   :category: mandatory
    :status: draft
    :release: todo
-   :fls: fls_4vjbkm4ceymk
-   :decidability: todo
-   :scope: todo
+   :fls: fls_wjldgtio5o75
+   :decidability: decidable
+   :scope: system
    :tags: reduce-human-error
 
    Description of the guideline goes here.
 
    .. rationale::
-      :id: rat_WJubG7KuUDLW
+      :id: rat_dNgSvC0SZ3JJ
       :status: draft
 
       Explanation of why this guideline is important.
 
    .. non_compliant_example::
-      :id: non_compl_ex_AyFnP0lJLHxi
+      :id: non_compl_ex_g9j8shyGM2Rh
       :status: draft
 
       Explanation of code example.
@@ -37,7 +40,7 @@
         # fn main() {}
 
    .. compliant_example::
-      :id: compl_ex_pO5gP1aj2v4F
+      :id: compl_ex_cFPg6y7upNdl
       :status: draft
 
       Explanation of code example.

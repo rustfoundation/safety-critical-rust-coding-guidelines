@@ -3,6 +3,9 @@
 
 .. default-domain:: coding-guidelines
 
+Attribute macros shall not be used
+==================================
+
 .. guideline:: Attribute macros shall not be used
    :id: gui_13XWp3mb0g2P
    :category: required
