@@ -2,16 +2,16 @@
    SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
 .. guideline:: Assure visibility of ``unsafe`` keyword in unsafe code
-    :id: gui_ZDLZzjeOwLSU
-    :category: required
-    :status: draft
-    :release: 1.85-latest
-    :fls: fls_8kqo952gjhaf
-    :decidability: decidable
-    :scope: crate
-    :tags: readability, reduce-human-error
+   :id: gui_ZDLZzjeOwLSU
+   :category: required
+   :status: draft
+   :release: 1.85-latest
+   :fls: fls_8kqo952gjhaf
+   :decidability: decidable
+   :scope: crate
+   :tags: readability, reduce-human-error
 
-    Mark all code that may violate safety guarantees with a visible ``unsafe`` keyword :cite:`gui_jK6lMn7oPq8r:RUST-REF-UNSAFE-KEYWORD`.
+    Mark all code that may violate safety guarantees with a visible ``unsafe`` keyword :cite:`gui_ZDLZzjeOwLSU:RUST-REF-UNSAFE-KEYWORD`.
     
     The following constructs require explicit ``unsafe`` visibility:
 
@@ -33,8 +33,8 @@
 
         * Auditability and Review
 
-            * ``unsafe`` blocks create clear audit boundaries where reviewers can focus on code that may violate Rust's safety guarantees :cite:`gui_bC2dEf3gHi4j:RUSTNOMICON-MEET-SAFE`
-            * Safety-critical standards like ISO 26262 :cite:`gui_kL5mNo6pQr7s:ISO-26262` and DO-178C :cite:`gui_tU8vWx9yZa0b:DO-178C` require traceability of hazardous operations
+            * ``unsafe`` blocks create clear audit boundaries where reviewers can focus on code that may violate Rust's safety guarantees :cite:`gui_ZDLZzjeOwLSU:RUSTNOMICON-MEET-SAFE`
+            * Safety-critical standards like ISO 26262 :cite:`gui_ZDLZzjeOwLSU:ISO-26262` and DO-178C :cite:`gui_ZDLZzjeOwLSU:DO-178C` require traceability of hazardous operations
             * Helps enumerate and document all places where safety requirements must be manually upheld
             * Satisfies ISO 26262 Part 6, Table 1, objective 1c (use of language subsets)
             * Satisfies DO-178C Section 6.3.4.f (source code traceability)
@@ -47,7 +47,7 @@
 
         * Static Analysis and Tooling
 
-            * Tools like ``cargo-geiger`` :cite:`gui_cD3eGh4iJk5l:CARGO-GEIGER`, ``unsafe-inspect``,
+            * Tools like ``cargo-geiger`` :cite:`gui_ZDLZzjeOwLSU:CARGO-GEIGER`, ``unsafe-inspect``,
               and custom linters can automatically locate and count unsafe blocks
             * Enables metrics like "unsafe density" for safety assessments
             * Supports qualification evidence required by certification standards
@@ -70,9 +70,9 @@
         It is even possible for an unmangled symbol to conflict with a mangled symbol.
 
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
+        In Rust Edition 2024, missing ``unsafe`` wrappers cause compilation errors.
 
         .. rust-example::
-..           :compile_fail:
 
             // Undefined behavior by the linker or loader is possible 
             // if another 'convert' function is defined.
@@ -94,6 +94,7 @@
         NOTE:  This code can still have undefined behavior if the 'convert' function symbol is define more than once.
 
         .. rust-example::
+          :miri:
 
             #[unsafe(no_mangle)] // compliant.
             fn convert() {}
@@ -115,7 +116,7 @@
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
-..           :compile_fail:
+          :miri:
 
            use std::ffi;
 
@@ -149,6 +150,7 @@
         ``malloc`` used in this compliant example has been correct to accept one argument of type ``usize``.
 
         .. rust-example::
+          :miri:
 
             use std::ffi;
 
@@ -192,17 +194,17 @@
         This noncompliant example requires Rust Edition 2021 or earlier to compile.
 
         .. rust-example::
-           :compile_fail:
+          :compile_fail:
+          :edition: 2024
 
             // Collides with the C library 'printf' function
             #[export_name = "printf"]  // noncompliant
 
             // Missing unsafe marker - noncompliant in Rust 2024
-            #[unsafe(link_section = ".init_array")] // noncompliant
+            #[link_section = ".init_array"] // noncompliant
             static DATA: u32 = 42;  // Corrupts initialization table!
 
             fn main() {
-                printf("Hello, World");
                 println!("DATA = {DATA}");
             }
 
@@ -214,6 +216,7 @@
         to make their safety implications visible.
 
         .. rust-example::
+          :miri:
 
             // SAFETY: 'custom_symbol' does not conflict with any other symbol
             #[unsafe(export_name = "custom_symbol")]
@@ -232,41 +235,35 @@
                println!("DATA = {DATA}");
            }
 
-    .. enforcement::
-        :id: enf_pQ8rSt9uVw0x
-        :status: draft
+    **Enforcement**
+    This guideline can be enforced through the following mechanisms:
 
-        This guideline can be enforced through the following mechanisms:
+    * **Rust Edition 2024**: Migrating to Rust Edition 2024 makes violations of this guideline
+      compilation errors for ``extern`` blocks and unsafe attributes.
 
-        * **Rust Edition 2024**: Migrating to Rust Edition 2024 makes violations of this guideline
-          compilation errors for ``extern`` blocks and unsafe attributes.
+    * **Compiler Lints**: Enable the following lints:
 
-        * **Compiler Lints**: Enable the following lints:
+        * ``#![deny(unsafe_code)]`` - Denies all unsafe code (use ``#[allow(unsafe_code)]`` for justified exceptions)
+        * ``#![deny(unsafe_op_in_unsafe_fn)]`` - Requires explicit unsafe blocks within unsafe functions
+        * ``#![warn(unsafe_attr_outside_unsafe)]`` - Warns about unsafe attributes without the ``unsafe()`` wrapper (pre-2024)
 
-            * ``#![deny(unsafe_code)]`` - Denies all unsafe code (use ``#[allow(unsafe_code)]`` for justified exceptions)
-            * ``#![deny(unsafe_op_in_unsafe_fn)]`` - Requires explicit unsafe blocks within unsafe functions
-            * ``#![warn(unsafe_attr_outside_unsafe)]`` - Warns about unsafe attributes without the ``unsafe()`` wrapper (pre-2024)
+    * **Static Analysis Tools**:
 
-        * **Static Analysis Tools**:
+        * ``cargo-geiger`` - Counts and reports unsafe code usage
+        * ``cargo-audit`` - Checks for known vulnerabilities in dependencies
+        * Custom Clippy lints for project-specific requirements
 
-            * ``cargo-geiger`` - Counts and reports unsafe code usage
-            * ``cargo-audit`` - Checks for known vulnerabilities in dependencies
-            * Custom Clippy lints for project-specific requirements
+    * **Code Review**: Manual review of all code containing ``unsafe`` tokens should be
+      part of the development process, with documented justification for each usage.
 
-        * **Code Review**: Manual review of all code containing ``unsafe`` tokens should be
-          part of the development process, with documented justification for each usage.
-
-    .. related_guidelines::
-        :id: rel_gH4iJk5lMn6o
-        :status: draft
-
-        * Minimize the scope of unsafe blocks
-        * Document safety invariants for all unsafe code with ``// SAFETY:`` comments
-        * Prefer safe abstractions over raw unsafe code
-        * Use ``#![forbid(unsafe_code)]`` at crate level where possible, with explicit exceptions
+    **Related guidelines**
+    * Minimize the scope of unsafe blocks
+    * Document safety invariants for all unsafe code with ``// SAFETY:`` comments
+    * Prefer safe abstractions over raw unsafe code
+    * Use ``#![forbid(unsafe_code)]`` at crate level where possible, with explicit exceptions
 
    .. bibliography::
-      :id: bib_WNCi5njUWLuZ
+      :id: bib_ZDLZzjeOwLSU
       :status: draft
 
       .. list-table::
@@ -274,38 +271,38 @@
          :widths: auto
          :class: bibliography-table
 
-         * - :bibentry:`gui_aB3cDe4fGh5i:RUST-EDITION-GUIDE`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:RUST-EDITION-GUIDE`
            - The Rust Edition Guide. "Rust 2024." https://doc.rust-lang.org/edition-guide/rust-2024/index.html.
 
-         * - :bibentry:`gui_jK6lMn7oPq8r:RUST-REF-UNSAFE-KEYWORD`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:RUST-REF-UNSAFE-KEYWORD`
            - The Rust Reference. "Unsafe Keyword." https://doc.rust-lang.org/reference/unsafe-keyword.html.
 
-         * - :bibentry:`gui_sT9uVw0xYz1a:RUST-LINT-UNSAFE`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:RUST-LINT-UNSAFE`
            - Rust Compiler Lint Documentation. "unsafe_code." https://doc.rust-lang.org/rustc/lints/listing/allowed-by-default.html#unsafe-code.
 
-         * - :bibentry:`gui_bC2dEf3gHi4j:RUSTNOMICON-MEET-SAFE`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:RUSTNOMICON-MEET-SAFE`
            - The Rustonomicon. "Meet Safe and Unsafe." https://doc.rust-lang.org/nomicon/meet-safe-and-unsafe.html.
 
-         * - :bibentry:`gui_kL5mNo6pQr7s:ISO-26262`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:ISO-26262`
            - International Organization for Standardization. "ISO 26262 - Road vehicles - Functional safety." https://www.iso.org/standard/68383.html.
 
-         * - :bibentry:`gui_tU8vWx9yZa0b:DO-178C`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:DO-178C`
            - RTCA, Inc. "DO-178C: Software Considerations in Airborne Systems and Equipment Certification." https://store.accuristech.com/standards/rtca-do-178c.
 
-         * - :bibentry:`gui_cD3eGh4iJk5l:CARGO-GEIGER`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:CARGO-GEIGER`
            - cargo-geiger contributors. "cargo-geiger: Detects usage of unsafe Rust." https://github.com/geiger-rs/cargo-geiger.
 
-         * - :bibentry:`gui_mN6oQp7rSt8u:RUST-REF-EXTERN`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:RUST-REF-EXTERN`
            - The Rust Reference. "External blocks." https://doc.rust-lang.org/reference/items/external-blocks.html.
 
-         * - :bibentry:`gui_vW9xYz0aAb1c:RUST-REF-UNSAFE-ATTR`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:RUST-REF-UNSAFE-ATTR`
            - The Rust Reference. "Unsafe attributes." https://doc.rust-lang.org/reference/attributes.html#unsafe-attributes.
 
-         * - :bibentry:`gui_dE2fGh3iJk4l:FERROCENE-SPEC`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:FERROCENE-SPEC`
            - Ferrocene GmbH. "Ferrocene Language Specification." https://spec.ferrocene.dev/.
 
-         * - :bibentry:`gui_eF3gHi4jKl5m:RUST-REF-UNION`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:RUST-REF-UNION`
            - The Rust Reference. "Unions." https://doc.rust-lang.org/reference/items/unions.html.
 
-         * - :bibentry:`gui_fG4hIj5kLm6n:UCG-VALIDITY`
+         * - :bibentry:`gui_ZDLZzjeOwLSU:UCG-VALIDITY`
            - Rust Unsafe Code Guidelines. "Validity and Safety Invariant." https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#validity-and-safety-invariant.
