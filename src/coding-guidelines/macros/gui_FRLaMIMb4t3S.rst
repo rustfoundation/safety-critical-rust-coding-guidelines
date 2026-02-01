@@ -4,7 +4,7 @@
 .. default-domain:: coding-guidelines
 
 Do not hide unsafe code in macros
-================================
+===================================
 
 .. guideline:: Do not hide unsafe code in macros
    :id: gui_FRLaMIMb4t3S
@@ -33,6 +33,7 @@ Do not hide unsafe code in macros
       This noncompliant example defines a ``deref_ptr`` macro that performs an unsafe pointer dereference.
 
       .. rust-example::
+        :miri:
 
         // This macro hides the unsafe token from callers - noncompliant
         macro_rules! deref_ptr {
@@ -54,9 +55,10 @@ Do not hide unsafe code in macros
 
       This compliant example requires the caller to wrap the macro invocation in an ``unsafe`` block,
       making the use of unsafe code obvious at the call site.
-      Visibility can be further improved by prefixing the identifier for each unsafe macro with the string "unsafe_".
+      Visibility can be further improved by prefixing the identifier for each unsafe macro with the string ``unsafe_``.
 
       .. rust-example::
+        :miri:
 
         // This macro requires the caller to acknowledge the unsafe operation - compliant
         macro_rules! unsafe_deref_ptr {
