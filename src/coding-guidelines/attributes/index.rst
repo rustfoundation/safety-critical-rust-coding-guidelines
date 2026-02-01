@@ -6,4 +6,9 @@
 Attributes
 ==========
 
-.. include:: gui_ZDLZzjeOwLSU.rst.inc
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*
