@@ -360,12 +360,11 @@ Do not directly or indirectly compare function pointers
 
           fn get_a() -> (u8, u8, u8, u8) {
               let mut a = MyMaybeUninit { init: (0, 0, 0, 0) };
-              let addr1 = write_first as usize;
-              let addr2 = write_second as usize;
+              let addr1 = write_first as *const ();
+              let addr2 = write_second as *const ();
               if addr1 == addr2 {
                   unsafe {
-                      let ptr = addr1 as *const ();
-                      let f: fn(&mut MyMaybeUninit) = core::mem::transmute(ptr);
+                      let f: fn(&mut MyMaybeUninit) = core::mem::transmute(addr1);
                       f(&mut a);
                   }
               }
