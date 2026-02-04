@@ -888,20 +888,9 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     Returns (response_message, success).
     """
     # Get or create the tracking entry for this issue
-    issue_key = str(issue_number)  # YAML keys are strings
-    if "active_reviews" not in state:
-        state["active_reviews"] = {}
-    if issue_key not in state["active_reviews"]:
-        state["active_reviews"][issue_key] = {"skipped": [], "current_reviewer": None}
-    
-    # Handle old format (just a list) - migrate to new format
-    if isinstance(state["active_reviews"][issue_key], list):
-        state["active_reviews"][issue_key] = {
-            "skipped": state["active_reviews"][issue_key],
-            "current_reviewer": None
-        }
-    
-    issue_data = state["active_reviews"][issue_key]
+    issue_data = ensure_review_entry(state, issue_number, create=True)
+    if issue_data is None:
+        return "❌ Unable to load review state.", False
     
     # Determine who the current reviewer is:
     # 1. First check our tracked state
@@ -1664,6 +1653,67 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 # ==============================================================================
 
 
+def ensure_review_entry(state: dict, issue_number: int, create: bool = False) -> dict | None:
+    """Ensure the active review entry exists and has required fields."""
+    issue_key = str(issue_number)
+
+    if "active_reviews" not in state:
+        state["active_reviews"] = {}
+
+    review_entry = state["active_reviews"].get(issue_key)
+    if review_entry is None:
+        if not create:
+            return None
+        review_entry = {
+            "skipped": [],
+            "current_reviewer": None,
+            "assigned_at": None,
+            "last_reviewer_activity": None,
+            "transition_warning_sent": None,
+            "assignment_method": None,
+            "review_completed_at": None,
+            "review_completed_by": None,
+            "review_completion_source": None,
+        }
+        state["active_reviews"][issue_key] = review_entry
+    elif isinstance(review_entry, list):
+        review_entry = {
+            "skipped": review_entry,
+            "current_reviewer": None,
+            "assigned_at": None,
+            "last_reviewer_activity": None,
+            "transition_warning_sent": None,
+            "assignment_method": None,
+            "review_completed_at": None,
+            "review_completed_by": None,
+            "review_completion_source": None,
+        }
+        state["active_reviews"][issue_key] = review_entry
+
+    if not isinstance(review_entry, dict):
+        return None
+
+    if not isinstance(review_entry.get("skipped"), list):
+        review_entry["skipped"] = []
+
+    required_fields = {
+        "current_reviewer": None,
+        "assigned_at": None,
+        "last_reviewer_activity": None,
+        "transition_warning_sent": None,
+        "assignment_method": None,
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+    }
+
+    for field, default in required_fields.items():
+        if field not in review_entry:
+            review_entry[field] = default
+
+    return review_entry
+
+
 def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
                         assignment_method: str = "round-robin") -> None:
     """Track the designated reviewer for an issue/PR in our state.
@@ -1674,48 +1724,21 @@ def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
         reviewer: GitHub username of the reviewer
         assignment_method: How they were assigned - 'round-robin', 'claim', or 'manual'
     """
-    issue_key = str(issue_number)
     now = datetime.now(timezone.utc).isoformat()
-    
-    if "active_reviews" not in state:
-        state["active_reviews"] = {}
-    if issue_key not in state["active_reviews"]:
-        state["active_reviews"][issue_key] = {
-            "skipped": [],
-            "current_reviewer": None,
-            "assigned_at": None,
-            "last_reviewer_activity": None,
-            "transition_warning_sent": None,
-            "assignment_method": None,
-        }
-    elif isinstance(state["active_reviews"][issue_key], list):
-        # Migrate old format
-        state["active_reviews"][issue_key] = {
-            "skipped": state["active_reviews"][issue_key],
-            "current_reviewer": None,
-            "assigned_at": None,
-            "last_reviewer_activity": None,
-            "transition_warning_sent": None,
-            "assignment_method": None,
-        }
-    
-    # Ensure new fields exist (migration for existing entries)
-    review_data = state["active_reviews"][issue_key]
-    if "assigned_at" not in review_data:
-        review_data["assigned_at"] = None
-    if "last_reviewer_activity" not in review_data:
-        review_data["last_reviewer_activity"] = None
-    if "transition_warning_sent" not in review_data:
-        review_data["transition_warning_sent"] = None
-    if "assignment_method" not in review_data:
-        review_data["assignment_method"] = None
-    
+
+    review_data = ensure_review_entry(state, issue_number, create=True)
+    if review_data is None:
+        return
+
     # Set the reviewer and timestamps
     review_data["current_reviewer"] = reviewer
     review_data["assigned_at"] = now
     review_data["last_reviewer_activity"] = now
     review_data["transition_warning_sent"] = None  # Clear any previous warning
     review_data["assignment_method"] = assignment_method
+    review_data["review_completed_at"] = None
+    review_data["review_completed_by"] = None
+    review_data["review_completion_source"] = None
 
 
 def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
@@ -1724,13 +1747,11 @@ def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> b
     
     Returns True if activity was recorded (reviewer matched), False otherwise.
     """
-    issue_key = str(issue_number)
-    
-    if "active_reviews" not in state or issue_key not in state["active_reviews"]:
+    review_data = ensure_review_entry(state, issue_number)
+    if review_data is None:
         return False
-    
-    review_data = state["active_reviews"][issue_key]
-    if not isinstance(review_data, dict):
+
+    if review_data.get("review_completed_at"):
         return False
     
     current_reviewer = review_data.get("current_reviewer")
@@ -1743,6 +1764,32 @@ def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> b
     review_data["transition_warning_sent"] = None
     
     print(f"Updated reviewer activity for #{issue_number} by @{reviewer}")
+    return True
+
+
+def mark_review_complete(
+    state: dict,
+    issue_number: int,
+    reviewer: str | None,
+    source: str,
+) -> bool:
+    """Mark a review as complete and stop reminder timers."""
+    review_data = ensure_review_entry(state, issue_number, create=True)
+    if review_data is None:
+        return False
+
+    if review_data.get("review_completed_at"):
+        return False
+
+    now = datetime.now(timezone.utc).isoformat()
+    review_data["review_completed_at"] = now
+    review_data["review_completed_by"] = reviewer or None
+    review_data["review_completion_source"] = source
+    review_data["last_reviewer_activity"] = now
+    review_data["transition_warning_sent"] = None
+
+    reviewer_text = f" by @{reviewer}" if reviewer else ""
+    print(f"Marked review complete for #{issue_number}{reviewer_text} ({source})")
     return True
 
 
@@ -1770,6 +1817,9 @@ def check_overdue_reviews(state: dict) -> list[dict]:
     
     for issue_key, review_data in state["active_reviews"].items():
         if not isinstance(review_data, dict):
+            continue
+
+        if review_data.get("review_completed_at"):
             continue
         
         current_reviewer = review_data.get("current_reviewer")
@@ -1981,15 +2031,31 @@ def handle_labeled_event(state: dict) -> bool:
     We already know from LABEL_NAME that the correct label was added,
     so we skip the label check that handle_issue_or_pr_opened does.
     """
-    label_name = os.environ.get("LABEL_NAME", "")
-
-    if label_name not in REVIEW_LABELS:
-        print(f"Label '{label_name}' is not a review label, skipping")
-        return False
-
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         print("No issue number found")
+        return False
+
+    label_name = os.environ.get("LABEL_NAME", "")
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+
+    if label_name == "sign-off: create pr":
+        if is_pr:
+            print("Sign-off label applied to PR; ignoring")
+            return False
+        review_data = ensure_review_entry(state, issue_number)
+        reviewer = None
+        if review_data:
+            reviewer = review_data.get("current_reviewer")
+        return mark_review_complete(
+            state,
+            issue_number,
+            reviewer,
+            "issue_label: sign-off: create pr",
+        )
+
+    if label_name not in REVIEW_LABELS:
+        print(f"Label '{label_name}' is not a review label, skipping")
         return False
 
     # Check if already has a reviewer (check our tracked state first, then GitHub)
@@ -2026,7 +2092,6 @@ def handle_labeled_event(state: dict) -> bool:
         return False
 
     # Assign the reviewer (best effort - may fail if no permissions)
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     assign_reviewer(issue_number, reviewer)
     
     # Track the reviewer in our state
@@ -2046,6 +2111,47 @@ def handle_labeled_event(state: dict) -> bool:
     post_comment(issue_number, guidance)
 
     return True
+
+
+def handle_pull_request_review_event(state: dict) -> bool:
+    """Handle submitted PR reviews for activity and completion tracking."""
+    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    if not issue_number:
+        print("No issue number found")
+        return False
+
+    review_state = os.environ.get("REVIEW_STATE", "").strip().upper()
+    review_author = os.environ.get("REVIEW_AUTHOR", "").strip()
+    if not review_state or not review_author:
+        print("Missing review context")
+        return False
+
+    review_data = ensure_review_entry(state, issue_number)
+    if review_data is None:
+        print(f"No active review entry for #{issue_number}")
+        return False
+
+    current_reviewer = review_data.get("current_reviewer")
+    if not current_reviewer or current_reviewer.lower() != review_author.lower():
+        print(
+            f"Ignoring review from @{review_author} on #{issue_number}; "
+            f"current reviewer is @{current_reviewer}"
+        )
+        return False
+
+    if review_state == "APPROVED":
+        return mark_review_complete(
+            state,
+            issue_number,
+            review_author,
+            "pull_request_review",
+        )
+
+    if review_state in {"COMMENTED", "CHANGES_REQUESTED"}:
+        return update_reviewer_activity(state, issue_number, review_author)
+
+    print(f"Ignoring review state '{review_state}' for #{issue_number}")
+    return False
 
 
 def handle_closed_event(state: dict) -> bool:
@@ -2356,6 +2462,10 @@ def main():
             state_changed = handle_labeled_event(state)
         elif event_action == "closed":
             state_changed = handle_closed_event(state)
+
+    elif event_name == "pull_request_review":
+        if event_action == "submitted":
+            state_changed = handle_pull_request_review_event(state)
 
     elif event_name == "issue_comment":
         if event_action == "created":
