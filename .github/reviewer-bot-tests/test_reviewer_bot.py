@@ -41,6 +41,8 @@ def clear_env():
         "ISSUE_NUMBER",
         "ISSUE_AUTHOR",
         "IS_PULL_REQUEST",
+        "REVIEW_AUTHOR",
+        "REVIEW_STATE",
         "REPO_OWNER",
         "REPO_NAME",
     }
@@ -554,6 +556,94 @@ def test_handle_labeled_event_wrong_label(stub_api, captured_comments):
     assert captured_comments == []
 
 
+def test_handle_labeled_event_sign_off_marks_completion(stub_api):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["LABEL_NAME"] = "sign-off: create pr"
+    os.environ["ISSUE_NUMBER"] = "42"
+    handled = reviewer_bot.handle_labeled_event(state)
+    assert handled is True
+    review_data = state["active_reviews"]["42"]
+    assert review_data["review_completed_at"] is not None
+    assert review_data["review_completed_by"] == "alice"
+    assert review_data["review_completion_source"] == "issue_label: sign-off: create pr"
+
+
+def test_handle_labeled_event_sign_off_ignored_for_pr(stub_api):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["LABEL_NAME"] = "sign-off: create pr"
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["IS_PULL_REQUEST"] = "true"
+    handled = reviewer_bot.handle_labeled_event(state)
+    assert handled is False
+    review_data = state["active_reviews"]["42"]
+    assert review_data.get("review_completed_at") is None
+
+
+def test_handle_pull_request_review_event_approval_marks_complete(stub_api):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = "approved"
+    os.environ["REVIEW_AUTHOR"] = "alice"
+    handled = reviewer_bot.handle_pull_request_review_event(state)
+    assert handled is True
+    review_data = state["active_reviews"]["42"]
+    assert review_data["review_completed_at"] is not None
+    assert review_data["review_completed_by"] == "alice"
+    assert review_data["review_completion_source"] == "pull_request_review"
+    assert review_data["last_reviewer_activity"] != "2000-01-01T00:00:00+00:00"
+
+
+@pytest.mark.parametrize("review_state", ["commented", "changes_requested"])
+def test_handle_pull_request_review_event_updates_activity(stub_api, review_state):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
+    }
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = review_state
+    os.environ["REVIEW_AUTHOR"] = "alice"
+    handled = reviewer_bot.handle_pull_request_review_event(state)
+    assert handled is True
+    review_data = state["active_reviews"]["42"]
+    assert review_data["last_reviewer_activity"] != "2000-01-01T00:00:00+00:00"
+    assert review_data.get("review_completed_at") is None
+    assert review_data.get("transition_warning_sent") is None
+
+
+def test_handle_pull_request_review_event_ignores_non_assigned(stub_api):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = "approved"
+    os.environ["REVIEW_AUTHOR"] = "bob"
+    handled = reviewer_bot.handle_pull_request_review_event(state)
+    assert handled is False
+    review_data = state["active_reviews"]["42"]
+    assert review_data.get("review_completed_at") is None
+
+
 def test_handle_closed_event_clears_active_review():
     state = make_state()
     state["active_reviews"]["42"] = {"current_reviewer": "alice"}
@@ -585,6 +675,18 @@ def test_check_overdue_reviews_detects_warning():
     overdue = reviewer_bot.check_overdue_reviews(state)
     assert overdue
     assert overdue[0]["needs_warning"] is True
+
+
+def test_check_overdue_reviews_skips_completed():
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "review_completed_at": "2000-01-02T00:00:00+00:00",
+    }
+    overdue = reviewer_bot.check_overdue_reviews(state)
+    assert overdue == []
 
 
 def test_handle_overdue_review_warning_posts_comment(stub_api, captured_comments):
