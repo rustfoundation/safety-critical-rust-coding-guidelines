@@ -20,8 +20,16 @@
     - [8) Your Guideline gets merged](#8-your-guideline-gets-merged)
     - [You just contributed a coding guideline!](#you-just-contributed-a-coding-guideline)
   - [Reviewer Bot Commands](#reviewer-bot-commands)
-    - [Overview](#overview)
-    - [Available Commands](#available-commands)
+    - [Pass this Review to the next Producer](#pass-this-review-to-the-next-producer)
+    - [Step Away from Queue](#step-away-from-queue)
+    - [Claim a Review](#claim-a-review)
+    - [Release Your Assignment](#release-your-assignment)
+    - [Assign a Specific Reviewer](#assign-a-specific-reviewer)
+    - [Request Next Reviewer from Queue](#request-next-reviewer-from-queue)
+    - [Manage Labels](#manage-labels)
+    - [Sync Members](#sync-members)
+    - [Check Queue Status](#check-queue-status)
+    - [Show Available Commands](#show-available-commands)
     - [Review Deadlines](#review-deadlines)
     - [Queue Status](#queue-status)
   - [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
@@ -182,19 +190,24 @@ That's it!
 
 ## Reviewer Bot Commands
 
-### Overview
+> [!NOTE]
+> These commands only apply in the context of coding guideline issues.
 
-The reviewer bot (`@guidelines-bot`) automatically assigns reviewers to coding guideline issues and PRs using a round-robin system. Only members marked as "Producer" in the consortium's `subcommittee/coding-guidelines/members.md` are included in the rotation.
+Before we continue, here's a preamble on how the reviewer bot helps reviewers do their job.
 
-The queue's state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314).
+1. The reviewer bot (`guidelines-bot`) automatically assigns reviewers to coding guideline issues and PRs using a round-robin system.
+
+2. Only members marked as "Producer" in the consortium's [`members.md`](https://github.com/rustfoundation/safety-critical-rust-consortium/blob/main/subcommittee/coding-guidelines/members.md) are included in the rotation.
+
+3. The queue's state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314).
+
+4. All commands are invoked by mentioning `@guidelines-bot` in a comment.
 
 Round-robin here means the bot maintains a queue of Producers and a `current_index` cursor. Each assignment takes the next eligible reviewer in queue order and advances the cursor; the queue order does not change, except when `/pass` repositions the reviewer to be next up for future assignments. If no eligible reviewer is available (queue empty or all candidates skipped), the bot leaves the issue or PR unassigned and posts: "No reviewers available in the queue. Please use `@guidelines-bot /sync-members` to update the queue."
 
-### Available Commands
+Down below are the available commands.
 
-All commands are invoked by mentioning `@guidelines-bot` in a comment:
-
-#### Pass a Review (This Issue Only)
+### Pass this Review to the next Producer
 
 ```
 @guidelines-bot /pass [optional reason]
@@ -207,7 +220,7 @@ Use this when you cannot review a specific issue/PR but want to remain in the ro
 @guidelines-bot /pass Not familiar enough with FFI to review this one
 ```
 
-#### Step Away from Queue
+### Step Away from Queue
 
 ```
 @guidelines-bot /away YYYY-MM-DD [optional reason]
@@ -220,7 +233,7 @@ Use this to temporarily remove yourself from the reviewer queue until the specif
 @guidelines-bot /away 2025-02-15 On vacation
 ```
 
-#### Claim a Review
+### Claim a Review
 
 ```
 @guidelines-bot /claim
@@ -233,7 +246,7 @@ Use this to assign yourself as the reviewer for an issue/PR. This removes any ex
 @guidelines-bot /claim
 ```
 
-#### Release Your Assignment
+### Release Your Assignment
 
 ```
 @guidelines-bot /release [reason]
@@ -246,7 +259,7 @@ Use this to release your assignment from an issue/PR without automatically assig
 @guidelines-bot /release Need to focus on other priorities
 ```
 
-#### Assign a Specific Reviewer
+### Assign a Specific Reviewer
 
 ```
 @guidelines-bot /r? @username
@@ -259,7 +272,7 @@ Use this to assign a specific person as the reviewer. This is useful when you kn
 @guidelines-bot /r? @expert-reviewer
 ```
 
-#### Request Next Reviewer from Queue
+### Request Next Reviewer from Queue
 
 ```
 @guidelines-bot /r? producers
@@ -275,7 +288,7 @@ Use this to request the next reviewer from the round-robin queue for an already-
 @guidelines-bot /r? producers
 ```
 
-#### Manage Labels
+### Manage Labels
 
 ```
 @guidelines-bot /label +label-name    # Add a label
@@ -288,7 +301,7 @@ Use this to request the next reviewer from the round-robin queue for an already-
 @guidelines-bot /label -ready-for-review
 ```
 
-#### Sync Members
+### Sync Members
 
 ```
 @guidelines-bot /sync-members
@@ -296,7 +309,7 @@ Use this to request the next reviewer from the round-robin queue for an already-
 
 Manually trigger a sync of the reviewer queue with `members.md`. This happens automatically on each workflow run, but you can force it if needed.
 
-#### Check Queue Status
+### Check Queue Status
 
 ```
 @guidelines-bot /queue
@@ -304,7 +317,7 @@ Manually trigger a sync of the reviewer queue with `members.md`. This happens au
 
 Shows the current queue position, who's next up for review, and who is currently away.
 
-#### Show Available Commands
+### Show Available Commands
 
 ```
 @guidelines-bot /commands
