@@ -184,7 +184,7 @@ That's it!
 
 The reviewer bot (`@guidelines-bot`) automatically assigns reviewers to coding guideline issues and PRs using a round-robin system. Only members marked as "Producer" in the consortium's `subcommittee/coding-guidelines/members.md` are included in the rotation.
 
-The queue state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314).
+The queue's state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314).
 
 Round-robin here means the bot maintains a queue of Producers and a `current_index` cursor. Each assignment takes the next eligible reviewer in queue order and advances the cursor; the queue order does not change, except when `/pass` repositions the reviewer to be next up for future assignments. If no eligible reviewer is available (queue empty or all candidates skipped), the bot leaves the issue or PR unassigned and posts: "No reviewers available in the queue. Please use `@guidelines-bot /sync-members` to update the queue."
 
@@ -353,7 +353,7 @@ The goal is communication, not perfection. If you need to pass or step away, jus
 
 ### Queue Status
 
-The queue state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314) and includes:
+The queue's state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314) and includes:
 
 - **Current queue position** - Who will be assigned next
 - **Active producers** - All reviewers in the rotation
