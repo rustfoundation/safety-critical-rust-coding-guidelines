@@ -102,6 +102,8 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 
 > **Note:** A reviewer is automatically assigned from the pool of Producers using a round-robin system. See [Reviewer Bot Commands](#reviewer-bot-commands) for details.
 
+When a subcommittee member adds the `sign-off: create pr` label, the issue review is considered complete and reviewer reminders stop.
+
 ### 4) Create the PR
 
 > [!NOTE]
@@ -313,6 +315,8 @@ Shows all available bot commands with descriptions.
 ### Review Deadlines
 
 Reviewers have **14 days** to provide initial feedback on assigned issues or PRs. This timeline helps ensure contributors receive timely responses.
+
+Review comments or changes requested by the assigned reviewer reset the 14-day timer. When the assigned reviewer approves the PR, the review is marked complete and reminders stop.
 
 #### What Happens If the Deadline Passes
 
