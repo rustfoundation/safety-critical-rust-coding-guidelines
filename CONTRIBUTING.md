@@ -95,6 +95,8 @@ contents converted to reStructuredText.
 
 Within 14 days of your submission, a member of the Coding Guidelines Subcommittee should give you a first review. You'll work with them (and other members) to flesh out the concept and ensure the guideline is well prepared for a Pull Request.
 
+When a subcommittee member adds the `sign-off: create pr` label, the issue review is considered complete and reviewer reminders stop.
+
 ### 4) Create the PR
 
 > [!NOTE]
@@ -128,6 +130,8 @@ This will ensure issue `#xyz` is closed when your Pull Request gets merged.
 The generated Pull Request may attract additional feedback or simply be an easier place to suggest targeted edits.
 
 As the contributor of the coding guideline and opener of the issue, you'll respond to comments, discuss, all the normal things on the pull request.
+
+Review comments or changes requested by the assigned reviewer reset the 14-day timer. When the assigned reviewer approves the PR, the review is marked complete and reminders stop.
 
 #### 5.2) Update the PR Based on Feedback
 
