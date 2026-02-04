@@ -2,9 +2,9 @@
 """
 Reviewer Bot for Safety-Critical Rust Coding Guidelines
 
-This bot manages round-robin assignment of reviewers for coding guideline
-issues and PRs. It supports commands for passing reviews, vacations, and
-label management.
+This bot manages round-robin assignment of reviewers for coding guideline and
+FLS audit issues and PRs. It supports commands for passing reviews, vacations,
+and label management.
 
 All commands must be prefixed with @guidelines-bot /<command>:
 
@@ -37,6 +37,9 @@ All commands must be prefixed with @guidelines-bot /<command>:
   @guidelines-bot /label -label-name
     - Remove a label from the issue/PR
 
+  @guidelines-bot /accept-no-fls-changes
+    - Update spec.lock and open a PR when the audit reports no guideline impact
+
   @guidelines-bot /sync-members
     - Manually trigger sync of the queue with members.md
 
@@ -50,8 +53,10 @@ All commands must be prefixed with @guidelines-bot /<command>:
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import yaml
 
@@ -70,6 +75,8 @@ except ImportError:
 BOT_NAME = "guidelines-bot"
 BOT_MENTION = f"@{BOT_NAME}"
 CODING_GUIDELINE_LABEL = "coding guideline"
+FLS_AUDIT_LABEL = "fls-audit"
+REVIEW_LABELS = {CODING_GUIDELINE_LABEL, FLS_AUDIT_LABEL}
 # State is stored in a dedicated GitHub issue body (set via environment variable)
 STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
 # Members file is in the consortium repo, not this repo
@@ -89,6 +96,7 @@ COMMANDS = {
     "claim": "Claim this review for yourself",
     "r?": "Assign a reviewer (@username or 'producers')",
     "label": "Add/remove labels (+label-name or -label-name)",
+    "accept-no-fls-changes": "Update spec.lock and open PR for a clean audit",
     "sync-members": "Sync queue with members.md",
     "queue": "Show reviewer queue and who's next",
     "commands": "Show all available commands",
@@ -653,7 +661,42 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
    - Content written may be *incomplete*, but must not be *incorrect*
    - The `🧪 Code Example Test Results` section shows all example code compiles
 
-4. When ready, **add the `sign-off: create pr from issue` label** to signal the contributor should create a PR
+4. When ready, **add the `sign-off: create pr` label** to signal the contributor should create a PR
+
+## Bot Commands
+
+If you need to pass this review:
+- `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
+- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
+- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
+
+To assign someone else:
+- `{BOT_MENTION} /r? @username` - Assign a specific reviewer
+- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue
+
+Other commands:
+- `{BOT_MENTION} /claim` - Claim this review for yourself
+- `{BOT_MENTION} /label +label-name` - Add a label
+- `{BOT_MENTION} /label -label-name` - Remove a label
+- `{BOT_MENTION} /queue` - Show reviewer queue
+- `{BOT_MENTION} /commands` - Show all available commands
+"""
+
+
+def get_fls_audit_guidance(reviewer: str, issue_author: str) -> str:
+    """Generate guidance text for an FLS audit issue reviewer."""
+    return f"""👋 Hey @{reviewer}! You've been assigned to review this FLS audit issue.
+
+## Your Role as Reviewer
+
+Please review the audit report in the issue body and determine whether any
+guideline changes are required.
+
+If the changes do **not** affect any guidelines:
+- Comment `{BOT_MENTION} /accept-no-fls-changes` to open a PR that updates `src/spec.lock`.
+
+If the changes **do** affect guidelines:
+- Open a PR with the necessary guideline updates and reference this issue.
 
 ## Bot Commands
 
@@ -723,45 +766,72 @@ Other commands:
 # ==============================================================================
 
 
+def strip_code_blocks(comment_body: str) -> str:
+    """Remove fenced, indented, and inline code blocks from text."""
+    sanitized = comment_body
+
+    def strip_fenced_blocks(text: str, fence: str) -> str:
+        pattern = re.compile(re.escape(fence) + r".*?" + re.escape(fence), re.DOTALL)
+        stripped = pattern.sub("", text)
+        last_fence = stripped.rfind(fence)
+        if last_fence != -1:
+            stripped = stripped[:last_fence]
+        return stripped
+
+    sanitized = strip_fenced_blocks(sanitized, "```")
+    sanitized = strip_fenced_blocks(sanitized, "~~~")
+    sanitized = re.sub(r"^(?: {4}|\t).*$", "", sanitized, flags=re.MULTILINE)
+    sanitized = re.sub(r"`[^`]*`", "", sanitized)
+
+    return sanitized
+
+
 def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
     """
     Parse a bot command from a comment body.
 
     Returns (command, args) or None if no command found.
-    
+
     Special return values:
+    - ("_multiple_commands", []) - Multiple commands found in a single comment
     - ("_malformed_known", [attempted_cmd]) - Missing / prefix on known command
     - ("_malformed_unknown", [attempted_word]) - Missing / prefix on unknown word
-    
+
     All commands must be prefixed with @guidelines-bot /<command>:
     - @guidelines-bot /pass [reason]
     - @guidelines-bot /r? @username (assign specific user)
     - @guidelines-bot /r? producers (assign next from queue)
     """
     # Look for @guidelines-bot /<command> pattern (correct syntax)
+    mention_pattern = rf"{re.escape(BOT_MENTION)}\s+/\S+"
     pattern = rf"{re.escape(BOT_MENTION)}\s+/(\S+)(.*)$"
+    matches = re.findall(mention_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
+
+    if len(matches) > 1:
+        return "_multiple_commands", []
+
     match = re.search(pattern, comment_body, re.IGNORECASE | re.MULTILINE)
 
     if not match:
         # Check for malformed command (missing / prefix)
         malformed_pattern = rf"{re.escape(BOT_MENTION)}\s+(\S+)"
         malformed_match = re.search(malformed_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
-        
+
         if malformed_match:
             attempted = malformed_match.group(1).lower()
             # Check if it looks like a command (not just random text after mention)
             # Ignore if it starts with common conversational words
-            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could", 
+            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could",
                             "would", "should", "please", "thanks", "thank", "hi", "hello", "hey"}
             if attempted in conversational:
                 return None
-            
+
             # Check if it's a known command without the /
             if attempted in COMMANDS or attempted in {"r?-user", "assign-from-queue"}:
                 return "_malformed_known", [attempted]
             else:
                 return "_malformed_unknown", [attempted]
-        
+
         return None
 
     command = match.group(1).lower()
@@ -818,20 +888,9 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     Returns (response_message, success).
     """
     # Get or create the tracking entry for this issue
-    issue_key = str(issue_number)  # YAML keys are strings
-    if "active_reviews" not in state:
-        state["active_reviews"] = {}
-    if issue_key not in state["active_reviews"]:
-        state["active_reviews"][issue_key] = {"skipped": [], "current_reviewer": None}
-    
-    # Handle old format (just a list) - migrate to new format
-    if isinstance(state["active_reviews"][issue_key], list):
-        state["active_reviews"][issue_key] = {
-            "skipped": state["active_reviews"][issue_key],
-            "current_reviewer": None
-        }
-    
-    issue_data = state["active_reviews"][issue_key]
+    issue_data = ensure_review_entry(state, issue_number, create=True)
+    if issue_data is None:
+        return "❌ Unable to load review state.", False
     
     # Determine who the current reviewer is:
     # 1. First check our tracked state
@@ -840,9 +899,13 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     if not passed_reviewer:
         current_assignees = get_issue_assignees(issue_number)
         passed_reviewer = current_assignees[0] if current_assignees else None
-    
+
     if not passed_reviewer:
         return "❌ No reviewer is currently assigned to pass.", False
+
+    if passed_reviewer.lower() != comment_author.lower():
+        return "❌ Only the currently assigned reviewer can use `/pass`.", False
+
 
     # Check if this is the first pass on this issue (for messaging only)
     is_first_pass = len(issue_data["skipped"]) == 0
@@ -1016,9 +1079,9 @@ def handle_label_command(issue_number: int, label_string: str) -> tuple[str, boo
     """
     import re
     
-    # Find all +label and -label patterns
-    # Labels can contain spaces, colons, etc. - they end at the next +/- or end of string
-    pattern = r'([+-])([^+-]+)'
+    # Find +label and -label patterns where the operator starts a label token.
+    # Operators must be at the start or preceded by whitespace to avoid splitting on hyphens.
+    pattern = r'(?:(?<=^)|(?<=\s))([+-])(.+?)(?=\s[+-]|\s*$)'
     matches = re.findall(pattern, label_string)
     
     if not matches:
@@ -1056,6 +1119,182 @@ def handle_label_command(issue_number: int, label_string: str) -> tuple[str, boo
         return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
     
     return "\n".join(results), all_success
+
+
+def parse_issue_labels() -> list[str]:
+    labels_json = os.environ.get("ISSUE_LABELS", "[]")
+    try:
+        labels = json.loads(labels_json)
+    except json.JSONDecodeError:
+        labels = []
+    if not isinstance(labels, list):
+        return []
+    return [str(label) for label in labels]
+
+
+def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    if check and result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Command failed").strip())
+    return result
+
+
+def summarize_output(result: subprocess.CompletedProcess, limit: int = 20) -> str:
+    combined = "\n".join(
+        [line for line in [result.stdout, result.stderr] if line]
+    ).strip()
+    if not combined:
+        return ""
+    lines = combined.splitlines()
+    return "\n".join(lines[-limit:])
+
+
+def list_changed_files(repo_root: Path) -> list[str]:
+    result = run_command(["git", "status", "--porcelain"], cwd=repo_root)
+    files = []
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        path = line[3:]
+        if " -> " in path:
+            path = path.split(" -> ")[-1]
+        files.append(path)
+    return files
+
+
+def get_default_branch() -> str:
+    repo_info = github_api("GET", "")
+    if isinstance(repo_info, dict):
+        return repo_info.get("default_branch", "main")
+    return "main"
+
+
+def find_open_pr_for_branch(branch: str) -> dict | None:
+    owner = os.environ.get("REPO_OWNER", "")
+    if not owner:
+        return None
+    response = github_api("GET", f"pulls?state=open&head={owner}:{branch}")
+    if isinstance(response, list) and response:
+        if isinstance(response[0], dict):
+            return response[0]
+    return None
+
+
+def create_pull_request(branch: str, base: str, issue_number: int) -> dict | None:
+    existing = find_open_pr_for_branch(branch)
+    if existing:
+        return existing
+    title = "chore: update spec.lock (no guideline impact)"
+    body = (
+        "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n"
+        f"Closes #{issue_number}"
+    )
+    response = github_api(
+        "POST",
+        "pulls",
+        {
+            "title": title,
+            "head": branch,
+            "base": base,
+            "body": body,
+        },
+    )
+    if isinstance(response, dict):
+        return response
+    return None
+
+
+def handle_accept_no_fls_changes_command(issue_number: int, comment_author: str) -> tuple[str, bool]:
+    if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
+        return "❌ This command can only be used on issues, not PRs.", False
+
+    labels = parse_issue_labels()
+    if FLS_AUDIT_LABEL not in labels:
+        return "❌ This command is only available on issues labeled `fls-audit`.", False
+
+    if not check_user_permission(comment_author, "triage"):
+        return "❌ You must have triage permissions to run this command.", False
+
+    repo_root = Path(__file__).resolve().parents[1]
+    if list_changed_files(repo_root):
+        return "❌ Working tree is not clean; refusing to update spec.lock.", False
+
+    audit_result = run_command(
+        ["uv", "run", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
+        cwd=repo_root,
+        check=False,
+    )
+    if audit_result.returncode == 2:
+        return (
+            "❌ The audit reports affected guidelines. Please review and open a PR with "
+            "the necessary guideline updates instead.",
+            False,
+        )
+    if audit_result.returncode != 0:
+        details = summarize_output(audit_result)
+        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
+        return (f"❌ Audit command failed.{detail_text}", False)
+
+    update_result = run_command(
+        ["uv", "run", "python", "./make.py", "--update-spec-lock-file"],
+        cwd=repo_root,
+        check=False,
+    )
+    if update_result.returncode != 0:
+        details = summarize_output(update_result)
+        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
+        return (f"❌ Failed to update spec.lock.{detail_text}", False)
+
+    changed_files = list_changed_files(repo_root)
+    if not changed_files:
+        return "✅ `src/spec.lock` is already up to date; no PR needed.", True
+
+    unexpected = {path for path in changed_files if path != "src/spec.lock"}
+    if unexpected:
+        paths = ", ".join(sorted(unexpected))
+        return (
+            "❌ Unexpected tracked file changes detected; refusing to open a PR. "
+            f"Please review: {paths}",
+            False,
+        )
+
+    branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    base_branch = get_default_branch()
+    branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
+    if run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
+        suffix = datetime.now(timezone.utc).strftime("%H%M%S")
+        branch_name = f"{branch_name}-{suffix}"
+
+    try:
+        run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
+        run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
+        run_command(
+            [
+                "git",
+                "-c",
+                "user.name=guidelines-bot",
+                "-c",
+                "user.email=guidelines-bot@users.noreply.github.com",
+                "commit",
+                "-m",
+                "chore: update spec.lock; no affected guidelines",
+            ],
+            cwd=repo_root,
+        )
+        run_command(["git", "push", "origin", branch_name], cwd=repo_root)
+    except RuntimeError as exc:
+        return (f"❌ Failed to create branch or push changes: {exc}", False)
+
+    pr = create_pull_request(branch_name, base_branch, issue_number)
+    if not pr or "html_url" not in pr:
+        return "❌ Failed to open a pull request for the spec.lock update.", False
+
+    return (f"✅ Opened PR {pr['html_url']}", True)
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
@@ -1127,18 +1366,19 @@ def handle_commands_command() -> tuple[str, bool]:
     """
     return (f"ℹ️ **Available Commands**\n\n"
             f"**Pass or step away:**\n"
-            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue\n"
+            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue (current reviewer only)\n"
             f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n"
             f"- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n"
             f"**Assign reviewers:**\n"
             f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
             f"- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n"
             f"- `{BOT_MENTION} /claim` - Claim this review for yourself\n\n"
-            f"**Other:**\n"
-            f"- `{BOT_MENTION} /label +label-name` - Add a label\n"
-            f"- `{BOT_MENTION} /label -label-name` - Remove a label\n"
-            f"- `{BOT_MENTION} /queue` - Show current queue status\n"
-            f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md"), True
+        f"**Other:**\n"
+        f"- `{BOT_MENTION} /label +label-name` - Add a label\n"
+        f"- `{BOT_MENTION} /label -label-name` - Remove a label\n"
+        f"- `{BOT_MENTION} /accept-no-fls-changes` - Update spec.lock and open a PR when no guidelines are impacted\n"
+        f"- `{BOT_MENTION} /queue` - Show current queue status\n"
+        f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md"), True
 
 
 def handle_claim_command(state: dict, issue_number: int,
@@ -1413,6 +1653,67 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 # ==============================================================================
 
 
+def ensure_review_entry(state: dict, issue_number: int, create: bool = False) -> dict | None:
+    """Ensure the active review entry exists and has required fields."""
+    issue_key = str(issue_number)
+
+    if "active_reviews" not in state:
+        state["active_reviews"] = {}
+
+    review_entry = state["active_reviews"].get(issue_key)
+    if review_entry is None:
+        if not create:
+            return None
+        review_entry = {
+            "skipped": [],
+            "current_reviewer": None,
+            "assigned_at": None,
+            "last_reviewer_activity": None,
+            "transition_warning_sent": None,
+            "assignment_method": None,
+            "review_completed_at": None,
+            "review_completed_by": None,
+            "review_completion_source": None,
+        }
+        state["active_reviews"][issue_key] = review_entry
+    elif isinstance(review_entry, list):
+        review_entry = {
+            "skipped": review_entry,
+            "current_reviewer": None,
+            "assigned_at": None,
+            "last_reviewer_activity": None,
+            "transition_warning_sent": None,
+            "assignment_method": None,
+            "review_completed_at": None,
+            "review_completed_by": None,
+            "review_completion_source": None,
+        }
+        state["active_reviews"][issue_key] = review_entry
+
+    if not isinstance(review_entry, dict):
+        return None
+
+    if not isinstance(review_entry.get("skipped"), list):
+        review_entry["skipped"] = []
+
+    required_fields = {
+        "current_reviewer": None,
+        "assigned_at": None,
+        "last_reviewer_activity": None,
+        "transition_warning_sent": None,
+        "assignment_method": None,
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+    }
+
+    for field, default in required_fields.items():
+        if field not in review_entry:
+            review_entry[field] = default
+
+    return review_entry
+
+
 def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
                         assignment_method: str = "round-robin") -> None:
     """Track the designated reviewer for an issue/PR in our state.
@@ -1423,48 +1724,21 @@ def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
         reviewer: GitHub username of the reviewer
         assignment_method: How they were assigned - 'round-robin', 'claim', or 'manual'
     """
-    issue_key = str(issue_number)
     now = datetime.now(timezone.utc).isoformat()
-    
-    if "active_reviews" not in state:
-        state["active_reviews"] = {}
-    if issue_key not in state["active_reviews"]:
-        state["active_reviews"][issue_key] = {
-            "skipped": [],
-            "current_reviewer": None,
-            "assigned_at": None,
-            "last_reviewer_activity": None,
-            "transition_warning_sent": None,
-            "assignment_method": None,
-        }
-    elif isinstance(state["active_reviews"][issue_key], list):
-        # Migrate old format
-        state["active_reviews"][issue_key] = {
-            "skipped": state["active_reviews"][issue_key],
-            "current_reviewer": None,
-            "assigned_at": None,
-            "last_reviewer_activity": None,
-            "transition_warning_sent": None,
-            "assignment_method": None,
-        }
-    
-    # Ensure new fields exist (migration for existing entries)
-    review_data = state["active_reviews"][issue_key]
-    if "assigned_at" not in review_data:
-        review_data["assigned_at"] = None
-    if "last_reviewer_activity" not in review_data:
-        review_data["last_reviewer_activity"] = None
-    if "transition_warning_sent" not in review_data:
-        review_data["transition_warning_sent"] = None
-    if "assignment_method" not in review_data:
-        review_data["assignment_method"] = None
-    
+
+    review_data = ensure_review_entry(state, issue_number, create=True)
+    if review_data is None:
+        return
+
     # Set the reviewer and timestamps
     review_data["current_reviewer"] = reviewer
     review_data["assigned_at"] = now
     review_data["last_reviewer_activity"] = now
     review_data["transition_warning_sent"] = None  # Clear any previous warning
     review_data["assignment_method"] = assignment_method
+    review_data["review_completed_at"] = None
+    review_data["review_completed_by"] = None
+    review_data["review_completion_source"] = None
 
 
 def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
@@ -1473,13 +1747,11 @@ def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> b
     
     Returns True if activity was recorded (reviewer matched), False otherwise.
     """
-    issue_key = str(issue_number)
-    
-    if "active_reviews" not in state or issue_key not in state["active_reviews"]:
+    review_data = ensure_review_entry(state, issue_number)
+    if review_data is None:
         return False
-    
-    review_data = state["active_reviews"][issue_key]
-    if not isinstance(review_data, dict):
+
+    if review_data.get("review_completed_at"):
         return False
     
     current_reviewer = review_data.get("current_reviewer")
@@ -1492,6 +1764,32 @@ def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> b
     review_data["transition_warning_sent"] = None
     
     print(f"Updated reviewer activity for #{issue_number} by @{reviewer}")
+    return True
+
+
+def mark_review_complete(
+    state: dict,
+    issue_number: int,
+    reviewer: str | None,
+    source: str,
+) -> bool:
+    """Mark a review as complete and stop reminder timers."""
+    review_data = ensure_review_entry(state, issue_number, create=True)
+    if review_data is None:
+        return False
+
+    if review_data.get("review_completed_at"):
+        return False
+
+    now = datetime.now(timezone.utc).isoformat()
+    review_data["review_completed_at"] = now
+    review_data["review_completed_by"] = reviewer or None
+    review_data["review_completion_source"] = source
+    review_data["last_reviewer_activity"] = now
+    review_data["transition_warning_sent"] = None
+
+    reviewer_text = f" by @{reviewer}" if reviewer else ""
+    print(f"Marked review complete for #{issue_number}{reviewer_text} ({source})")
     return True
 
 
@@ -1519,6 +1817,9 @@ def check_overdue_reviews(state: dict) -> list[dict]:
     
     for issue_key, review_data in state["active_reviews"].items():
         if not isinstance(review_data, dict):
+            continue
+
+        if review_data.get("review_completed_at"):
             continue
         
         current_reviewer = review_data.get("current_reviewer")
@@ -1643,7 +1944,7 @@ _If you believe this is in error or have extenuating circumstances, please reach
 
 def handle_issue_or_pr_opened(state: dict) -> bool:
     """
-    Handle when an issue or PR is opened with the coding guideline label.
+    Handle when an issue or PR is opened with a review label.
 
     Returns True if we took action, False otherwise.
     """
@@ -1671,7 +1972,7 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
         print(f"Issue #{issue_number} already has reviewers/assignees: {current_assignees}")
         return False
 
-    # Check for coding guideline label
+    # Check for review labels
     labels_json = os.environ.get("ISSUE_LABELS", "[]")
     print(f"ISSUE_LABELS env: {labels_json}")
     try:
@@ -1680,8 +1981,11 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
         print("Failed to parse ISSUE_LABELS as JSON")
         labels = []
 
-    if CODING_GUIDELINE_LABEL not in labels:
-        print(f"Issue #{issue_number} does not have '{CODING_GUIDELINE_LABEL}' label (labels: {labels})")
+    if not any(label in REVIEW_LABELS for label in labels):
+        print(
+            f"Issue #{issue_number} does not have review labels {sorted(REVIEW_LABELS)} "
+            f"(labels: {labels})"
+        )
         return False
 
     # Get issue author to skip them
@@ -1710,6 +2014,8 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
     # Post guidance comment
     if is_pr:
         guidance = get_pr_guidance(reviewer, issue_author)
+    elif FLS_AUDIT_LABEL in labels:
+        guidance = get_fls_audit_guidance(reviewer, issue_author)
     else:
         guidance = get_issue_guidance(reviewer, issue_author)
 
@@ -1720,20 +2026,36 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
 
 def handle_labeled_event(state: dict) -> bool:
     """
-    Handle when an issue or PR is labeled with the coding guideline label.
+    Handle when an issue or PR is labeled with a review label.
 
     We already know from LABEL_NAME that the correct label was added,
     so we skip the label check that handle_issue_or_pr_opened does.
     """
-    label_name = os.environ.get("LABEL_NAME", "")
-
-    if label_name != CODING_GUIDELINE_LABEL:
-        print(f"Label '{label_name}' is not '{CODING_GUIDELINE_LABEL}', skipping")
-        return False
-
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         print("No issue number found")
+        return False
+
+    label_name = os.environ.get("LABEL_NAME", "")
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+
+    if label_name == "sign-off: create pr":
+        if is_pr:
+            print("Sign-off label applied to PR; ignoring")
+            return False
+        review_data = ensure_review_entry(state, issue_number)
+        reviewer = None
+        if review_data:
+            reviewer = review_data.get("current_reviewer")
+        return mark_review_complete(
+            state,
+            issue_number,
+            reviewer,
+            "issue_label: sign-off: create pr",
+        )
+
+    if label_name not in REVIEW_LABELS:
+        print(f"Label '{label_name}' is not a review label, skipping")
         return False
 
     # Check if already has a reviewer (check our tracked state first, then GitHub)
@@ -1770,7 +2092,6 @@ def handle_labeled_event(state: dict) -> bool:
         return False
 
     # Assign the reviewer (best effort - may fail if no permissions)
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     assign_reviewer(issue_number, reviewer)
     
     # Track the reviewer in our state
@@ -1782,12 +2103,55 @@ def handle_labeled_event(state: dict) -> bool:
     # Post guidance comment
     if is_pr:
         guidance = get_pr_guidance(reviewer, issue_author)
+    elif label_name == FLS_AUDIT_LABEL:
+        guidance = get_fls_audit_guidance(reviewer, issue_author)
     else:
         guidance = get_issue_guidance(reviewer, issue_author)
 
     post_comment(issue_number, guidance)
 
     return True
+
+
+def handle_pull_request_review_event(state: dict) -> bool:
+    """Handle submitted PR reviews for activity and completion tracking."""
+    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    if not issue_number:
+        print("No issue number found")
+        return False
+
+    review_state = os.environ.get("REVIEW_STATE", "").strip().upper()
+    review_author = os.environ.get("REVIEW_AUTHOR", "").strip()
+    if not review_state or not review_author:
+        print("Missing review context")
+        return False
+
+    review_data = ensure_review_entry(state, issue_number)
+    if review_data is None:
+        print(f"No active review entry for #{issue_number}")
+        return False
+
+    current_reviewer = review_data.get("current_reviewer")
+    if not current_reviewer or current_reviewer.lower() != review_author.lower():
+        print(
+            f"Ignoring review from @{review_author} on #{issue_number}; "
+            f"current reviewer is @{current_reviewer}"
+        )
+        return False
+
+    if review_state == "APPROVED":
+        return mark_review_complete(
+            state,
+            issue_number,
+            review_author,
+            "pull_request_review",
+        )
+
+    if review_state in {"COMMENTED", "CHANGES_REQUESTED"}:
+        return update_reviewer_activity(state, issue_number, review_author)
+
+    print(f"Ignoring review state '{review_state}' for #{issue_number}")
+    return False
 
 
 def handle_closed_event(state: dict) -> bool:
@@ -1833,7 +2197,8 @@ def handle_comment_event(state: dict) -> bool:
     activity_updated = update_reviewer_activity(state, issue_number, comment_author)
     
     # Parse for bot command
-    parsed = parse_command(comment_body)
+    sanitized_body = strip_code_blocks(comment_body)
+    parsed = parse_command(sanitized_body)
     if not parsed:
         # No bot command, but we may have updated activity
         return activity_updated
@@ -1845,8 +2210,13 @@ def handle_comment_event(state: dict) -> bool:
     success = False
     state_changed = False
 
+    if command == "_multiple_commands":
+        response = ("⚠️ Multiple bot commands in one comment are ignored. "
+                    "Please post a single command per comment. "
+                    f"For a list of commands, use `{BOT_MENTION} /commands`.")
+        success = False
     # Handle each command
-    if command == "pass":
+    elif command == "pass":
         reason = " ".join(args) if args else None
         response, success = handle_pass_command(state, issue_number, comment_author, reason)
         state_changed = success
@@ -1873,6 +2243,9 @@ def handle_comment_event(state: dict) -> bool:
             # Then parse for +label and -label patterns
             full_arg = " ".join(args)
             response, success = handle_label_command(issue_number, full_arg)
+
+    elif command == "accept-no-fls-changes":
+        response, success = handle_accept_no_fls_changes_command(issue_number, comment_author)
 
     elif command == "sync-members":
         response, success = handle_sync_members_command(state)
@@ -1931,7 +2304,7 @@ def handle_comment_event(state: dict) -> bool:
         success = False
 
     # React to the command comment
-    if comment_id:
+    if comment_id and command != "_multiple_commands":
         add_reaction(int(comment_id), "eyes")
         if success:
             add_reaction(int(comment_id), "+1")
@@ -2089,6 +2462,10 @@ def main():
             state_changed = handle_labeled_event(state)
         elif event_action == "closed":
             state_changed = handle_closed_event(state)
+
+    elif event_name == "pull_request_review":
+        if event_action == "submitted":
+            state_changed = handle_pull_request_review_event(state)
 
     elif event_name == "issue_comment":
         if event_action == "created":

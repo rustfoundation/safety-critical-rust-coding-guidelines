@@ -6,6 +6,9 @@
 Types and Traits
 ================
 
-.. include:: gui_xztNdXA2oFNC.rst.inc
-.. include:: gui_0cuTYG8RVYjg.rst.inc
-.. include:: gui_6JSM7YE7a1KR.rst.inc
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*

@@ -11,7 +11,7 @@ This script:
 2. Converts them to rust-example:: directives
 3. Optionally runs a compilation check to suggest appropriate attributes
 
-Supports both monolithic chapter files (*.rst) and per-guideline files (*.rst.inc).
+Supports monolithic chapter files and per-guideline files (*.rst).
 
 Usage:
     # Preview changes (dry run)
@@ -25,17 +25,12 @@ Usage:
 """
 
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Add scripts directory to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, script_dir)
-
-from rustdoc_utils import RustExample, compile_single_example
+from scripts.rustdoc_utils import RustExample, compile_single_example
 
 # Pattern to find code-block:: rust within the content
 # Use [ \t]* instead of \s* to avoid matching newlines
@@ -61,9 +56,8 @@ def find_rst_files(src_dir: Path) -> List[Path]:
     """
     Find all RST files in the source directory.
     
-    Searches for both:
-    - *.rst files (chapter index files, monolithic chapter files)
-    - *.rst.inc files (per-guideline include files)
+    Searches for:
+    - *.rst files (chapter index files, monolithic chapter files, per-guideline files)
     
     Args:
         src_dir: Directory to search
@@ -71,9 +65,7 @@ def find_rst_files(src_dir: Path) -> List[Path]:
     Returns:
         List of Path objects for all RST files found
     """
-    rst_files = list(src_dir.glob("**/*.rst"))
-    rst_inc_files = list(src_dir.glob("**/*.rst.inc"))
-    return rst_files + rst_inc_files
+    return list(src_dir.glob("**/*.rst"))
 
 
 def extract_code_block_content(content: str, start_pos: int, base_indent: str) -> Tuple[str, int]:
@@ -319,7 +311,7 @@ def process_file(
     Process a single RST file.
     
     Args:
-        file_path: Path to the RST file (supports .rst and .rst.inc)
+    file_path: Path to the RST file
         dry_run: If True, don't write changes
         detect_failures: Whether to detect compilation failures
         prelude: Optional prelude code
@@ -399,7 +391,7 @@ def main():
         else:
             print(f"⚠️  Prelude file not found: {prelude_path}")
     
-    # Find and process RST files (both .rst and .rst.inc)
+    # Find and process RST files
     all_files = find_rst_files(src_dir)
     print(f"🔍 Found {len(all_files)} RST files in {src_dir}")
     

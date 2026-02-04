@@ -52,6 +52,13 @@ def write_guidelines_ids(app):
     # List to track guidelines with missing elements
     incomplete_guidelines = []
 
+    def resolve_document_key(docname: str) -> str:
+        parts = docname.split("/")
+        if len(parts) >= 3 and parts[0] == "coding-guidelines":
+            if parts[2].startswith("gui_"):
+                return "/".join([parts[0], parts[1], "index"])
+        return docname
+
     # Process all guidelines
     for need_id, need in all_needs.items():
         if need["type"] == "guideline":
@@ -138,8 +145,9 @@ def write_guidelines_ids(app):
                     }
                 )
 
-            # Add this guideline to the document
-            documents_data[docname]["guidelines"].append(guideline_data)
+            # Add this guideline to the document (group by chapter index when applicable)
+            document_key = resolve_document_key(docname)
+            documents_data[document_key]["guidelines"].append(guideline_data)
 
     # Prepare the final structure for JSON
     documents = []

@@ -14,6 +14,10 @@ on:
   issue_comment:
     types: [created]
 
+  # Trigger on PR review submissions
+  pull_request_review:
+    types: [submitted]
+
   # Nightly check for overdue reviews (runs at 9 AM UTC daily)
   schedule:
     - cron: '0 9 * * *'
@@ -40,6 +44,7 @@ concurrency:
 permissions:
   issues: write
   pull-requests: write
+  contents: write
 
 env:
   # Issue number where bot state is stored (create this issue first!)
@@ -87,6 +92,9 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
           COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
           COMMENT_ID: ${{ github.event.comment.id }}
+          # Review context (for pull_request_review events)
+          REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_AUTHOR: ${{ github.event.review.user.login }}
           # For manual dispatch
           MANUAL_ACTION: ${{ github.event.inputs.action }}
           # Repository info

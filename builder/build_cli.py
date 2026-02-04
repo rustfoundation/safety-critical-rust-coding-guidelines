@@ -9,6 +9,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ EXTRA_WATCH_DIRS = ["exts", "themes"]
 
 SPEC_CHECKSUM_URL = "https://rust-lang.github.io/fls/paragraph-ids.json"
 SPEC_LOCKFILE = "spec.lock"
+PAGES_DEPLOYMENTS_URL = "https://api.github.com/repos/rust-lang/fls/deployments"
 
 
 def build_docs(
@@ -116,26 +118,112 @@ def build_docs(
     return dest / builder
 
 
+def github_headers() -> dict[str, str]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    token = (
+        os.environ.get("GITHUB_TOKEN")
+        or os.environ.get("GH_TOKEN")
+        or os.environ.get("GITHUB_API_TOKEN")
+    )
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def fetch_pages_deployments(limit: int = 10) -> list[dict[str, str]]:
+    try:
+        response = requests.get(
+            PAGES_DEPLOYMENTS_URL,
+            headers=github_headers(),
+            params={"environment": "github-pages", "per_page": str(limit)},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def fetch_deployment_status(statuses_url: str) -> dict[str, str] | None:
+    if not statuses_url:
+        return None
+    try:
+        response = requests.get(
+            f"{statuses_url}?per_page=1", headers=github_headers(), timeout=30
+        )
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, list) and data:
+            return data[0]
+        return None
+    except Exception:
+        return None
+
+
+def select_pages_deployment() -> tuple[dict[str, str] | None, dict[str, str] | None]:
+    deployments = fetch_pages_deployments()
+    for deployment in deployments:
+        status = fetch_deployment_status(deployment.get("statuses_url", ""))
+        if status and status.get("state") == "success":
+            return deployment, status
+    if deployments:
+        return deployments[0], fetch_deployment_status(
+            deployments[0].get("statuses_url", "")
+        )
+    return None, None
+
+
+def extract_deployment_id(deployment: dict[str, str] | None) -> str:
+    if not deployment:
+        return ""
+    deployment_id = deployment.get("id")
+    if deployment_id is None:
+        return ""
+    return str(deployment_id)
+
+
 def update_spec_lockfile(spec_checksum_location, lockfile_location):
     try:
-        response = requests.get(spec_checksum_location, stream=True)
-
+        response = requests.get(spec_checksum_location, timeout=30)
         response.raise_for_status()
+        data = response.json()
 
-        with open(lockfile_location, "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    file.write(chunk)
+        previous_metadata = None
+        if lockfile_location.exists():
+            try:
+                with open(lockfile_location, "r", encoding="utf-8") as file:
+                    existing = json.load(file)
+                previous_metadata = existing.get("metadata")
+            except Exception:
+                previous_metadata = None
 
-        with open(lockfile_location, "r") as file:
-            data = json.load(file)
+        metadata = {"fls_source_url": spec_checksum_location}
+        deployment, status = select_pages_deployment()
+        if deployment:
+            metadata.update(
+                {
+                    "fls_deployed_commit": deployment.get("sha", ""),
+                    "fls_deployed_at": (
+                        status.get("created_at", "") if status else ""
+                    )
+                    or deployment.get("created_at", ""),
+                    "fls_pages_deployment_id": extract_deployment_id(deployment),
+                }
+            )
 
-        print("-- read in --")
+        if isinstance(previous_metadata, dict):
+            previous = dict(previous_metadata)
+            previous.pop("previous", None)
+            metadata["previous"] = previous
 
-        with open(lockfile_location, "w") as outfile:
+        data["metadata"] = metadata
+
+        with open(lockfile_location, "w", encoding="utf-8") as outfile:
             json.dump(data, outfile, indent=4, sort_keys=True)
-
-        print("-- wrote back out --")
 
         return True
 
@@ -196,15 +284,18 @@ def main(root):
     )
     args = parser.parse_args()
 
+    debug = args.debug or args.verbose
+    builder = "linkcheck" if args.check_links else "xml" if args.xml else "html"
+
     if args.update_spec_lock_file:
         update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
 
     build_docs(
         root,
-        "xml" if args.xml else "html",
+        builder,
         args.clear,
         args.serve,
-        args.debug,
+        debug,
         args.offline,
         not args.ignore_spec_lock_diff,
         args.validate_urls,
