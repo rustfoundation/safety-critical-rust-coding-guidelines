@@ -117,6 +117,8 @@ needs_tags = [
     dict(name="numerics", description="Numerics-related guideline"),
     dict(name="undefined-behavior", description="Guideline related to Undefined Behavior"),
     dict(name="stack-overflow", description="Guideline related to Stack Overflow"),
+    dict(name="unions", description="Guideline related to union types and field access"),
+    dict(name="initialization", description="Guideline related to initialization requirements and uninitialized data"),
 
     dict(name="maintainability", description="How effectively and efficiently a product or system can be modified. This includes improvements, fault corrections, and adaptations to changes in the environment or requirements. It is considered a crucial software quality characteristic."),
     dict(name="portability", description="The degree to which a system, product, or component can be effectively and efficiently transferred from one hardware, software, or other operational or usage environment to another."),
