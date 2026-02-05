@@ -100,7 +100,8 @@ contents converted to reStructuredText.
 
 Within 14 days of your submission, a member of the Coding Guidelines Subcommittee should give you a first review. You'll work with them (and other members) to flesh out the concept and ensure the guideline is well prepared for a Pull Request.
 
-> **Note:** A reviewer is automatically assigned from the pool of Producers using a round-robin system. See [REVIEWING.md](REVIEWING.md) for reviewer bot details.
+> [!TIP]
+> A reviewer is automatically assigned from the pool of Producers using a round-robin system. See [REVIEWING.md](REVIEWING.md) for reviewer bot details.
 
 When a subcommittee member adds the `sign-off: create pr` label, the issue review is considered complete and reviewer reminders stop.
 
