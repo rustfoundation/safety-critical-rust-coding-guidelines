@@ -1,48 +1,33 @@
 # Contributing to the coding guidelines
 
+> [!NOTE]
+> Reviewer or Producer guidance, including bot commands and review deadlines, lives in [REVIEWING.md](REVIEWING.md).
+
 ## Table of Contents
 
-- [Contributing to the coding guidelines](#contributing-to-the-coding-guidelines)
-  - [Table of Contents](#table-of-contents)
-  - [Contribution Workflow](#contribution-workflow)
-    - [Note on Chapter Layout](#note-on-chapter-layout)
-    - [0) Bring up the idea for discussion](#0-optional-bring-the-idea-up-for-discussion)
-    - [1) Submit coding guideline issue](#1-submit-coding-guideline-issue)
-      - [1.1) Finding the FLS ID](#11-finding-the-fls-id)
-    - [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment)
-    - [3) Create a Draft with a Member](#3-create-a-draft-with-a-member)
-    - [4) Create the PR](#4-create-the-pr)
-    - [5) Iterate on Feedback](#5-iterate-on-feedback)
-      - [5.1) Member Begins Review](#51-member-begins-review)
-      - [5.2) Update the PR Based on Feedback](#52-update-the-pr-based-on-feedback)
-    - [6) Contributor Applies Feedback on Issue](#6-contributor-applies-feedback-on-issue)
-    - [7) Contributor Applies Regenerated Guideline to PR](#7-contributor-applies-regenerated-guideline-to-pr)
-    - [8) Your Guideline gets merged](#8-your-guideline-gets-merged)
-    - [You just contributed a coding guideline!](#you-just-contributed-a-coding-guideline)
-  - [Reviewer Bot Commands](#reviewer-bot-commands)
-    - [Pass this Review to the next Producer](#pass-this-review-to-the-next-producer)
-    - [Step Away from Queue](#step-away-from-queue)
-    - [Claim a Review](#claim-a-review)
-    - [Release Your Assignment](#release-your-assignment)
-    - [Assign a Specific Reviewer](#assign-a-specific-reviewer)
-    - [Request Next Reviewer from Queue](#request-next-reviewer-from-queue)
-    - [Manage Labels](#manage-labels)
-    - [Sync Members](#sync-members)
-    - [Check Queue Status](#check-queue-status)
-    - [Show Available Commands](#show-available-commands)
-    - [Review Deadlines](#review-deadlines)
-    - [Queue Status](#queue-status)
-  - [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
-    - [Guideline template](#guideline-template)
-  - [Before You Begin Contributing](#before-you-begin-contributing)
-    - [Licenses](#licenses)
-    - [Code of Conduct](#code-of-conduct)
-  - [Contribution Process](#contribution-process)
-    - [Issues](#issues)
+- [First-time contributor quick start](#first-time-contributor-quick-start)
+- [Contribution workflow](#contribution-workflow)
+- [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
+- [Before you begin contributing](#before-you-begin-contributing)
+- [Contribution process](#contribution-process)
+
+## First-time contributor quick start
+
+If you are new here, this is the shortest path to a first PR. The detailed workflow is in the next section.
+
+1. (Optional) Discuss the idea on Zulip. See [0) Bring the idea up for discussion](#0-optional-bring-the-idea-up-for-discussion).
+2. Open a coding guideline issue. See [1) Submit coding guideline issue](#1-submit-coding-guideline-issue).
+3. Wait for the reStructuredText comment from the bot. See [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
+4. Collaborate with a subcommittee member to refine the draft and get `sign-off: create pr`. See [3) Create a Draft with a Member](#3-create-a-draft-with-a-member).
+5. Create the PR using the generated RST and include `closes #xyz` in the PR body. See [4) Create the PR](#4-create-the-pr).
+6. Iterate on PR feedback until it is approved and merged. See [5) Iterate on Feedback](#5-iterate-on-feedback).
 
 ## Contribution Workflow
 
-Here's a diagram of the overall process:
+The full workflow is below. Expand the diagram if you want a high-level view.
+
+<details>
+<summary>Workflow diagram</summary>
 
 ```mermaid
 flowchart TD
@@ -68,6 +53,8 @@ flowchart TD
   Main --> End(["9: End"])
 ```
 
+</details>
+
 ### Note on Chapter Layout
 
 The Safety Critical Rust Coding guidelines has the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute a new guideline, find a section from the FLS that interests you, then write a guideline in the corresponding chapter of these coding guidelines.
@@ -84,6 +71,9 @@ To add a new coding guideline, open a [coding guideline issue](https://github.co
 
 #### 1.1) Finding the FLS ID
 
+<details>
+<summary>How to find the FLS paragraph ID</summary>
+
 Note that the FLS ID should be filled according to the FLS paragraph ID for which the guideline is covering. One way to go about finding this is to inspect the page using your web browser. You'll be looking for something like:
 
 
@@ -92,6 +82,8 @@ Note that the FLS ID should be filled according to the FLS paragraph ID for whic
 ```
 
 You would then pull `fls_4rhjpdu4zfqj` to place in the FLS ID field.
+
+</details>
 
 
 ### 2) Guideline Generated as a Comment
@@ -108,7 +100,7 @@ contents converted to reStructuredText.
 
 Within 14 days of your submission, a member of the Coding Guidelines Subcommittee should give you a first review. You'll work with them (and other members) to flesh out the concept and ensure the guideline is well prepared for a Pull Request.
 
-> **Note:** A reviewer is automatically assigned from the pool of Producers using a round-robin system. See [Reviewer Bot Commands](#reviewer-bot-commands) for details.
+> **Note:** A reviewer is automatically assigned from the pool of Producers using a round-robin system. See [REVIEWING.md](REVIEWING.md) for reviewer bot details.
 
 When a subcommittee member adds the `sign-off: create pr` label, the issue review is considered complete and reviewer reminders stop.
 
@@ -188,198 +180,12 @@ That's it!
 
 ---
 
-## Reviewer Bot Commands
-
-> [!NOTE]
-> These commands only apply in the context of coding guideline issues.
-
-Before we continue, here's a preamble on how the reviewer bot helps reviewers do their job.
-
-1. The reviewer bot (`guidelines-bot`) automatically assigns reviewers to coding guideline issues and PRs using a round-robin system.
-
-2. Only members marked as "Producer" in the consortium's [`members.md`](https://github.com/rustfoundation/safety-critical-rust-consortium/blob/main/subcommittee/coding-guidelines/members.md) are included in the rotation.
-
-3. The queue's state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314).
-
-4. All commands are invoked by mentioning `@guidelines-bot` in a comment.
-
-Round-robin here means the bot maintains a queue of Producers and a `current_index` cursor. Each assignment takes the next eligible reviewer in queue order and advances the cursor; the queue order does not change, except when `/pass` repositions the reviewer to be next up for future assignments. If no eligible reviewer is available (queue empty or all candidates skipped), the bot leaves the issue or PR unassigned and posts: "No reviewers available in the queue. Please use `@guidelines-bot /sync-members` to update the queue."
-
-Down below are the available commands.
-
-### Pass this Review to the next Producer
-
-```
-@guidelines-bot /pass [optional reason]
-```
-
-Use this when you cannot review a specific issue/PR but want to remain in the rotation for future assignments. The next reviewer in the queue will be assigned instead.
-
-**Example:**
-```
-@guidelines-bot /pass Not familiar enough with FFI to review this one
-```
-
-### Step Away from Queue
-
-```
-@guidelines-bot /away YYYY-MM-DD [optional reason]
-```
-
-Use this to temporarily remove yourself from the reviewer queue until the specified date. You'll be automatically added back when the date arrives. If you're currently assigned to an issue/PR, the next reviewer will be assigned.
-
-**Example:**
-```
-@guidelines-bot /away 2025-02-15 On vacation
-```
-
-### Claim a Review
-
-```
-@guidelines-bot /claim
-```
-
-Use this to assign yourself as the reviewer for an issue/PR. This removes any existing reviewer assignment. Only Producers can claim reviews.
-
-**Example:**
-```
-@guidelines-bot /claim
-```
-
-### Release Your Assignment
-
-```
-@guidelines-bot /release [reason]
-```
-
-Use this to release your assignment from an issue/PR without automatically assigning someone else. The issue/PR will be left unassigned. Use `/pass` if you want to automatically assign the next reviewer.
-
-**Example:**
-```
-@guidelines-bot /release Need to focus on other priorities
-```
-
-### Assign a Specific Reviewer
-
-```
-@guidelines-bot /r? @username
-```
-
-Use this to assign a specific person as the reviewer. This is useful when you know someone has specific expertise relevant to the guideline.
-
-**Example:**
-```
-@guidelines-bot /r? @expert-reviewer
-```
-
-### Request Next Reviewer from Queue
-
-```
-@guidelines-bot /r? producers
-```
-
-Use this to request the next reviewer from the round-robin queue for an already-open issue or PR. This is useful when:
-- An issue/PR was opened without the `coding guideline` label and later labeled
-- The original reviewer was removed and you need a new one
-- You want to explicitly trigger the round-robin assignment
-
-**Example:**
-```
-@guidelines-bot /r? producers
-```
-
-### Manage Labels
-
-```
-@guidelines-bot /label +label-name    # Add a label
-@guidelines-bot /label -label-name    # Remove a label
-```
-
-**Example:**
-```
-@guidelines-bot /label +needs-discussion
-@guidelines-bot /label -ready-for-review
-```
-
-### Sync Members
-
-```
-@guidelines-bot /sync-members
-```
-
-Manually trigger a sync of the reviewer queue with `members.md`. This happens automatically on each workflow run, but you can force it if needed.
-
-### Check Queue Status
-
-```
-@guidelines-bot /queue
-```
-
-Shows the current queue position, who's next up for review, and who is currently away.
-
-### Show Available Commands
-
-```
-@guidelines-bot /commands
-```
-
-Shows all available bot commands with descriptions.
-
-### Review Deadlines
-
-Reviewers have **14 days** to provide initial feedback on assigned issues or PRs. This timeline helps ensure contributors receive timely responses.
-
-Review comments or changes requested by the assigned reviewer reset the 14-day timer. When the assigned reviewer approves the PR, the review is marked complete and reminders stop.
-
-#### What Happens If the Deadline Passes
-
-1. **First 14 days**: The assigned reviewer should provide feedback or take action
-2. **After 14 days with no activity**: The bot posts a reminder and the reviewer enters a **14-day transition period** to Observer status
-3. **After 28 days total**: If still no activity, the reviewer may be transitioned from Producer to Observer status, and the review is reassigned
-
-#### Acceptable Responses
-
-Life happens! Any of these actions will reset the 14-day clock:
-
-- **Post a review comment** - Any substantive feedback counts
-- **Use `/pass [reason]`** - Pass the review to the next person if you can't review it
-- **Use `/away YYYY-MM-DD [reason]`** - Step away temporarily (e.g., "On vacation until 2025-02-15")
-
-#### Before You Pass: Consider the Learning Opportunity
-
-Being assigned a review outside your comfort zone can feel daunting, but it's also one of the most effective ways to deepen your Rust knowledge. When you have a concrete goal—understanding *this* guideline about *this* feature—learning becomes focused and sticky in a way that abstract study rarely achieves.
-
-Before reaching for `/pass`, we encourage you to spend about an hour engaging with the unfamiliar material:
-
-- Skim the relevant FLS section and any linked documentation
-- Read through the guideline with fresh eyes, noting what *does* make sense
-- Search for a blog post or example that illuminates the concept
-- Try compiling and tweaking the code examples yourself
-
-You may find that an hour of targeted exploration is enough to provide meaningful feedback, even if you're not an expert. Catching unclear explanations, spotting typos, or asking "what does this term mean?"—these contributions are valuable precisely *because* you're approaching the material without deep familiarity.
-
-That said, `/pass` exists for good reason. If after an honest effort the material remains opaque, or if the guideline requires genuine expertise you don't have (and can't reasonably acquire in an hour), passing to someone better suited is the right call. The goal is thoughtful engagement, not struggling through a review you can't meaningfully contribute to.
-
-#### Examples of Valid Reasons to Pass
-
-- "Not familiar enough with FFI to review this one"
-- "On holiday, please assign to someone else"
-- "Swamped with other work this week"
-
-The goal is communication, not perfection. If you need to pass or step away, just let us know!
-
-### Queue Status
-
-The queue's state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314) and includes:
-
-- **Current queue position** - Who will be assigned next
-- **Active producers** - All reviewers in the rotation
-- **Pass-until list** - Who is temporarily away and when they return
-- **Recent assignments** - History of the last 20 assignments
-
----
-
 ## Writing a guideline locally (less typical, not recommended)
+
+We recommend the issue-based workflow above. If you need to work locally, expand the section below.
+
+<details>
+<summary>Local authoring steps</summary>
 
 While it is possible to create guidelines locally, we encourage contributors to make use of the process described above since it handles some of the fiddly details for you as a guideline writer.
 
@@ -387,7 +193,9 @@ While it is possible to create guidelines locally, we encourage contributors to 
 
 We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
 
-You can the copy and paste this guideline from the command line into the correct chapter.
+You can then copy and paste this guideline from the command line into the correct chapter.
+
+</details>
 
 ## Before You Begin Contributing
 
