@@ -49,9 +49,9 @@ def clear_env():
         "REPO_OWNER",
         "REPO_NAME",
         "WORKFLOW_RUN_EVENT",
-        "WORKFLOW_RUN_HEAD_BRANCH",
-        "WORKFLOW_RUN_HEAD_REPO_OWNER",
-        "WORKFLOW_RUN_PULL_REQUESTS",
+        "WORKFLOW_RUN_HEAD_SHA",
+        "WORKFLOW_RUN_RECONCILE_PR_NUMBER",
+        "WORKFLOW_RUN_RECONCILE_HEAD_SHA",
     }
     with pytest.MonkeyPatch().context() as monkeypatch:
         for name in env_vars:
@@ -859,30 +859,53 @@ def test_reconcile_active_review_entry_missing_entry_returns_noop():
     assert "No active review entry exists" in message
 
 
-def test_resolve_workflow_run_pr_number_from_payload():
-    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = '[{"number": 42}]'
+def test_resolve_workflow_run_pr_number_from_artifact_context(monkeypatch):
+    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
+    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
+        if method == "GET" and endpoint == "pulls/42"
+        else None,
+    )
 
     assert reviewer_bot.resolve_workflow_run_pr_number() == 42
 
 
-def test_resolve_workflow_run_pr_number_fallback_by_head(monkeypatch):
-    observed = {}
-    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = "[]"
-    os.environ["WORKFLOW_RUN_HEAD_REPO_OWNER"] = "octocat"
-    os.environ["WORKFLOW_RUN_HEAD_BRANCH"] = "feature/test-branch"
+def test_resolve_workflow_run_pr_number_missing_artifact_env_raises():
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
 
-    def fake_find_open_pr_by_head(owner, branch):
-        observed["owner"] = owner
-        observed["branch"] = branch
-        return {"number": 77}
+    with pytest.raises(RuntimeError, match="Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER"):
+        reviewer_bot.resolve_workflow_run_pr_number()
 
-    monkeypatch.setattr(reviewer_bot, "find_open_pr_by_head", fake_find_open_pr_by_head)
 
-    assert reviewer_bot.resolve_workflow_run_pr_number() == 77
-    assert observed == {
-        "owner": "octocat",
-        "branch": "feature/test-branch",
-    }
+def test_resolve_workflow_run_pr_number_sha_mismatch_raises():
+    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
+    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "def456"
+
+    with pytest.raises(RuntimeError, match="SHA mismatch"):
+        reviewer_bot.resolve_workflow_run_pr_number()
+
+
+def test_resolve_workflow_run_pr_number_pr_head_sha_mismatch_raises(monkeypatch):
+    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
+    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "def456"}}
+        if method == "GET" and endpoint == "pulls/42"
+        else None,
+    )
+
+    with pytest.raises(RuntimeError, match="head SHA does not match"):
+        reviewer_bot.resolve_workflow_run_pr_number()
 
 
 def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
@@ -899,7 +922,16 @@ def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
         "skipped": [],
     }
     os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
-    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = '[{"number": 42}]'
+    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
+    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
+        if method == "GET" and endpoint == "pulls/42"
+        else {},
+    )
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
@@ -921,6 +953,52 @@ def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
     assert review_data["review_completion_source"] == "workflow_run:pull_request_review"
 
 
+def test_handle_workflow_run_event_idempotent_when_review_already_complete(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "review_completed_at": "2000-01-02T00:00:00+00:00",
+        "review_completed_by": "alice",
+        "review_completion_source": "workflow_run:pull_request_review",
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
+    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
+
+    called = {"reviews": False}
+
+    def should_not_fetch_reviews(*args, **kwargs):
+        called["reviews"] = True
+        return []
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
+        if method == "GET" and endpoint == "pulls/42"
+        else {},
+    )
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", should_not_fetch_reviews)
+
+    handled = reviewer_bot.handle_workflow_run_event(state)
+
+    assert handled is False
+    assert called["reviews"] is False
+
+
+def test_handle_workflow_run_event_raises_on_invalid_context():
+    state = make_state()
+    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+
+    with pytest.raises(RuntimeError, match="Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER"):
+        reviewer_bot.handle_workflow_run_event(state)
+
+
 def test_handle_workflow_run_event_ignores_non_review_events():
     state = make_state()
     state["active_reviews"]["42"] = {
@@ -929,7 +1007,6 @@ def test_handle_workflow_run_event_ignores_non_review_events():
         "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
     }
     os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_target"
-    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = '[{"number": 42}]'
 
     handled = reviewer_bot.handle_workflow_run_event(state)
 
@@ -1132,6 +1209,20 @@ def test_main_fails_when_save_state_fails(monkeypatch):
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "handle_comment_event", lambda state: True)
     monkeypatch.setattr(reviewer_bot, "save_state", lambda state: False)
+
+    with pytest.raises(SystemExit) as excinfo:
+        reviewer_bot.main()
+
+    assert excinfo.value.code == 1
+
+
+def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "workflow_run")
+    monkeypatch.setenv("EVENT_ACTION", "completed")
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
 
     with pytest.raises(SystemExit) as excinfo:
         reviewer_bot.main()
