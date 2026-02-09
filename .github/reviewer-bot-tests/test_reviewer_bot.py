@@ -158,6 +158,12 @@ def test_parse_command_pass_reason():
     assert args == ["reason", "here"]
 
 
+def test_parse_command_rectify():
+    command, args = reviewer_bot.parse_command("@guidelines-bot /rectify")
+    assert command == "rectify"
+    assert args == []
+
+
 def test_parse_command_multiple_commands():
     command, args = reviewer_bot.parse_command(
         "@guidelines-bot /queue\n@guidelines-bot /commands"
@@ -311,6 +317,32 @@ def test_handle_comment_event_pass_command(stub_api, captured_comments, monkeypa
     assert handled is True
     assert len(captured_comments) == 1
     assert "has passed" in captured_comments[0]["body"]
+
+
+def test_handle_comment_event_rectify_command(stub_api, captured_comments, monkeypatch):
+    state = make_state()
+    os.environ["COMMENT_BODY"] = "@guidelines-bot /rectify"
+    os.environ["COMMENT_AUTHOR"] = "alice"
+    os.environ["ISSUE_NUMBER"] = "42"
+
+    observed = {}
+
+    def fake_handle_rectify(passed_state, issue_number, comment_author):
+        observed["state"] = passed_state
+        observed["issue_number"] = issue_number
+        observed["comment_author"] = comment_author
+        return "rectified", True, True
+
+    monkeypatch.setattr(reviewer_bot, "handle_rectify_command", fake_handle_rectify)
+
+    handled = reviewer_bot.handle_comment_event(state)
+
+    assert handled is True
+    assert observed["state"] is state
+    assert observed["issue_number"] == 42
+    assert observed["comment_author"] == "alice"
+    assert len(captured_comments) == 1
+    assert captured_comments[0]["body"] == "rectified"
 
 
 def test_handle_comment_event_claim_command(stub_api, captured_comments):
@@ -589,6 +621,237 @@ def test_handle_labeled_event_sign_off_ignored_for_pr(stub_api):
     assert review_data.get("review_completed_at") is None
 
 
+def test_handle_rectify_command_allows_assigned_reviewer(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": None,
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "reconcile_active_review_entry",
+        lambda *args, **kwargs: ("ok", True, True),
+    )
+
+    message, success, state_changed = reviewer_bot.handle_rectify_command(state, 42, "alice")
+
+    assert message == "ok"
+    assert success is True
+    assert state_changed is True
+
+
+def test_handle_rectify_command_allows_triage(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": None,
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        reviewer_bot,
+        "reconcile_active_review_entry",
+        lambda *args, **kwargs: ("ok", True, False),
+    )
+
+    message, success, state_changed = reviewer_bot.handle_rectify_command(state, 42, "bob")
+
+    assert message == "ok"
+    assert success is True
+    assert state_changed is False
+
+
+def test_handle_rectify_command_denies_unauthorized(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": None,
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
+
+    message, success, state_changed = reviewer_bot.handle_rectify_command(state, 42, "bob")
+
+    assert success is False
+    assert state_changed is False
+    assert "Only the assigned reviewer" in message
+
+
+def test_reconcile_active_review_entry_marks_complete_for_approved(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    os.environ["IS_PULL_REQUEST"] = "true"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "state": "COMMENTED",
+                "submitted_at": "2026-02-01T00:00:00Z",
+                "user": {"login": "alice"},
+            },
+            {
+                "state": "APPROVED",
+                "submitted_at": "2026-02-02T00:00:00Z",
+                "user": {"login": "alice"},
+            },
+        ],
+    )
+
+    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
+
+    assert success is True
+    assert state_changed is True
+    assert "marked review complete" in message
+    review_data = state["active_reviews"]["42"]
+    assert review_data["review_completed_at"] is not None
+    assert review_data["review_completed_by"] == "alice"
+    assert review_data["review_completion_source"] == "rectify:reconcile-pr-review"
+    assert review_data["transition_warning_sent"] is None
+
+
+@pytest.mark.parametrize("latest_state", ["COMMENTED", "CHANGES_REQUESTED"])
+def test_reconcile_active_review_entry_updates_activity_for_non_approval(monkeypatch, latest_state):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    os.environ["IS_PULL_REQUEST"] = "true"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "state": latest_state,
+                "submitted_at": "2026-02-02T00:00:00Z",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+
+    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
+
+    assert success is True
+    assert state_changed is True
+    assert latest_state in message
+    review_data = state["active_reviews"]["42"]
+    assert review_data["review_completed_at"] is None
+    assert review_data["transition_warning_sent"] is None
+    assert review_data["last_reviewer_activity"] != "2000-01-01T00:00:00+00:00"
+
+
+def test_reconcile_active_review_entry_ignores_non_assigned_reviews(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": None,
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    os.environ["IS_PULL_REQUEST"] = "true"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "state": "APPROVED",
+                "submitted_at": "2026-02-02T00:00:00Z",
+                "user": {"login": "bob"},
+            }
+        ],
+    )
+
+    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
+
+    assert success is True
+    assert state_changed is False
+    assert "No review by assigned reviewer @alice" in message
+    assert state["active_reviews"]["42"]["review_completed_at"] is None
+
+
+def test_reconcile_active_review_entry_idempotent_when_already_completed(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": None,
+        "review_completed_at": "2000-01-02T00:00:00+00:00",
+        "review_completed_by": "alice",
+        "review_completion_source": "pull_request_review",
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    os.environ["IS_PULL_REQUEST"] = "true"
+
+    called = {"api": False}
+
+    def should_not_be_called(*args, **kwargs):
+        called["api"] = True
+        return []
+
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", should_not_be_called)
+
+    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
+
+    assert success is True
+    assert state_changed is False
+    assert "already marked complete" in message
+    assert called["api"] is False
+
+
+def test_reconcile_active_review_entry_missing_entry_returns_noop():
+    state = make_state()
+
+    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
+
+    assert success is True
+    assert state_changed is False
+    assert "No active review entry exists" in message
+
+
 def test_handle_pull_request_review_event_approval_marks_complete(stub_api):
     state = make_state()
     state["active_reviews"]["42"] = {
@@ -642,6 +905,24 @@ def test_handle_pull_request_review_event_ignores_non_assigned(stub_api):
     assert handled is False
     review_data = state["active_reviews"]["42"]
     assert review_data.get("review_completed_at") is None
+
+
+def test_handle_pull_request_review_event_cross_repo_defers(stub_api):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = "approved"
+    os.environ["REVIEW_AUTHOR"] = "alice"
+    os.environ["PR_IS_CROSS_REPOSITORY"] = "true"
+
+    handled = reviewer_bot.handle_pull_request_review_event(state)
+
+    assert handled is False
+    assert state["active_reviews"]["42"].get("review_completed_at") is None
 
 
 def test_handle_closed_event_clears_active_review():
@@ -756,3 +1037,18 @@ def test_handle_comment_event_unknown_command(stub_api, captured_comments):
     assert handled is False
     assert len(captured_comments) == 1
     assert "Unknown command" in captured_comments[0]["body"]
+
+
+def test_main_fails_when_save_state_fails(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "issue_comment")
+    monkeypatch.setenv("EVENT_ACTION", "created")
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "handle_comment_event", lambda state: True)
+    monkeypatch.setattr(reviewer_bot, "save_state", lambda state: False)
+
+    with pytest.raises(SystemExit) as excinfo:
+        reviewer_bot.main()
+
+    assert excinfo.value.code == 1
