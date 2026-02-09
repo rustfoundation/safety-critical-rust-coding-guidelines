@@ -24,6 +24,10 @@ All commands must be prefixed with @guidelines-bot /<command>:
     - Release your assignment from this issue/PR (or someone else's with triage+ permission)
     - Does NOT auto-assign the next reviewer (use /pass for that)
 
+  @guidelines-bot /rectify
+    - Reconcile this issue/PR's review state from GitHub review history
+    - Useful when cross-repo review events cannot persist state immediately
+
   @guidelines-bot /r? @username
     - Assign a specific reviewer
 
@@ -93,6 +97,7 @@ COMMANDS = {
     "pass": "Pass this review to next in queue",
     "away": "Step away from queue until date (YYYY-MM-DD)",
     "release": "Release assignment (yours, or @username with triage+ permission)",
+    "rectify": "Reconcile this issue/PR's review state from GitHub",
     "claim": "Claim this review for yourself",
     "r?": "Assign a reviewer (@username or 'producers')",
     "label": "Add/remove labels (+label-name or -label-name)",
@@ -1376,6 +1381,7 @@ def handle_commands_command() -> tuple[str, bool]:
         f"**Other:**\n"
         f"- `{BOT_MENTION} /label +label-name` - Add a label\n"
         f"- `{BOT_MENTION} /label -label-name` - Remove a label\n"
+        f"- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub\n"
         f"- `{BOT_MENTION} /accept-no-fls-changes` - Update spec.lock and open a PR when no guidelines are impacted\n"
         f"- `{BOT_MENTION} /queue` - Show current queue status\n"
         f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md"), True
@@ -1793,6 +1799,172 @@ def mark_review_complete(
     return True
 
 
+def parse_github_timestamp(value: str | None) -> datetime | None:
+    """Parse a GitHub timestamp string into a datetime."""
+    if not isinstance(value, str) or not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
+    """Fetch submitted reviews for a pull request."""
+    result = github_api("GET", f"pulls/{issue_number}/reviews?per_page=100")
+    if result is None:
+        return None
+    if not isinstance(result, list):
+        return []
+    return [review for review in result if isinstance(review, dict)]
+
+
+def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | None:
+    """Return the latest review authored by the given reviewer."""
+    latest_review = None
+    latest_key = (datetime.min.replace(tzinfo=timezone.utc), -1)
+
+    for index, review in enumerate(reviews):
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or author.lower() != reviewer.lower():
+            continue
+
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None:
+            submitted_at = datetime.min.replace(tzinfo=timezone.utc)
+
+        review_key = (submitted_at, index)
+        if review_key >= latest_key:
+            latest_key = review_key
+            latest_review = review
+
+    return latest_review
+
+
+def reconcile_active_review_entry(state: dict, issue_number: int) -> tuple[str, bool, bool]:
+    """Reconcile one active review entry from current GitHub PR review state.
+
+    Returns (message, success, state_changed).
+    """
+    review_data = ensure_review_entry(state, issue_number)
+    if review_data is None:
+        return f"ℹ️ No active review entry exists for #{issue_number}; nothing to rectify.", True, False
+
+    assigned_reviewer = review_data.get("current_reviewer")
+    if not assigned_reviewer:
+        return (
+            f"ℹ️ #{issue_number} has no tracked assigned reviewer; nothing to rectify.",
+            True,
+            False,
+        )
+
+    if review_data.get("review_completed_at"):
+        return f"ℹ️ Review for #{issue_number} is already marked complete; no changes made.", True, False
+
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    if not is_pr:
+        return (
+            f"ℹ️ #{issue_number} is not a pull request in this event context; `/rectify` only "
+            "reconciles PR reviews.",
+            True,
+            False,
+        )
+
+    reviews = get_pull_request_reviews(issue_number)
+    if reviews is None:
+        return f"❌ Failed to fetch reviews for PR #{issue_number}; cannot run `/rectify`.", False, False
+
+    latest_review = get_latest_review_by_reviewer(reviews, assigned_reviewer)
+    if latest_review is None:
+        return (
+            f"ℹ️ No review by assigned reviewer @{assigned_reviewer} was found on PR #{issue_number}; "
+            "nothing to rectify.",
+            True,
+            False,
+        )
+
+    latest_state = str(latest_review.get("state", "")).upper()
+    if latest_state == "APPROVED":
+        changed = mark_review_complete(
+            state,
+            issue_number,
+            assigned_reviewer,
+            "rectify:reconcile-pr-review",
+        )
+        if changed:
+            return (
+                f"✅ Rectified PR #{issue_number}: latest review by @{assigned_reviewer} is "
+                "`APPROVED`; marked review complete.",
+                True,
+                True,
+            )
+        return f"ℹ️ Review for #{issue_number} is already complete; no changes made.", True, False
+
+    if latest_state in {"COMMENTED", "CHANGES_REQUESTED"}:
+        changed = update_reviewer_activity(state, issue_number, assigned_reviewer)
+        if changed:
+            return (
+                f"✅ Rectified PR #{issue_number}: latest review by @{assigned_reviewer} is "
+                f"`{latest_state}`; refreshed reviewer activity.",
+                True,
+                True,
+            )
+        return (
+            f"ℹ️ Latest assigned-reviewer state is `{latest_state}` for #{issue_number}, but "
+            "no state update was needed.",
+            True,
+            False,
+        )
+
+    state_name = latest_state or "UNKNOWN"
+    return (
+        f"ℹ️ Latest review by @{assigned_reviewer} on PR #{issue_number} is `{state_name}`; "
+        "no reconciliation transition applies.",
+        True,
+        False,
+    )
+
+
+def handle_rectify_command(state: dict, issue_number: int, comment_author: str) -> tuple[str, bool, bool]:
+    """Handle /rectify for the current issue/PR only.
+
+    Permission model:
+    - Allowed for the currently assigned reviewer.
+    - Allowed for users with triage+ permissions.
+
+    Returns (message, success, state_changed).
+    """
+    review_data = ensure_review_entry(state, issue_number)
+    current_reviewer = review_data.get("current_reviewer") if review_data else None
+
+    is_current_reviewer = (
+        isinstance(current_reviewer, str)
+        and current_reviewer.lower() == comment_author.lower()
+    )
+
+    has_triage = False
+    if not is_current_reviewer:
+        has_triage = check_user_permission(comment_author, "triage")
+
+    if not is_current_reviewer and not has_triage:
+        if current_reviewer:
+            return (
+                f"❌ Only the assigned reviewer (@{current_reviewer}) or a maintainer with triage+ "
+                "permission can run `/rectify`.",
+                False,
+                False,
+            )
+        return (
+            "❌ Only maintainers with triage+ permission can run `/rectify` when no assigned "
+            "reviewer is tracked.",
+            False,
+            False,
+        )
+
+    return reconcile_active_review_entry(state, issue_number)
+
+
 def check_overdue_reviews(state: dict) -> list[dict]:
     """
     Check all active reviews for overdue ones.
@@ -2126,6 +2298,16 @@ def handle_pull_request_review_event(state: dict) -> bool:
         print("Missing review context")
         return False
 
+    is_cross_repo = os.environ.get("PR_IS_CROSS_REPOSITORY", "false").lower() == "true"
+    if is_cross_repo:
+        print(
+            "Deferring cross-repo pull_request_review reconciliation for "
+            f"#{issue_number}: this event may have read-only permissions and cannot "
+            "persist reviewer-bot state. Use `@guidelines-bot /rectify` on the PR to "
+            "reconcile and persist state."
+        )
+        return False
+
     review_data = ensure_review_entry(state, issue_number)
     if review_data is None:
         print(f"No active review entry for #{issue_number}")
@@ -2265,6 +2447,13 @@ def handle_comment_event(state: dict) -> bool:
         # Pass args to handle_release_command for @username parsing
         response, success = handle_release_command(state, issue_number, comment_author, args)
         state_changed = success
+
+    elif command == "rectify":
+        response, success, state_changed = handle_rectify_command(
+            state,
+            issue_number,
+            comment_author,
+        )
 
     elif command == "r?-user":
         # Handle "/r? @username" - assign specific user
@@ -2480,7 +2669,15 @@ def main():
 
     # Save state if changed (or if we synced members/pass-until)
     if state_changed or sync_changes or restored:
-        save_state(state)
+        print("State updates detected; attempting to persist reviewer-bot state.")
+        if not save_state(state):
+            print(
+                "ERROR: State updates were computed but could not be persisted. "
+                "Failing this run to avoid silent success.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
         # Set output for the workflow
         with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
             f.write("state_changed=true\n")
