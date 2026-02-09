@@ -136,7 +136,7 @@
              
   <section id="do-not-shift-an-expression-by-a-negative-number-of-bits-or-by-greater-than-or-equal-to-the-bitwidth-of-the-operand">
 <h1>Do not shift an expression by a negative number of bits or by greater than or equal to the bitwidth of the operand<a class="headerlink" href="#do-not-shift-an-expression-by-a-negative-number-of-bits-or-by-greater-than-or-equal-to-the-bitwidth-of-the-operand" title="Link to this heading"></a></h1>
-<div class="need_container docutils container" id="SNCB-4aa89231">
+<div class="need_container docutils container" id="SNCB-f82cbc18">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_guideline docutils align-default" id="gui_RHvQj8BHlz9b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -211,7 +211,7 @@ then the operation results in an out-of-range shift.</p>
 <script type="application/json" class="rust-example-data">{"code": "use core::ops::Shl;\n#[allow(dead_code)]\nstruct MyType;\n\nimpl Shl<u32> for MyType {\n    type Output = MyType;\n    fn shl(self, _rhs: u32) -> Self::Output { MyType }\n}\n\nfn main() {}", "displayCode": "use core::ops::Shl;\n#[allow(dead_code)]\nstruct MyType;\n\nimpl Shl<u32> for MyType {\n    type Output = MyType;\n    fn shl(self, _rhs: u32) -> Self::Output { MyType }\n}", "hiddenLineNumbers": [8, 9], "edition": "2021", "channel": "stable", "version": "1.85.0", "expectedOutcome": "success", "expectedError": null, "runnable": true, "hasHiddenLines": true, "warnMode": "error", "fullCodeHighlighted": "<span class=\"k\">use</span><span class=\"w\"> </span><span class=\"n\">core</span><span class=\"p\">::</span><span class=\"n\">ops</span><span class=\"p\">::</span><span class=\"n\">Shl</span><span class=\"p\">;</span>\n<span class=\"cp\">#[allow(dead_code)]</span>\n<span class=\"k\">struct</span><span class=\"w\"> </span><span class=\"nc\">MyType</span><span class=\"p\">;</span>\n\n<span class=\"k\">impl</span><span class=\"w\"> </span><span class=\"n\">Shl</span><span class=\"o\">&lt;</span><span class=\"kt\">u32</span><span class=\"o\">&gt;</span><span class=\"w\"> </span><span class=\"k\">for</span><span class=\"w\"> </span><span class=\"n\">MyType</span><span class=\"w\"> </span><span class=\"p\">{</span>\n<span class=\"w\">    </span><span class=\"k\">type</span><span class=\"w\"> </span><span class=\"nc\">Output</span><span class=\"w\"> </span><span class=\"o\">=</span><span class=\"w\"> </span><span class=\"n\">MyType</span><span class=\"p\">;</span>\n<span class=\"w\">    </span><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">shl</span><span class=\"p\">(</span><span class=\"bp\">self</span><span class=\"p\">,</span><span class=\"w\"> </span><span class=\"n\">_rhs</span><span class=\"p\">:</span><span class=\"w\"> </span><span class=\"kt\">u32</span><span class=\"p\">)</span><span class=\"w\"> </span><span class=\"p\">-&gt;</span><span class=\"w\"> </span><span class=\"nc\">Self</span><span class=\"p\">::</span><span class=\"n\">Output</span><span class=\"w\"> </span><span class=\"p\">{</span><span class=\"w\"> </span><span class=\"n\">MyType</span><span class=\"w\"> </span><span class=\"p\">}</span>\n<span class=\"p\">}</span>\n<span class=\"rust-hidden-line\"></span>\n<span class=\"rust-hidden-line\"><span class=\"k\">fn</span><span class=\"w\"> </span><span class=\"nf\">main</span><span class=\"p\">()</span><span class=\"w\"> </span><span class=\"p\">{}</span></span>\n"}</script></div>
 <p>You may choose any type for the right operand (not just integers), because you control the implementation.</p>
 <p>This rule is based on The CERT C Coding Standard Rule <a class="citation-ref reference internal" href="#cite-gui_RHvQj8BHlz9b-CERT-C-INT34">[CERT-C-INT34]</a>.</p>
-<div class="need_container docutils container" id="SNCB-1e775caa">
+<div class="need_container docutils container" id="SNCB-f6f82faf">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_rationale docutils align-default" id="rat_3MpR8QfHodGT">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -234,7 +234,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-8785c24c">
+<div class="need_container docutils container" id="SNCB-a8c759c2">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcn">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -270,7 +270,7 @@ are non-sensical expressions which typically indicate a logic error has occurred
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-7a47ab77">
+<div class="need_container docutils container" id="SNCB-395db99d">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_mvkgTL3kulZ5">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -307,7 +307,7 @@ than or equal to the width of the left operand.</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-01f11548">
+<div class="need_container docutils container" id="SNCB-31e62fed">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcm">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -346,7 +346,7 @@ The <code class="docutils literal notranslate"><span class="pre">wrapping_shl</s
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-a07f8a0d">
+<div class="need_container docutils container" id="SNCB-1576b54e">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcx">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -387,7 +387,7 @@ The use of this function is noncompliant because it does not detect out-of-range
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-0afc24a7">
+<div class="need_container docutils container" id="SNCB-086a8242">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_non_compliant_example docutils align-default" id="non_compl_ex_O9FZuazu3Lcp">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -430,7 +430,7 @@ If the shift value is too large, then value is masked (N-1) where N is the numbe
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-1862f6a8">
+<div class="need_container docutils container" id="SNCB-3fed8800">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_compliant_example docutils align-default" id="compl_ex_xpPQqYeEPGIo">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
@@ -482,7 +482,7 @@ Shifting by:</p>
 </tbody>
 </table>
 </div>
-<div class="need_container docutils container" id="SNCB-d421901f">
+<div class="need_container docutils container" id="SNCB-792fb055">
 <table class="need needs_grid_simple needs_layout_clean needs_style_none needs_type_bibliography docutils align-default" id="bib_RHvQj8BHlz9b">
 <tbody>
 <tr class="need head row-odd"><td class="need head"><div class="needs_head line-block">
