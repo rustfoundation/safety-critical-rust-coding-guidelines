@@ -1179,14 +1179,94 @@ def get_default_branch() -> str:
     return "main"
 
 
+def parse_workflow_run_pull_requests() -> list[dict]:
+    """Parse workflow_run pull request references from environment JSON."""
+    payload = os.environ.get("WORKFLOW_RUN_PULL_REQUESTS", "")
+    if not payload:
+        return []
+
+    try:
+        decoded = json.loads(payload)
+    except json.JSONDecodeError:
+        print("Failed to parse WORKFLOW_RUN_PULL_REQUESTS as JSON")
+        return []
+
+    if not isinstance(decoded, list):
+        print("WORKFLOW_RUN_PULL_REQUESTS is not a list payload")
+        return []
+
+    return [entry for entry in decoded if isinstance(entry, dict)]
+
+
+def find_open_pr_by_head(owner: str, branch: str) -> dict | None:
+    """Find an open PR by head owner and branch."""
+    if not owner or not branch:
+        return None
+
+    response = github_api("GET", f"pulls?state=open&head={owner}:{branch}")
+    if isinstance(response, list) and response:
+        first = response[0]
+        if isinstance(first, dict):
+            return first
+    return None
+
+
 def find_open_pr_for_branch(branch: str) -> dict | None:
     owner = os.environ.get("REPO_OWNER", "")
     if not owner:
         return None
-    response = github_api("GET", f"pulls?state=open&head={owner}:{branch}")
-    if isinstance(response, list) and response:
-        if isinstance(response[0], dict):
-            return response[0]
+    return find_open_pr_by_head(owner, branch)
+
+
+def resolve_workflow_run_pr_number() -> int | None:
+    """Resolve PR number for workflow_run reconcile execution."""
+    for pull_request in parse_workflow_run_pull_requests():
+        number = pull_request.get("number")
+        if isinstance(number, int) and number > 0:
+            print(f"Resolved workflow_run PR from payload: #{number}")
+            return number
+        if isinstance(number, str) and number.isdigit() and int(number) > 0:
+            resolved = int(number)
+            print(f"Resolved workflow_run PR from payload: #{resolved}")
+            return resolved
+
+    head_owner = os.environ.get("WORKFLOW_RUN_HEAD_REPO_OWNER", "").strip()
+    head_branch = os.environ.get("WORKFLOW_RUN_HEAD_BRANCH", "").strip()
+    if not head_owner or not head_branch:
+        print(
+            "Could not resolve workflow_run PR number from payload and "
+            "head owner/branch fallback is missing."
+        )
+        return None
+
+    fallback_pr = find_open_pr_by_head(head_owner, head_branch)
+    if not fallback_pr:
+        print(
+            "No open PR found for workflow_run head "
+            f"{head_owner}:{head_branch}."
+        )
+        return None
+
+    fallback_number = fallback_pr.get("number")
+    if isinstance(fallback_number, int) and fallback_number > 0:
+        print(
+            "Resolved workflow_run PR from head owner/branch fallback: "
+            f"#{fallback_number}"
+        )
+        return fallback_number
+    if (
+        isinstance(fallback_number, str)
+        and fallback_number.isdigit()
+        and int(fallback_number) > 0
+    ):
+        resolved = int(fallback_number)
+        print(
+            "Resolved workflow_run PR from head owner/branch fallback: "
+            f"#{resolved}"
+        )
+        return resolved
+
+    print("Fallback PR lookup returned an invalid PR number")
     return None
 
 
@@ -1842,7 +1922,13 @@ def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | 
     return latest_review
 
 
-def reconcile_active_review_entry(state: dict, issue_number: int) -> tuple[str, bool, bool]:
+def reconcile_active_review_entry(
+    state: dict,
+    issue_number: int,
+    *,
+    require_pull_request_context: bool = True,
+    completion_source: str = "rectify:reconcile-pr-review",
+) -> tuple[str, bool, bool]:
     """Reconcile one active review entry from current GitHub PR review state.
 
     Returns (message, success, state_changed).
@@ -1862,14 +1948,15 @@ def reconcile_active_review_entry(state: dict, issue_number: int) -> tuple[str, 
     if review_data.get("review_completed_at"):
         return f"ℹ️ Review for #{issue_number} is already marked complete; no changes made.", True, False
 
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    if not is_pr:
-        return (
-            f"ℹ️ #{issue_number} is not a pull request in this event context; `/rectify` only "
-            "reconciles PR reviews.",
-            True,
-            False,
-        )
+    if require_pull_request_context:
+        is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+        if not is_pr:
+            return (
+                f"ℹ️ #{issue_number} is not a pull request in this event context; `/rectify` only "
+                "reconciles PR reviews.",
+                True,
+                False,
+            )
 
     reviews = get_pull_request_reviews(issue_number)
     if reviews is None:
@@ -1890,7 +1977,7 @@ def reconcile_active_review_entry(state: dict, issue_number: int) -> tuple[str, 
             state,
             issue_number,
             assigned_reviewer,
-            "rectify:reconcile-pr-review",
+            completion_source,
         )
         if changed:
             return (
@@ -2336,6 +2423,35 @@ def handle_pull_request_review_event(state: dict) -> bool:
     return False
 
 
+def handle_workflow_run_event(state: dict) -> bool:
+    """Handle trusted second-hop workflow_run reconciliation."""
+    workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
+    if workflow_run_event != "pull_request_review":
+        observed = workflow_run_event or "<missing>"
+        print(
+            "Ignoring workflow_run reconcile event with unsupported source event: "
+            f"{observed}"
+        )
+        return False
+
+    issue_number = resolve_workflow_run_pr_number()
+    if not issue_number:
+        print("Unable to resolve pull request number for workflow_run reconcile event")
+        return False
+
+    message, success, state_changed = reconcile_active_review_entry(
+        state,
+        issue_number,
+        require_pull_request_context=False,
+        completion_source="workflow_run:pull_request_review",
+    )
+    print(message)
+
+    if not success:
+        return False
+    return state_changed
+
+
 def handle_closed_event(state: dict) -> bool:
     """
     Handle when an issue or PR is closed.
@@ -2666,6 +2782,10 @@ def main():
     elif event_name == "schedule":
         # Nightly check for overdue reviews
         state_changed = handle_scheduled_check(state)
+
+    elif event_name == "workflow_run":
+        if event_action == "completed":
+            state_changed = handle_workflow_run_event(state)
 
     # Save state if changed (or if we synced members/pass-until)
     if state_changed or sync_changes or restored:

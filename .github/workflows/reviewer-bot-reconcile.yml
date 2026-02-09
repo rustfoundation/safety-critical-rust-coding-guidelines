@@ -1,0 +1,41 @@
+name: Reviewer Bot Reconcile
+
+on:
+  workflow_run:
+    workflows: ["Reviewer Bot"]
+    types: [completed]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+env:
+  STATE_ISSUE_NUMBER: "314"
+
+jobs:
+  reconcile:
+    if: ${{ github.event.workflow_run.event == 'pull_request_review' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run reviewer bot reconcile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE_ISSUE_NUMBER: ${{ env.STATE_ISSUE_NUMBER }}
+          EVENT_NAME: workflow_run
+          EVENT_ACTION: ${{ github.event.action }}
+          WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW_RUN_PULL_REQUESTS: ${{ toJson(github.event.workflow_run.pull_requests) }}
+          WORKFLOW_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_RUN_HEAD_REPO_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          uv run python scripts/reviewer_bot.py
