@@ -2429,6 +2429,14 @@ def handle_workflow_run_event(state: dict) -> bool:
         raise RuntimeError(
             f"Workflow_run reconcile failed for pull request #{issue_number}: {message}"
         )
+
+    if state_changed and not post_comment(issue_number, message):
+        print(
+            "WARNING: Workflow_run reconcile changed state but failed to post "
+            f"comment on pull request #{issue_number}.",
+            file=sys.stderr,
+        )
+
     return state_changed
 
 

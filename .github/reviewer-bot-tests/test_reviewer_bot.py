@@ -944,6 +944,14 @@ def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
         ],
     )
 
+    posted_comments = []
+
+    def record_comment(issue_number, body):
+        posted_comments.append((issue_number, body))
+        return True
+
+    monkeypatch.setattr(reviewer_bot, "post_comment", record_comment)
+
     handled = reviewer_bot.handle_workflow_run_event(state)
 
     assert handled is True
@@ -951,6 +959,9 @@ def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
     assert review_data["review_completed_at"] is not None
     assert review_data["review_completed_by"] == "alice"
     assert review_data["review_completion_source"] == "workflow_run:pull_request_review"
+    assert len(posted_comments) == 1
+    assert posted_comments[0][0] == 42
+    assert "Rectified PR #42" in posted_comments[0][1]
 
 
 def test_handle_workflow_run_event_idempotent_when_review_already_complete(monkeypatch):
@@ -970,11 +981,15 @@ def test_handle_workflow_run_event_idempotent_when_review_already_complete(monke
     os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
     os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
 
-    called = {"reviews": False}
+    called = {"reviews": False, "comment": False}
 
     def should_not_fetch_reviews(*args, **kwargs):
         called["reviews"] = True
         return []
+
+    def should_not_post_comment(*args, **kwargs):
+        called["comment"] = True
+        return True
 
     monkeypatch.setattr(
         reviewer_bot,
@@ -984,11 +999,63 @@ def test_handle_workflow_run_event_idempotent_when_review_already_complete(monke
         else {},
     )
     monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", should_not_fetch_reviews)
+    monkeypatch.setattr(reviewer_bot, "post_comment", should_not_post_comment)
 
     handled = reviewer_bot.handle_workflow_run_event(state)
 
     assert handled is False
     assert called["reviews"] is False
+    assert called["comment"] is False
+
+
+def test_handle_workflow_run_event_comment_failure_is_non_fatal(monkeypatch, capsys):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
+    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
+        if method == "GET" and endpoint == "pulls/42"
+        else {},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "state": "APPROVED",
+                "submitted_at": "2026-02-02T00:00:00Z",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: False)
+
+    handled = reviewer_bot.handle_workflow_run_event(state)
+
+    assert handled is True
+    review_data = state["active_reviews"]["42"]
+    assert review_data["review_completed_at"] is not None
+    assert review_data["review_completion_source"] == "workflow_run:pull_request_review"
+    captured = capsys.readouterr()
+    assert (
+        "WARNING: Workflow_run reconcile changed state but failed to post comment "
+        "on pull request #42." in captured.err
+    )
 
 
 def test_handle_workflow_run_event_raises_on_invalid_context():
