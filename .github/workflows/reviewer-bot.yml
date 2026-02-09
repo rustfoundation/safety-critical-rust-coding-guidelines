@@ -105,3 +105,34 @@ jobs:
           ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name || github.event.pull_request.labels.*.name) }}
         run: |
           uv run python scripts/reviewer_bot.py
+
+      - name: Write reconcile context artifact
+        if: ${{ success() && github.event_name == 'pull_request_review' && github.event.action == 'submitted' }}
+        env:
+          RECONCILE_CONTEXT_PATH: ${{ runner.temp }}/reviewer-bot/reconcile-context.json
+          RECONCILE_EVENT_NAME: ${{ github.event_name }}
+          RECONCILE_EVENT_ACTION: ${{ github.event.action }}
+          RECONCILE_PR_NUMBER: ${{ github.event.pull_request.number }}
+          RECONCILE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RECONCILE_SOURCE_RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p "$(dirname "${RECONCILE_CONTEXT_PATH}")"
+          cat > "${RECONCILE_CONTEXT_PATH}" <<EOF
+          {
+            "schema_version": 1,
+            "event_name": "${RECONCILE_EVENT_NAME}",
+            "event_action": "${RECONCILE_EVENT_ACTION}",
+            "pr_number": ${RECONCILE_PR_NUMBER},
+            "head_sha": "${RECONCILE_HEAD_SHA}",
+            "source_run_id": ${RECONCILE_SOURCE_RUN_ID}
+          }
+          EOF
+
+      - name: Upload reconcile context artifact
+        if: ${{ success() && github.event_name == 'pull_request_review' && github.event.action == 'submitted' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewer-bot-reconcile-context-${{ github.run_id }}
+          path: ${{ runner.temp }}/reviewer-bot/reconcile-context.json
+          retention-days: 1
+          if-no-files-found: error

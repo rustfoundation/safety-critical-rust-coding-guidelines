@@ -1179,27 +1179,9 @@ def get_default_branch() -> str:
     return "main"
 
 
-def parse_workflow_run_pull_requests() -> list[dict]:
-    """Parse workflow_run pull request references from environment JSON."""
-    payload = os.environ.get("WORKFLOW_RUN_PULL_REQUESTS", "")
-    if not payload:
-        return []
-
-    try:
-        decoded = json.loads(payload)
-    except json.JSONDecodeError:
-        print("Failed to parse WORKFLOW_RUN_PULL_REQUESTS as JSON")
-        return []
-
-    if not isinstance(decoded, list):
-        print("WORKFLOW_RUN_PULL_REQUESTS is not a list payload")
-        return []
-
-    return [entry for entry in decoded if isinstance(entry, dict)]
-
-
-def find_open_pr_by_head(owner: str, branch: str) -> dict | None:
-    """Find an open PR by head owner and branch."""
+def find_open_pr_for_branch(branch: str) -> dict | None:
+    owner = os.environ.get("REPO_OWNER", "").strip()
+    branch = branch.strip()
     if not owner or not branch:
         return None
 
@@ -1211,63 +1193,62 @@ def find_open_pr_by_head(owner: str, branch: str) -> dict | None:
     return None
 
 
-def find_open_pr_for_branch(branch: str) -> dict | None:
-    owner = os.environ.get("REPO_OWNER", "")
-    if not owner:
-        return None
-    return find_open_pr_by_head(owner, branch)
-
-
-def resolve_workflow_run_pr_number() -> int | None:
-    """Resolve PR number for workflow_run reconcile execution."""
-    for pull_request in parse_workflow_run_pull_requests():
-        number = pull_request.get("number")
-        if isinstance(number, int) and number > 0:
-            print(f"Resolved workflow_run PR from payload: #{number}")
-            return number
-        if isinstance(number, str) and number.isdigit() and int(number) > 0:
-            resolved = int(number)
-            print(f"Resolved workflow_run PR from payload: #{resolved}")
-            return resolved
-
-    head_owner = os.environ.get("WORKFLOW_RUN_HEAD_REPO_OWNER", "").strip()
-    head_branch = os.environ.get("WORKFLOW_RUN_HEAD_BRANCH", "").strip()
-    if not head_owner or not head_branch:
-        print(
-            "Could not resolve workflow_run PR number from payload and "
-            "head owner/branch fallback is missing."
+def resolve_workflow_run_pr_number() -> int:
+    """Resolve and validate PR number for workflow_run reconcile execution."""
+    pr_number_raw = os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
+    if not pr_number_raw:
+        raise RuntimeError(
+            "Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER in workflow_run reconcile context"
         )
-        return None
 
-    fallback_pr = find_open_pr_by_head(head_owner, head_branch)
-    if not fallback_pr:
-        print(
-            "No open PR found for workflow_run head "
-            f"{head_owner}:{head_branch}."
-        )
-        return None
+    try:
+        pr_number = int(pr_number_raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            "WORKFLOW_RUN_RECONCILE_PR_NUMBER must be a positive integer"
+        ) from exc
 
-    fallback_number = fallback_pr.get("number")
-    if isinstance(fallback_number, int) and fallback_number > 0:
-        print(
-            "Resolved workflow_run PR from head owner/branch fallback: "
-            f"#{fallback_number}"
+    if pr_number <= 0:
+        raise RuntimeError(
+            "WORKFLOW_RUN_RECONCILE_PR_NUMBER must be a positive integer"
         )
-        return fallback_number
-    if (
-        isinstance(fallback_number, str)
-        and fallback_number.isdigit()
-        and int(fallback_number) > 0
-    ):
-        resolved = int(fallback_number)
-        print(
-            "Resolved workflow_run PR from head owner/branch fallback: "
-            f"#{resolved}"
-        )
-        return resolved
 
-    print("Fallback PR lookup returned an invalid PR number")
-    return None
+    reconcile_head_sha = os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip()
+    if not reconcile_head_sha:
+        raise RuntimeError(
+            "Missing WORKFLOW_RUN_RECONCILE_HEAD_SHA in workflow_run reconcile context"
+        )
+
+    workflow_run_head_sha = os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip()
+    if not workflow_run_head_sha:
+        raise RuntimeError("Missing WORKFLOW_RUN_HEAD_SHA for workflow_run reconcile")
+
+    if reconcile_head_sha != workflow_run_head_sha:
+        raise RuntimeError(
+            "Workflow_run reconcile context SHA mismatch between artifact and workflow payload"
+        )
+
+    pull_request = github_api("GET", f"pulls/{pr_number}")
+    if not isinstance(pull_request, dict):
+        raise RuntimeError(f"Failed to fetch pull request #{pr_number} during workflow_run reconcile")
+
+    head = pull_request.get("head")
+    pull_request_head_sha = ""
+    if isinstance(head, dict):
+        head_sha = head.get("sha")
+        if isinstance(head_sha, str):
+            pull_request_head_sha = head_sha.strip()
+
+    if not pull_request_head_sha:
+        raise RuntimeError(f"Pull request #{pr_number} is missing a valid head SHA")
+
+    if pull_request_head_sha != reconcile_head_sha:
+        raise RuntimeError(
+            f"Pull request #{pr_number} head SHA does not match workflow_run reconcile context"
+        )
+
+    print(f"Resolved workflow_run PR from reconcile context: #{pr_number}")
+    return pr_number
 
 
 def create_pull_request(branch: str, base: str, issue_number: int) -> dict | None:
@@ -2435,9 +2416,6 @@ def handle_workflow_run_event(state: dict) -> bool:
         return False
 
     issue_number = resolve_workflow_run_pr_number()
-    if not issue_number:
-        print("Unable to resolve pull request number for workflow_run reconcile event")
-        return False
 
     message, success, state_changed = reconcile_active_review_entry(
         state,
@@ -2448,7 +2426,9 @@ def handle_workflow_run_event(state: dict) -> bool:
     print(message)
 
     if not success:
-        return False
+        raise RuntimeError(
+            f"Workflow_run reconcile failed for pull request #{issue_number}: {message}"
+        )
     return state_changed
 
 
@@ -2785,7 +2765,11 @@ def main():
 
     elif event_name == "workflow_run":
         if event_action == "completed":
-            state_changed = handle_workflow_run_event(state)
+            try:
+                state_changed = handle_workflow_run_event(state)
+            except RuntimeError as exc:
+                print(f"ERROR: {exc}", file=sys.stderr)
+                sys.exit(1)
 
     # Save state if changed (or if we synced members/pass-until)
     if state_changed or sync_changes or restored:
