@@ -38,13 +38,20 @@ def clear_env():
         "COMMENT_BODY",
         "COMMENT_AUTHOR",
         "COMMENT_ID",
+        "EVENT_ACTION",
+        "EVENT_NAME",
         "ISSUE_NUMBER",
         "ISSUE_AUTHOR",
         "IS_PULL_REQUEST",
+        "PR_IS_CROSS_REPOSITORY",
         "REVIEW_AUTHOR",
         "REVIEW_STATE",
         "REPO_OWNER",
         "REPO_NAME",
+        "WORKFLOW_RUN_EVENT",
+        "WORKFLOW_RUN_HEAD_BRANCH",
+        "WORKFLOW_RUN_HEAD_REPO_OWNER",
+        "WORKFLOW_RUN_PULL_REQUESTS",
     }
     with pytest.MonkeyPatch().context() as monkeypatch:
         for name in env_vars:
@@ -850,6 +857,84 @@ def test_reconcile_active_review_entry_missing_entry_returns_noop():
     assert success is True
     assert state_changed is False
     assert "No active review entry exists" in message
+
+
+def test_resolve_workflow_run_pr_number_from_payload():
+    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = '[{"number": 42}]'
+
+    assert reviewer_bot.resolve_workflow_run_pr_number() == 42
+
+
+def test_resolve_workflow_run_pr_number_fallback_by_head(monkeypatch):
+    observed = {}
+    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = "[]"
+    os.environ["WORKFLOW_RUN_HEAD_REPO_OWNER"] = "octocat"
+    os.environ["WORKFLOW_RUN_HEAD_BRANCH"] = "feature/test-branch"
+
+    def fake_find_open_pr_by_head(owner, branch):
+        observed["owner"] = owner
+        observed["branch"] = branch
+        return {"number": 77}
+
+    monkeypatch.setattr(reviewer_bot, "find_open_pr_by_head", fake_find_open_pr_by_head)
+
+    assert reviewer_bot.resolve_workflow_run_pr_number() == 77
+    assert observed == {
+        "owner": "octocat",
+        "branch": "feature/test-branch",
+    }
+
+
+def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
+        "review_completed_at": None,
+        "review_completed_by": None,
+        "review_completion_source": None,
+        "assignment_method": "round-robin",
+        "skipped": [],
+    }
+    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = '[{"number": 42}]'
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "state": "APPROVED",
+                "submitted_at": "2026-02-02T00:00:00Z",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+
+    handled = reviewer_bot.handle_workflow_run_event(state)
+
+    assert handled is True
+    review_data = state["active_reviews"]["42"]
+    assert review_data["review_completed_at"] is not None
+    assert review_data["review_completed_by"] == "alice"
+    assert review_data["review_completion_source"] == "workflow_run:pull_request_review"
+
+
+def test_handle_workflow_run_event_ignores_non_review_events():
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_target"
+    os.environ["WORKFLOW_RUN_PULL_REQUESTS"] = '[{"number": 42}]'
+
+    handled = reviewer_bot.handle_workflow_run_event(state)
+
+    assert handled is False
+    assert state["active_reviews"]["42"].get("review_completed_at") is None
 
 
 def test_handle_pull_request_review_event_approval_marks_complete(stub_api):
