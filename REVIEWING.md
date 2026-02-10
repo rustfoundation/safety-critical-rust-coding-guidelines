@@ -208,7 +208,7 @@ That said, `/pass` exists for good reason. If after an honest effort the materia
 
 The goal is communication, not perfection. If you need to pass or step away, just let us know!
 
-### Queue Status
+## Queue Status
 
 The queue's state is stored in [Issue #314](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/314) and includes:
 
