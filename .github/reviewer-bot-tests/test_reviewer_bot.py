@@ -52,25 +52,58 @@ def clear_env():
         "WORKFLOW_RUN_HEAD_SHA",
         "WORKFLOW_RUN_RECONCILE_PR_NUMBER",
         "WORKFLOW_RUN_RECONCILE_HEAD_SHA",
+        "WORKFLOW_RUN_ID",
+        "WORKFLOW_NAME",
+        "WORKFLOW_JOB_NAME",
     }
     with pytest.MonkeyPatch().context() as monkeypatch:
         for name in env_vars:
             monkeypatch.delenv(name, raising=False)
+        monkeypatch.setattr(
+            reviewer_bot,
+            "ACTIVE_LEASE_CONTEXT",
+            reviewer_bot.LeaseContext(
+                lock_token="test-lock-token",
+                lock_owner_run_id="test-run",
+                lock_owner_workflow="test-workflow",
+                lock_owner_job="test-job",
+                state_issue_url="https://example.com/state",
+            ),
+        )
         yield
 
 
 @pytest.fixture
 def stub_api(monkeypatch):
     monkeypatch.setattr(reviewer_bot, "github_api", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda *args, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={},
+            headers={},
+            text="",
+            ok=True,
+        ),
+    )
     monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "post_comment", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "assign_reviewer", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        reviewer_bot,
+        "request_reviewer_assignment",
+        lambda *args, **kwargs: reviewer_bot.AssignmentAttempt(success=True, status_code=201),
+    )
     monkeypatch.setattr(reviewer_bot, "unassign_reviewer", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "remove_pr_reviewer", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "remove_assignee", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "get_repo_labels", lambda *args, **kwargs: {"a", "b"})
     monkeypatch.setattr(reviewer_bot, "add_label", lambda *args, **kwargs: True)
+    monkeypatch.setattr(reviewer_bot, "add_label_with_status", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "remove_label", lambda *args, **kwargs: True)
+    monkeypatch.setattr(reviewer_bot, "remove_label_with_status", lambda *args, **kwargs: True)
+    monkeypatch.setattr(reviewer_bot, "ensure_label_exists", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "fetch_members", lambda *args, **kwargs: [])
 
 
@@ -122,20 +155,103 @@ def test_load_state_applies_defaults(monkeypatch):
 
 def test_save_state_formats_issue_body(monkeypatch):
     payload = {}
-
-    def capture_api(method, endpoint, data=None):
-        payload["method"] = method
-        payload["endpoint"] = endpoint
-        payload["data"] = data
-        return {"ok": True}
-
-    monkeypatch.setattr(reviewer_bot, "github_api", capture_api)
     monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
+
+    initial_body = reviewer_bot.render_state_issue_body(make_state(), reviewer_bot.clear_lock_metadata())
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_state_issue_snapshot",
+        lambda: reviewer_bot.StateIssueSnapshot(
+            body=initial_body,
+            etag='"abc123"',
+            html_url="https://example.com/issues/314",
+        ),
+    )
+
+    def capture_patch(body, etag):
+        payload["body"] = body
+        payload["etag"] = etag
+        return reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"ok": True},
+            headers={},
+            text="",
+            ok=True,
+        )
+
+    monkeypatch.setattr(reviewer_bot, "conditional_patch_state_issue", capture_patch)
     state = make_state()
     assert reviewer_bot.save_state(state) is True
-    assert payload["method"] == "PATCH"
-    assert payload["endpoint"] == "issues/314"
-    assert "```yaml" in payload["data"]["body"]
+    assert payload["etag"] == '"abc123"'
+    assert reviewer_bot.STATE_BLOCK_START_MARKER in payload["body"]
+    assert reviewer_bot.LOCK_BLOCK_START_MARKER in payload["body"]
+    assert "```yaml" in payload["body"]
+
+
+def test_parse_lock_metadata_from_issue_body_uses_markers():
+    lock_meta = reviewer_bot.normalize_lock_metadata(
+        {
+            "schema_version": 1,
+            "lock_owner_run_id": "123",
+            "lock_owner_workflow": "Reviewer Bot",
+            "lock_owner_job": "reviewer-bot",
+            "lock_token": "abcdef",
+            "lock_acquired_at": "2026-02-11T00:00:00+00:00",
+            "lock_expires_at": "2026-02-11T00:05:00+00:00",
+        }
+    )
+    body = reviewer_bot.render_state_issue_body(make_state(), lock_meta)
+
+    parsed = reviewer_bot.parse_lock_metadata_from_issue_body(body)
+
+    assert parsed == lock_meta
+
+
+def test_save_state_preserves_lock_metadata_across_save(monkeypatch):
+    payload = {}
+    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
+    expected_lock_meta = reviewer_bot.normalize_lock_metadata(
+        {
+            "schema_version": 1,
+            "lock_owner_run_id": "run-42",
+            "lock_owner_workflow": "Reviewer Bot",
+            "lock_owner_job": "reviewer-bot",
+            "lock_token": "lock-token-42",
+            "lock_acquired_at": "2026-02-11T10:00:00+00:00",
+            "lock_expires_at": "2026-02-11T10:05:00+00:00",
+        }
+    )
+    initial_body = reviewer_bot.render_state_issue_body(make_state(), expected_lock_meta)
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_state_issue_snapshot",
+        lambda: reviewer_bot.StateIssueSnapshot(
+            body=initial_body,
+            etag='"etag-state"',
+            html_url="https://example.com/issues/314",
+        ),
+    )
+
+    def capture_patch(body, etag):
+        payload["body"] = body
+        payload["etag"] = etag
+        return reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"ok": True},
+            headers={},
+            text="",
+            ok=True,
+        )
+
+    monkeypatch.setattr(reviewer_bot, "conditional_patch_state_issue", capture_patch)
+
+    state = make_state()
+    assert reviewer_bot.save_state(state) is True
+    assert payload["etag"] == '"etag-state"'
+    parsed_lock = reviewer_bot.parse_lock_metadata_from_issue_body(payload["body"])
+    assert parsed_lock == expected_lock_meta
 
 
 def test_strip_code_blocks_removes_fenced_indented_inline():
@@ -197,6 +313,7 @@ def test_github_api_error_handling(monkeypatch):
             self.status_code = status_code
             self.content = content
             self.text = "error"
+            self.headers = {}
 
         def json(self):
             return {"ok": True}
@@ -210,6 +327,159 @@ def test_github_api_error_handling(monkeypatch):
 
     monkeypatch.setattr(reviewer_bot.requests, "request", fake_request)
     assert reviewer_bot.github_api("GET", "issues/1") is None
+
+
+def test_acquire_state_issue_lease_lock_success(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    monkeypatch.setenv("WORKFLOW_RUN_ID", "9001")
+    monkeypatch.setenv("WORKFLOW_NAME", "Reviewer Bot")
+    monkeypatch.setenv("WORKFLOW_JOB_NAME", "reviewer-bot")
+    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
+    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
+
+    body = reviewer_bot.render_state_issue_body(make_state(), reviewer_bot.clear_lock_metadata())
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_state_issue_snapshot",
+        lambda: reviewer_bot.StateIssueSnapshot(
+            body=body,
+            etag='"etag"',
+            html_url="https://example.com/issues/314",
+        ),
+    )
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "conditional_patch_state_issue",
+        lambda body, etag: reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"ok": True},
+            headers={},
+            text="",
+            ok=True,
+        ),
+    )
+
+    ctx = reviewer_bot.acquire_state_issue_lease_lock()
+
+    assert ctx.lock_owner_run_id == "9001"
+    assert ctx.lock_owner_workflow == "Reviewer Bot"
+    assert ctx.lock_owner_job == "reviewer-bot"
+    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is not None
+
+
+def test_acquire_state_issue_lease_lock_retries_on_conflict(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
+    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
+
+    body = reviewer_bot.render_state_issue_body(make_state(), reviewer_bot.clear_lock_metadata())
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_state_issue_snapshot",
+        lambda: reviewer_bot.StateIssueSnapshot(
+            body=body,
+            etag='"etag"',
+            html_url="https://example.com/issues/314",
+        ),
+    )
+
+    statuses = iter([412, 200])
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "conditional_patch_state_issue",
+        lambda body, etag: reviewer_bot.GitHubApiResult(
+            status_code=next(statuses),
+            payload={"ok": True},
+            headers={},
+            text="",
+            ok=True,
+        ),
+    )
+
+    ctx = reviewer_bot.acquire_state_issue_lease_lock()
+    assert ctx.lock_token
+
+
+def test_acquire_state_issue_lease_lock_takes_over_expired_lock(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
+    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
+
+    expired_lock = reviewer_bot.normalize_lock_metadata(
+        {
+            "schema_version": 1,
+            "lock_owner_run_id": "123",
+            "lock_owner_workflow": "Reviewer Bot",
+            "lock_owner_job": "reviewer-bot",
+            "lock_token": "stale-lock",
+            "lock_acquired_at": "2020-01-01T00:00:00+00:00",
+            "lock_expires_at": "2020-01-01T00:01:00+00:00",
+        }
+    )
+    body = reviewer_bot.render_state_issue_body(make_state(), expired_lock)
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_state_issue_snapshot",
+        lambda: reviewer_bot.StateIssueSnapshot(
+            body=body,
+            etag='"etag"',
+            html_url="https://example.com/issues/314",
+        ),
+    )
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "conditional_patch_state_issue",
+        lambda body, etag: reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"ok": True},
+            headers={},
+            text="",
+            ok=True,
+        ),
+    )
+
+    ctx = reviewer_bot.acquire_state_issue_lease_lock()
+    assert ctx.lock_token != "stale-lock"
+
+
+def test_acquire_state_issue_lease_lock_times_out(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    monkeypatch.setattr(reviewer_bot, "LOCK_MAX_WAIT_SECONDS", 1)
+    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
+    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
+
+    valid_lock = reviewer_bot.normalize_lock_metadata(
+        {
+            "schema_version": 1,
+            "lock_owner_run_id": "other-run",
+            "lock_owner_workflow": "Reviewer Bot",
+            "lock_owner_job": "reviewer-bot",
+            "lock_token": "active-lock",
+            "lock_acquired_at": "2999-01-01T00:00:00+00:00",
+            "lock_expires_at": "2999-01-01T00:10:00+00:00",
+        }
+    )
+    body = reviewer_bot.render_state_issue_body(make_state(), valid_lock)
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_state_issue_snapshot",
+        lambda: reviewer_bot.StateIssueSnapshot(
+            body=body,
+            etag='"etag"',
+            html_url="https://example.com/issues/314",
+        ),
+    )
+
+    monotonic_values = iter([0.0, 0.0, 2.0, 2.0])
+    monkeypatch.setattr(reviewer_bot.time, "monotonic", lambda: next(monotonic_values))
+
+    with pytest.raises(RuntimeError, match="Timed out waiting for reviewer-bot lease lock"):
+        reviewer_bot.acquire_state_issue_lease_lock()
 
 
 def test_handle_pass_command_requires_current_reviewer(stub_api, monkeypatch):
@@ -523,6 +793,53 @@ def test_handle_comment_event_assign_from_queue(stub_api, captured_comments, mon
     assert "assigned as reviewer" in captured_comments[1]["body"]
 
 
+def test_handle_assign_from_queue_truthful_when_pr_request_returns_422(
+    stub_api, captured_comments, monkeypatch
+):
+    state = make_state()
+    os.environ["IS_PULL_REQUEST"] = "true"
+    os.environ["ISSUE_AUTHOR"] = "dana"
+
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
+    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "request_reviewer_assignment",
+        lambda *args, **kwargs: reviewer_bot.AssignmentAttempt(success=False, status_code=422),
+    )
+
+    response, success = reviewer_bot.handle_assign_from_queue_command(state, 42)
+
+    assert success is True
+    assert "has been assigned as reviewer" not in response
+    assert "remains designated as reviewer" in response
+    assert len(captured_comments) == 1
+    assert captured_comments[0]["body"] == reviewer_bot.REVIEWER_REQUEST_422_TEMPLATE.format(reviewer="alice")
+
+
+def test_handle_issue_or_pr_opened_pr_request_422_posts_truthful_message(
+    stub_api, captured_comments, monkeypatch
+):
+    state = make_state()
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["ISSUE_AUTHOR"] = "dana"
+    os.environ["ISSUE_LABELS"] = '["coding guideline"]'
+    os.environ["IS_PULL_REQUEST"] = "true"
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
+    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "request_reviewer_assignment",
+        lambda *args, **kwargs: reviewer_bot.AssignmentAttempt(success=False, status_code=422),
+    )
+
+    handled = reviewer_bot.handle_issue_or_pr_opened(state)
+
+    assert handled is True
+    assert len(captured_comments) == 1
+    assert captured_comments[0]["body"] == reviewer_bot.REVIEWER_REQUEST_422_TEMPLATE.format(reviewer="alice")
+
+
 def test_handle_issue_or_pr_opened_assigns_reviewer(stub_api, captured_comments, monkeypatch):
     state = make_state()
     os.environ["ISSUE_NUMBER"] = "42"
@@ -733,12 +1050,13 @@ def test_reconcile_active_review_entry_marks_complete_for_approved(monkeypatch):
             },
         ],
     )
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
 
     message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
 
     assert success is True
     assert state_changed is True
-    assert "marked review complete" in message
+    assert "applied approval transitions" in message
     review_data = state["active_reviews"]["42"]
     assert review_data["review_completed_at"] is not None
     assert review_data["review_completed_by"] == "alice"
@@ -943,6 +1261,7 @@ def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
             }
         ],
     )
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
 
     posted_comments = []
 
@@ -1043,6 +1362,7 @@ def test_handle_workflow_run_event_comment_failure_is_non_fatal(monkeypatch, cap
             }
         ],
     )
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: False)
 
     handled = reviewer_bot.handle_workflow_run_event(state)
@@ -1098,6 +1418,101 @@ def test_handle_pull_request_review_event_approval_marks_complete(stub_api):
     assert review_data["review_completed_by"] == "alice"
     assert review_data["review_completion_source"] == "pull_request_review"
     assert review_data["last_reviewer_activity"] != "2000-01-01T00:00:00+00:00"
+
+
+def test_read_level_designated_approval_triggers_mandatory_escalation(
+    stub_api, captured_comments, monkeypatch
+):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = "approved"
+    os.environ["REVIEW_AUTHOR"] = "alice"
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
+
+    handled = reviewer_bot.handle_pull_request_review_event(state)
+
+    assert handled is True
+    review_data = state["active_reviews"]["42"]
+    assert review_data["review_completed_at"] is not None
+    assert review_data["mandatory_approver_required"] is True
+    assert review_data["mandatory_approver_pinged_at"] is not None
+    assert any(
+        c["body"] == reviewer_bot.MANDATORY_TRIAGE_ESCALATION_TEMPLATE
+        for c in captured_comments
+    )
+
+
+def test_read_level_escalation_comment_posts_once_per_review_cycle(
+    stub_api, captured_comments, monkeypatch
+):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = "approved"
+    os.environ["REVIEW_AUTHOR"] = "alice"
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
+
+    assert reviewer_bot.handle_pull_request_review_event(state) is True
+    assert reviewer_bot.handle_pull_request_review_event(state) is False
+
+    escalation_comments = [
+        c for c in captured_comments if c["body"] == reviewer_bot.MANDATORY_TRIAGE_ESCALATION_TEMPLATE
+    ]
+    assert len(escalation_comments) == 1
+
+
+def test_triage_approval_clears_mandatory_escalation(
+    stub_api, captured_comments, monkeypatch
+):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "mandatory_approver_required": True,
+        "mandatory_approver_pinged_at": "2026-02-11T10:00:00+00:00",
+        "mandatory_approver_label_applied_at": "2026-02-11T10:00:00+00:00",
+    }
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = "approved"
+    os.environ["REVIEW_AUTHOR"] = "bob"
+
+    removed = {"called": False}
+
+    def fake_remove_label(issue_number, label):
+        removed["called"] = True
+        assert issue_number == 42
+        assert label == reviewer_bot.MANDATORY_TRIAGE_APPROVER_LABEL
+        return True
+
+    monkeypatch.setattr(
+        reviewer_bot,
+        "check_user_permission",
+        lambda username, required_permission="triage": username.lower() == "bob",
+    )
+    monkeypatch.setattr(reviewer_bot, "remove_label_with_status", fake_remove_label)
+
+    handled = reviewer_bot.handle_pull_request_review_event(state)
+
+    assert handled is True
+    review_data = state["active_reviews"]["42"]
+    assert review_data["mandatory_approver_required"] is False
+    assert review_data["mandatory_approver_satisfied_by"] == "bob"
+    assert review_data["mandatory_approver_satisfied_at"] is not None
+    assert removed["called"] is True
+    assert any(
+        c["body"] == reviewer_bot.MANDATORY_TRIAGE_SATISFIED_TEMPLATE.format(approver="bob")
+        for c in captured_comments
+    )
 
 
 @pytest.mark.parametrize("review_state", ["commented", "changes_requested"])
@@ -1271,6 +1686,8 @@ def test_handle_comment_event_unknown_command(stub_api, captured_comments):
 def test_main_fails_when_save_state_fails(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
     monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
     monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
@@ -1287,6 +1704,8 @@ def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
     monkeypatch.setenv("EVENT_ACTION", "completed")
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
     monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
     monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))

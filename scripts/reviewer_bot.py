@@ -56,21 +56,20 @@ All commands must be prefixed with @guidelines-bot /<command>:
 
 import json
 import os
+import random
 import re
 import subprocess
 import sys
+import time
+import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-
-import yaml
+from typing import Any
 
 # GitHub API interaction
-try:
-    import requests
-except ImportError:
-    # requests is available via uv
-    pass
-
+import requests
+import yaml
 
 # ==============================================================================
 # Configuration
@@ -86,6 +85,50 @@ STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
 # Members file is in the consortium repo, not this repo
 MEMBERS_URL = "https://raw.githubusercontent.com/rustfoundation/safety-critical-rust-consortium/main/subcommittee/coding-guidelines/members.md"
 MAX_RECENT_ASSIGNMENTS = 20
+
+STATE_BLOCK_START_MARKER = "<!-- REVIEWER_BOT_STATE_START -->"
+STATE_BLOCK_END_MARKER = "<!-- REVIEWER_BOT_STATE_END -->"
+LOCK_BLOCK_START_MARKER = "<!-- REVIEWER_BOT_LOCK_START -->"
+LOCK_BLOCK_END_MARKER = "<!-- REVIEWER_BOT_LOCK_END -->"
+
+LOCK_SCHEMA_VERSION = 1
+LOCK_LEASE_TTL_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_TTL_SECONDS", "300"))
+LOCK_RETRY_BASE_SECONDS = float(os.environ.get("REVIEWER_BOT_LOCK_RETRY_SECONDS", "2"))
+LOCK_MAX_WAIT_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "1200"))
+LOCK_API_RETRY_LIMIT = int(os.environ.get("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "5"))
+
+MANDATORY_TRIAGE_APPROVER_LABEL = "triage approver required"
+MANDATORY_TRIAGE_PING_TARGETS = [
+    "@PLeVasseur",
+    "@felix91gr",
+    "@rcseacord",
+    "@plaindocs",
+    "@AlexCeleste",
+    "@sei-dsvoboda",
+]
+
+REVIEWER_REQUEST_422_TEMPLATE = (
+    "@{reviewer} is designated as reviewer by queue rotation, but GitHub could not add them to PR "
+    "Reviewers automatically (API 422). A triage+ approver may still be required before merge queue."
+)
+MANDATORY_TRIAGE_ESCALATION_TEMPLATE = (
+    "Mandatory triage approval required before merge queue. Pinging "
+    f"{' '.join(MANDATORY_TRIAGE_PING_TARGETS)}. "
+    "Label applied: `triage approver required`."
+)
+MANDATORY_TRIAGE_SATISFIED_TEMPLATE = (
+    "Mandatory triage approval satisfied by @{approver}; removed `triage approver required`."
+)
+
+LOCK_METADATA_KEYS = [
+    "schema_version",
+    "lock_owner_run_id",
+    "lock_owner_workflow",
+    "lock_owner_job",
+    "lock_token",
+    "lock_acquired_at",
+    "lock_expires_at",
+]
 
 # Review deadline configuration
 REVIEW_DEADLINE_DAYS = 14  # Days before first warning
@@ -121,6 +164,52 @@ def get_commands_help() -> str:
 # ==============================================================================
 
 
+@dataclass
+class GitHubApiResult:
+    status_code: int
+    payload: Any
+    headers: dict[str, str]
+    text: str
+    ok: bool
+
+
+@dataclass
+class AssignmentAttempt:
+    success: bool
+    status_code: int | None
+    exhausted_retryable_failure: bool = False
+
+
+@dataclass
+class StateIssueSnapshot:
+    body: str
+    etag: str | None
+    html_url: str
+
+
+@dataclass
+class StateIssueBodyParts:
+    prefix: str
+    state_block_inner: str | None
+    between_state_and_lock: str
+    lock_block_inner: str | None
+    suffix: str
+    has_state_markers: bool
+    has_lock_markers: bool
+
+
+@dataclass
+class LeaseContext:
+    lock_token: str
+    lock_owner_run_id: str
+    lock_owner_workflow: str
+    lock_owner_job: str
+    state_issue_url: str
+
+
+ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
+
+
 def get_github_token() -> str:
     """Get the GitHub token from environment."""
     token = os.environ.get("GITHUB_TOKEN")
@@ -130,8 +219,15 @@ def get_github_token() -> str:
     return token
 
 
-def github_api(method: str, endpoint: str, data: dict | None = None) -> dict | None:
-    """Make a GitHub API request."""
+def github_api_request(
+    method: str,
+    endpoint: str,
+    data: dict | None = None,
+    extra_headers: dict[str, str] | None = None,
+    *,
+    suppress_error_log: bool = False,
+) -> GitHubApiResult:
+    """Make a GitHub API request and return status, payload, and headers."""
     token = get_github_token()
     repo = f"{os.environ['REPO_OWNER']}/{os.environ['REPO_NAME']}"
     url = f"https://api.github.com/repos/{repo}/{endpoint}"
@@ -141,16 +237,43 @@ def github_api(method: str, endpoint: str, data: dict | None = None) -> dict | N
         "Accept": "application/vnd.github.v3+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+    if extra_headers:
+        headers.update(extra_headers)
 
     response = requests.request(method, url, headers=headers, json=data)
 
-    if response.status_code >= 400:
-        print(f"GitHub API error: {response.status_code} - {response.text}", file=sys.stderr)
-        return None
-
+    payload: Any = None
     if response.content:
-        return response.json()
-    return {}
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+
+    ok = response.status_code < 400
+    if not ok and not suppress_error_log:
+        print(
+            f"GitHub API error: {response.status_code} - {response.text}",
+            file=sys.stderr,
+        )
+
+    normalized_headers = {key.lower(): value for key, value in response.headers.items()}
+    return GitHubApiResult(
+        status_code=response.status_code,
+        payload=payload,
+        headers=normalized_headers,
+        text=response.text,
+        ok=ok,
+    )
+
+
+def github_api(method: str, endpoint: str, data: dict | None = None) -> Any | None:
+    """Backward-compatible wrapper around github_api_request."""
+    response = github_api_request(method, endpoint, data)
+    if not response.ok:
+        return None
+    if response.payload is None:
+        return {}
+    return response.payload
 
 
 def post_comment(issue_number: int, body: str) -> bool:
@@ -180,20 +303,155 @@ def remove_label(issue_number: int, label: str) -> bool:
     return True
 
 
-def assign_reviewer(issue_number: int, username: str) -> bool:
-    """Assign a user as a reviewer (via assignees for issues, reviewers for PRs)."""
+def add_label_with_status(issue_number: int, label: str) -> bool:
+    """Add a label with explicit HTTP status handling."""
+    response = github_api_request(
+        "POST",
+        f"issues/{issue_number}/labels",
+        {"labels": [label]},
+        suppress_error_log=True,
+    )
+    if response.status_code in {200, 201}:
+        return True
+    if response.status_code in {401, 403}:
+        raise RuntimeError(
+            f"Permission denied adding label '{label}' to #{issue_number}: {response.text}"
+        )
+    print(
+        f"WARNING: Failed to add label '{label}' to #{issue_number} "
+        f"(status {response.status_code}): {response.text}",
+        file=sys.stderr,
+    )
+    return False
+
+
+def remove_label_with_status(issue_number: int, label: str) -> bool:
+    """Remove a label with explicit HTTP status handling."""
+    response = github_api_request(
+        "DELETE",
+        f"issues/{issue_number}/labels/{label}",
+        suppress_error_log=True,
+    )
+    if response.status_code in {200, 204, 404}:
+        return True
+    if response.status_code in {401, 403}:
+        raise RuntimeError(
+            f"Permission denied removing label '{label}' from #{issue_number}: {response.text}"
+        )
+    print(
+        f"WARNING: Failed to remove label '{label}' from #{issue_number} "
+        f"(status {response.status_code}): {response.text}",
+        file=sys.stderr,
+    )
+    return False
+
+
+def ensure_label_exists(label: str) -> bool:
+    """Create label if missing; treat 422 as already exists."""
+    response = github_api_request(
+        "POST",
+        "labels",
+        {
+            "name": label,
+            "color": "d73a4a",
+            "description": "Indicates triage+ approval is required before merge queue",
+        },
+        suppress_error_log=True,
+    )
+
+    if response.status_code == 201:
+        return True
+    if response.status_code == 422:
+        return True
+
+    print(
+        f"WARNING: Failed to ensure label '{label}' exists (status {response.status_code}): "
+        f"{response.text}",
+        file=sys.stderr,
+    )
+    return False
+
+
+def request_reviewer_assignment(issue_number: int, username: str) -> AssignmentAttempt:
+    """Request reviewer/assignee with status-aware handling and retries."""
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
 
     if is_pr:
-        # For PRs, request review
-        result = github_api("POST", f"pulls/{issue_number}/requested_reviewers",
-                          {"reviewers": [username]})
+        endpoint = f"pulls/{issue_number}/requested_reviewers"
+        payload = {"reviewers": [username]}
+        assignment_target = "PR reviewer"
     else:
-        # For issues, use assignees
-        result = github_api("POST", f"issues/{issue_number}/assignees",
-                          {"assignees": [username]})
+        endpoint = f"issues/{issue_number}/assignees"
+        payload = {"assignees": [username]}
+        assignment_target = "issue assignee"
 
-    return result is not None
+    for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
+        response = github_api_request("POST", endpoint, payload, suppress_error_log=True)
+
+        if response.status_code in {200, 201}:
+            return AssignmentAttempt(success=True, status_code=response.status_code)
+
+        if response.status_code == 422:
+            # Queue policy remains permissive: reviewer is still designated in bot state.
+            return AssignmentAttempt(success=False, status_code=422)
+
+        if response.status_code in {401, 403}:
+            raise RuntimeError(
+                f"Permission denied requesting {assignment_target} @{username} on "
+                f"#{issue_number} (status {response.status_code}): {response.text}"
+            )
+
+        if response.status_code == 429 or response.status_code >= 500:
+            if attempt < LOCK_API_RETRY_LIMIT:
+                delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+                print(
+                    f"Retryable {assignment_target} API failure for @{username} on #{issue_number} "
+                    f"(status {response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})"
+                )
+                time.sleep(delay)
+                continue
+            return AssignmentAttempt(
+                success=False,
+                status_code=response.status_code,
+                exhausted_retryable_failure=True,
+            )
+
+        print(
+            f"WARNING: Unexpected {assignment_target} API status {response.status_code} "
+            f"for @{username} on #{issue_number}: {response.text}",
+            file=sys.stderr,
+        )
+        return AssignmentAttempt(success=False, status_code=response.status_code)
+
+    return AssignmentAttempt(success=False, status_code=None, exhausted_retryable_failure=True)
+
+
+def assign_reviewer(issue_number: int, username: str) -> bool:
+    """Backward-compatible reviewer assignment boolean wrapper."""
+    attempt = request_reviewer_assignment(issue_number, username)
+    return attempt.success
+
+
+def get_assignment_failure_comment(reviewer: str, attempt: AssignmentAttempt) -> str | None:
+    """Return truthful assignment warning comment text when GitHub assignment fails."""
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+
+    if attempt.status_code == 422:
+        if is_pr:
+            return REVIEWER_REQUEST_422_TEMPLATE.format(reviewer=reviewer)
+        return (
+            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not "
+            "add them as an assignee automatically (API 422)."
+        )
+
+    if attempt.exhausted_retryable_failure:
+        return (
+            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not "
+            f"add them to PR Reviewers automatically after retries (status {attempt.status_code}). "
+            "A triage+ approver may still be required before merge queue."
+        )
+
+    return None
 
 
 def get_issue_assignees(issue_number: int) -> list[str]:
@@ -353,29 +611,262 @@ def get_state_issue() -> dict | None:
     if not STATE_ISSUE_NUMBER:
         print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
         return None
-    
+
     return github_api("GET", f"issues/{STATE_ISSUE_NUMBER}")
 
 
-def parse_state_from_issue(issue: dict) -> dict:
-    """Parse YAML state from issue body."""
-    body = issue.get("body", "") or ""
-    
-    # Extract YAML from code block if present
-    yaml_match = re.search(r"```ya?ml\n(.*?)\n```", body, re.DOTALL)
-    if yaml_match:
-        yaml_content = yaml_match.group(1)
-    else:
-        # Try to parse the whole body as YAML
-        yaml_content = body
-    
+def default_state_issue_prefix() -> str:
+    """Return canonical prefix text for state issue layout."""
+    return (
+        "## Reviewer Bot State\n\n"
+        "> WARNING: DO NOT EDIT MANUALLY - This issue is automatically maintained by the reviewer bot.\n"
+        "> Use bot commands instead (see "
+        "[CONTRIBUTING.md](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/blob/main/CONTRIBUTING.md) "
+        "for details).\n\n"
+        "This issue tracks the round-robin assignment of reviewers for coding guidelines.\n\n"
+        "### Current State\n\n"
+    )
+
+
+def split_state_issue_body(body: str) -> StateIssueBodyParts:
+    """Split state issue body into prefix, state block, lock block, and suffix."""
+    if not body:
+        return StateIssueBodyParts(
+            prefix=default_state_issue_prefix(),
+            state_block_inner=None,
+            between_state_and_lock="\n\n",
+            lock_block_inner=None,
+            suffix="\n",
+            has_state_markers=False,
+            has_lock_markers=False,
+        )
+
+    state_start = body.find(STATE_BLOCK_START_MARKER)
+    state_end = body.find(STATE_BLOCK_END_MARKER)
+    lock_start = body.find(LOCK_BLOCK_START_MARKER)
+    lock_end = body.find(LOCK_BLOCK_END_MARKER)
+
+    has_state_markers = state_start >= 0 and state_end > state_start
+    has_lock_markers = lock_start >= 0 and lock_end > lock_start
+
+    if has_state_markers and has_lock_markers and state_end < lock_start:
+        return StateIssueBodyParts(
+            prefix=body[:state_start],
+            state_block_inner=body[state_start + len(STATE_BLOCK_START_MARKER):state_end],
+            between_state_and_lock=body[state_end + len(STATE_BLOCK_END_MARKER):lock_start],
+            lock_block_inner=body[lock_start + len(LOCK_BLOCK_START_MARKER):lock_end],
+            suffix=body[lock_end + len(LOCK_BLOCK_END_MARKER):],
+            has_state_markers=True,
+            has_lock_markers=True,
+        )
+
+    # Partial/legacy format fallback: migrate to canonical marker layout.
+    return StateIssueBodyParts(
+        prefix=default_state_issue_prefix(),
+        state_block_inner=None,
+        between_state_and_lock="\n\n",
+        lock_block_inner=None,
+        suffix="\n",
+        has_state_markers=False,
+        has_lock_markers=False,
+    )
+
+
+def extract_fenced_block(inner_block: str, language_pattern: str) -> str | None:
+    """Extract fenced block content from marker inner block."""
+    if not inner_block:
+        return None
+
+    match = re.search(
+        rf"```(?:{language_pattern})\n(.*?)\n```",
+        inner_block,
+        re.DOTALL,
+    )
+    if match:
+        return match.group(1)
+    return None
+
+
+def normalize_lock_metadata(lock_meta: dict | None) -> dict:
+    """Normalize lock metadata to schema v1 keys."""
+    normalized: dict[str, Any] = dict.fromkeys(LOCK_METADATA_KEYS)
+    normalized["schema_version"] = LOCK_SCHEMA_VERSION
+
+    if not isinstance(lock_meta, dict):
+        return normalized
+
+    for key in LOCK_METADATA_KEYS:
+        if key == "schema_version":
+            schema_value = lock_meta.get("schema_version")
+            if isinstance(schema_value, int):
+                normalized["schema_version"] = schema_value
+            continue
+        if key in lock_meta:
+            normalized[key] = lock_meta.get(key)
+
+    return normalized
+
+
+def parse_state_yaml_from_issue_body(body: str) -> dict:
+    """Parse YAML state from issue body markers or legacy YAML block."""
+    parts = split_state_issue_body(body)
+
+    yaml_content = None
+    if parts.has_state_markers and parts.state_block_inner is not None:
+        yaml_content = extract_fenced_block(parts.state_block_inner, "ya?ml")
+
+    if yaml_content is None:
+        yaml_match = re.search(r"```ya?ml\n(.*?)\n```", body, re.DOTALL)
+        if yaml_match:
+            yaml_content = yaml_match.group(1)
+        else:
+            yaml_content = body
+
     try:
         state = yaml.safe_load(yaml_content) or {}
-    except yaml.YAMLError as e:
-        print(f"WARNING: Failed to parse state YAML: {e}", file=sys.stderr)
+    except yaml.YAMLError as exc:
+        print(f"WARNING: Failed to parse state YAML: {exc}", file=sys.stderr)
         state = {}
-    
+
+    if not isinstance(state, dict):
+        return {}
     return state
+
+
+def parse_lock_metadata_from_issue_body(body: str) -> dict:
+    """Parse lock metadata JSON block from issue body markers."""
+    parts = split_state_issue_body(body)
+    if not parts.has_lock_markers or parts.lock_block_inner is None:
+        return normalize_lock_metadata(None)
+
+    lock_json = extract_fenced_block(parts.lock_block_inner, "json")
+    if lock_json is None:
+        return normalize_lock_metadata(None)
+
+    try:
+        parsed = json.loads(lock_json)
+    except json.JSONDecodeError as exc:
+        print(f"WARNING: Failed to parse lock metadata JSON: {exc}", file=sys.stderr)
+        return normalize_lock_metadata(None)
+
+    if not isinstance(parsed, dict):
+        return normalize_lock_metadata(None)
+
+    return normalize_lock_metadata(parsed)
+
+
+def render_marked_fenced_block(
+    start_marker: str,
+    end_marker: str,
+    language: str,
+    content: str,
+) -> str:
+    """Render a marker-delimited fenced block."""
+    normalized = content.rstrip("\n")
+    return f"{start_marker}\n```{language}\n{normalized}\n```\n{end_marker}"
+
+
+def render_state_issue_body(
+    state: dict,
+    lock_meta: dict,
+    base_body: str | None = None,
+    *,
+    preserve_state_block: bool = False,
+) -> str:
+    """Render full issue body preserving markers and surrounding text."""
+    parts = split_state_issue_body(base_body or "")
+
+    if preserve_state_block and parts.has_state_markers and parts.state_block_inner is not None:
+        state_section = f"{STATE_BLOCK_START_MARKER}{parts.state_block_inner}{STATE_BLOCK_END_MARKER}"
+    else:
+        yaml_content = yaml.dump(
+            state,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        )
+        state_section = render_marked_fenced_block(
+            STATE_BLOCK_START_MARKER,
+            STATE_BLOCK_END_MARKER,
+            "yaml",
+            yaml_content,
+        )
+
+    lock_json = json.dumps(normalize_lock_metadata(lock_meta), indent=2, sort_keys=False)
+    lock_section = render_marked_fenced_block(
+        LOCK_BLOCK_START_MARKER,
+        LOCK_BLOCK_END_MARKER,
+        "json",
+        lock_json,
+    )
+
+    prefix = parts.prefix or default_state_issue_prefix()
+    between = parts.between_state_and_lock if parts.has_state_markers and parts.has_lock_markers else "\n\n"
+    suffix = parts.suffix if parts.has_lock_markers else "\n"
+
+    return f"{prefix}{state_section}{between}{lock_section}{suffix}"
+
+
+def parse_state_from_issue(issue: dict) -> dict:
+    """Parse YAML state from issue payload."""
+    body = issue.get("body", "") or ""
+    return parse_state_yaml_from_issue_body(body)
+
+
+def get_state_issue_snapshot() -> StateIssueSnapshot | None:
+    """Fetch state issue body plus ETag for conditional writes."""
+    if not STATE_ISSUE_NUMBER:
+        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
+        return None
+
+    response = github_api_request(
+        "GET",
+        f"issues/{STATE_ISSUE_NUMBER}",
+        suppress_error_log=True,
+    )
+    if response.status_code != 200:
+        print(
+            "ERROR: Failed to fetch state issue "
+            f"#{STATE_ISSUE_NUMBER} (status {response.status_code}): {response.text}",
+            file=sys.stderr,
+        )
+        return None
+
+    if not isinstance(response.payload, dict):
+        print("ERROR: State issue response payload was not an object", file=sys.stderr)
+        return None
+
+    body = response.payload.get("body")
+    if not isinstance(body, str):
+        body = ""
+
+    html_url = response.payload.get("html_url")
+    if not isinstance(html_url, str) or not html_url:
+        repo = f"{os.environ.get('REPO_OWNER', '')}/{os.environ.get('REPO_NAME', '')}".strip("/")
+        html_url = f"https://github.com/{repo}/issues/{STATE_ISSUE_NUMBER}" if repo else ""
+
+    return StateIssueSnapshot(
+        body=body,
+        etag=response.headers.get("etag"),
+        html_url=html_url,
+    )
+
+
+def conditional_patch_state_issue(body: str, etag: str) -> GitHubApiResult:
+    """Patch state issue body with optimistic concurrency via If-Match."""
+    return github_api_request(
+        "PATCH",
+        f"issues/{STATE_ISSUE_NUMBER}",
+        {"body": body},
+        extra_headers={"If-Match": etag},
+        suppress_error_log=True,
+    )
+
+
+def assert_lock_held(operation: str) -> None:
+    """Fail fast when mutating state outside the lease lock boundary."""
+    if ACTIVE_LEASE_CONTEXT is None:
+        raise RuntimeError(f"Mutating path reached without lease lock: {operation}")
 
 
 def load_state() -> dict:
@@ -416,44 +907,350 @@ def load_state() -> dict:
 
 def save_state(state: dict) -> bool:
     """Save the state to the state issue. Returns True on success."""
+    assert_lock_held("save_state")
+
     if not STATE_ISSUE_NUMBER:
         print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
         return False
-    
+
     state["last_updated"] = datetime.now(timezone.utc).isoformat()
 
-    # Format the issue body with YAML in a code block
-    yaml_content = yaml.dump(state, default_flow_style=False, sort_keys=False,
-                            allow_unicode=True)
-    
-    body = f"""## 📊 Reviewer Bot State
+    for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
+        snapshot = get_state_issue_snapshot()
+        if snapshot is None:
+            return False
 
-> ⚠️ **DO NOT EDIT MANUALLY** - This issue is automatically maintained by the reviewer bot.
-> Use bot commands instead (see [CONTRIBUTING.md](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/blob/main/CONTRIBUTING.md) for details).
+        if not snapshot.etag:
+            print("ERROR: Missing ETag on state issue GET; cannot perform conditional PATCH", file=sys.stderr)
+            return False
 
-This issue tracks the round-robin assignment of reviewers for coding guidelines.
+        lock_meta = parse_lock_metadata_from_issue_body(snapshot.body)
+        body = render_state_issue_body(state, lock_meta, snapshot.body)
 
-### Current State
+        response = conditional_patch_state_issue(body, snapshot.etag)
+        if response.status_code == 200:
+            print(f"State saved to issue #{STATE_ISSUE_NUMBER} with If-Match")
+            return True
 
-```yaml
-{yaml_content}```
+        if response.status_code in {409, 412}:
+            print(
+                "WARNING: State save hit optimistic concurrency conflict "
+                f"(status {response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
+                file=sys.stderr,
+            )
+            delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+            time.sleep(delay)
+            continue
 
-### What This Tracks
+        if response.status_code == 404:
+            print(
+                f"ERROR: State issue #{STATE_ISSUE_NUMBER} not found during save_state",
+                file=sys.stderr,
+            )
+            return False
 
-- **queue**: Active reviewers in rotation order
-- **current_index**: Position in queue (who's next)
-- **pass_until**: Reviewers temporarily away with return dates
-- **recent_assignments**: Last {MAX_RECENT_ASSIGNMENTS} assignments for visibility
-- **active_reviews**: Per-issue/PR tracking of who passed and the current designated reviewer
-"""
+        if response.status_code in {401, 403}:
+            print(
+                "ERROR: Permission failure while saving state issue "
+                f"#{STATE_ISSUE_NUMBER} (status {response.status_code}): {response.text}",
+                file=sys.stderr,
+            )
+            return False
 
-    result = github_api("PATCH", f"issues/{STATE_ISSUE_NUMBER}", {"body": body})
-    if result:
-        print(f"State saved to issue #{STATE_ISSUE_NUMBER}")
-        return True
-    else:
-        print(f"ERROR: Failed to save state to issue #{STATE_ISSUE_NUMBER}", file=sys.stderr)
+        if response.status_code == 429 or response.status_code >= 500:
+            if attempt < LOCK_API_RETRY_LIMIT:
+                delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+                print(
+                    "WARNING: Retryable state issue write failure "
+                    f"(status {response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
+                    file=sys.stderr,
+                )
+                time.sleep(delay)
+                continue
+            print(
+                "ERROR: Exhausted retries while saving state issue "
+                f"#{STATE_ISSUE_NUMBER}; last status {response.status_code}: {response.text}",
+                file=sys.stderr,
+            )
+            return False
+
+        print(
+            f"ERROR: Unexpected status {response.status_code} while saving state issue: {response.text}",
+            file=sys.stderr,
+        )
         return False
+
+    print(
+        f"ERROR: Failed to save state to issue #{STATE_ISSUE_NUMBER} after retries",
+        file=sys.stderr,
+    )
+    return False
+
+
+def parse_iso8601_timestamp(value: Any) -> datetime | None:
+    """Parse an ISO8601 timestamp and normalize to UTC timezone."""
+    if not isinstance(value, str) or not value:
+        return None
+
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def lock_is_currently_valid(lock_meta: dict, now: datetime | None = None) -> bool:
+    """Return True when lock metadata contains a non-expired lease token."""
+    if not isinstance(lock_meta, dict):
+        return False
+
+    lock_token = lock_meta.get("lock_token")
+    if not isinstance(lock_token, str) or not lock_token:
+        return False
+
+    expires_at = parse_iso8601_timestamp(lock_meta.get("lock_expires_at"))
+    if expires_at is None:
+        return False
+
+    now = now or datetime.now(timezone.utc)
+    return expires_at > now
+
+
+def get_lock_owner_context() -> tuple[str, str, str]:
+    """Get lock owner identity from workflow context."""
+    run_id = (
+        os.environ.get("WORKFLOW_RUN_ID", "").strip()
+        or os.environ.get("GITHUB_RUN_ID", "").strip()
+        or "local-run"
+    )
+    workflow = (
+        os.environ.get("WORKFLOW_NAME", "").strip()
+        or os.environ.get("GITHUB_WORKFLOW", "").strip()
+        or "reviewer-bot"
+    )
+    job = (
+        os.environ.get("WORKFLOW_JOB_NAME", "").strip()
+        or os.environ.get("GITHUB_JOB", "").strip()
+        or "reviewer-bot"
+    )
+    return run_id, workflow, job
+
+
+def build_lock_metadata(
+    lock_token: str,
+    lock_owner_run_id: str,
+    lock_owner_workflow: str,
+    lock_owner_job: str,
+) -> dict:
+    """Build normalized lock metadata document."""
+    acquired_at = datetime.now(timezone.utc)
+    expires_at = acquired_at.timestamp() + LOCK_LEASE_TTL_SECONDS
+    return normalize_lock_metadata(
+        {
+            "schema_version": LOCK_SCHEMA_VERSION,
+            "lock_owner_run_id": lock_owner_run_id,
+            "lock_owner_workflow": lock_owner_workflow,
+            "lock_owner_job": lock_owner_job,
+            "lock_token": lock_token,
+            "lock_acquired_at": acquired_at.isoformat(),
+            "lock_expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc).isoformat(),
+        }
+    )
+
+
+def clear_lock_metadata() -> dict:
+    """Return normalized empty lock metadata."""
+    return normalize_lock_metadata(None)
+
+
+def acquire_state_issue_lease_lock() -> LeaseContext:
+    """Acquire durable lease lock from in-repo state issue using If-Match."""
+    global ACTIVE_LEASE_CONTEXT
+
+    if ACTIVE_LEASE_CONTEXT is not None:
+        return ACTIVE_LEASE_CONTEXT
+
+    lock_token = uuid.uuid4().hex
+    lock_owner_run_id, lock_owner_workflow, lock_owner_job = get_lock_owner_context()
+    wait_started_at = time.monotonic()
+    attempt = 0
+
+    while True:
+        attempt += 1
+        elapsed = time.monotonic() - wait_started_at
+        if elapsed > LOCK_MAX_WAIT_SECONDS:
+            raise RuntimeError(
+                "Timed out waiting for reviewer-bot lease lock "
+                f"after {int(elapsed)}s (run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, "
+                f"state_issue={STATE_ISSUE_NUMBER})"
+            )
+
+        snapshot = get_state_issue_snapshot()
+        if snapshot is None:
+            raise RuntimeError("Failed to read state issue while acquiring lease lock")
+
+        if not snapshot.etag:
+            raise RuntimeError("State issue GET response did not include ETag header")
+
+        current_lock = parse_lock_metadata_from_issue_body(snapshot.body)
+        now = datetime.now(timezone.utc)
+        lock_valid = lock_is_currently_valid(current_lock, now)
+
+        if not lock_valid:
+            desired_lock = build_lock_metadata(
+                lock_token,
+                lock_owner_run_id,
+                lock_owner_workflow,
+                lock_owner_job,
+            )
+            state = parse_state_yaml_from_issue_body(snapshot.body)
+            updated_body = render_state_issue_body(
+                state,
+                desired_lock,
+                snapshot.body,
+                preserve_state_block=True,
+            )
+
+            patch_response = conditional_patch_state_issue(updated_body, snapshot.etag)
+            if patch_response.status_code == 200:
+                ACTIVE_LEASE_CONTEXT = LeaseContext(
+                    lock_token=lock_token,
+                    lock_owner_run_id=lock_owner_run_id,
+                    lock_owner_workflow=lock_owner_workflow,
+                    lock_owner_job=lock_owner_job,
+                    state_issue_url=snapshot.html_url,
+                )
+                print(
+                    "Acquired reviewer-bot lease lock "
+                    f"(run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, "
+                    f"issue={snapshot.html_url or STATE_ISSUE_NUMBER})"
+                )
+                return ACTIVE_LEASE_CONTEXT
+
+            if patch_response.status_code in {409, 412}:
+                print(
+                    "Lease lock acquire conflict "
+                    f"(status {patch_response.status_code}); retrying (attempt {attempt})"
+                )
+            elif patch_response.status_code == 404:
+                raise RuntimeError(
+                    f"State issue #{STATE_ISSUE_NUMBER} not found while acquiring lease lock"
+                )
+            elif patch_response.status_code in {401, 403}:
+                raise RuntimeError(
+                    "Insufficient permission to acquire reviewer-bot lease lock "
+                    f"(status {patch_response.status_code}): {patch_response.text}"
+                )
+            elif patch_response.status_code == 429 or patch_response.status_code >= 500:
+                print(
+                    "Retryable lease lock acquire failure "
+                    f"(status {patch_response.status_code}); retrying (attempt {attempt})"
+                )
+            else:
+                raise RuntimeError(
+                    "Unexpected status while acquiring reviewer-bot lease lock "
+                    f"(status {patch_response.status_code}): {patch_response.text}"
+                )
+        else:
+            lock_owner = current_lock.get("lock_owner_run_id") or "unknown"
+            lock_expires_at = current_lock.get("lock_expires_at") or "unknown"
+            print(
+                "Reviewer-bot lease lock currently held by "
+                f"run_id={lock_owner} until {lock_expires_at}; waiting"
+            )
+
+        delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+        time.sleep(delay)
+
+
+def release_state_issue_lease_lock() -> bool:
+    """Release lease lock if currently owned by this run context."""
+    global ACTIVE_LEASE_CONTEXT
+
+    if ACTIVE_LEASE_CONTEXT is None:
+        return True
+
+    context = ACTIVE_LEASE_CONTEXT
+    released = False
+
+    try:
+        for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
+            snapshot = get_state_issue_snapshot()
+            if snapshot is None:
+                break
+
+            if not snapshot.etag:
+                print(
+                    "ERROR: Missing ETag while releasing reviewer-bot lease lock",
+                    file=sys.stderr,
+                )
+                break
+
+            current_lock = parse_lock_metadata_from_issue_body(snapshot.body)
+            current_token = current_lock.get("lock_token")
+            if current_token and current_token != context.lock_token:
+                print(
+                    "WARNING: Lease lock token mismatch during release; "
+                    f"expected prefix={context.lock_token[:8]}, got prefix={str(current_token)[:8]}",
+                    file=sys.stderr,
+                )
+                return False
+
+            state = parse_state_yaml_from_issue_body(snapshot.body)
+            updated_body = render_state_issue_body(
+                state,
+                clear_lock_metadata(),
+                snapshot.body,
+                preserve_state_block=True,
+            )
+            patch_response = conditional_patch_state_issue(updated_body, snapshot.etag)
+
+            if patch_response.status_code == 200:
+                released = True
+                print(
+                    "Released reviewer-bot lease lock "
+                    f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]})"
+                )
+                return True
+
+            if patch_response.status_code in {409, 412, 429} or patch_response.status_code >= 500:
+                print(
+                    "Retryable lease lock release failure "
+                    f"(status {patch_response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
+                    file=sys.stderr,
+                )
+                delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+                time.sleep(delay)
+                continue
+
+            if patch_response.status_code in {401, 403, 404}:
+                print(
+                    "ERROR: Hard failure releasing reviewer-bot lease lock "
+                    f"(status {patch_response.status_code}): {patch_response.text}",
+                    file=sys.stderr,
+                )
+                break
+
+            print(
+                "ERROR: Unexpected status while releasing reviewer-bot lease lock "
+                f"(status {patch_response.status_code}): {patch_response.text}",
+                file=sys.stderr,
+            )
+            break
+
+        return False
+    finally:
+        if not released:
+            print(
+                "ERROR: Lease lock release failed "
+                f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]}, "
+                f"state_issue_url={context.state_issue_url})",
+                file=sys.stderr,
+            )
+        ACTIVE_LEASE_CONTEXT = None
 
 
 def sync_members_with_queue(state: dict) -> tuple[dict, list[str]]:
@@ -942,9 +1739,9 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     # Unassign the passed reviewer first (best effort - may fail if no permissions)
     unassign_reviewer(issue_number, passed_reviewer)
 
-    # Assign the substitute to this issue (best effort)
+    # Assign the substitute to this issue.
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assign_reviewer(issue_number, next_reviewer)  # Don't fail if this doesn't work
+    assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
     
     # Track the new reviewer in our state (this is the source of truth)
     set_current_reviewer(state, issue_number, next_reviewer)
@@ -952,16 +1749,28 @@ def handle_pass_command(state: dict, issue_number: int, comment_author: str,
     # Record the assignment
     record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
 
+    assignment_line = f"@{next_reviewer} is now assigned as the reviewer."
+    if not assignment_attempt.success:
+        failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
+        if failure_comment:
+            assignment_line = failure_comment
+        else:
+            status_text = assignment_attempt.status_code or "unknown"
+            assignment_line = (
+                f"@{next_reviewer} is designated as reviewer in bot state, but GitHub "
+                f"assignment could not be confirmed (status {status_text})."
+            )
+
     reason_text = f" Reason: {reason}" if reason else ""
     if is_first_pass:
         return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
-                f"@{next_reviewer} is now assigned as the reviewer.\n\n"
+                f"{assignment_line}\n\n"
                 f"_@{passed_reviewer} is next in queue for future issues._"), True
     else:
         # Get the original passer (first in the skip list)
         original_passer = issue_data["skipped"][0]
         return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
-                f"@{next_reviewer} is now assigned as the reviewer.\n\n"
+                f"{assignment_line}\n\n"
                 f"_@{original_passer} remains next in queue for future issues._"), True
 
 
@@ -1055,11 +1864,23 @@ def handle_pass_until_command(state: dict, issue_number: int, comment_author: st
 
         if next_reviewer:
             is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-            assign_reviewer(issue_number, next_reviewer)
+            assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
             set_current_reviewer(state, issue_number, next_reviewer)
             record_assignment(state, next_reviewer, issue_number,
                             "pr" if is_pr else "issue")
-            reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
+            if assignment_attempt.success:
+                reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
+            else:
+                failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
+                if failure_comment:
+                    reassigned_msg = f"\n\n{failure_comment}"
+                else:
+                    status_text = assignment_attempt.status_code or "unknown"
+                    reassigned_msg = (
+                        "\n\n"
+                        f"@{next_reviewer} is designated as the new reviewer in bot state, but "
+                        f"GitHub assignment is not confirmed (status {status_text})."
+                    )
         else:
             # Clear the current reviewer
             if "active_reviews" in state and issue_key in state["active_reviews"]:
@@ -1481,9 +2302,9 @@ def handle_claim_command(state: dict, issue_number: int,
     for assignee in current_assignees:
         unassign_reviewer(issue_number, assignee)
 
-    # Assign the claimer (best effort)
+    # Assign the claimer.
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assign_reviewer(issue_number, comment_author)
+    assignment_attempt = request_reviewer_assignment(issue_number, comment_author)
     
     # Track the reviewer in our state
     set_current_reviewer(state, issue_number, comment_author, assignment_method="claim")
@@ -1496,7 +2317,13 @@ def handle_claim_command(state: dict, issue_number: int,
     else:
         prev_text = ""
 
-    return f"✅ @{comment_author} has claimed this review{prev_text}.", True
+    response = f"✅ @{comment_author} has claimed this review{prev_text}."
+    if not assignment_attempt.success:
+        failure_comment = get_assignment_failure_comment(comment_author, assignment_attempt)
+        if failure_comment:
+            response = f"{response}\n\n{failure_comment}"
+
+    return response, True
 
 
 def handle_release_command(state: dict, issue_number: int,
@@ -1647,9 +2474,9 @@ def handle_assign_command(state: dict, issue_number: int,
     for assignee in current_assignees:
         unassign_reviewer(issue_number, assignee)
 
-    # Assign the specified user (best effort)
+    # Assign the specified user.
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assign_reviewer(issue_number, username)
+    assignment_attempt = request_reviewer_assignment(issue_number, username)
     
     # Track the reviewer in our state
     set_current_reviewer(state, issue_number, username, assignment_method="manual")
@@ -1662,7 +2489,18 @@ def handle_assign_command(state: dict, issue_number: int,
     else:
         prev_text = ""
 
-    return f"✅ @{username} has been assigned as reviewer{prev_text}.", True
+    if assignment_attempt.success:
+        return f"✅ @{username} has been assigned as reviewer{prev_text}.", True
+
+    response = (
+        f"✅ @{username} remains designated as reviewer in bot state{prev_text}. "
+        "GitHub reviewer assignment could not be completed."
+    )
+    failure_comment = get_assignment_failure_comment(username, assignment_attempt)
+    if failure_comment:
+        response = f"{response}\n\n{failure_comment}"
+
+    return response, True
 
 
 def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[str, bool]:
@@ -1689,9 +2527,9 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
         return ("❌ No reviewers available in the queue. "
                 f"Please use `{BOT_MENTION} /sync-members` to update the queue."), False
 
-    # Assign the reviewer (best effort - may fail if no permissions)
+    # Assign the reviewer.
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assign_reviewer(issue_number, next_reviewer)
+    assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
 
     # Track the reviewer in our state (source of truth for pass command)
     set_current_reviewer(state, issue_number, next_reviewer)
@@ -1704,15 +2542,26 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
     else:
         prev_text = ""
 
+    failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
+    if failure_comment:
+        post_comment(issue_number, failure_comment)
+
     # Post the appropriate guidance
     if is_pr:
-        guidance = get_pr_guidance(next_reviewer, issue_author)
+        if assignment_attempt.success:
+            guidance = get_pr_guidance(next_reviewer, issue_author)
+            post_comment(issue_number, guidance)
     else:
         guidance = get_issue_guidance(next_reviewer, issue_author)
+        post_comment(issue_number, guidance)
 
-    post_comment(issue_number, guidance)
+    if assignment_attempt.success:
+        return f"✅ @{next_reviewer} (next in queue) has been assigned as reviewer{prev_text}.", True
 
-    return f"✅ @{next_reviewer} (next in queue) has been assigned as reviewer{prev_text}.", True
+    return (
+        f"✅ @{next_reviewer} remains designated as reviewer in bot state{prev_text}."
+        " GitHub reviewer assignment could not be completed."
+    ), True
 
 
 # ==============================================================================
@@ -1741,6 +2590,11 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
             "review_completed_at": None,
             "review_completed_by": None,
             "review_completion_source": None,
+            "mandatory_approver_required": False,
+            "mandatory_approver_label_applied_at": None,
+            "mandatory_approver_pinged_at": None,
+            "mandatory_approver_satisfied_by": None,
+            "mandatory_approver_satisfied_at": None,
         }
         state["active_reviews"][issue_key] = review_entry
     elif isinstance(review_entry, list):
@@ -1754,6 +2608,11 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
             "review_completed_at": None,
             "review_completed_by": None,
             "review_completion_source": None,
+            "mandatory_approver_required": False,
+            "mandatory_approver_label_applied_at": None,
+            "mandatory_approver_pinged_at": None,
+            "mandatory_approver_satisfied_by": None,
+            "mandatory_approver_satisfied_at": None,
         }
         state["active_reviews"][issue_key] = review_entry
 
@@ -1772,6 +2631,11 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
         "review_completed_at": None,
         "review_completed_by": None,
         "review_completion_source": None,
+        "mandatory_approver_required": False,
+        "mandatory_approver_label_applied_at": None,
+        "mandatory_approver_pinged_at": None,
+        "mandatory_approver_satisfied_by": None,
+        "mandatory_approver_satisfied_at": None,
     }
 
     for field, default in required_fields.items():
@@ -1806,6 +2670,11 @@ def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
     review_data["review_completed_at"] = None
     review_data["review_completed_by"] = None
     review_data["review_completion_source"] = None
+    review_data["mandatory_approver_required"] = False
+    review_data["mandatory_approver_label_applied_at"] = None
+    review_data["mandatory_approver_pinged_at"] = None
+    review_data["mandatory_approver_satisfied_by"] = None
+    review_data["mandatory_approver_satisfied_at"] = None
 
 
 def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
@@ -1860,6 +2729,131 @@ def mark_review_complete(
     return True
 
 
+def is_triage_or_higher(username: str) -> bool:
+    """Return True when user has triage+ permissions."""
+    return check_user_permission(username, "triage")
+
+
+def trigger_mandatory_approver_escalation(state: dict, issue_number: int) -> bool:
+    """Open mandatory triage-approval escalation for a PR review cycle."""
+    review_data = ensure_review_entry(state, issue_number, create=True)
+    if review_data is None:
+        return False
+
+    now = datetime.now(timezone.utc).isoformat()
+    state_changed = False
+
+    if not review_data.get("mandatory_approver_required"):
+        review_data["mandatory_approver_required"] = True
+        review_data["mandatory_approver_satisfied_by"] = None
+        review_data["mandatory_approver_satisfied_at"] = None
+        state_changed = True
+
+    label_ensure_ok = ensure_label_exists(MANDATORY_TRIAGE_APPROVER_LABEL)
+    if label_ensure_ok:
+        try:
+            if add_label_with_status(issue_number, MANDATORY_TRIAGE_APPROVER_LABEL):
+                if review_data.get("mandatory_approver_label_applied_at") is None:
+                    review_data["mandatory_approver_label_applied_at"] = now
+                    state_changed = True
+        except RuntimeError as exc:
+            print(
+                f"WARNING: Unable to apply escalation label on #{issue_number}: {exc}",
+                file=sys.stderr,
+            )
+    else:
+        print(
+            "WARNING: Escalation label ensure/create failed; proceeding with comment-only escalation",
+            file=sys.stderr,
+        )
+
+    if review_data.get("mandatory_approver_pinged_at") is None:
+        if post_comment(issue_number, MANDATORY_TRIAGE_ESCALATION_TEMPLATE):
+            review_data["mandatory_approver_pinged_at"] = now
+            state_changed = True
+
+    return state_changed
+
+
+def satisfy_mandatory_approver_requirement(
+    state: dict,
+    issue_number: int,
+    approver: str,
+) -> bool:
+    """Close mandatory triage escalation after first triage+ approval."""
+    review_data = ensure_review_entry(state, issue_number, create=True)
+    if review_data is None:
+        return False
+
+    if not review_data.get("mandatory_approver_required"):
+        return False
+
+    if review_data.get("mandatory_approver_satisfied_at"):
+        return False
+
+    now = datetime.now(timezone.utc).isoformat()
+    review_data["mandatory_approver_required"] = False
+    review_data["mandatory_approver_satisfied_by"] = approver
+    review_data["mandatory_approver_satisfied_at"] = now
+
+    try:
+        remove_label_with_status(issue_number, MANDATORY_TRIAGE_APPROVER_LABEL)
+    except RuntimeError as exc:
+        print(
+            f"WARNING: Unable to remove escalation label on #{issue_number}: {exc}",
+            file=sys.stderr,
+        )
+
+    post_comment(issue_number, MANDATORY_TRIAGE_SATISFIED_TEMPLATE.format(approver=approver))
+    return True
+
+
+def handle_pr_approved_review(
+    state: dict,
+    issue_number: int,
+    review_author: str,
+    completion_source: str,
+) -> bool:
+    """Apply approval transitions for designated and mandatory triage flows."""
+    review_data = ensure_review_entry(state, issue_number)
+    if review_data is None:
+        print(f"No active review entry for #{issue_number}")
+        return False
+
+    current_reviewer = review_data.get("current_reviewer")
+    author_is_designated = (
+        isinstance(current_reviewer, str)
+        and current_reviewer.lower() == review_author.lower()
+    )
+
+    author_is_triage = is_triage_or_higher(review_author)
+    state_changed = False
+
+    if author_is_designated:
+        if mark_review_complete(state, issue_number, review_author, completion_source):
+            state_changed = True
+
+        if author_is_triage:
+            if satisfy_mandatory_approver_requirement(state, issue_number, review_author):
+                state_changed = True
+            return state_changed
+
+        if trigger_mandatory_approver_escalation(state, issue_number):
+            state_changed = True
+        return state_changed
+
+    if review_data.get("mandatory_approver_required") and author_is_triage:
+        if satisfy_mandatory_approver_requirement(state, issue_number, review_author):
+            state_changed = True
+        return state_changed
+
+    print(
+        f"Ignoring approved review from @{review_author} on #{issue_number}; "
+        f"designated reviewer is @{current_reviewer}"
+    )
+    return state_changed
+
+
 def parse_github_timestamp(value: str | None) -> datetime | None:
     """Parse a GitHub timestamp string into a datetime."""
     if not isinstance(value, str) or not value:
@@ -1903,6 +2897,44 @@ def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | 
     return latest_review
 
 
+def find_triage_approval_after(
+    reviews: list[dict],
+    since: datetime | None,
+) -> tuple[str, datetime] | None:
+    """Find the first triage+ approval submitted after `since`."""
+    permission_cache: dict[str, bool] = {}
+    approvals: list[tuple[datetime, int, str]] = []
+
+    for index, review in enumerate(reviews):
+        state = str(review.get("state", "")).upper()
+        if state != "APPROVED":
+            continue
+
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or not author:
+            continue
+
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None:
+            continue
+
+        if since is not None and submitted_at <= since:
+            continue
+
+        approvals.append((submitted_at, index, author))
+
+    approvals.sort(key=lambda item: (item[0], item[1]))
+
+    for submitted_at, _, author in approvals:
+        cache_key = author.lower()
+        if cache_key not in permission_cache:
+            permission_cache[cache_key] = is_triage_or_higher(author)
+        if permission_cache[cache_key]:
+            return author, submitted_at
+
+    return None
+
+
 def reconcile_active_review_entry(
     state: dict,
     issue_number: int,
@@ -1926,7 +2958,7 @@ def reconcile_active_review_entry(
             False,
         )
 
-    if review_data.get("review_completed_at"):
+    if review_data.get("review_completed_at") and not review_data.get("mandatory_approver_required"):
         return f"ℹ️ Review for #{issue_number} is already marked complete; no changes made.", True, False
 
     if require_pull_request_context:
@@ -1943,55 +2975,68 @@ def reconcile_active_review_entry(
     if reviews is None:
         return f"❌ Failed to fetch reviews for PR #{issue_number}; cannot run `/rectify`.", False, False
 
+    state_changed = False
+    messages: list[str] = []
+
     latest_review = get_latest_review_by_reviewer(reviews, assigned_reviewer)
     if latest_review is None:
-        return (
-            f"ℹ️ No review by assigned reviewer @{assigned_reviewer} was found on PR #{issue_number}; "
-            "nothing to rectify.",
-            True,
-            False,
+        messages.append(
+            f"No review by assigned reviewer @{assigned_reviewer} was found on PR #{issue_number}."
         )
-
-    latest_state = str(latest_review.get("state", "")).upper()
-    if latest_state == "APPROVED":
-        changed = mark_review_complete(
-            state,
-            issue_number,
-            assigned_reviewer,
-            completion_source,
-        )
-        if changed:
-            return (
-                f"✅ Rectified PR #{issue_number}: latest review by @{assigned_reviewer} is "
-                "`APPROVED`; marked review complete.",
-                True,
-                True,
+    else:
+        latest_state = str(latest_review.get("state", "")).upper()
+        if latest_state == "APPROVED":
+            changed = handle_pr_approved_review(
+                state,
+                issue_number,
+                assigned_reviewer,
+                completion_source,
             )
-        return f"ℹ️ Review for #{issue_number} is already complete; no changes made.", True, False
-
-    if latest_state in {"COMMENTED", "CHANGES_REQUESTED"}:
-        changed = update_reviewer_activity(state, issue_number, assigned_reviewer)
-        if changed:
-            return (
-                f"✅ Rectified PR #{issue_number}: latest review by @{assigned_reviewer} is "
-                f"`{latest_state}`; refreshed reviewer activity.",
-                True,
-                True,
+            if changed:
+                state_changed = True
+                messages.append(
+                    f"latest review by @{assigned_reviewer} is `APPROVED`; applied approval transitions"
+                )
+            else:
+                messages.append(
+                    f"latest review by @{assigned_reviewer} is `APPROVED`, but state already reflected it"
+                )
+        elif latest_state in {"COMMENTED", "CHANGES_REQUESTED"}:
+            changed = update_reviewer_activity(state, issue_number, assigned_reviewer)
+            if changed:
+                state_changed = True
+                messages.append(
+                    f"latest review by @{assigned_reviewer} is `{latest_state}`; refreshed reviewer activity"
+                )
+            else:
+                messages.append(
+                    f"latest assigned-reviewer state is `{latest_state}` and no update was needed"
+                )
+        else:
+            state_name = latest_state or "UNKNOWN"
+            messages.append(
+                f"latest review by @{assigned_reviewer} is `{state_name}` and no reconciliation transition applies"
             )
-        return (
-            f"ℹ️ Latest assigned-reviewer state is `{latest_state}` for #{issue_number}, but "
-            "no state update was needed.",
-            True,
-            False,
-        )
 
-    state_name = latest_state or "UNKNOWN"
-    return (
-        f"ℹ️ Latest review by @{assigned_reviewer} on PR #{issue_number} is `{state_name}`; "
-        "no reconciliation transition applies.",
-        True,
-        False,
-    )
+    review_data = ensure_review_entry(state, issue_number, create=True)
+    if review_data and review_data.get("mandatory_approver_required"):
+        escalation_opened_at = (
+            parse_iso8601_timestamp(review_data.get("mandatory_approver_pinged_at"))
+            or parse_iso8601_timestamp(review_data.get("mandatory_approver_label_applied_at"))
+        )
+        triage_approval = find_triage_approval_after(reviews, escalation_opened_at)
+        if triage_approval is not None:
+            approver, _ = triage_approval
+            if satisfy_mandatory_approver_requirement(state, issue_number, approver):
+                state_changed = True
+                messages.append(f"mandatory triage approval satisfied by @{approver}")
+
+    if state_changed:
+        detail = "; ".join(messages) if messages else "applied state reconciliation transitions"
+        return f"✅ Rectified PR #{issue_number}: {detail}.", True, True
+
+    detail = "; ".join(messages) if messages else "no reconciliation transitions applied"
+    return f"ℹ️ Rectify checked PR #{issue_number}: {detail}.", True, False
 
 
 def handle_rectify_command(state: dict, issue_number: int, comment_author: str) -> tuple[str, bool, bool]:
@@ -2188,6 +3233,8 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
 
     Returns True if we took action, False otherwise.
     """
+    assert_lock_held("handle_issue_or_pr_opened")
+
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         print("No issue number found")
@@ -2241,9 +3288,9 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
                     f"Please use `{BOT_MENTION} /sync-members` to update the queue.")
         return False
 
-    # Assign the reviewer (best effort - may fail if no permissions)
+    # Assign the reviewer.
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assign_reviewer(issue_number, reviewer)
+    assignment_attempt = request_reviewer_assignment(issue_number, reviewer)
     
     # Track the reviewer in our state (source of truth for pass command)
     set_current_reviewer(state, issue_number, reviewer)
@@ -2251,15 +3298,21 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
     # Record the assignment
     record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
 
+    failure_comment = get_assignment_failure_comment(reviewer, assignment_attempt)
+    if failure_comment:
+        post_comment(issue_number, failure_comment)
+
     # Post guidance comment
     if is_pr:
-        guidance = get_pr_guidance(reviewer, issue_author)
-    elif FLS_AUDIT_LABEL in labels:
-        guidance = get_fls_audit_guidance(reviewer, issue_author)
+        if assignment_attempt.success:
+            guidance = get_pr_guidance(reviewer, issue_author)
+            post_comment(issue_number, guidance)
     else:
-        guidance = get_issue_guidance(reviewer, issue_author)
-
-    post_comment(issue_number, guidance)
+        if FLS_AUDIT_LABEL in labels:
+            guidance = get_fls_audit_guidance(reviewer, issue_author)
+        else:
+            guidance = get_issue_guidance(reviewer, issue_author)
+        post_comment(issue_number, guidance)
 
     return True
 
@@ -2271,6 +3324,8 @@ def handle_labeled_event(state: dict) -> bool:
     We already know from LABEL_NAME that the correct label was added,
     so we skip the label check that handle_issue_or_pr_opened does.
     """
+    assert_lock_held("handle_labeled_event")
+
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         print("No issue number found")
@@ -2331,8 +3386,8 @@ def handle_labeled_event(state: dict) -> bool:
                     f"Please use `{BOT_MENTION} /sync-members` to update the queue.")
         return False
 
-    # Assign the reviewer (best effort - may fail if no permissions)
-    assign_reviewer(issue_number, reviewer)
+    # Assign the reviewer.
+    assignment_attempt = request_reviewer_assignment(issue_number, reviewer)
     
     # Track the reviewer in our state
     set_current_reviewer(state, issue_number, reviewer)
@@ -2340,21 +3395,29 @@ def handle_labeled_event(state: dict) -> bool:
     # Record the assignment
     record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
 
+    failure_comment = get_assignment_failure_comment(reviewer, assignment_attempt)
+    if failure_comment:
+        post_comment(issue_number, failure_comment)
+
     # Post guidance comment
     if is_pr:
-        guidance = get_pr_guidance(reviewer, issue_author)
-    elif label_name == FLS_AUDIT_LABEL:
-        guidance = get_fls_audit_guidance(reviewer, issue_author)
+        if assignment_attempt.success:
+            guidance = get_pr_guidance(reviewer, issue_author)
+            post_comment(issue_number, guidance)
     else:
-        guidance = get_issue_guidance(reviewer, issue_author)
-
-    post_comment(issue_number, guidance)
+        if label_name == FLS_AUDIT_LABEL:
+            guidance = get_fls_audit_guidance(reviewer, issue_author)
+        else:
+            guidance = get_issue_guidance(reviewer, issue_author)
+        post_comment(issue_number, guidance)
 
     return True
 
 
 def handle_pull_request_review_event(state: dict) -> bool:
     """Handle submitted PR reviews for activity and completion tracking."""
+    assert_lock_held("handle_pull_request_review_event")
+
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         print("No issue number found")
@@ -2382,15 +3445,8 @@ def handle_pull_request_review_event(state: dict) -> bool:
         return False
 
     current_reviewer = review_data.get("current_reviewer")
-    if not current_reviewer or current_reviewer.lower() != review_author.lower():
-        print(
-            f"Ignoring review from @{review_author} on #{issue_number}; "
-            f"current reviewer is @{current_reviewer}"
-        )
-        return False
-
     if review_state == "APPROVED":
-        return mark_review_complete(
+        return handle_pr_approved_review(
             state,
             issue_number,
             review_author,
@@ -2398,6 +3454,12 @@ def handle_pull_request_review_event(state: dict) -> bool:
         )
 
     if review_state in {"COMMENTED", "CHANGES_REQUESTED"}:
+        if not current_reviewer or current_reviewer.lower() != review_author.lower():
+            print(
+                f"Ignoring review from @{review_author} on #{issue_number}; "
+                f"current reviewer is @{current_reviewer}"
+            )
+            return False
         return update_reviewer_activity(state, issue_number, review_author)
 
     print(f"Ignoring review state '{review_state}' for #{issue_number}")
@@ -2406,6 +3468,8 @@ def handle_pull_request_review_event(state: dict) -> bool:
 
 def handle_workflow_run_event(state: dict) -> bool:
     """Handle trusted second-hop workflow_run reconciliation."""
+    assert_lock_held("handle_workflow_run_event")
+
     workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
     if workflow_run_event != "pull_request_review":
         observed = workflow_run_event or "<missing>"
@@ -2445,9 +3509,11 @@ def handle_closed_event(state: dict) -> bool:
     Handle when an issue or PR is closed.
     
     Cleans up the active_reviews entry to prevent state from growing indefinitely.
-    
+
     Returns True if we modified state, False otherwise.
     """
+    assert_lock_held("handle_closed_event")
+
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         print("No issue number found for closed event")
@@ -2470,6 +3536,8 @@ def handle_comment_event(state: dict) -> bool:
 
     Returns True if we took action, False otherwise.
     """
+    assert_lock_held("handle_comment_event")
+
     comment_body = os.environ.get("COMMENT_BODY", "")
     comment_author = os.environ.get("COMMENT_AUTHOR", "")
     comment_id = os.environ.get("COMMENT_ID", "")
@@ -2611,6 +3679,8 @@ def handle_comment_event(state: dict) -> bool:
 
 def handle_manual_dispatch(state: dict) -> bool:
     """Handle manual workflow dispatch."""
+    assert_lock_held("handle_manual_dispatch")
+
     action = os.environ.get("MANUAL_ACTION", "")
 
     if action == "sync-members":
@@ -2638,9 +3708,11 @@ def handle_scheduled_check(state: dict) -> bool:
     1. Checks all active reviews for overdue ones
     2. Posts warnings for reviews that are 14+ days overdue
     3. Posts transition notices and reassigns for 28+ days overdue
-    
+
     Returns True if any action was taken, False otherwise.
     """
+    assert_lock_held("handle_scheduled_check")
+
     print("Running scheduled check for overdue reviews...")
     
     overdue_reviews = check_overdue_reviews(state)
@@ -2688,7 +3760,7 @@ def handle_scheduled_check(state: dict) -> bool:
                 unassign_reviewer(issue_number, reviewer)
                 
                 # Assign new reviewer
-                assign_reviewer(issue_number, next_reviewer)
+                assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
                 set_current_reviewer(state, issue_number, next_reviewer)
                 
                 # Track the skip
@@ -2697,6 +3769,10 @@ def handle_scheduled_check(state: dict) -> bool:
                         state["active_reviews"][issue_key]["skipped"].append(reviewer)
                 
                 # Post assignment comment (assume issue since we don't track type here)
+                failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
+                if failure_comment:
+                    post_comment(issue_number, failure_comment)
+
                 guidance = get_issue_guidance(next_reviewer, "the contributor")
                 post_comment(issue_number, guidance)
                 
@@ -2717,6 +3793,21 @@ def handle_scheduled_check(state: dict) -> bool:
 # ==============================================================================
 
 
+def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
+    """Return True for event paths that may mutate reviewer-bot state."""
+    if event_name in {"issues", "pull_request_target"}:
+        return event_action in {"opened", "labeled", "closed"}
+    if event_name == "issue_comment":
+        return event_action == "created"
+    if event_name == "pull_request_review":
+        return event_action == "submitted"
+    if event_name == "workflow_run":
+        return event_action == "completed"
+    if event_name in {"workflow_dispatch", "schedule"}:
+        return True
+    return False
+
+
 def main():
     """Main entry point for the reviewer bot."""
     event_name = os.environ.get("EVENT_NAME", "")
@@ -2724,78 +3815,111 @@ def main():
 
     print(f"Event: {event_name}, Action: {event_action}")
 
-    # Load current state
-    state = load_state()
+    lock_required = event_requires_lease_lock(event_name, event_action)
+    lock_acquired = False
+    release_failed = False
+    exit_code = 0
 
-    # Process any expired pass-until entries
-    state, restored = process_pass_until_expirations(state)
-    if restored:
-        print(f"Restored from pass-until: {restored}")
-
-    # Always sync members on any event
-    state, sync_changes = sync_members_with_queue(state)
-    if sync_changes:
-        print(f"Members sync changes: {sync_changes}")
-
-    # Handle the event
     state_changed = False
+    sync_changes: list[str] = []
+    restored: list[str] = []
 
-    if event_name == "issues":
-        if event_action == "opened":
-            state_changed = handle_issue_or_pr_opened(state)
-        elif event_action == "labeled":
-            state_changed = handle_labeled_event(state)
-        elif event_action == "closed":
-            state_changed = handle_closed_event(state)
+    try:
+        if lock_required:
+            acquire_state_issue_lease_lock()
+            lock_acquired = True
 
-    elif event_name == "pull_request_target":
-        if event_action == "opened":
-            state_changed = handle_issue_or_pr_opened(state)
-        elif event_action == "labeled":
-            state_changed = handle_labeled_event(state)
-        elif event_action == "closed":
-            state_changed = handle_closed_event(state)
+        # Load current state
+        state = load_state()
 
-    elif event_name == "pull_request_review":
-        if event_action == "submitted":
-            state_changed = handle_pull_request_review_event(state)
+        if lock_required:
+            # Process any expired pass-until entries
+            state, restored = process_pass_until_expirations(state)
+            if restored:
+                print(f"Restored from pass-until: {restored}")
 
-    elif event_name == "issue_comment":
-        if event_action == "created":
-            state_changed = handle_comment_event(state)
+            # Always sync members on mutating paths
+            state, sync_changes = sync_members_with_queue(state)
+            if sync_changes:
+                print(f"Members sync changes: {sync_changes}")
 
-    elif event_name == "workflow_dispatch":
-        state_changed = handle_manual_dispatch(state)
+        # Handle the event
+        if event_name == "issues":
+            if event_action == "opened":
+                state_changed = handle_issue_or_pr_opened(state)
+            elif event_action == "labeled":
+                state_changed = handle_labeled_event(state)
+            elif event_action == "closed":
+                state_changed = handle_closed_event(state)
 
-    elif event_name == "schedule":
-        # Nightly check for overdue reviews
-        state_changed = handle_scheduled_check(state)
+        elif event_name == "pull_request_target":
+            if event_action == "opened":
+                state_changed = handle_issue_or_pr_opened(state)
+            elif event_action == "labeled":
+                state_changed = handle_labeled_event(state)
+            elif event_action == "closed":
+                state_changed = handle_closed_event(state)
 
-    elif event_name == "workflow_run":
-        if event_action == "completed":
-            try:
+        elif event_name == "pull_request_review":
+            if event_action == "submitted":
+                state_changed = handle_pull_request_review_event(state)
+
+        elif event_name == "issue_comment":
+            if event_action == "created":
+                state_changed = handle_comment_event(state)
+
+        elif event_name == "workflow_dispatch":
+            state_changed = handle_manual_dispatch(state)
+
+        elif event_name == "schedule":
+            # Nightly check for overdue reviews
+            state_changed = handle_scheduled_check(state)
+
+        elif event_name == "workflow_run":
+            if event_action == "completed":
                 state_changed = handle_workflow_run_event(state)
-            except RuntimeError as exc:
-                print(f"ERROR: {exc}", file=sys.stderr)
-                sys.exit(1)
 
-    # Save state if changed (or if we synced members/pass-until)
-    if state_changed or sync_changes or restored:
-        print("State updates detected; attempting to persist reviewer-bot state.")
-        if not save_state(state):
-            print(
-                "ERROR: State updates were computed but could not be persisted. "
-                "Failing this run to avoid silent success.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        # Save state if changed (or if we synced members/pass-until)
+        if state_changed or sync_changes or restored:
+            if not lock_acquired:
+                raise RuntimeError(
+                    "State mutation reached save path without lease lock. "
+                    "Acquire lock before mutating state."
+                )
 
-        # Set output for the workflow
-        with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
-            f.write("state_changed=true\n")
-    else:
-        with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
-            f.write("state_changed=false\n")
+            print("State updates detected; attempting to persist reviewer-bot state.")
+            if not save_state(state):
+                raise RuntimeError(
+                    "State updates were computed but could not be persisted. "
+                    "Failing this run to avoid silent success."
+                )
+
+            with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
+                f.write("state_changed=true\n")
+        else:
+            with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
+                f.write("state_changed=false\n")
+
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        exit_code = 1
+    except Exception as exc:  # pragma: no cover - defensive hard-fail path
+        print(f"ERROR: Unexpected reviewer-bot failure: {exc}", file=sys.stderr)
+        exit_code = 1
+    finally:
+        if lock_acquired:
+            if not release_state_issue_lease_lock():
+                release_failed = True
+
+    if release_failed:
+        print(
+            "ERROR: Failed to release reviewer-bot lease lock after processing event.",
+            file=sys.stderr,
+        )
+        exit_code = 1
+
+    if exit_code:
+        sys.exit(exit_code)
 
 
 if __name__ == "__main__":
