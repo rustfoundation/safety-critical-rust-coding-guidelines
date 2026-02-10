@@ -40366,9 +40366,9 @@
         "fls_pages_deployment_id": "3803520904",
         "fls_source_url": "https://rust-lang.github.io/fls/paragraph-ids.json",
         "previous": {
-            "fls_deployed_at": "2026-02-09T13:45:30Z",
-            "fls_deployed_commit": "e66c7ade08cc89a6e76a59517e51c3798200e56f",
-            "fls_pages_deployment_id": "3801262512",
+            "fls_deployed_at": "2026-02-09T19:31:44Z",
+            "fls_deployed_commit": "fb8a46795eda1f1db5e3232002fd94a270bfbffd",
+            "fls_pages_deployment_id": "3803520904",
             "fls_source_url": "https://rust-lang.github.io/fls/paragraph-ids.json"
         }
     }
