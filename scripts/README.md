@@ -6,7 +6,7 @@ This directory contains utility scripts for managing coding guidelines.
 
 | Script | Purpose |
 |--------|---------|
-| `auto-pr-helper.py` | Transforms issue JSON to RST format (used by auto-PR workflow) |
+| `guideline-from-issue.py` | Transforms issue JSON to RST format for guidelines |
 | `generate-rst-comment.py` | Generates GitHub comment with RST preview |
 | `guideline_utils.py` | Shared utility functions for guideline processing |
 | `rustdoc_utils.py` | Shared utilities for Rust example handling |
@@ -281,7 +281,7 @@ A shared module containing common functions used by other scripts:
 
 ---
 
-## `auto-pr-helper.py`
+## `guideline-from-issue.py`
 
 This script transforms a GitHub issue's JSON data into reStructuredText format for coding guidelines.
 
@@ -289,13 +289,13 @@ This script transforms a GitHub issue's JSON data into reStructuredText format f
 
 ```bash
 # From a local JSON file
-cat path/to/issue.json | uv run python scripts/auto-pr-helper.py
+cat path/to/issue.json | uv run python scripts/guideline-from-issue.py
 
 # From GitHub API directly
-curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/123 | uv run python scripts/auto-pr-helper.py
+curl https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/123 | uv run python scripts/guideline-from-issue.py
 
 # Save the output to the appropriate chapter file
-cat path/to/issue.json | uv run python scripts/auto-pr-helper.py --save
+cat path/to/issue.json | uv run python scripts/guideline-from-issue.py --save
 ```
 
 ### Options

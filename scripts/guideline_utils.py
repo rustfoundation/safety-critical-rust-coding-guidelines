@@ -5,23 +5,22 @@
 Shared utilities for parsing GitHub issues and generating RST guideline content.
 
 This module contains common functions used by:
-- auto-pr-helper.py (for automated PR generation)
+- guideline-from-issue.py (for issue JSON to RST conversion)
 - generate-rst-comment.py (for generating preview comments)
 """
 
-import os
 import re
-import sys
 from pathlib import Path
 from textwrap import dedent, indent
+from typing import Optional
 
 import pypandoc
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
-sys.path.append(parent_dir)
-
-from generate_guideline_templates import (
+from scripts.common.guideline_pages import (
+    build_guideline_page_content,
+    extract_guideline_title,
+)
+from scripts.common.guideline_templates import (
     guideline_rst_template,
     issue_header_map,
     parse_bibliography_entries,
@@ -30,13 +29,6 @@ from generate_guideline_templates import (
 # =============================================================================
 # Constants for per-guideline file structure
 # =============================================================================
-
-# Header comment for individual guideline files
-GUIDELINE_FILE_HEADER = """\
-.. SPDX-License-Identifier: MIT OR Apache-2.0
-   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
-
-"""
 
 # Default guidelines directory
 DEFAULT_GUIDELINES_DIR = Path("src/coding-guidelines")
@@ -52,6 +44,14 @@ MARKDOWN_CITATION_PATTERN = re.compile(
 MARKDOWN_LINK_PATTERN = re.compile(
     r'\[([^\]]+)\]\([^)]+\)'
 )
+
+GUIDELINE_TOCTREE_BLOCK = """.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*
+"""
 
 
 # =============================================================================
@@ -615,16 +615,35 @@ def dirname_to_chapter(dirname: str) -> str:
 # Index management for per-guideline structure
 # =============================================================================
 
-def add_include_to_chapter_index(
+def has_guideline_toctree(content: str) -> bool:
+    """
+    Check whether a chapter index already lists guideline pages.
+    """
+    in_toctree = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(".. toctree::"):
+            in_toctree = True
+            continue
+        if in_toctree:
+            if not stripped or stripped.startswith(":"):
+                continue
+            if line.startswith(" "):
+                if stripped.startswith("gui_"):
+                    return True
+                continue
+            in_toctree = False
+    return False
+
+
+def ensure_guideline_toctree(
     chapter_dir: Path,
-    guideline_filename: str,
 ) -> bool:
     """
-    Add an include directive to a chapter's index.rst, maintaining alphabetical order.
+    Ensure a chapter index uses a toctree for guideline pages.
 
     Args:
         chapter_dir: Path to the chapter directory
-        guideline_filename: Filename of the guideline (e.g., "gui_abc123.rst.inc")
 
     Returns:
         True if successful, False otherwise
@@ -636,77 +655,15 @@ def add_include_to_chapter_index(
         return False
 
     content = index_path.read_text()
+    new_content = content.rstrip() + "\n"
 
-    # Check if already included
-    if guideline_filename in content:
-        print(f"Note: {guideline_filename} already in index")
-        return True
-
-    # Find existing include directives and their position
-    include_pattern = re.compile(r'^(\s*)\.\.\ include::\s+(gui_[a-zA-Z0-9]+\.rst\.inc)\s*$', re.MULTILINE)
-    matches = list(include_pattern.finditer(content))
-
-    new_include = f".. include:: {guideline_filename}"
-
-    if matches:
-        # Get the indentation from existing includes
-        indent_str = matches[0].group(1)
-        new_include = f"{indent_str}.. include:: {guideline_filename}"
-
-        # Find where to insert alphabetically
-        existing_files = [(m.group(2), m.start(), m.end()) for m in matches]
-
-        insert_pos = None
-        for filename, start, end in existing_files:
-            if guideline_filename < filename:
-                insert_pos = start
-                break
-
-        if insert_pos is None:
-            # Add at end (after last include)
-            last_end = existing_files[-1][2]
-            content = content[:last_end] + "\n" + new_include + content[last_end:]
-        else:
-            # Insert before the found position
-            content = content[:insert_pos] + new_include + "\n" + content[insert_pos:]
-    else:
-        # No existing includes - add at end of file
-        content = content.rstrip() + "\n\n" + new_include + "\n"
-
-    index_path.write_text(content)
-    return True
-
-
-def remove_include_from_chapter_index(
-    chapter_dir: Path,
-    guideline_filename: str,
-) -> bool:
-    """
-    Remove an include directive from a chapter's index.rst.
-
-    Args:
-        chapter_dir: Path to the chapter directory
-        guideline_filename: Filename of the guideline to remove
-
-    Returns:
-        True if successful, False otherwise
-    """
-    index_path = chapter_dir / "index.rst"
-
-    if not index_path.exists():
-        return False
-
-    content = index_path.read_text()
-
-    # Remove the include line
-    pattern = re.compile(rf'^\s*\.\.\ include::\s+{re.escape(guideline_filename)}\s*\n?', re.MULTILINE)
-    new_content = pattern.sub('', content)
+    if not has_guideline_toctree(new_content):
+        new_content = new_content.rstrip() + "\n\n" + GUIDELINE_TOCTREE_BLOCK
 
     if new_content != content:
         index_path.write_text(new_content)
-        return True
 
-    return False
+    return True
 
 
 # =============================================================================
@@ -716,15 +673,15 @@ def remove_include_from_chapter_index(
 def save_guideline_file(
     content: str,
     chapter: str,
-    guidelines_dir: Path = None,
+    guidelines_dir: Optional[Path] = None,
 ) -> Path:
     """
     Save a guideline to a per-guideline file in the chapter directory.
 
     This creates:
     1. The chapter directory if it doesn't exist
-    2. A new file named {guideline_id}.rst.inc
-    3. Updates the chapter's index.rst with an include directive
+    2. A new file named {guideline_id}.rst
+    3. Ensures the chapter's index.rst lists guideline pages via a toctree
 
     Args:
         content: The RST content for the guideline
@@ -752,17 +709,15 @@ def save_guideline_file(
     if not guideline_id:
         raise ValueError("Could not extract guideline ID from content")
 
-    # Create the guideline file
-    guideline_filename = f"{guideline_id}.rst.inc"
+    guideline_title = extract_guideline_title(content) or f"Guideline {guideline_id}"
+    guideline_filename = f"{guideline_id}.rst"
     guideline_path = chapter_dir / guideline_filename
-
-    # Add header and write content
-    full_content = GUIDELINE_FILE_HEADER + content.strip() + "\n"
+    full_content = build_guideline_page_content(guideline_title, content)
     guideline_path.write_text(full_content)
     print(f"Created guideline file: {guideline_path}")
 
     # Update the chapter index
-    if add_include_to_chapter_index(chapter_dir, guideline_filename):
+    if ensure_guideline_toctree(chapter_dir):
         print(f"Updated index: {chapter_dir / 'index.rst'}")
 
     return guideline_path
@@ -771,7 +726,7 @@ def save_guideline_file(
 def save_guideline_file_legacy(
     content: str,
     chapter: str,
-    guidelines_dir: Path = None,
+    guidelines_dir: Optional[Path] = None,
 ) -> Path:
     """
     Append a guideline to a monolithic chapter file (legacy structure).
@@ -809,8 +764,8 @@ def list_guidelines_in_chapter(chapter_dir: Path) -> list:
     """
     guidelines = []
 
-    for file_path in chapter_dir.glob("gui_*.rst.inc"):
-        guideline_id = file_path.stem  # Remove .rst.inc extension
+    for file_path in chapter_dir.glob("gui_*.rst"):
+        guideline_id = file_path.stem
         guidelines.append(guideline_id)
 
     return sorted(guidelines)

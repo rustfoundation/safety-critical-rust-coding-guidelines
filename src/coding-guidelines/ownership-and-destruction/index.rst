@@ -5,4 +5,3 @@
 
 Ownership And Destruction
 =========================
-

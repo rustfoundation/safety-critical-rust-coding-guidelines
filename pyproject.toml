@@ -1,3 +1,7 @@
+[build-system]
+requires = ["uv_build>=0.9.27,<0.10.0"]
+build-backend = "uv_build"
+
 [project]
 name = "safety-critical-rust-coding-guidelines"
 version = "0.1.0"
@@ -6,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "builder",
+    "coding-guidelines-ext",
     "tqdm",
     "pypandoc",
     "sphinx>=8.2.3",
@@ -17,10 +22,15 @@ dependencies = [
 ]
 
 [tool.uv.workspace]
-members = ["builder"]
+members = ["builder", "exts"]
 
 [tool.uv.sources]
 builder = { workspace = true }
+coding-guidelines-ext = { workspace = true }
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "scripts"
 
 [tool.ruff]
 
@@ -37,7 +47,7 @@ lint.ignore = [
     "E501",  # Ignore long lines, bc we use them frequently while composing .rst templates
     "W293",  # Ignore white spaces in blank lines
     "W291",  # Ignore Trailing white lines
-    "E402",  # Ignore "Imports must be at the top of the file" enforcement bc `auto-pr-helper.py` needs it
+    "E402",  # Ignore "Imports must be at the top of the file" enforcement bc `guideline-from-issue.py` needs it
     "C401",  # Ignore `Unnecessary generator` checks, further tests are needed in fls_checks.py
 ]
 

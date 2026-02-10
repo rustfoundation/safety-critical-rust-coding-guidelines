@@ -5,5 +5,3 @@
 
 Values
 ======
-
-.. include:: gui_uyp3mCj77FS8.rst.inc
