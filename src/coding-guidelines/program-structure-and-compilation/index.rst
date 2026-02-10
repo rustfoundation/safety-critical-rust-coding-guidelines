@@ -5,5 +5,3 @@
 
 Program Structure And Compilation
 =================================
-
-.. include:: gui_J3K3ZqC8qoOn.rst.inc

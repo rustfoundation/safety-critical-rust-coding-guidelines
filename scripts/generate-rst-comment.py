@@ -23,11 +23,12 @@ import tempfile
 from dataclasses import dataclass, field
 from typing import List, Set, Tuple
 
-# Add the scripts directory to Python path so we can import guideline_utils
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, script_dir)
-
-from guideline_utils import (
+from scripts.common.guideline_pages import (
+    build_guideline_page_content,
+    extract_guideline_title,
+)
+from scripts.common.guideline_templates import parse_bibliography_entries
+from scripts.guideline_utils import (
     chapter_to_filename,
     collect_examples,
     extract_citation_references,
@@ -36,18 +37,6 @@ from guideline_utils import (
     normalize_list_separation,
     normalize_md,
 )
-
-# Import bibliography parser
-parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
-sys.path.insert(0, parent_dir)
-from generate_guideline_templates import parse_bibliography_entries
-
-# SPDX header to prepend to guideline files
-GUIDELINE_FILE_HEADER = """\
-.. SPDX-License-Identifier: MIT OR Apache-2.0
-   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
-
-"""
 
 
 @dataclass
@@ -146,9 +135,9 @@ def wrap_in_main(code: str) -> str:
     has_mod = re.search(r'\bmod\b', code)
     has_type = re.search(r'\btype\b', code)
 
-    # If it looks like top-level items, don't wrap
+    # If it looks like top-level items, add a stub main
     if has_functions or has_impl or has_struct or has_enum or has_trait or has_mod or has_type:
-        return code
+        return code + "\n\nfn main() {}"
 
     # Check for use/const/static statements
     has_use = re.search(r'\buse\b', code)
@@ -583,8 +572,8 @@ def generate_comment(
     chapter_slug = chapter_to_filename(chapter)
     guideline_id = extract_guideline_id(rst_content)
 
-    # Prepend the SPDX header to the RST content for display
-    full_rst_content = GUIDELINE_FILE_HEADER + rst_content.strip()
+    page_title = extract_guideline_title(rst_content) or f"Guideline {guideline_id}"
+    full_rst_content = build_guideline_page_content(page_title, rst_content)
 
     # Format test results
     test_results_section = format_test_results(test_results)
@@ -595,47 +584,45 @@ def generate_comment(
     # Determine target path based on whether we have a guideline ID
     if guideline_id:
         target_dir = f"src/coding-guidelines/{chapter_slug}/"
-        target_file = f"{target_dir}{guideline_id}.rst.inc"
+        target_file = f"{target_dir}{guideline_id}.rst"
         chapter_index_file = f"{target_dir}index.rst"
         file_instructions = f"""
 ### 📁 Target Location
 
-Create a new file: `{target_file}`
+Create a new file:
 
-> **Note:** The `.rst.inc` extension prevents Sphinx from auto-discovering the file.
-> It will be included via the chapter's `index.rst`.
+- `{target_file}`
 
-We add it to this path, to allow the newly added guideline to appear in the correct chapter.
+Create the guideline page like this:
+
+```rst
+{full_rst_content}
+```
 
 ### 🗂️ Update Chapter Index
 
-Update `{chapter_index_file}` to include `{guideline_id}.rst.inc`, like so:
+Ensure `{chapter_index_file}` lists guideline pages with a toctree:
 
+```rst
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*
 ```
-Chapter Name Here <- chapter heading inside of `{chapter_index_file}`
-=================
 
-.. include:: gui_7y0GAMmtMhch.rst.inc -| existing guidelines
-.. include:: gui_ADHABsmK9FXz.rst.inc  |
-...                                    |
-...                                    |
-.. include:: gui_RHvQj8BHlz9b.rst.inc  |
-.. include:: gui_dCquvqE1csI3.rst.inc -|
-.. include:: {guideline_id}.rst.inc <- your new guideline to add
-```"""
+With `:glob:` you do not need to add the new guideline manually.
+"""
     else:
         return "No guideline ID generated, failing!"
 
-    comment = f"""## 📋 RST Preview for Coding Guideline
-
-This is an automatically generated preview of your coding guideline in reStructuredText format.
-{file_instructions}
-
-{test_results_section}
-
-{bib_results_section}
-
-### 📝 How to Use This
+    header_section = (
+        "## 📋 RST Preview for Coding Guideline\n\n"
+        "This is an automatically generated preview of your coding guideline "
+        "in reStructuredText format."
+    )
+    how_to_use_section = f"""### 📝 How to Use This
 
 1. **Fork the repository** (if you haven't already) and clone it locally
 2. **Create a new branch** from `main`:
@@ -644,16 +631,21 @@ This is an automatically generated preview of your coding guideline in reStructu
    git pull origin main
    git checkout -b guideline/your-descriptive-branch-name
    ```
-3. **Create the guideline file**:
+3. **Create the guideline directory**:
    ```bash
    mkdir -p src/coding-guidelines/{chapter_slug}
    ```
-4. **Copy the RST content** below into a new file named `{guideline_id}.rst.inc`
-5. **Update the chapter index** - Add an include directive to `src/coding-guidelines/{chapter_slug}/index.rst`:
+4. **Copy the RST content** below into a new file named `{guideline_id}.rst`
+5. **Ensure the chapter index** `src/coding-guidelines/{chapter_slug}/index.rst` contains the toctree block:
    ```rst
-   .. include:: {guideline_id}.rst.inc
+    .. toctree::
+       :maxdepth: 1
+       :titlesonly:
+       :glob:
+
+       gui_*
    ```
-   Keep the includes in alphabetical order by guideline ID.
+   With `:glob:` you do not need to update the index per guideline.
 6. **Build locally** to verify the guideline renders correctly:
    ```bash
    ./make.py
@@ -664,22 +656,31 @@ This is an automatically generated preview of your coding guideline in reStructu
    git commit -m "Add guideline: <your guideline title>"
    git push origin guideline/your-descriptive-branch-name
    ```
-8. **Open a Pull Request** against `main`
-
-<details>
+8. **Open a Pull Request** against `main`"""
+    rst_preview_section = f"""<details>
 <summary><strong>📄 Click to expand RST content</strong></summary>
 
 ```rst
 {full_rst_content}
 ```
 
-</details>
-
----
-<sub>🤖 This comment was automatically generated from the issue content. It will be updated when you edit the issue body.</sub>
-
-<!-- rst-preview-comment -->
-"""
+</details>"""
+    footer_section = (
+        "---\n"
+        "<sub>🤖 This comment was automatically generated from the issue "
+        "content. It will be updated when you edit the issue body.</sub>\n\n"
+        "<!-- rst-preview-comment -->"
+    )
+    sections = [
+        header_section,
+        test_results_section,
+        bib_results_section,
+        file_instructions.strip(),
+        how_to_use_section,
+        rst_preview_section,
+        footer_section,
+    ]
+    comment = "\n\n".join(section for section in sections if section)
     return comment
 
 

@@ -28,7 +28,7 @@ If you still need to install `uv` you can follow the [steps outlined](https://do
 
 You can build the rendered version by running:
 
-On Linux-like systems:
+On Linux-like and macOS systems:
 
 ```shell
    ./make.py
@@ -97,23 +97,21 @@ When the build breaks due to the difference a file is created here:
 
 which can be used to aid in auditing the differences.
 
-Follow the below steps to ensure that the guidelines remain a representation of the FLS:
-
-1. Check if there are any guidelines currently affected, if no, go to 6.
-2. For each affected guideline, audit the previous text and current text of the appropriate paragraph-id in the FLS
-3. If the prior and new text of that paragraph in the FLS does not effect the guideline, proceed back to 2. to the next affected guideline
-4. If the prior and new text of that paragraph do differ in the FLS, then a rationalization step is required
-   1. In the rationalization step, either yourself or another coding guidelines member must modify the guideline to comply with the new text
-5. If you any affected coding guidelines remain proceed back to 2. to the next affected guideline
-6. You are done
-
-Once you have completed the above steps, you will now update the local copy of the `spec.lock` file with the live version:
+For a quick summary:
 
 ```shell
-   ./make.py --update-spec-lock-file
+   uv run python scripts/fls_audit.py --summary-only
 ```
 
-Open a new PR with only the changes necessary to rationalize the guidelines with the new FLS text.
+For a full report:
+
+```shell
+   uv run python scripts/fls_audit.py
+```
+
+See `docs/fls-audit.md` for the full workflow, snapshots, advanced options, and
+the steps to rationalize and update `src/spec.lock`, including the
+rationalization checklist.
 
 ## Outline & issue breakdown
 

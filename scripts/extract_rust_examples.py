@@ -11,7 +11,7 @@ This script:
 3. Generates a test crate with all examples as doc tests
 4. Runs the tests and reports results
 
-Supports both monolithic chapter files (*.rst) and per-guideline files (*.rst.inc).
+Supports monolithic chapter files and per-guideline files (*.rst).
 
 Configuration is loaded from src/rust_examples_config.toml for default values.
 
@@ -40,11 +40,7 @@ import tomllib
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Add scripts directory to path
-script_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, script_dir)
-
-from rustdoc_utils import (
+from scripts.rustdoc_utils import (
     RustExample,
     TestResult,
     compile_single_example,
@@ -167,10 +163,10 @@ class RustExamplesConfig:
     """Configuration loaded from rust_examples_config.toml"""
     
     def __init__(self):
-        self.edition = None
-        self.channel = None
-        self.version = None
-        self.version_mismatch_threshold = None
+        self.edition: str = ""
+        self.channel: str = ""
+        self.version: str = ""
+        self.version_mismatch_threshold: int = 0
         # Miri settings
         self.miri_require_for_unsafe = True
         self.miri_timeout = 60
@@ -236,7 +232,7 @@ class RustExamplesConfig:
         return config
     
     @classmethod
-    def find_and_load(cls, search_paths: List[Path] = None) -> "RustExamplesConfig":
+    def find_and_load(cls, search_paths: Optional[List[Path]] = None) -> "RustExamplesConfig":
         """
         Find and load configuration from standard locations.
         
@@ -448,7 +444,7 @@ def extract_rust_examples_from_file(
     - Legacy code-block:: rust directives (for backwards compatibility during migration)
     
     Args:
-        file_path: Path to the RST file (supports .rst and .rst.inc)
+        file_path: Path to the RST file
         config: Configuration with default values
         
     Returns:
@@ -513,8 +509,8 @@ def extract_rust_examples_from_file(
         # Note: min_version should only be set if explicitly specified in the example
         # config.version is the reference toolchain version, not a requirement for all examples
         min_version = options.get('version') or options.get('min-version') or None
-        channel = options.get('channel', config.channel)
-        edition = options.get('edition', config.edition)
+        channel = options.get('channel') or config.channel
+        edition = options.get('edition') or config.edition
         
         # Find parent context
         parent_type, parent_id, guideline_id = find_parent_context(content, start)
@@ -590,9 +586,8 @@ def find_rst_files(src_dir: Path) -> List[Path]:
     """
     Find all RST files in the source directory.
     
-    Searches for both:
-    - *.rst files (chapter index files, monolithic chapter files)
-    - *.rst.inc files (per-guideline include files)
+    Searches for:
+    - *.rst files (chapter index files, monolithic chapter files, per-guideline files)
     
     Args:
         src_dir: Directory to search
@@ -600,9 +595,7 @@ def find_rst_files(src_dir: Path) -> List[Path]:
     Returns:
         List of Path objects for all RST files found
     """
-    rst_files = list(src_dir.glob("**/*.rst"))
-    rst_inc_files = list(src_dir.glob("**/*.rst.inc"))
-    return rst_files + rst_inc_files
+    return list(src_dir.glob("**/*.rst"))
 
 
 def extract_all_examples(
