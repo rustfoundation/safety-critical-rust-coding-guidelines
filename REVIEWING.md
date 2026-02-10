@@ -176,7 +176,7 @@ Review comments or changes requested by the assigned reviewer reset the 14-day t
 2. **After 14 days with no activity**: The bot posts a reminder and the reviewer enters a **14-day transition period** to Observer status
 3. **After 28 days total**: If still no activity, the reviewer may be transitioned from Producer to Observer status, and the review is reassigned
 
-#### Acceptable Responses
+### Acceptable Responses
 
 Life happens! Any of these actions will reset the 14-day clock:
 
