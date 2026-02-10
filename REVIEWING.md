@@ -74,6 +74,30 @@ Use this to release your assignment from an issue/PR without automatically assig
 @guidelines-bot /release Need to focus on other priorities
 ```
 
+### Rectify Review State
+
+```
+@guidelines-bot /rectify
+```
+
+Use this when GitHub review activity and reviewer-bot state appear out of sync.
+This is most common on cross-repository PRs where a review event may not have had
+permission to persist reviewer-bot state.
+
+Who can run it:
+- The currently assigned reviewer
+- A maintainer with triage+ permission
+
+What it does (for the current PR only):
+- If the latest review by the assigned reviewer is `APPROVED`, it marks the review complete.
+- If the latest review by the assigned reviewer is `COMMENTED` or `CHANGES_REQUESTED`, it refreshes reviewer activity.
+- Otherwise, it reports that no reconciliation transition applies.
+
+**Example:**
+```
+@guidelines-bot /rectify
+```
+
 ### Assign a Specific Reviewer
 
 ```
@@ -159,6 +183,7 @@ Life happens! Any of these actions will reset the 14-day clock:
 - **Post a review comment** - Any substantive feedback counts
 - **Use `/pass [reason]`** - Pass the review to the next person if you can't review it
 - **Use `/away YYYY-MM-DD [reason]`** - Step away temporarily (e.g., "On vacation until 2025-02-15")
+- **Use `/rectify`** - Reconcile PR review state when review activity happened but bot state is stale
 
 #### Before You Pass: Consider the Learning Opportunity
 
