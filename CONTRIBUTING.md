@@ -1,35 +1,33 @@
 # Contributing to the coding guidelines
 
+> [!NOTE]
+> Reviewer or Producer guidance, including bot commands and review deadlines, lives in [REVIEWING.md](REVIEWING.md).
+
 ## Table of Contents
 
-- [Contributing to the coding guidelines](#contributing-to-the-coding-guidelines)
-  - [Table of Contents](#table-of-contents)
-  - [Contribution Workflow](#contribution-workflow)
-    - [Note on Chapter Layout](#note-on-chapter-layout)
-    - [0) Bring up the idea for discussion](#0-optional-bring-the-idea-up-for-discussion)
-    - [1) Submit coding guideline issue](#1-submit-coding-guideline-issue)
-      - [1.1) Finding the FLS ID](#11-finding-the-fls-id)
-    - [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment)
-    - [3) Create a Draft with a Member](#3-create-a-draft-with-a-member)
-    - [4) Create the PR](#4-create-the-pr)
-    - [5) Iterate on Feedback](#5-iterate-on-feedback)
-      - [5.1) Member Begins Review](#51-member-begins-review)
-      - [5.2) Update the PR Based on Feedback](#52-update-the-pr-based-on-feedback)
-    - [6) Contributor Applies Feedback on Issue](#6-contributor-applies-feedback-on-issue)
-    - [7) Contributor Applies Regenerated Guideline to PR](#7-contributor-applies-regenerated-guideline-to-pr)
-    - [8) Your Guideline gets merged](#8-your-guideline-gets-merged)
-    - [You just contributed a coding guideline!](#you-just-contributed-a-coding-guideline)
-  - [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
-    - [Guideline template](#guideline-template)
-  - [Before You Begin Contributing](#before-you-begin-contributing)
-    - [Licenses](#licenses)
-    - [Code of Conduct](#code-of-conduct)
-  - [Contribution Process](#contribution-process)
-    - [Issues](#issues)
+- [First-time contributor quick start](#first-time-contributor-quick-start)
+- [Contribution workflow](#contribution-workflow)
+- [Writing a guideline locally (less typical, not recommended)](#writing-a-guideline-locally-less-typical-not-recommended)
+- [Before you begin contributing](#before-you-begin-contributing)
+- [Contribution process](#contribution-process)
+
+## First-time contributor quick start
+
+If you are new here, this is the shortest path to a first PR. The detailed workflow is in the next section.
+
+1. (Optional) Discuss the idea on Zulip. See [0) Bring the idea up for discussion](#0-optional-bring-the-idea-up-for-discussion).
+2. Open a coding guideline issue. See [1) Submit coding guideline issue](#1-submit-coding-guideline-issue).
+3. Wait for the reStructuredText comment from the bot. See [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
+4. Collaborate with a subcommittee member to refine the draft and get `sign-off: create pr`. See [3) Create a Draft with a Member](#3-create-a-draft-with-a-member).
+5. Create the PR using the generated RST and include `closes #xyz` in the PR body. See [4) Create the PR](#4-create-the-pr).
+6. Iterate on PR feedback until it is approved and merged. See [5) Iterate on Feedback](#5-iterate-on-feedback).
 
 ## Contribution Workflow
 
-Here's a diagram of the overall process:
+The full workflow is below. Expand the diagram if you want a high-level view.
+
+<details>
+<summary>Workflow diagram</summary>
 
 ```mermaid
 flowchart TD
@@ -55,6 +53,8 @@ flowchart TD
   Main --> End(["9: End"])
 ```
 
+</details>
+
 ### Note on Chapter Layout
 
 The Safety Critical Rust Coding guidelines has the same chapter layout as the [Ferrocene Language Specification](https://spec.ferrocene.dev/) (FLS). If you would like to contribute a new guideline, find a section from the FLS that interests you, then write a guideline in the corresponding chapter of these coding guidelines.
@@ -71,6 +71,9 @@ To add a new coding guideline, open a [coding guideline issue](https://github.co
 
 #### 1.1) Finding the FLS ID
 
+<details>
+<summary>How to find the FLS paragraph ID</summary>
+
 Note that the FLS ID should be filled according to the FLS paragraph ID for which the guideline is covering. One way to go about finding this is to inspect the page using your web browser. You'll be looking for something like:
 
 
@@ -79,6 +82,8 @@ Note that the FLS ID should be filled according to the FLS paragraph ID for whic
 ```
 
 You would then pull `fls_4rhjpdu4zfqj` to place in the FLS ID field.
+
+</details>
 
 
 ### 2) Guideline Generated as a Comment
@@ -94,6 +99,11 @@ contents converted to reStructuredText.
 ### 3) Create a Draft with a Member
 
 Within 14 days of your submission, a member of the Coding Guidelines Subcommittee should give you a first review. You'll work with them (and other members) to flesh out the concept and ensure the guideline is well prepared for a Pull Request.
+
+> [!TIP]
+> A reviewer is automatically assigned from the pool of Producers using a round-robin system. See [REVIEWING.md](REVIEWING.md) for reviewer bot details.
+
+When a subcommittee member adds the `sign-off: create pr` label, the issue review is considered complete and reviewer reminders stop.
 
 ### 4) Create the PR
 
@@ -169,8 +179,14 @@ Once the coding guideline contents have passed review, a subcommittee member wil
 
 That's it!
 
+---
 
 ## Writing a guideline locally (less typical, not recommended)
+
+We recommend the issue-based workflow above. If you need to work locally, expand the section below.
+
+<details>
+<summary>Local authoring steps</summary>
 
 While it is possible to create guidelines locally, we encourage contributors to make use of the process described above since it handles some of the fiddly details for you as a guideline writer.
 
@@ -178,7 +194,9 @@ While it is possible to create guidelines locally, we encourage contributors to 
 
 We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
 
-You can the copy and paste this guideline from the command line into the correct chapter.
+You can then copy and paste this guideline from the command line into the correct chapter.
+
+</details>
 
 ## Before You Begin Contributing
 

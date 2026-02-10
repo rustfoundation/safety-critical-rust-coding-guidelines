@@ -681,6 +681,7 @@ To assign someone else:
 
 Other commands:
 - `{BOT_MENTION} /claim` - Claim this review for yourself
+- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub
 - `{BOT_MENTION} /label +label-name` - Add a label
 - `{BOT_MENTION} /label -label-name` - Remove a label
 - `{BOT_MENTION} /queue` - Show reviewer queue
@@ -716,6 +717,7 @@ To assign someone else:
 
 Other commands:
 - `{BOT_MENTION} /claim` - Claim this review for yourself
+- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub
 - `{BOT_MENTION} /label +label-name` - Add a label
 - `{BOT_MENTION} /label -label-name` - Remove a label
 - `{BOT_MENTION} /queue` - Show reviewer queue
@@ -759,6 +761,7 @@ To assign someone else:
 
 Other commands:
 - `{BOT_MENTION} /claim` - Claim this review for yourself
+- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub
 - `{BOT_MENTION} /label +label-name` - Add a label
 - `{BOT_MENTION} /label -label-name` - Remove a label
 - `{BOT_MENTION} /queue` - Show reviewer queue
