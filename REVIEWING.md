@@ -170,7 +170,7 @@ Reviewers have **14 days** to provide initial feedback on assigned issues or PRs
 
 Review comments or changes requested by the assigned reviewer reset the 14-day timer. When the assigned reviewer approves the PR, the review is marked complete and reminders stop.
 
-#### What Happens If the Deadline Passes
+### What Happens If the Deadline Passes
 
 1. **First 14 days**: The assigned reviewer should provide feedback or take action
 2. **After 14 days with no activity**: The bot posts a reminder and the reviewer enters a **14-day transition period** to Observer status
