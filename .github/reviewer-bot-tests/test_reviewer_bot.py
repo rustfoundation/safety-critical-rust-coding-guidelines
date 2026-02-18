@@ -336,22 +336,26 @@ def test_acquire_state_issue_lease_lock_success(monkeypatch):
     monkeypatch.setenv("WORKFLOW_JOB_NAME", "reviewer-bot")
     monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
     monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
-
-    body = reviewer_bot.render_state_issue_body(make_state(), reviewer_bot.clear_lock_metadata())
     monkeypatch.setattr(
         reviewer_bot,
-        "get_state_issue_snapshot",
-        lambda: reviewer_bot.StateIssueSnapshot(
-            body=body,
-            etag='"etag"',
-            html_url="https://example.com/issues/314",
+        "get_lock_ref_snapshot",
+        lambda: ("parent-sha", "tree-sha", reviewer_bot.clear_lock_metadata()),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "create_lock_commit",
+        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
+            status_code=201,
+            payload={"sha": "new-lock-commit-sha"},
+            headers={},
+            text="",
+            ok=True,
         ),
     )
-
     monkeypatch.setattr(
         reviewer_bot,
-        "conditional_patch_state_issue",
-        lambda body, etag: reviewer_bot.GitHubApiResult(
+        "cas_update_lock_ref",
+        lambda new_sha: reviewer_bot.GitHubApiResult(
             status_code=200,
             payload={"ok": True},
             headers={},
@@ -366,6 +370,8 @@ def test_acquire_state_issue_lease_lock_success(monkeypatch):
     assert ctx.lock_owner_workflow == "Reviewer Bot"
     assert ctx.lock_owner_job == "reviewer-bot"
     assert reviewer_bot.ACTIVE_LEASE_CONTEXT is not None
+    assert ctx.lock_ref == "refs/heads/reviewer-bot-state-lock"
+    assert isinstance(ctx.lock_expires_at, str)
 
 
 def test_acquire_state_issue_lease_lock_retries_on_conflict(monkeypatch):
@@ -373,23 +379,27 @@ def test_acquire_state_issue_lease_lock_retries_on_conflict(monkeypatch):
     monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
     monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
 
-    body = reviewer_bot.render_state_issue_body(make_state(), reviewer_bot.clear_lock_metadata())
     monkeypatch.setattr(
         reviewer_bot,
-        "get_state_issue_snapshot",
-        lambda: reviewer_bot.StateIssueSnapshot(
-            body=body,
-            etag='"etag"',
-            html_url="https://example.com/issues/314",
+        "get_lock_ref_snapshot",
+        lambda: ("parent-sha", "tree-sha", reviewer_bot.clear_lock_metadata()),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "create_lock_commit",
+        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
+            status_code=201,
+            payload={"sha": "new-lock-commit-sha"},
+            headers={},
+            text="",
+            ok=True,
         ),
     )
-
-    statuses = iter([412, 200])
-
+    statuses = iter([409, 200])
     monkeypatch.setattr(
         reviewer_bot,
-        "conditional_patch_state_issue",
-        lambda body, etag: reviewer_bot.GitHubApiResult(
+        "cas_update_lock_ref",
+        lambda new_sha: reviewer_bot.GitHubApiResult(
             status_code=next(statuses),
             payload={"ok": True},
             headers={},
@@ -413,27 +423,33 @@ def test_acquire_state_issue_lease_lock_takes_over_expired_lock(monkeypatch):
             "lock_owner_run_id": "123",
             "lock_owner_workflow": "Reviewer Bot",
             "lock_owner_job": "reviewer-bot",
+            "lock_state": "locked",
             "lock_token": "stale-lock",
             "lock_acquired_at": "2020-01-01T00:00:00+00:00",
             "lock_expires_at": "2020-01-01T00:01:00+00:00",
         }
     )
-    body = reviewer_bot.render_state_issue_body(make_state(), expired_lock)
-
     monkeypatch.setattr(
         reviewer_bot,
-        "get_state_issue_snapshot",
-        lambda: reviewer_bot.StateIssueSnapshot(
-            body=body,
-            etag='"etag"',
-            html_url="https://example.com/issues/314",
-        ),
+        "get_lock_ref_snapshot",
+        lambda: ("parent-sha", "tree-sha", expired_lock),
     )
 
     monkeypatch.setattr(
         reviewer_bot,
-        "conditional_patch_state_issue",
-        lambda body, etag: reviewer_bot.GitHubApiResult(
+        "create_lock_commit",
+        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
+            status_code=201,
+            payload={"sha": "new-lock-commit-sha"},
+            headers={},
+            text="",
+            ok=True,
+        ),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "cas_update_lock_ref",
+        lambda new_sha: reviewer_bot.GitHubApiResult(
             status_code=200,
             payload={"ok": True},
             headers={},
@@ -458,24 +474,19 @@ def test_acquire_state_issue_lease_lock_times_out(monkeypatch):
             "lock_owner_run_id": "other-run",
             "lock_owner_workflow": "Reviewer Bot",
             "lock_owner_job": "reviewer-bot",
+            "lock_state": "locked",
             "lock_token": "active-lock",
             "lock_acquired_at": "2999-01-01T00:00:00+00:00",
             "lock_expires_at": "2999-01-01T00:10:00+00:00",
         }
     )
-    body = reviewer_bot.render_state_issue_body(make_state(), valid_lock)
-
     monkeypatch.setattr(
         reviewer_bot,
-        "get_state_issue_snapshot",
-        lambda: reviewer_bot.StateIssueSnapshot(
-            body=body,
-            etag='"etag"',
-            html_url="https://example.com/issues/314",
-        ),
+        "get_lock_ref_snapshot",
+        lambda: ("parent-sha", "tree-sha", valid_lock),
     )
 
-    monotonic_values = iter([0.0, 0.0, 2.0, 2.0])
+    monotonic_values = iter([0.0, 0.0, 2.0])
     monkeypatch.setattr(reviewer_bot.time, "monotonic", lambda: next(monotonic_values))
 
     with pytest.raises(RuntimeError, match="Timed out waiting for reviewer-bot lease lock"):
@@ -1681,6 +1692,69 @@ def test_handle_comment_event_unknown_command(stub_api, captured_comments):
     assert handled is False
     assert len(captured_comments) == 1
     assert "Unknown command" in captured_comments[0]["body"]
+
+
+def test_classify_event_intent_cross_repo_review_is_non_mutating_defer(monkeypatch):
+    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "true")
+    intent = reviewer_bot.classify_event_intent("pull_request_review", "submitted")
+    assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
+
+
+def test_classify_event_intent_same_repo_review_is_mutating(monkeypatch):
+    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "false")
+    intent = reviewer_bot.classify_event_intent("pull_request_review", "submitted")
+    assert intent == reviewer_bot.EVENT_INTENT_MUTATING
+
+
+def test_main_cross_repo_review_does_not_acquire_lock(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "pull_request_review")
+    monkeypatch.setenv("EVENT_ACTION", "submitted")
+    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "true")
+
+    acquire_called = {"value": False}
+
+    def fail_if_called():
+        acquire_called["value"] = True
+        raise AssertionError("acquire_state_issue_lease_lock should not be called")
+
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", fail_if_called)
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
+
+    reviewer_bot.main()
+
+    assert acquire_called["value"] is False
+
+
+def test_main_same_repo_review_acquires_lock(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "pull_request_review")
+    monkeypatch.setenv("EVENT_ACTION", "submitted")
+    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "false")
+
+    acquire_called = {"value": False}
+
+    def fake_acquire():
+        acquire_called["value"] = True
+        return reviewer_bot.LeaseContext(
+            lock_token="token",
+            lock_owner_run_id="run",
+            lock_owner_workflow="workflow",
+            lock_owner_job="job",
+            state_issue_url="https://example.com/issues/314",
+            lock_ref="refs/heads/reviewer-bot-state-lock",
+            lock_expires_at="2999-01-01T00:00:00+00:00",
+        )
+
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", fake_acquire)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
+
+    reviewer_bot.main()
+
+    assert acquire_called["value"] is True
 
 
 def test_main_fails_when_save_state_fails(monkeypatch):
