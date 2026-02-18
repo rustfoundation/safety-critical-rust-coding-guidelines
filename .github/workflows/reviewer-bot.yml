@@ -35,12 +35,6 @@ on:
           - show-state
           - check-overdue
 
-# Per-issue/PR concurrency only reduces duplicate same-item runs.
-# Global state serialization is enforced by reviewer_bot.py lease locking on issue #314.
-concurrency:
-  group: reviewer-bot-${{ github.event.issue.number || github.event.pull_request.number || 'manual' }}
-  cancel-in-progress: false
-
 permissions:
   issues: write
   pull-requests: write

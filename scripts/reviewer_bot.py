@@ -96,6 +96,16 @@ LOCK_LEASE_TTL_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_TTL_SECONDS", "30
 LOCK_RETRY_BASE_SECONDS = float(os.environ.get("REVIEWER_BOT_LOCK_RETRY_SECONDS", "2"))
 LOCK_MAX_WAIT_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "1200"))
 LOCK_API_RETRY_LIMIT = int(os.environ.get("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "5"))
+LOCK_RENEWAL_WINDOW_SECONDS = int(
+    os.environ.get("REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS", "60")
+)
+LOCK_REF_NAME = os.environ.get("REVIEWER_BOT_LOCK_REF_NAME", "heads/reviewer-bot-state-lock")
+LOCK_REF_BOOTSTRAP_BRANCH = os.environ.get("REVIEWER_BOT_LOCK_BOOTSTRAP_BRANCH", "main")
+LOCK_COMMIT_MARKER = "reviewer-bot-lock-v1"
+
+EVENT_INTENT_MUTATING = "mutating"
+EVENT_INTENT_NON_MUTATING_DEFER = "non_mutating_defer"
+EVENT_INTENT_NON_MUTATING_READONLY = "non_mutating_readonly"
 
 MANDATORY_TRIAGE_APPROVER_LABEL = "triage approver required"
 MANDATORY_TRIAGE_PING_TARGETS = [
@@ -122,6 +132,7 @@ MANDATORY_TRIAGE_SATISFIED_TEMPLATE = (
 
 LOCK_METADATA_KEYS = [
     "schema_version",
+    "lock_state",
     "lock_owner_run_id",
     "lock_owner_workflow",
     "lock_owner_job",
@@ -205,6 +216,8 @@ class LeaseContext:
     lock_owner_workflow: str
     lock_owner_job: str
     state_issue_url: str
+    lock_ref: str = ""
+    lock_expires_at: str | None = None
 
 
 ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
@@ -814,7 +827,7 @@ def parse_state_from_issue(issue: dict) -> dict:
 
 
 def get_state_issue_snapshot() -> StateIssueSnapshot | None:
-    """Fetch state issue body plus ETag for conditional writes."""
+    """Fetch state issue body plus metadata for state writes."""
     if not STATE_ISSUE_NUMBER:
         print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
         return None
@@ -852,19 +865,22 @@ def get_state_issue_snapshot() -> StateIssueSnapshot | None:
     )
 
 
-def conditional_patch_state_issue(body: str, etag: str) -> GitHubApiResult:
-    """Patch state issue body with optimistic concurrency via If-Match."""
+def conditional_patch_state_issue(body: str, etag: str | None = None) -> GitHubApiResult:
+    """Patch state issue body.
+
+    The `etag` argument is retained for compatibility with tests and call sites,
+    but state serialization is handled by the dedicated lock backend.
+    """
     return github_api_request(
         "PATCH",
         f"issues/{STATE_ISSUE_NUMBER}",
         {"body": body},
-        extra_headers={"If-Match": etag},
         suppress_error_log=True,
     )
 
 
 def assert_lock_held(operation: str) -> None:
-    """Fail fast when mutating state outside the lease lock boundary."""
+    """Fail fast when mutating state outside the lock boundary."""
     if ACTIVE_LEASE_CONTEXT is None:
         raise RuntimeError(f"Mutating path reached without lease lock: {operation}")
 
@@ -916,12 +932,12 @@ def save_state(state: dict) -> bool:
     state["last_updated"] = datetime.now(timezone.utc).isoformat()
 
     for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
-        snapshot = get_state_issue_snapshot()
-        if snapshot is None:
+        if not ensure_state_issue_lease_lock_fresh():
+            print("ERROR: Failed to refresh reviewer-bot lease lock before save", file=sys.stderr)
             return False
 
-        if not snapshot.etag:
-            print("ERROR: Missing ETag on state issue GET; cannot perform conditional PATCH", file=sys.stderr)
+        snapshot = get_state_issue_snapshot()
+        if snapshot is None:
             return False
 
         lock_meta = parse_lock_metadata_from_issue_body(snapshot.body)
@@ -929,12 +945,12 @@ def save_state(state: dict) -> bool:
 
         response = conditional_patch_state_issue(body, snapshot.etag)
         if response.status_code == 200:
-            print(f"State saved to issue #{STATE_ISSUE_NUMBER} with If-Match")
+            print(f"State saved to issue #{STATE_ISSUE_NUMBER}")
             return True
 
         if response.status_code in {409, 412}:
             print(
-                "WARNING: State save hit optimistic concurrency conflict "
+                "WARNING: State save hit conflict "
                 f"(status {response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
                 file=sys.stderr,
             )
@@ -1007,6 +1023,9 @@ def lock_is_currently_valid(lock_meta: dict, now: datetime | None = None) -> boo
     if not isinstance(lock_meta, dict):
         return False
 
+    if lock_meta.get("lock_state") != "locked":
+        return False
+
     lock_token = lock_meta.get("lock_token")
     if not isinstance(lock_token, str) or not lock_token:
         return False
@@ -1051,6 +1070,7 @@ def build_lock_metadata(
     return normalize_lock_metadata(
         {
             "schema_version": LOCK_SCHEMA_VERSION,
+            "lock_state": "locked",
             "lock_owner_run_id": lock_owner_run_id,
             "lock_owner_workflow": lock_owner_workflow,
             "lock_owner_job": lock_owner_job,
@@ -1063,11 +1083,335 @@ def build_lock_metadata(
 
 def clear_lock_metadata() -> dict:
     """Return normalized empty lock metadata."""
-    return normalize_lock_metadata(None)
+    return normalize_lock_metadata(
+        {
+            "schema_version": LOCK_SCHEMA_VERSION,
+            "lock_state": "unlocked",
+        }
+    )
+
+
+def normalize_lock_ref_name(ref_name: str) -> str:
+    """Normalize lock ref name to REST API path form (without refs/ prefix)."""
+    normalized = ref_name.strip()
+    if normalized.startswith("refs/"):
+        normalized = normalized[len("refs/") :]
+    if not normalized:
+        normalized = "heads/reviewer-bot-state-lock"
+    return normalized
+
+
+def get_lock_ref_name() -> str:
+    """Return normalized lock ref name."""
+    return normalize_lock_ref_name(LOCK_REF_NAME)
+
+
+def get_lock_ref_display() -> str:
+    """Return full lock ref for logs."""
+    return f"refs/{get_lock_ref_name()}"
+
+
+def get_state_issue_html_url() -> str:
+    """Build canonical state issue URL for diagnostics."""
+    repo = f"{os.environ.get('REPO_OWNER', '')}/{os.environ.get('REPO_NAME', '')}".strip("/")
+    if not repo or not STATE_ISSUE_NUMBER:
+        return ""
+    return f"https://github.com/{repo}/issues/{STATE_ISSUE_NUMBER}"
+
+
+def extract_ref_sha(payload: Any) -> str | None:
+    """Extract git ref target SHA from API payload."""
+    if not isinstance(payload, dict):
+        return None
+    obj = payload.get("object")
+    if isinstance(obj, dict):
+        sha = obj.get("sha")
+        if isinstance(sha, str) and sha:
+            return sha
+    sha = payload.get("sha")
+    if isinstance(sha, str) and sha:
+        return sha
+    return None
+
+
+def extract_commit_tree_sha(payload: Any) -> str | None:
+    """Extract commit tree SHA from API payload."""
+    if not isinstance(payload, dict):
+        return None
+    tree = payload.get("tree")
+    if not isinstance(tree, dict):
+        return None
+    tree_sha = tree.get("sha")
+    if isinstance(tree_sha, str) and tree_sha:
+        return tree_sha
+    return None
+
+
+def extract_commit_sha(payload: Any) -> str | None:
+    """Extract commit SHA from API payload."""
+    if not isinstance(payload, dict):
+        return None
+    sha = payload.get("sha")
+    if isinstance(sha, str) and sha:
+        return sha
+    return None
+
+
+def render_lock_commit_message(lock_meta: dict) -> str:
+    """Render lock metadata into a deterministic commit message payload."""
+    normalized = normalize_lock_metadata(lock_meta)
+    payload = json.dumps(normalized, sort_keys=True)
+    return f"{LOCK_COMMIT_MARKER}\n{payload}\n"
+
+
+def parse_lock_metadata_from_lock_commit_message(message: str) -> dict:
+    """Parse lock metadata from lock commit message."""
+    if not isinstance(message, str):
+        return clear_lock_metadata()
+
+    lines = message.splitlines()
+    if not lines:
+        return clear_lock_metadata()
+
+    if lines[0].strip() != LOCK_COMMIT_MARKER:
+        return clear_lock_metadata()
+
+    payload = "\n".join(lines[1:]).strip()
+    if not payload:
+        return clear_lock_metadata()
+
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        return clear_lock_metadata()
+
+    if not isinstance(parsed, dict):
+        return clear_lock_metadata()
+    return normalize_lock_metadata(parsed)
+
+
+def ensure_lock_ref_exists() -> str:
+    """Ensure lock ref exists and return current head SHA."""
+    lock_ref = get_lock_ref_name()
+    get_response = github_api_request("GET", f"git/ref/{lock_ref}", suppress_error_log=True)
+    if get_response.status_code == 200:
+        ref_sha = extract_ref_sha(get_response.payload)
+        if ref_sha:
+            return ref_sha
+        raise RuntimeError("Lock ref GET returned success but no SHA")
+
+    if get_response.status_code not in {404}:
+        raise RuntimeError(
+            "Failed to read reviewer-bot lock ref "
+            f"{get_lock_ref_display()} (status {get_response.status_code}): {get_response.text}"
+        )
+
+    base_branch = LOCK_REF_BOOTSTRAP_BRANCH.strip() or "main"
+    base_response = github_api_request(
+        "GET",
+        f"git/ref/heads/{base_branch}",
+        suppress_error_log=True,
+    )
+    if base_response.status_code != 200:
+        raise RuntimeError(
+            "Failed to bootstrap reviewer-bot lock ref from "
+            f"heads/{base_branch} (status {base_response.status_code}): {base_response.text}"
+        )
+
+    base_sha = extract_ref_sha(base_response.payload)
+    if not base_sha:
+        raise RuntimeError("Bootstrap branch ref response missing SHA")
+
+    create_response = github_api_request(
+        "POST",
+        "git/refs",
+        {
+            "ref": f"refs/{lock_ref}",
+            "sha": base_sha,
+        },
+        suppress_error_log=True,
+    )
+    if create_response.status_code not in {201, 422}:
+        raise RuntimeError(
+            "Failed to create reviewer-bot lock ref "
+            f"{get_lock_ref_display()} (status {create_response.status_code}): {create_response.text}"
+        )
+
+    refresh_response = github_api_request("GET", f"git/ref/{lock_ref}", suppress_error_log=True)
+    if refresh_response.status_code != 200:
+        raise RuntimeError(
+            "Unable to read reviewer-bot lock ref after create "
+            f"(status {refresh_response.status_code}): {refresh_response.text}"
+        )
+
+    ref_sha = extract_ref_sha(refresh_response.payload)
+    if not ref_sha:
+        raise RuntimeError("Reviewer-bot lock ref exists but SHA was missing")
+    return ref_sha
+
+
+def get_lock_ref_snapshot() -> tuple[str, str, dict]:
+    """Return lock ref head SHA, tree SHA, and parsed lock metadata."""
+    ref_sha = ensure_lock_ref_exists()
+    commit_response = github_api_request(
+        "GET",
+        f"git/commits/{ref_sha}",
+        suppress_error_log=True,
+    )
+    if commit_response.status_code != 200:
+        raise RuntimeError(
+            "Failed to read lock commit "
+            f"{ref_sha} (status {commit_response.status_code}): {commit_response.text}"
+        )
+
+    if not isinstance(commit_response.payload, dict):
+        raise RuntimeError("Lock commit response payload was not a JSON object")
+
+    tree_sha = extract_commit_tree_sha(commit_response.payload)
+    if not tree_sha:
+        raise RuntimeError("Lock commit payload missing tree SHA")
+
+    message = commit_response.payload.get("message")
+    if not isinstance(message, str):
+        message = ""
+
+    lock_meta = parse_lock_metadata_from_lock_commit_message(message)
+    return ref_sha, tree_sha, lock_meta
+
+
+def create_lock_commit(parent_sha: str, tree_sha: str, lock_meta: dict) -> GitHubApiResult:
+    """Create lock state commit that references existing tree."""
+    return github_api_request(
+        "POST",
+        "git/commits",
+        {
+            "message": render_lock_commit_message(lock_meta),
+            "tree": tree_sha,
+            "parents": [parent_sha],
+        },
+        suppress_error_log=True,
+    )
+
+
+def cas_update_lock_ref(new_sha: str) -> GitHubApiResult:
+    """Update lock ref with fast-forward (CAS-like) semantics."""
+    return github_api_request(
+        "PATCH",
+        f"git/refs/{get_lock_ref_name()}",
+        {
+            "sha": new_sha,
+            "force": False,
+        },
+        suppress_error_log=True,
+    )
+
+
+def ensure_state_issue_lease_lock_fresh() -> bool:
+    """Renew lock if expiration is near while this run still owns it."""
+    context = ACTIVE_LEASE_CONTEXT
+    if context is None:
+        return False
+
+    if not context.lock_expires_at:
+        return True
+
+    expires_at = parse_iso8601_timestamp(context.lock_expires_at)
+    if expires_at is None:
+        return renew_state_issue_lease_lock(context)
+
+    remaining_seconds = (expires_at - datetime.now(timezone.utc)).total_seconds()
+    if remaining_seconds > LOCK_RENEWAL_WINDOW_SECONDS:
+        return True
+
+    print(
+        "Reviewer-bot lease lock nearing expiry; attempting renewal "
+        f"(remaining={int(remaining_seconds)}s, token_prefix={context.lock_token[:8]})"
+    )
+    return renew_state_issue_lease_lock(context)
+
+
+def renew_state_issue_lease_lock(context: LeaseContext) -> bool:
+    """Renew currently held lock lease by appending refreshed lock commit."""
+    for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
+        try:
+            ref_head_sha, tree_sha, current_lock = get_lock_ref_snapshot()
+        except RuntimeError as exc:
+            print(f"ERROR: Failed to read lock snapshot during renewal: {exc}", file=sys.stderr)
+            return False
+
+        current_token = current_lock.get("lock_token")
+        if current_token != context.lock_token:
+            print(
+                "ERROR: Cannot renew reviewer-bot lock due to token mismatch "
+                f"(expected prefix={context.lock_token[:8]}, got prefix={str(current_token)[:8]})",
+                file=sys.stderr,
+            )
+            return False
+
+        desired_lock = build_lock_metadata(
+            context.lock_token,
+            context.lock_owner_run_id,
+            context.lock_owner_workflow,
+            context.lock_owner_job,
+        )
+
+        create_response = create_lock_commit(ref_head_sha, tree_sha, desired_lock)
+        if create_response.status_code != 201:
+            if create_response.status_code == 429 or create_response.status_code >= 500:
+                delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+                print(
+                    "Retryable lease lock renewal commit failure "
+                    f"(status {create_response.status_code}); retrying "
+                    f"({attempt}/{LOCK_API_RETRY_LIMIT})",
+                    file=sys.stderr,
+                )
+                time.sleep(delay)
+                continue
+            print(
+                "ERROR: Failed to create lock renewal commit "
+                f"(status {create_response.status_code}): {create_response.text}",
+                file=sys.stderr,
+            )
+            return False
+
+        new_commit_sha = extract_commit_sha(create_response.payload)
+        if not new_commit_sha:
+            print("ERROR: Lock renewal commit response missing SHA", file=sys.stderr)
+            return False
+
+        update_response = cas_update_lock_ref(new_commit_sha)
+        if update_response.status_code == 200:
+            context.lock_expires_at = desired_lock.get("lock_expires_at")
+            print(
+                "Renewed reviewer-bot lease lock "
+                f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]})"
+            )
+            return True
+
+        if update_response.status_code in {409, 422, 429} or update_response.status_code >= 500:
+            delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+            print(
+                "Retryable lease lock renewal ref update failure "
+                f"(status {update_response.status_code}); retrying "
+                f"({attempt}/{LOCK_API_RETRY_LIMIT})",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+            continue
+
+        print(
+            "ERROR: Failed to update lock ref during renewal "
+            f"(status {update_response.status_code}): {update_response.text}",
+            file=sys.stderr,
+        )
+        return False
+
+    print("ERROR: Exhausted retries while renewing reviewer-bot lease lock", file=sys.stderr)
+    return False
 
 
 def acquire_state_issue_lease_lock() -> LeaseContext:
-    """Acquire durable lease lock from in-repo state issue using If-Match."""
+    """Acquire durable lease lock using git-ref CAS updates."""
     global ACTIVE_LEASE_CONTEXT
 
     if ACTIVE_LEASE_CONTEXT is not None:
@@ -1085,17 +1429,10 @@ def acquire_state_issue_lease_lock() -> LeaseContext:
             raise RuntimeError(
                 "Timed out waiting for reviewer-bot lease lock "
                 f"after {int(elapsed)}s (run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, "
-                f"state_issue={STATE_ISSUE_NUMBER})"
+                f"lock_ref={get_lock_ref_display()})"
             )
 
-        snapshot = get_state_issue_snapshot()
-        if snapshot is None:
-            raise RuntimeError("Failed to read state issue while acquiring lease lock")
-
-        if not snapshot.etag:
-            raise RuntimeError("State issue GET response did not include ETag header")
-
-        current_lock = parse_lock_metadata_from_issue_body(snapshot.body)
+        ref_head_sha, tree_sha, current_lock = get_lock_ref_snapshot()
         now = datetime.now(timezone.utc)
         lock_valid = lock_is_currently_valid(current_lock, now)
 
@@ -1106,60 +1443,79 @@ def acquire_state_issue_lease_lock() -> LeaseContext:
                 lock_owner_workflow,
                 lock_owner_job,
             )
-            state = parse_state_yaml_from_issue_body(snapshot.body)
-            updated_body = render_state_issue_body(
-                state,
-                desired_lock,
-                snapshot.body,
-                preserve_state_block=True,
-            )
+            create_response = create_lock_commit(ref_head_sha, tree_sha, desired_lock)
+            if create_response.status_code != 201:
+                if create_response.status_code == 429 or create_response.status_code >= 500:
+                    print(
+                        "Retryable lease lock acquire commit failure "
+                        f"(status {create_response.status_code}); retrying (attempt {attempt})"
+                    )
+                    delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+                    time.sleep(delay)
+                    continue
+                if create_response.status_code in {401, 403}:
+                    raise RuntimeError(
+                        "Insufficient permission to create reviewer-bot lock commit "
+                        f"(status {create_response.status_code}): {create_response.text}"
+                    )
+                raise RuntimeError(
+                    "Unexpected status while creating reviewer-bot lock commit "
+                    f"(status {create_response.status_code}): {create_response.text}"
+                )
 
-            patch_response = conditional_patch_state_issue(updated_body, snapshot.etag)
-            if patch_response.status_code == 200:
+            new_commit_sha = extract_commit_sha(create_response.payload)
+            if not new_commit_sha:
+                raise RuntimeError("Lock acquire commit response did not include commit SHA")
+
+            update_response = cas_update_lock_ref(new_commit_sha)
+            if update_response.status_code == 200:
                 ACTIVE_LEASE_CONTEXT = LeaseContext(
                     lock_token=lock_token,
                     lock_owner_run_id=lock_owner_run_id,
                     lock_owner_workflow=lock_owner_workflow,
                     lock_owner_job=lock_owner_job,
-                    state_issue_url=snapshot.html_url,
+                    state_issue_url=get_state_issue_html_url(),
+                    lock_ref=get_lock_ref_display(),
+                    lock_expires_at=desired_lock.get("lock_expires_at"),
                 )
                 print(
                     "Acquired reviewer-bot lease lock "
                     f"(run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, "
-                    f"issue={snapshot.html_url or STATE_ISSUE_NUMBER})"
+                    f"lock_ref={get_lock_ref_display()})"
                 )
                 return ACTIVE_LEASE_CONTEXT
 
-            if patch_response.status_code in {409, 412}:
+            if update_response.status_code in {409, 422}:
                 print(
                     "Lease lock acquire conflict "
-                    f"(status {patch_response.status_code}); retrying (attempt {attempt})"
+                    f"(status {update_response.status_code}); retrying (attempt {attempt})"
                 )
-            elif patch_response.status_code == 404:
+            elif update_response.status_code == 404:
                 raise RuntimeError(
-                    f"State issue #{STATE_ISSUE_NUMBER} not found while acquiring lease lock"
+                    f"Lock ref {get_lock_ref_display()} not found while acquiring lease lock"
                 )
-            elif patch_response.status_code in {401, 403}:
+            elif update_response.status_code in {401, 403}:
                 raise RuntimeError(
                     "Insufficient permission to acquire reviewer-bot lease lock "
-                    f"(status {patch_response.status_code}): {patch_response.text}"
+                    f"(status {update_response.status_code}): {update_response.text}"
                 )
-            elif patch_response.status_code == 429 or patch_response.status_code >= 500:
+            elif update_response.status_code == 429 or update_response.status_code >= 500:
                 print(
                     "Retryable lease lock acquire failure "
-                    f"(status {patch_response.status_code}); retrying (attempt {attempt})"
+                    f"(status {update_response.status_code}); retrying (attempt {attempt})"
                 )
             else:
                 raise RuntimeError(
                     "Unexpected status while acquiring reviewer-bot lease lock "
-                    f"(status {patch_response.status_code}): {patch_response.text}"
+                    f"(status {update_response.status_code}): {update_response.text}"
                 )
         else:
             lock_owner = current_lock.get("lock_owner_run_id") or "unknown"
             lock_expires_at = current_lock.get("lock_expires_at") or "unknown"
             print(
                 "Reviewer-bot lease lock currently held by "
-                f"run_id={lock_owner} until {lock_expires_at}; waiting"
+                f"run_id={lock_owner} until {lock_expires_at}; waiting "
+                f"(lock_ref={get_lock_ref_display()})"
             )
 
         delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
@@ -1178,20 +1534,14 @@ def release_state_issue_lease_lock() -> bool:
 
     try:
         for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
-            snapshot = get_state_issue_snapshot()
-            if snapshot is None:
+            try:
+                ref_head_sha, tree_sha, current_lock = get_lock_ref_snapshot()
+            except RuntimeError as exc:
+                print(f"ERROR: Failed to read lock snapshot while releasing lock: {exc}", file=sys.stderr)
                 break
 
-            if not snapshot.etag:
-                print(
-                    "ERROR: Missing ETag while releasing reviewer-bot lease lock",
-                    file=sys.stderr,
-                )
-                break
-
-            current_lock = parse_lock_metadata_from_issue_body(snapshot.body)
             current_token = current_lock.get("lock_token")
-            if current_token and current_token != context.lock_token:
+            if current_token != context.lock_token:
                 print(
                     "WARNING: Lease lock token mismatch during release; "
                     f"expected prefix={context.lock_token[:8]}, got prefix={str(current_token)[:8]}",
@@ -1199,44 +1549,62 @@ def release_state_issue_lease_lock() -> bool:
                 )
                 return False
 
-            state = parse_state_yaml_from_issue_body(snapshot.body)
-            updated_body = render_state_issue_body(
-                state,
-                clear_lock_metadata(),
-                snapshot.body,
-                preserve_state_block=True,
-            )
-            patch_response = conditional_patch_state_issue(updated_body, snapshot.etag)
+            create_response = create_lock_commit(ref_head_sha, tree_sha, clear_lock_metadata())
+            if create_response.status_code != 201:
+                if create_response.status_code in {429} or create_response.status_code >= 500:
+                    print(
+                        "Retryable lease lock release commit failure "
+                        f"(status {create_response.status_code}); retrying "
+                        f"({attempt}/{LOCK_API_RETRY_LIMIT})",
+                        file=sys.stderr,
+                    )
+                    delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
+                    time.sleep(delay)
+                    continue
+                print(
+                    "ERROR: Failed to create lock release commit "
+                    f"(status {create_response.status_code}): {create_response.text}",
+                    file=sys.stderr,
+                )
+                break
 
-            if patch_response.status_code == 200:
+            new_commit_sha = extract_commit_sha(create_response.payload)
+            if not new_commit_sha:
+                print("ERROR: Lock release commit response missing SHA", file=sys.stderr)
+                break
+
+            update_response = cas_update_lock_ref(new_commit_sha)
+
+            if update_response.status_code == 200:
                 released = True
                 print(
                     "Released reviewer-bot lease lock "
-                    f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]})"
+                    f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]}, "
+                    f"lock_ref={get_lock_ref_display()})"
                 )
                 return True
 
-            if patch_response.status_code in {409, 412, 429} or patch_response.status_code >= 500:
+            if update_response.status_code in {409, 422, 429} or update_response.status_code >= 500:
                 print(
                     "Retryable lease lock release failure "
-                    f"(status {patch_response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
+                    f"(status {update_response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
                     file=sys.stderr,
                 )
                 delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
                 time.sleep(delay)
                 continue
 
-            if patch_response.status_code in {401, 403, 404}:
+            if update_response.status_code in {401, 403, 404}:
                 print(
                     "ERROR: Hard failure releasing reviewer-bot lease lock "
-                    f"(status {patch_response.status_code}): {patch_response.text}",
+                    f"(status {update_response.status_code}): {update_response.text}",
                     file=sys.stderr,
                 )
                 break
 
             print(
                 "ERROR: Unexpected status while releasing reviewer-bot lease lock "
-                f"(status {patch_response.status_code}): {patch_response.text}",
+                f"(status {update_response.status_code}): {update_response.text}",
                 file=sys.stderr,
             )
             break
@@ -3416,8 +3784,6 @@ def handle_labeled_event(state: dict) -> bool:
 
 def handle_pull_request_review_event(state: dict) -> bool:
     """Handle submitted PR reviews for activity and completion tracking."""
-    assert_lock_held("handle_pull_request_review_event")
-
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         print("No issue number found")
@@ -3433,11 +3799,13 @@ def handle_pull_request_review_event(state: dict) -> bool:
     if is_cross_repo:
         print(
             "Deferring cross-repo pull_request_review reconciliation for "
-            f"#{issue_number}: this event may have read-only permissions and cannot "
-            "persist reviewer-bot state. Use `@guidelines-bot /rectify` on the PR to "
-            "reconcile and persist state."
+            f"#{issue_number}: this event may have read-only permissions. "
+            "A trusted workflow_run reconcile will persist state after this run succeeds. "
+            "If needed, use `@guidelines-bot /rectify` as manual fallback."
         )
         return False
+
+    assert_lock_held("handle_pull_request_review_event")
 
     review_data = ensure_review_entry(state, issue_number)
     if review_data is None:
@@ -3679,19 +4047,19 @@ def handle_comment_event(state: dict) -> bool:
 
 def handle_manual_dispatch(state: dict) -> bool:
     """Handle manual workflow dispatch."""
-    assert_lock_held("handle_manual_dispatch")
-
     action = os.environ.get("MANUAL_ACTION", "")
+
+    if action == "show-state":
+        print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
+        return False
+
+    assert_lock_held("handle_manual_dispatch")
 
     if action == "sync-members":
         state, changes = sync_members_with_queue(state)
         if changes:
             print(f"Sync changes: {changes}")
         return True
-
-    elif action == "show-state":
-        print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
-        return False
 
     elif action == "check-overdue":
         # Manually trigger the overdue review check
@@ -3793,19 +4161,49 @@ def handle_scheduled_check(state: dict) -> bool:
 # ==============================================================================
 
 
-def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
-    """Return True for event paths that may mutate reviewer-bot state."""
+def classify_event_intent(event_name: str, event_action: str) -> str:
+    """Classify whether a run can mutate reviewer-bot state."""
     if event_name in {"issues", "pull_request_target"}:
-        return event_action in {"opened", "labeled", "closed"}
+        if event_action in {"opened", "labeled", "closed"}:
+            return EVENT_INTENT_MUTATING
+        return EVENT_INTENT_NON_MUTATING_READONLY
+
     if event_name == "issue_comment":
-        return event_action == "created"
+        if event_action == "created":
+            return EVENT_INTENT_MUTATING
+        return EVENT_INTENT_NON_MUTATING_READONLY
+
     if event_name == "pull_request_review":
-        return event_action == "submitted"
+        if event_action != "submitted":
+            return EVENT_INTENT_NON_MUTATING_READONLY
+        is_cross_repo = os.environ.get("PR_IS_CROSS_REPOSITORY", "false").lower() == "true"
+        if is_cross_repo:
+            return EVENT_INTENT_NON_MUTATING_DEFER
+        return EVENT_INTENT_MUTATING
+
     if event_name == "workflow_run":
-        return event_action == "completed"
-    if event_name in {"workflow_dispatch", "schedule"}:
-        return True
-    return False
+        if event_action != "completed":
+            return EVENT_INTENT_NON_MUTATING_READONLY
+        workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
+        if workflow_run_event == "pull_request_review":
+            return EVENT_INTENT_MUTATING
+        return EVENT_INTENT_NON_MUTATING_READONLY
+
+    if event_name == "workflow_dispatch":
+        action = os.environ.get("MANUAL_ACTION", "").strip()
+        if action == "show-state":
+            return EVENT_INTENT_NON_MUTATING_READONLY
+        return EVENT_INTENT_MUTATING
+
+    if event_name == "schedule":
+        return EVENT_INTENT_MUTATING
+
+    return EVENT_INTENT_NON_MUTATING_READONLY
+
+
+def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
+    """Backwards-compatible helper for tests and call sites."""
+    return classify_event_intent(event_name, event_action) == EVENT_INTENT_MUTATING
 
 
 def main():
@@ -3813,9 +4211,13 @@ def main():
     event_name = os.environ.get("EVENT_NAME", "")
     event_action = os.environ.get("EVENT_ACTION", "")
 
-    print(f"Event: {event_name}, Action: {event_action}")
+    event_intent = classify_event_intent(event_name, event_action)
+    lock_required = event_intent == EVENT_INTENT_MUTATING
+    print(
+        f"Event: {event_name}, Action: {event_action}, Intent: {event_intent}, "
+        f"Lock Required: {lock_required}"
+    )
 
-    lock_required = event_requires_lease_lock(event_name, event_action)
     lock_acquired = False
     release_failed = False
     exit_code = 0
@@ -3877,7 +4279,13 @@ def main():
 
         elif event_name == "workflow_run":
             if event_action == "completed":
-                state_changed = handle_workflow_run_event(state)
+                if os.environ.get("WORKFLOW_RUN_EVENT", "").strip() == "pull_request_review":
+                    state_changed = handle_workflow_run_event(state)
+                else:
+                    print(
+                        "Ignoring workflow_run event with unsupported source event: "
+                        f"{os.environ.get('WORKFLOW_RUN_EVENT', '').strip() or '<missing>'}"
+                    )
 
         # Save state if changed (or if we synced members/pass-until)
         if state_changed or sync_changes or restored:

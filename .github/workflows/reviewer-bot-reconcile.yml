@@ -8,7 +8,7 @@ on:
 permissions:
   issues: write
   pull-requests: write
-  contents: read
+  contents: write
   actions: read
 
 env:
