@@ -281,6 +281,38 @@
       ]
     },
     {
+      "title": "Attributes",
+      "link": "coding-guidelines/attributes/index.html",
+      "guidelines": [
+        {
+          "id": "gui_ZDLZzjeOwLSU",
+          "title": "Assure visibility of ``unsafe`` keyword in unsafe code",
+          "link": "coding-guidelines/attributes/gui_ZDLZzjeOwLSU.html#gui_ZDLZzjeOwLSU",
+          "checksum": "ea742a794ac602331a4c3f9eca92d5f3205965f6a951f0f5151a8c107f2cca21",
+          "rationale": {
+            "id": "rat_eQV3s9ggNegr",
+            "link": "coding-guidelines/attributes/gui_ZDLZzjeOwLSU.html#rat_eQV3s9ggNegr",
+            "checksum": "0a27e6454c0bb140d182f380f155f3eb89efb7704bc3071103571ca5a7bd8f56"
+          },
+          "non_compliant_example": {
+            "id": "non_compl_ex_Hk3mNp5qRs7t",
+            "link": "coding-guidelines/attributes/gui_ZDLZzjeOwLSU.html#non_compl_ex_Hk3mNp5qRs7t",
+            "checksum": "cff575004207f9285f3febce239eb596a866a503059eb4f55205b7424629aa4c"
+          },
+          "compliant_example": {
+            "id": "compl_ex_xY2zAb3cDe4f",
+            "link": "coding-guidelines/attributes/gui_ZDLZzjeOwLSU.html#compl_ex_xY2zAb3cDe4f",
+            "checksum": "1b125f2b9d523944907574cbae28f77e1d226339395b62960135d3b80b4b4aea"
+          },
+          "bibliography": {
+            "id": "bib_n8YJHvQf4mWx",
+            "link": "coding-guidelines/attributes/gui_ZDLZzjeOwLSU.html#bib_n8YJHvQf4mWx",
+            "checksum": "694ca5fbaecc482bd8f6d60864b108e4422433cf76445e5f1696131d9b597ecd"
+          }
+        }
+      ]
+    },
+    {
       "title": "Associated Items",
       "link": "coding-guidelines/associated-items/index.html",
       "guidelines": [
