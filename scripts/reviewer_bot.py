@@ -20,8 +20,12 @@ All commands must be prefixed with @guidelines-bot /<command>:
     - Assign yourself as the reviewer for this issue/PR
     - Removes any existing reviewer assignment
 
-  @guidelines-bot /release [@username] [reason]
-    - Release your assignment from this issue/PR (or someone else's with triage+ permission)
+  @guidelines-bot /release [reason]
+    - Release your own assignment from this issue/PR
+    - Leaves this issue/PR unassigned
+
+  @guidelines-bot /release @username [reason]
+    - Release someone else's assignment from this issue/PR (triage+ required)
     - Does NOT auto-assign the next reviewer (use /pass for that)
 
   @guidelines-bot /rectify
@@ -150,7 +154,7 @@ TRANSITION_PERIOD_DAYS = 14  # Days after warning before transition to Observer
 COMMANDS = {
     "pass": "Pass this review to next in queue",
     "away": "Step away from queue until date (YYYY-MM-DD)",
-    "release": "Release assignment (yours, or @username with triage+ permission)",
+    "release": "Release your assignment (/release) or another's (/release @username, triage+)",
     "rectify": "Reconcile this issue/PR's review state from GitHub",
     "claim": "Claim this review for yourself",
     "r?": "Assign a reviewer (@username or 'producers')",
@@ -1838,7 +1842,8 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
 If you need to pass this review:
 - `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
 - `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
+- `{BOT_MENTION} /release [reason]` - Release your own assignment and leave this issue unassigned
+- `{BOT_MENTION} /release @username [reason]` - Release another reviewer's assignment (triage+ required)
 
 To assign someone else:
 - `{BOT_MENTION} /r? @username` - Assign a specific reviewer
@@ -1874,7 +1879,8 @@ If the changes **do** affect guidelines:
 If you need to pass this review:
 - `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
 - `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
+- `{BOT_MENTION} /release [reason]` - Release your own assignment and leave this issue unassigned
+- `{BOT_MENTION} /release @username [reason]` - Release another reviewer's assignment (triage+ required)
 
 To assign someone else:
 - `{BOT_MENTION} /r? @username` - Assign a specific reviewer
@@ -1918,7 +1924,8 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
 If you need to pass this review:
 - `{BOT_MENTION} /pass [reason]` - Pass just this PR to the next reviewer
 - `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
+- `{BOT_MENTION} /release [reason]` - Release your own assignment and leave this PR unassigned
+- `{BOT_MENTION} /release @username [reason]` - Release another reviewer's assignment (triage+ required)
 
 To assign someone else:
 - `{BOT_MENTION} /r? @username` - Assign a specific reviewer
@@ -2626,7 +2633,8 @@ def handle_commands_command() -> tuple[str, bool]:
             f"**Pass or step away:**\n"
             f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue (current reviewer only)\n"
             f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n"
-            f"- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n"
+            f"- `{BOT_MENTION} /release [reason]` - Release your own assignment and leave this unassigned\n"
+            f"- `{BOT_MENTION} /release @username [reason]` - Release another reviewer's assignment (triage+ required)\n\n"
             f"**Assign reviewers:**\n"
             f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
             f"- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n"
@@ -2767,10 +2775,19 @@ def handle_release_command(state: dict, issue_number: int,
             # Trying to release self when not assigned
             if tracked_reviewer:
                 return (f"❌ @{comment_author} is not the current reviewer. "
-                        f"Current reviewer: @{tracked_reviewer}"), False
+                        f"Current reviewer: @{tracked_reviewer}\n\n"
+                        f"If you meant to release @{tracked_reviewer}, use "
+                        f"`{BOT_MENTION} /release @{tracked_reviewer}` "
+                        f"(triage+ required)."), False
             elif current_assignees:
-                return (f"❌ @{comment_author} is not assigned to this issue/PR. "
-                        f"Current assignee(s): @{', @'.join(current_assignees)}"), False
+                response = (f"❌ @{comment_author} is not assigned to this issue/PR. "
+                            f"Current assignee(s): @{', @'.join(current_assignees)}")
+                if len(current_assignees) == 1:
+                    current_assignee = current_assignees[0]
+                    response += (f"\n\nIf you meant to release @{current_assignee}, use "
+                                 f"`{BOT_MENTION} /release @{current_assignee}` "
+                                 f"(triage+ required).")
+                return response, False
             else:
                 return "❌ No reviewer is currently assigned to release.", False
 

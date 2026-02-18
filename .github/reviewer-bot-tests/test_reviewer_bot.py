@@ -307,6 +307,20 @@ def test_parse_command_malformed_unknown():
     assert args == ["greetings"]
 
 
+@pytest.mark.parametrize(
+    ("guidance_builder", "builder_args"),
+    [
+        (reviewer_bot.get_issue_guidance, ("alice", "bob")),
+        (reviewer_bot.get_fls_audit_guidance, ("alice", "bob")),
+        (reviewer_bot.get_pr_guidance, ("alice", "bob")),
+    ],
+)
+def test_guidance_release_commands_are_explicit(guidance_builder, builder_args):
+    guidance = guidance_builder(*builder_args)
+    assert "@guidelines-bot /release [reason]" in guidance
+    assert "@guidelines-bot /release @username [reason]" in guidance
+
+
 def test_github_api_error_handling(monkeypatch):
     class FakeResponse:
         def __init__(self, status_code, content):
@@ -707,7 +721,10 @@ def test_handle_comment_event_commands_command(stub_api, captured_comments):
     handled = reviewer_bot.handle_comment_event(state)
     assert handled is False
     assert len(captured_comments) == 1
-    assert "Available Commands" in captured_comments[0]["body"]
+    response = captured_comments[0]["body"]
+    assert "Available Commands" in response
+    assert "@guidelines-bot /release [reason]" in response
+    assert "@guidelines-bot /release @username [reason]" in response
 
 
 def test_handle_comment_event_away_command(stub_api, captured_comments, monkeypatch):
@@ -741,6 +758,49 @@ def test_handle_comment_event_release_command_self(stub_api, captured_comments, 
     assert handled is True
     assert len(captured_comments) == 1
     assert "has released" in captured_comments[0]["body"]
+
+
+def test_handle_comment_event_release_command_self_not_current_suggests_target(
+    stub_api, captured_comments, monkeypatch
+):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "skipped": [],
+        "current_reviewer": "alice",
+        "assignment_method": "round-robin",
+    }
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: ["alice"])
+    os.environ["COMMENT_BODY"] = "@guidelines-bot /release"
+    os.environ["COMMENT_AUTHOR"] = "bob"
+    os.environ["ISSUE_NUMBER"] = "42"
+
+    handled = reviewer_bot.handle_comment_event(state)
+
+    assert handled is False
+    assert len(captured_comments) == 1
+    response = captured_comments[0]["body"]
+    assert "@bob is not the current reviewer" in response
+    assert "Current reviewer: @alice" in response
+    assert "@guidelines-bot /release @alice" in response
+    assert "triage+ required" in response
+
+
+def test_handle_release_command_self_not_assigned_uses_single_assignee_hint(stub_api, monkeypatch):
+    state = make_state()
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: ["alice"])
+
+    response, success = reviewer_bot.handle_release_command(
+        state=state,
+        issue_number=42,
+        comment_author="bob",
+        args=[],
+    )
+
+    assert success is False
+    assert "@bob is not assigned to this issue/PR" in response
+    assert "Current assignee(s): @alice" in response
+    assert "@guidelines-bot /release @alice" in response
+    assert "triage+ required" in response
 
 
 def test_handle_comment_event_release_command_other_requires_permission(
