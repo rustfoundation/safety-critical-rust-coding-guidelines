@@ -129,6 +129,9 @@ needs_tags = [
     dict(name="defect", description="Guideline associated with the defect-prevention profile"),
 
     dict(name="unsafe", description="Guidelines that interact with or involve the unsafe keyword"),
+
+    dict(name="injection", description="Guidelines about various kinds of injections"),
+    dict(name="sanitization", description="Guidelines about sanitizing untrusted input"),
 ]
 
 needs_categories = [
