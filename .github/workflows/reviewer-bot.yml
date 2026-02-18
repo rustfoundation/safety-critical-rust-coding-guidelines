@@ -35,12 +35,6 @@ on:
           - show-state
           - check-overdue
 
-# Ensure only one instance runs at a time per issue/PR
-# This prevents race conditions when both 'opened' and 'labeled' fire together
-concurrency:
-  group: reviewer-bot-${{ github.event.issue.number || github.event.pull_request.number || 'manual' }}
-  cancel-in-progress: false
-
 permissions:
   issues: write
   pull-requests: write
@@ -101,6 +95,9 @@ jobs:
           # Repository info
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_JOB_NAME: ${{ github.job }}
           # Labels on the issue/PR (as JSON)
           ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name || github.event.pull_request.labels.*.name) }}
         run: |
