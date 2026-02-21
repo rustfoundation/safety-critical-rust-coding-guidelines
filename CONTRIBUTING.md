@@ -194,6 +194,29 @@ While it is possible to create guidelines locally, we encourage contributors to 
 
 We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
 
+To see all available options, run:
+
+```bash
+./generate_guideline_templates.py --help
+```
+
+Here are a few examples of how to generate templates:
+
+- Generate a standard template (1 compliant and 1 non-compliant example):
+  ```bash
+  ./generate_guideline_templates.py
+  ```
+
+- Generate a template with multiple examples and a bibliography:
+  ```bash
+  ./generate_guideline_templates.py --non-compliant 2 --compliant 3 --bibliography --bib-entries 2
+  ```
+
+- Generate multiple templates at once:
+  ```bash
+  ./generate_guideline_templates.py -n 3
+  ```
+
 You can then copy and paste this guideline from the command line into the correct chapter.
 
 </details>
