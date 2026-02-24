@@ -101,8 +101,7 @@ policy][ip-policy].
 
 ## Other Policies
 
-You can read about other Rust Foundation policies in the footer of the Foundation
-[website][foundation-website].
+Read other Rust Foundation [policies][foundation-website].
 
 [code-of-conduct]: https://foundation.rust-lang.org/policies/code-of-conduct/
 [foundation-website]: https://foundation.rust-lang.org
