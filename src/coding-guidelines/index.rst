@@ -28,3 +28,5 @@ Coding Guidelines
    macros/index
    ffi/index
    inline-assembly/index
+
+   generated/index
