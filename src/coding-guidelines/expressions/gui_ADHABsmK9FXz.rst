@@ -121,18 +121,15 @@ The 'as' operator should not be used with numeric operands
              let _a3: u64   = std::mem::transmute(p1);  // OK, size is checked
              // let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes
 
-             #[allow(integer_to_ptr_transmutes)]
-             let _p2: * const u32 = std::mem::transmute(a1); // OK
-             #[allow(integer_to_ptr_transmutes)]
-             let _p3: * const u32 = std::mem::transmute(a1); // OK
+              let _p2: * const u32 = std::mem::transmute(a1); // OK
+              let _p3: * const u32 = std::mem::transmute(a1); // OK
            }
 
            unsafe {
              // does something entirely different,
              // reinterpreting the bits of z as the IEEE bit pattern of a double
              // precision object, rather than converting the integer value
-             #[allow(unnecessary_transmutes)]
-             let _f1: f64 = std::mem::transmute(_z);
+              let _f1: f64 = std::mem::transmute(_z);
            }
          }
          #

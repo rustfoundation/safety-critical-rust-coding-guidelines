@@ -224,11 +224,13 @@ Assure visibility of ``unsafe`` keyword in unsafe code
           pub fn my_function() {}
 
           // SAFETY: Placing data in a specific section for embedded systems
-          #[unsafe(link_section = ".noinit")]
+          #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,.noinit"))]
+          #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".noinit"))]
           static mut PERSISTENT_DATA: [u8; 256] = [0; 256];
 
           // SAFETY: Custom section for shared memory
-          #[unsafe(link_section = ".shared")]
+          #[cfg_attr(target_os = "macos", unsafe(link_section = "__DATA,.shared"))]
+          #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".shared"))]
           static SHARED_BUFFER: [u8; 4096] = [0; 4096];
 
           fn main() {
