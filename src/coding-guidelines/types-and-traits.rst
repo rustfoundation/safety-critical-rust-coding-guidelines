@@ -197,7 +197,7 @@ Types and Traits
            fn main() {
                unsafe {
                    let mut x = 5;
-                   // Setup a mutable raw pointer and a shared reference to `x`,
+                   // Set up a mutable raw pointer and a shared reference to `x`,
                    // and derive a raw pointer from that shared reference.
                    let ptr = &mut x as *mut i32;
                    let shrref = &*ptr;
