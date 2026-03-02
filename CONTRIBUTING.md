@@ -97,7 +97,7 @@ Further discussion about the amount and correctness of its content shall then be
 The generated Pull Request may attract additional feedback or simply be an easier place to suggest targeted edits.
 As the contributor of the coding guideline and opener of the issue, you'll respond to comments, discuss, all the normal things on the pull request.
 
-- If you you're comfortable editing reStructuredText, you can apply feedback directly in thr PR.
+- If you you're comfortable editing reStructuredText, you can apply feedback directly in the PR.
 - If you'd rather make revisions in Markdown, edit the original issue, and and regenerate the reStructuredText that way. You'll have to copy the changes to the PR.
 
 Once the coding guideline contents have passed review, a subcommittee member will approve the pull request, and put it on the merge queue.
