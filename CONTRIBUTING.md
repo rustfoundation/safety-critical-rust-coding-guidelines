@@ -110,3 +110,5 @@ repository, commonly MIT, Apache, and/or CC-BY, but could be a different
 license. In other words, your contribution will be licensed to the Foundation
 and all downstream users under those licenses. You can read more in the
 Foundation's [intellectual property policy][ip-policy].
+
+[ip-policy]: https://foundation.rust-lang.org/policies/intellectual-property-policy/
