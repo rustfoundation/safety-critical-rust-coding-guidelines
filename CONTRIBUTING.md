@@ -66,7 +66,7 @@ Note that if you later update the body of the coding guideline issue this will
 fire the GitHub Action again and update the original comment with the new
 contents converted to reStructuredText.
 
-### 3) Improve the draft with a Member
+### 3) Improve the draft with a consortium Member
 
 Within 14 days of your submission, a member of the Coding Guidelines Subcommittee should give you a first review. You'll work with them (and other members) to flesh out the concept and ensure the guideline is well prepared for a Pull Request.
 
