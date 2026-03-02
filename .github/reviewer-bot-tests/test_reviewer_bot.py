@@ -888,6 +888,14 @@ def test_handle_issue_or_pr_opened_missing_label(stub_api, captured_comments, mo
     assert captured_comments == []
 
 
+def test_get_issue_guidance_includes_signoff_command_and_pr_ownership():
+    guidance = reviewer_bot.get_issue_guidance("alice", "dana")
+
+    assert "@guidelines-bot /label +sign-off: create pr" in guidance
+    assert "does not auto-create coding guideline PRs" in guidance
+    assert "stays open until that PR merges" in guidance
+
+
 def test_handle_labeled_event_assigns_reviewer(stub_api, captured_comments, monkeypatch):
     state = make_state()
     os.environ["LABEL_NAME"] = "coding guideline"
@@ -938,6 +946,48 @@ def test_handle_labeled_event_sign_off_marks_completion(stub_api):
     assert review_data["review_completed_at"] is not None
     assert review_data["review_completed_by"] == "alice"
     assert review_data["review_completion_source"] == "issue_label: sign-off: create pr"
+
+
+def test_handle_labeled_event_sign_off_posts_transition_comment(captured_comments):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+    }
+    os.environ["LABEL_NAME"] = "sign-off: create pr"
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["ISSUE_AUTHOR"] = "dana"
+
+    handled = reviewer_bot.handle_labeled_event(state)
+
+    assert handled is True
+    assert len(captured_comments) == 1
+    body = captured_comments[0]["body"]
+    assert "issue is now PR-ready" in body
+    assert "@dana" in body
+    assert "`closes #42`" in body
+    assert "Keep this issue open until that PR merges." in body
+
+
+def test_handle_labeled_event_sign_off_already_complete_no_transition_comment(captured_comments):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
+        "review_completed_at": "2000-01-02T00:00:00+00:00",
+        "review_completed_by": "alice",
+        "review_completion_source": "issue_label: sign-off: create pr",
+    }
+    os.environ["LABEL_NAME"] = "sign-off: create pr"
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["ISSUE_AUTHOR"] = "dana"
+
+    handled = reviewer_bot.handle_labeled_event(state)
+
+    assert handled is False
+    assert captured_comments == []
 
 
 def test_handle_labeled_event_sign_off_ignored_for_pr(stub_api):

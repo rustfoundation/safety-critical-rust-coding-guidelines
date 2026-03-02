@@ -1831,7 +1831,9 @@ As outlined in our [contribution guide](CONTRIBUTING.md), please:
    - Content written may be *incomplete*, but must not be *incorrect*
    - The `🧪 Code Example Test Results` section shows all example code compiles
 
-4. When ready, **add the `sign-off: create pr` label** to signal the contributor should create a PR
+4. When ready, run **`{BOT_MENTION} /label +sign-off: create pr`** to mark the issue PR-ready
+5. This signals @{issue_author} to open a Pull Request; the bot does not auto-create coding guideline PRs
+6. The issue stays open until that PR merges
 
 ## Bot Commands
 
@@ -1852,6 +1854,27 @@ Other commands:
 - `{BOT_MENTION} /queue` - Show reviewer queue
 - `{BOT_MENTION} /commands` - Show all available commands
 """
+
+
+def get_issue_signoff_transition_comment(issue_number: int, issue_author: str) -> str:
+    """Generate follow-up guidance when an issue is marked PR-ready."""
+    if issue_author:
+        contributor_line = (
+            f"@{issue_author}, please open a Pull Request using the generated RST "
+            "comment from this issue."
+        )
+    else:
+        contributor_line = (
+            "Please open a Pull Request using the generated RST comment from this issue."
+        )
+
+    return (
+        "✅ This issue is now PR-ready (`sign-off: create pr`).\n\n"
+        f"{contributor_line}\n\n"
+        "When you open the PR:\n"
+        f"- Include `closes #{issue_number}` in the PR body so this issue closes when the PR merges.\n"
+        "- Keep this issue open until that PR merges."
+    )
 
 
 def get_fls_audit_guidance(reviewer: str, issue_author: str) -> str:
@@ -3713,12 +3736,24 @@ def handle_labeled_event(state: dict) -> bool:
         reviewer = None
         if review_data:
             reviewer = review_data.get("current_reviewer")
-        return mark_review_complete(
+        review_marked_complete = mark_review_complete(
             state,
             issue_number,
             reviewer,
             "issue_label: sign-off: create pr",
         )
+        if review_marked_complete:
+            issue_author = os.environ.get("ISSUE_AUTHOR", "").strip()
+            transition_comment = get_issue_signoff_transition_comment(
+                issue_number,
+                issue_author,
+            )
+            if not post_comment(issue_number, transition_comment):
+                print(
+                    f"WARNING: Failed to post sign-off transition comment on #{issue_number}",
+                    file=sys.stderr,
+                )
+        return review_marked_complete
 
     if label_name not in REVIEW_LABELS:
         print(f"Label '{label_name}' is not a review label, skipping")

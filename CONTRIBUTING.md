@@ -20,7 +20,7 @@ If you are new here, this is the shortest path to a first PR. The detailed workf
 3. Wait for the reStructuredText comment from the bot. See [2) Guideline Generated as a Comment](#2-guideline-generated-as-a-comment).
 4. Collaborate with a subcommittee member to refine the draft and get `sign-off: create pr`. See [3) Create a Draft with a Member](#3-create-a-draft-with-a-member).
 5. Create the PR using the generated RST and include `closes #xyz` in the PR body. See [4) Create the PR](#4-create-the-pr).
-6. Iterate on PR feedback until it is approved and merged. See [5) Iterate on Feedback](#5-iterate-on-feedback).
+6. Iterate on PR feedback until it is approved, queued, and merged. See [5) Iterate on Feedback](#5-iterate-on-feedback).
 
 ## Contribution Workflow
 
@@ -44,12 +44,12 @@ flowchart TD
 
   Issue --> S4{{"4: Contributor creates a PR using the reStructuredText generated for them on issue"}} --> PR["Coding Guideline<br>Pull Request"]
 
-  S5{{"5: <br> 5.1 PR review started by subcommittee member in <= 14 days <br><br> 5.2 Contributor discusses on PR with members and updates"}} --> PR
+  S5{{"5: <br> 5.1 PR review started by subcommittee member in <= 14 days <br><br> 5.2 Contributor discusses on PR with members and updates <br><br> 5.3 Approved PR is queued by someone with write permissions"}} --> PR
   PR --> S5
 
   PR --> S6{{"(Optional) <br> 6: Contributor applies feedback to issue"}} --> Issue
   Issue --> S7{{"(Optional)<br> 7: Contributor applies updated reStructuredText to Pull request"}} --> PR
-  PR --> S8{{"8: Subcommittee member <br> approves & queues;<br>merges to main"}} --> Main[[main]]
+  PR --> S8{{"8: Producer reviewer approves;<br>someone with write permissions queues;<br>merges to main"}} --> Main[[main]]
   Main --> End(["9: End"])
 ```
 
@@ -105,6 +105,10 @@ Within 14 days of your submission, a member of the Coding Guidelines Subcommitte
 
 When a subcommittee member adds the `sign-off: create pr` label, the issue review is considered complete and reviewer reminders stop.
 
+> [!IMPORTANT]
+> `sign-off: create pr` means the issue is ready for a Pull Request.
+> It does **not** mean the Pull Request is approved or queued for merge.
+
 ### 4) Create the PR
 
 > [!NOTE]
@@ -119,6 +123,8 @@ When a subcommittee member adds the `sign-off: create pr` label, the issue revie
 > * `🧪 Code Example Test Results` section shows all example code compiles
 
 As soon as these prerequisites are fulfilled, the draft shall be marked as PR-ready by a subcommittee member, by labeling the issue with `sign-off: create pr`. This denotes that you should create a Pull Request with your Guideline. Further discussion about the amount and correctness of its content shall then be done on the Pull Request itself.
+
+Contributors open their own Pull Requests after sign-off. The reviewer marks the issue PR-ready but does not create the coding guideline PR automatically.
 
 The contents of the PR should be based on the bot comment containing the generated RST form of your guideline, as seen in [Step 2](#2-guideline-generated-as-a-comment). The comment has the exact file content you'll need.
 
@@ -152,6 +158,18 @@ If you agree with the suggested changes, you've got two options:
   and
   [7) Contributor Applies Regenerated Guideline to PR](#7-contributor-applies-regenerated-guideline-to-pr)
 
+#### 5.3) PR Approval and Merge Queue
+
+Once the pull request content is ready, the expected merge flow is:
+
+1. The assigned Producer reviewer approves the pull request.
+2. Someone with write permissions adds the approved pull request to the merge queue.
+3. GitHub runs the required checks for queued merges (including `build`).
+4. GitHub merges the pull request automatically after required checks pass.
+5. If the PR body includes `closes #xyz`, GitHub closes that issue when the PR merges.
+
+If your PR is approved but not yet queued, comment on the PR and ask a maintainer or Producer with write permissions to queue it.
+
 ### 6) Contributor Applies Feedback on Issue
 
 (Optional, if not comfortable with reStructured Text from
@@ -173,7 +191,7 @@ reflected into the Pull Request.
 
 ### 8) Your Guideline gets merged
 
-Once the coding guideline contents have passed review, a subcommittee member will approve the pull request, and put it on the merge queue to be merged.
+Once the coding guideline contents have passed review, the pull request is approved by a Producer reviewer and queued by someone with write permissions. GitHub then merges it to `main` automatically after required checks pass.
 
 ### You just contributed a coding guideline!
 
