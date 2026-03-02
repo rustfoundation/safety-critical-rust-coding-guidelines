@@ -164,6 +164,25 @@ Shows the current queue position, who's next up for review, and who is currently
 
 Shows all available bot commands with descriptions.
 
+## PR Merge Handoff
+
+Once a coding guideline PR is content-complete, use the following handoff flow:
+
+| Stage | Primary actor | Action | Completion signal |
+| --- | --- | --- | --- |
+| Issue draft review | Producer | Add `sign-off: create pr` on the issue | Issue is PR-ready |
+| PR content review | Assigned Producer reviewer | Approve the PR | Review is complete |
+| Merge execution | Maintainer or Producer with write permissions | Add approved PR to merge queue | PR is merged to `main` |
+
+Important distinctions:
+
+- `sign-off: create pr` means the issue is ready for a PR. It does not mean merge approval.
+- PR approval and queueing are separate actions.
+- If the assigned reviewer does not have write permissions, ask in the PR thread for a maintainer or Producer with write permissions to queue the PR.
+- Queued PRs merge automatically after required checks pass (including `build`).
+
+If the assigned reviewer has already approved, but reviewer-bot state still looks incomplete, run `@guidelines-bot /rectify`.
+
 ## Review Deadlines
 
 Reviewers have **14 days** to provide initial feedback on assigned issues or PRs. This timeline helps ensure contributors receive timely responses.
