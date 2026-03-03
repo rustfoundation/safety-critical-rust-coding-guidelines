@@ -193,7 +193,7 @@ needs_releases = [
 ]
 
 # Enable needs export
-needs_fields = [
+needs_extra_options = [
     "category",
     "recommendation",
     "fls",
