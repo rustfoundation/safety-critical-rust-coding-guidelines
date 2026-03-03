@@ -38,6 +38,7 @@ def clear_env():
         "COMMENT_BODY",
         "COMMENT_AUTHOR",
         "COMMENT_ID",
+        "ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE",
         "EVENT_ACTION",
         "EVENT_NAME",
         "ISSUE_NUMBER",
@@ -151,6 +152,83 @@ def test_load_state_applies_defaults(monkeypatch):
     assert state["pass_until"] == []
     assert state["recent_assignments"] == []
     assert state["active_reviews"] == {}
+
+
+def test_load_state_fails_closed_when_required_and_unavailable(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "get_state_issue", lambda: None)
+
+    with pytest.raises(RuntimeError):
+        reviewer_bot.load_state(fail_on_unavailable=True)
+
+
+def test_get_state_issue_retries_then_succeeds(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
+
+    responses = [
+        reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload=None,
+            headers={},
+            text="bad gateway",
+            ok=False,
+        ),
+        reviewer_bot.GitHubApiResult(
+            status_code=503,
+            payload=None,
+            headers={},
+            text="service unavailable",
+            ok=False,
+        ),
+        reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"body": "ok"},
+            headers={},
+            text="",
+            ok=True,
+        ),
+    ]
+    calls = {"value": 0}
+    sleeps: list[float] = []
+
+    def fake_request(*args, **kwargs):
+        calls["value"] += 1
+        return responses.pop(0)
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
+    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    issue = reviewer_bot.get_state_issue()
+
+    assert isinstance(issue, dict)
+    assert issue.get("body") == "ok"
+    assert calls["value"] == 3
+    assert len(sleeps) == 2
+
+
+def test_get_state_issue_retry_exhaustion_returns_none(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
+
+    calls = {"value": 0}
+    sleeps: list[float] = []
+
+    def fake_request(*args, **kwargs):
+        calls["value"] += 1
+        return reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload=None,
+            headers={},
+            text="bad gateway",
+            ok=False,
+        )
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
+    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    issue = reviewer_bot.get_state_issue()
+
+    assert issue is None
+    assert calls["value"] == reviewer_bot.STATE_READ_RETRY_LIMIT
+    assert len(sleeps) == reviewer_bot.STATE_READ_RETRY_LIMIT - 1
 
 
 def test_save_state_formats_issue_body(monkeypatch):
@@ -1718,7 +1796,7 @@ def test_main_cross_repo_review_does_not_acquire_lock(monkeypatch):
         raise AssertionError("acquire_state_issue_lease_lock should not be called")
 
     monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", fail_if_called)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
     monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
 
     reviewer_bot.main()
@@ -1747,7 +1825,7 @@ def test_main_same_repo_review_acquires_lock(monkeypatch):
 
     monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", fake_acquire)
     monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
     monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
@@ -1762,7 +1840,7 @@ def test_main_fails_when_save_state_fails(monkeypatch):
     monkeypatch.setenv("EVENT_ACTION", "created")
     monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
     monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
     monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "handle_comment_event", lambda state: True)
@@ -1780,7 +1858,7 @@ def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
     monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
     monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda: make_state())
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
     monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
 
@@ -1788,3 +1866,110 @@ def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
         reviewer_bot.main()
 
     assert excinfo.value.code == 1
+
+
+def test_main_mutating_event_fails_closed_when_state_unavailable(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "issue_comment")
+    monkeypatch.setenv("EVENT_ACTION", "created")
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+
+    def fail_load(*, fail_on_unavailable=False):
+        assert fail_on_unavailable is True
+        raise RuntimeError("state unavailable")
+
+    monkeypatch.setattr(reviewer_bot, "load_state", fail_load)
+
+    with pytest.raises(SystemExit) as excinfo:
+        reviewer_bot.main()
+
+    assert excinfo.value.code == 1
+
+
+def test_main_mutating_event_does_not_sync_or_save_when_state_unavailable(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "issue_comment")
+    monkeypatch.setenv("EVENT_ACTION", "created")
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+
+    called = {
+        "pass_until": False,
+        "sync": False,
+        "handler": False,
+        "save": False,
+    }
+
+    def fail_load(*, fail_on_unavailable=False):
+        assert fail_on_unavailable is True
+        raise RuntimeError("state unavailable")
+
+    def track_pass_until(state):
+        called["pass_until"] = True
+        return state, []
+
+    def track_sync(state):
+        called["sync"] = True
+        return state, []
+
+    def track_handler(state):
+        called["handler"] = True
+        return True
+
+    def track_save(state):
+        called["save"] = True
+        return True
+
+    monkeypatch.setattr(reviewer_bot, "load_state", fail_load)
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", track_pass_until)
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", track_sync)
+    monkeypatch.setattr(reviewer_bot, "handle_comment_event", track_handler)
+    monkeypatch.setattr(reviewer_bot, "save_state", track_save)
+
+    with pytest.raises(SystemExit) as excinfo:
+        reviewer_bot.main()
+
+    assert excinfo.value.code == 1
+    assert called == {
+        "pass_until": False,
+        "sync": False,
+        "handler": False,
+        "save": False,
+    }
+
+
+def test_schedule_guard_blocks_empty_active_reviews_wipe(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "schedule")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+
+    state = make_state()
+    state["active_reviews"] = {
+        "42": {
+            "current_reviewer": "alice",
+            "assigned_at": "2026-01-01T00:00:00+00:00",
+            "last_reviewer_activity": "2026-01-01T00:00:00+00:00",
+        }
+    }
+
+    def wipe_active_reviews(input_state):
+        input_state["active_reviews"] = {}
+        return True
+
+    save_called = {"value": False}
+
+    def track_save(_state):
+        save_called["value"] = True
+        return True
+
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
+    monkeypatch.setattr(reviewer_bot, "handle_scheduled_check", wipe_active_reviews)
+    monkeypatch.setattr(reviewer_bot, "save_state", track_save)
+
+    with pytest.raises(SystemExit) as excinfo:
+        reviewer_bot.main()
+
+    assert excinfo.value.code == 1
+    assert save_called["value"] is False
