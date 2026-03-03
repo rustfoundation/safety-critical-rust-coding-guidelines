@@ -79,6 +79,7 @@ needs_layouts = {
             "non_compliant_example",
             "compliant_example",
             "bibliography",
+            "misra",
         ]
     }
 }
@@ -92,6 +93,7 @@ needs_render_contexts = {
             "non_compliant_example",
             "non_compliant_example",
             "bibliography",
+            "misra",
         ],
     }
 }
@@ -191,13 +193,14 @@ needs_releases = [
 ]
 
 # Enable needs export
-needs_extra_options = [
+needs_fields = [
     "category",
     "recommendation",
     "fls",
     "decidability",
     "scope",
     "release",
+    "misra",
 ]
 
 
