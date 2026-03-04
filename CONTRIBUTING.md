@@ -100,7 +100,7 @@ As the contributor of the coding guideline and opener of the issue, you'll respo
 - If you you're comfortable editing reStructuredText, you can apply feedback directly in the PR.
 - If you'd rather make revisions in Markdown, edit the original issue, and and regenerate the reStructuredText that way. You'll have to copy the changes to the PR.
 
-Once the coding guideline contents have passed review, a subcommittee member will approve the pull request, and put it on the merge queue.
+Once the coding guideline contents have passed review, a subcommittee member with `write` access will approve the pull request, and put it on the merge queue.
 
 ### Licenses
 

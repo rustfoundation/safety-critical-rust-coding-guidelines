@@ -45,7 +45,7 @@ The file is checked against the current live version of the specification, which
 
 #### Continuing work while on a feature branch
 
-If you run into this while developing a feature, you may ignore this error by running the build with:
+If you run into this while developing a coding guideline, you may ignore this error by running the build with:
 
 ```shell
 ./make.py --ignore-spec-lock-diff
@@ -53,7 +53,7 @@ If you run into this while developing a feature, you may ignore this error by ru
 
 #### Auditing the difference
 
-When the build breaks due to the difference in `spec.lock`, a log is saved in `/tmp/fls_diff_<random>.txt` which you can useto audit the differences.
+When the build breaks due to the difference in `spec.lock`, a log is saved in `/tmp/fls_diff_<random>.txt` which you can use to audit the differences.
 
 To see a quick summary of the difference:
 
