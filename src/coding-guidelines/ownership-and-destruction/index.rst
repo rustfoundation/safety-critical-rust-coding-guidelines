@@ -5,3 +5,10 @@
 
 Ownership And Destruction
 =========================
+
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*

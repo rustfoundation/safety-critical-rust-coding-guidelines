@@ -5,3 +5,10 @@
 
 Unsafety
 ========
+
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*

@@ -5,3 +5,10 @@
 
 Entities And Resolution
 =======================
+
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*

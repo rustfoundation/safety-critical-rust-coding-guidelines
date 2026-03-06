@@ -5,3 +5,10 @@
 
 Program Structure And Compilation
 =================================
+
+.. toctree::
+   :maxdepth: 1
+   :titlesonly:
+   :glob:
+
+   gui_*
