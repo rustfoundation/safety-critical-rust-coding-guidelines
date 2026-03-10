@@ -133,11 +133,6 @@ Here are a few examples of how to generate templates:
   ./generate_guideline_templates.py --non-compliant 2 --compliant 3 --bibliography --bib-entries 2
   ```
 
-- Generate multiple templates at once:
-  ```bash
-  ./generate_guideline_templates.py -n 3
-  ```
-
 You can then copy and paste this guideline from the command line into the correct chapter.
 
 </details>
