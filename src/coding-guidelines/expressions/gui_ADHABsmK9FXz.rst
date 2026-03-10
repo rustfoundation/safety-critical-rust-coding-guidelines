@@ -24,8 +24,8 @@ The 'as' operator should not be used with numeric operands
 
    as either the right operand or the type of the left operand.
 
-   **Exception:** ``as`` may be used with ``usize`` as the right operand and an expression of raw pointer
-   type as the left operand.
+   **Exception:** ``as`` may be used with an integer type as the right operand and an expression of floating
+   point type as the left operand.
 
    .. rationale::
       :id: rat_v56bjjcveLxQ
@@ -41,13 +41,11 @@ The 'as' operator should not be used with numeric operands
       value, and which are intended to be fallible. The latter cannot be used from const functions, indicating
       that these should avoid using fallible conversions.
 
-      A pointer-to-address cast does not lose value, but will be truncated unless the destination type is large
-      enough to hold the address value. The ``usize`` type is guaranteed to be wide enough for this purpose.
+      A pointer-to-address or address-to-pointer cast should be performed using the exposed or strict provenance APIs
+      (``addr``, ``expose_provenance``, ``with_addr`` or ``with_exposed_provenance``).
 
-      A pointer-to-address cast is not symmetrical because the resulting pointer may not point to a valid object,
-      may not point to an object of the right type, or may not be properly aligned.
-      If a conversion in this direction is needed, :std:`std::mem::transmute` will communicate the intent to perform
-      an unsafe operation.
+      Casts between pointer types should use the ``cast``, ``cast_const`` or ``cast_mut`` methods to better
+      communicate intent.
 
    .. non_compliant_example::
       :id: non_compl_ex_hzGUYoMnK59w
@@ -72,15 +70,15 @@ The 'as' operator should not be used with numeric operands
            let _g = e as i64;            // non-compliant - lossy despite object size
 
            let b: u32 = 0;
-           let p1: * const u32 = &b;
+           let p1: *const u32 = &b;
            let _a1 = p1 as usize;        // compliant by exception
            let _a2 = p1 as u16;          // non-compliant - may lose address range
-           let _a3 = p1 as u64;          // non-compliant - use usize to indicate intent
+           let _a3 = p1 as u64;          // non-compliant - use .addr() or .expose_provenance()
 
            let a1 = p1 as usize;
-           let _p2 = a1 as * const u32;  // non-compliant - prefer transmute
+           let _p2 = a1 as *const u32;  // non-compliant
            let a2 = p1 as u16;
-           let _p3 = a2 as * const u32;  // non-compliant (and most likely not in a valid address range)
+           let _p3 = a2 as *const u32;  // non-compliant (and most likely not in a valid address range)
          }
          #
          # fn main() {}
@@ -93,7 +91,7 @@ The 'as' operator should not be used with numeric operands
       better with ``into()`` or ``from()``.
       Valid conversions that risk losing value, where doing so would be an error, can
       communicate this and include an error check, with ``try_into`` or ``try_from``.
-      Other forms of conversion may find ``transmute`` better communicates their intent.
+      Other forms of conversion may find explicit functions better communicate their intent.
 
       .. rust-example::
          :miri:
@@ -114,26 +112,13 @@ The 'as' operator should not be used with numeric operands
 
            let h: u32 = 0;
            let p1: * const u32 = &h;
-           let a1 = p1 as usize;     // (compliant)
+           let a1 = p1.expose_provenance();     // compliant
+           let a2 = p1.addr();     // compliant, can't be turned back into a dereferencable pointer
 
-           unsafe {
-             let _a2: usize = std::mem::transmute(p1);  // OK
-             let _a3: u64   = std::mem::transmute(p1);  // OK, size is checked
-             // let a3: u16   = std::mem::transmute(p1);  // invalid, different sizes
-
-             #[allow(integer_to_ptr_transmutes)]
-             let _p2: * const u32 = std::mem::transmute(a1); // OK
-             #[allow(integer_to_ptr_transmutes)]
-             let _p3: * const u32 = std::mem::transmute(a1); // OK
-           }
-
-           unsafe {
-             // does something entirely different,
-             // reinterpreting the bits of z as the IEEE bit pattern of a double
-             // precision object, rather than converting the integer value
-             #[allow(unnecessary_transmutes)]
-             let _f1: f64 = std::mem::transmute(_z);
-           }
+           // does something entirely different,
+           // reinterpreting the bits of z as the IEEE bit pattern of a double
+           // precision object, rather than converting the integer value
+           let _f1: f64 = _z.to_bits();
          }
          #
          # fn main() {}
