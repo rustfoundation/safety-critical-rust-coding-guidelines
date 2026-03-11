@@ -113,7 +113,7 @@ While it is possible to create guidelines locally, we encourage contributors to 
 
 ### Guideline template
 
-We have a script `./generate_guideline_templates.py` which assumes you're using `uv` that can be run to generate the template for a guideline with properly randomized IDs.
+Use `./generate_guideline_templates.py` to generate a guideline template with properly randomized IDs. You'll need to `uv` to install the dependencies.
 
 To see all available options, run:
 
