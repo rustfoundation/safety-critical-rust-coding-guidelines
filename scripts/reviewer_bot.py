@@ -96,6 +96,10 @@ LOCK_LEASE_TTL_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_TTL_SECONDS", "30
 LOCK_RETRY_BASE_SECONDS = float(os.environ.get("REVIEWER_BOT_LOCK_RETRY_SECONDS", "2"))
 LOCK_MAX_WAIT_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "1200"))
 LOCK_API_RETRY_LIMIT = int(os.environ.get("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "5"))
+STATE_READ_RETRY_LIMIT = int(os.environ.get("REVIEWER_BOT_STATE_READ_RETRY_LIMIT", "4"))
+STATE_READ_RETRY_BASE_SECONDS = float(
+    os.environ.get("REVIEWER_BOT_STATE_READ_RETRY_SECONDS", "1")
+)
 LOCK_RENEWAL_WINDOW_SECONDS = int(
     os.environ.get("REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS", "60")
 )
@@ -620,12 +624,64 @@ def fetch_members() -> list[dict]:
 
 
 def get_state_issue() -> dict | None:
-    """Fetch the state issue from GitHub."""
+    """Fetch the state issue from GitHub with retry for transient failures."""
     if not STATE_ISSUE_NUMBER:
         print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
         return None
 
-    return github_api("GET", f"issues/{STATE_ISSUE_NUMBER}")
+    for attempt in range(1, STATE_READ_RETRY_LIMIT + 1):
+        response = github_api_request(
+            "GET",
+            f"issues/{STATE_ISSUE_NUMBER}",
+            suppress_error_log=True,
+        )
+
+        if response.status_code == 200:
+            if not isinstance(response.payload, dict):
+                print(
+                    "ERROR: State issue response payload was not an object",
+                    file=sys.stderr,
+                )
+                return None
+            return response.payload
+
+        if response.status_code in {401, 403, 404}:
+            print(
+                "ERROR: Failed to fetch state issue "
+                f"#{STATE_ISSUE_NUMBER} (status {response.status_code}): {response.text}",
+                file=sys.stderr,
+            )
+            return None
+
+        if response.status_code == 429 or response.status_code >= 500:
+            if attempt < STATE_READ_RETRY_LIMIT:
+                delay = STATE_READ_RETRY_BASE_SECONDS + random.uniform(0, STATE_READ_RETRY_BASE_SECONDS)
+                print(
+                    "WARNING: Retryable state issue read failure "
+                    f"(status {response.status_code}); retrying ({attempt}/{STATE_READ_RETRY_LIMIT})",
+                    file=sys.stderr,
+                )
+                time.sleep(delay)
+                continue
+            print(
+                "ERROR: Exhausted retries while fetching state issue "
+                f"#{STATE_ISSUE_NUMBER}; last status {response.status_code}: {response.text}",
+                file=sys.stderr,
+            )
+            return None
+
+        print(
+            "ERROR: Unexpected status while fetching state issue "
+            f"#{STATE_ISSUE_NUMBER}: {response.status_code} {response.text}",
+            file=sys.stderr,
+        )
+        return None
+
+    print(
+        f"ERROR: Failed to fetch state issue #{STATE_ISSUE_NUMBER} after retries",
+        file=sys.stderr,
+    )
+    return None
 
 
 def default_state_issue_prefix() -> str:
@@ -885,8 +941,11 @@ def assert_lock_held(operation: str) -> None:
         raise RuntimeError(f"Mutating path reached without lease lock: {operation}")
 
 
-def load_state() -> dict:
-    """Load the current state from the state issue."""
+def load_state(*, fail_on_unavailable: bool = False) -> dict:
+    """Load the current state from the state issue.
+
+    When fail_on_unavailable=True, inability to fetch state is a hard failure.
+    """
     default_state = {
         "last_updated": None,
         "current_index": 0,
@@ -898,6 +957,11 @@ def load_state() -> dict:
     
     issue = get_state_issue()
     if not issue:
+        if fail_on_unavailable:
+            raise RuntimeError(
+                "State issue is unavailable for a mutating event; refusing to continue "
+                "with fallback defaults."
+            )
         print("WARNING: Could not fetch state issue, using defaults", file=sys.stderr)
         return default_state
     
@@ -4228,6 +4292,7 @@ def main():
     state_changed = False
     sync_changes: list[str] = []
     restored: list[str] = []
+    loaded_active_reviews_count = 0
 
     try:
         if lock_required:
@@ -4235,7 +4300,10 @@ def main():
             lock_acquired = True
 
         # Load current state
-        state = load_state()
+        state = load_state(fail_on_unavailable=lock_required)
+        active_reviews = state.get("active_reviews")
+        if isinstance(active_reviews, dict):
+            loaded_active_reviews_count = len(active_reviews)
 
         if lock_required:
             # Process any expired pass-until entries
@@ -4297,6 +4365,25 @@ def main():
                     "State mutation reached save path without lease lock. "
                     "Acquire lock before mutating state."
                 )
+
+            if event_name == "schedule":
+                current_active_reviews = state.get("active_reviews")
+                current_active_reviews_count = (
+                    len(current_active_reviews) if isinstance(current_active_reviews, dict) else 0
+                )
+                allow_empty_override = (
+                    os.environ.get("ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE", "").strip().lower() == "true"
+                )
+                if (
+                    loaded_active_reviews_count > 0
+                    and current_active_reviews_count == 0
+                    and not allow_empty_override
+                ):
+                    raise RuntimeError(
+                        "STATE_GUARD_BLOCKED_EMPTY_ACTIVE_REVIEWS: refusing to persist schedule "
+                        f"state update that drops active_reviews from {loaded_active_reviews_count} "
+                        "to 0. Set ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE=true to override."
+                    )
 
             print("State updates detected; attempting to persist reviewer-bot state.")
             if not save_state(state):
