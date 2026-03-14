@@ -69,10 +69,10 @@ from typing import Any
 from urllib.parse import quote
 
 # GitHub API interaction
-import requests
 import yaml
 
 try:
+    import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.state_store as state_store_module
     from scripts.reviewer_bot_lib import app as app_module
     from scripts.reviewer_bot_lib.config import (  # noqa: F401
@@ -141,6 +141,7 @@ try:
     )
 except ImportError:
     import reviewer_bot_lib.app as app_module
+    import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.state_store as state_store_module
     from reviewer_bot_lib.config import (  # noqa: F401
         BOT_MENTION,
@@ -207,6 +208,8 @@ except ImportError:
         sync_members_with_queue as queue_sync_members_with_queue,
     )
 
+requests = github_api_module.requests
+
 # ==============================================================================
 # GitHub API Helpers
 # ==============================================================================
@@ -217,12 +220,7 @@ TOUCHED_ISSUE_NUMBERS: set[int] = set()
 
 
 def get_github_token() -> str:
-    """Get the GitHub token from environment."""
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        print("ERROR: GITHUB_TOKEN not set", file=sys.stderr)
-        sys.exit(1)
-    return token
+    return github_api_module.get_github_token()
 
 
 def github_api_request(
@@ -233,123 +231,42 @@ def github_api_request(
     *,
     suppress_error_log: bool = False,
 ) -> GitHubApiResult:
-    """Make a GitHub API request and return status, payload, and headers."""
-    token = get_github_token()
-    repo = f"{os.environ['REPO_OWNER']}/{os.environ['REPO_NAME']}"
-    url = f"https://api.github.com/repos/{repo}/{endpoint}"
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github.v3+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    if extra_headers:
-        headers.update(extra_headers)
-
-    response = requests.request(method, url, headers=headers, json=data)
-
-    payload: Any = None
-    if response.content:
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = None
-
-    ok = response.status_code < 400
-    if not ok and not suppress_error_log:
-        print(
-            f"GitHub API error: {response.status_code} - {response.text}",
-            file=sys.stderr,
-        )
-
-    normalized_headers = {key.lower(): value for key, value in response.headers.items()}
-    return GitHubApiResult(
-        status_code=response.status_code,
-        payload=payload,
-        headers=normalized_headers,
-        text=response.text,
-        ok=ok,
+    return github_api_module.github_api_request(
+        sys.modules[__name__],
+        method,
+        endpoint,
+        data,
+        extra_headers,
+        suppress_error_log=suppress_error_log,
     )
 
 
 def github_api(method: str, endpoint: str, data: dict | None = None) -> Any | None:
-    """Backward-compatible wrapper around github_api_request."""
-    response = github_api_request(method, endpoint, data)
-    if not response.ok:
-        return None
-    if response.payload is None:
-        return {}
-    return response.payload
+    return github_api_module.github_api(sys.modules[__name__], method, endpoint, data)
 
 
 def post_comment(issue_number: int, body: str) -> bool:
-    """Post a comment on an issue or PR."""
-    result = github_api("POST", f"issues/{issue_number}/comments", {"body": body})
-    return result is not None
+    return github_api_module.post_comment(sys.modules[__name__], issue_number, body)
 
 
 def get_repo_labels() -> set[str]:
-    """Get all labels that exist in the repository."""
-    result = github_api("GET", "labels?per_page=100")
-    if result and isinstance(result, list):
-        return {label["name"] for label in result}
-    return set()
+    return github_api_module.get_repo_labels(sys.modules[__name__])
 
 
 def add_label(issue_number: int, label: str) -> bool:
-    """Add a label to an issue or PR."""
-    result = github_api("POST", f"issues/{issue_number}/labels", {"labels": [label]})
-    return result is not None
+    return github_api_module.add_label(sys.modules[__name__], issue_number, label)
 
 
 def remove_label(issue_number: int, label: str) -> bool:
-    """Remove a label from an issue or PR."""
-    github_api("DELETE", f"issues/{issue_number}/labels/{quote(label, safe='')}")
-    # 404 is ok - label might not exist
-    return True
+    return github_api_module.remove_label(sys.modules[__name__], issue_number, label)
 
 
 def add_label_with_status(issue_number: int, label: str) -> bool:
-    """Add a label with explicit HTTP status handling."""
-    response = github_api_request(
-        "POST",
-        f"issues/{issue_number}/labels",
-        {"labels": [label]},
-        suppress_error_log=True,
-    )
-    if response.status_code in {200, 201}:
-        return True
-    if response.status_code in {401, 403}:
-        raise RuntimeError(
-            f"Permission denied adding label '{label}' to #{issue_number}: {response.text}"
-        )
-    print(
-        f"WARNING: Failed to add label '{label}' to #{issue_number} "
-        f"(status {response.status_code}): {response.text}",
-        file=sys.stderr,
-    )
-    return False
+    return github_api_module.add_label_with_status(sys.modules[__name__], issue_number, label)
 
 
 def remove_label_with_status(issue_number: int, label: str) -> bool:
-    """Remove a label with explicit HTTP status handling."""
-    response = github_api_request(
-        "DELETE",
-        f"issues/{issue_number}/labels/{quote(label, safe='')}",
-        suppress_error_log=True,
-    )
-    if response.status_code in {200, 204, 404}:
-        return True
-    if response.status_code in {401, 403}:
-        raise RuntimeError(
-            f"Permission denied removing label '{label}' from #{issue_number}: {response.text}"
-        )
-    print(
-        f"WARNING: Failed to remove label '{label}' from #{issue_number} "
-        f"(status {response.status_code}): {response.text}",
-        file=sys.stderr,
-    )
-    return False
+    return github_api_module.remove_label_with_status(sys.modules[__name__], issue_number, label)
 
 
 def ensure_label_exists(
@@ -358,30 +275,12 @@ def ensure_label_exists(
     color: str | None = None,
     description: str | None = None,
 ) -> bool:
-    """Create label if missing; treat 422 as already exists."""
-    label_config = STATUS_LABEL_CONFIG.get(label, {})
-    response = github_api_request(
-        "POST",
-        "labels",
-        {
-            "name": label,
-            "color": color or label_config.get("color", "d73a4a"),
-            "description": description or label_config.get("description", ""),
-        },
-        suppress_error_log=True,
+    return github_api_module.ensure_label_exists(
+        sys.modules[__name__],
+        label,
+        color=color,
+        description=description,
     )
-
-    if response.status_code == 201:
-        return True
-    if response.status_code == 422:
-        return True
-
-    print(
-        f"WARNING: Failed to ensure label '{label}' exists (status {response.status_code}): "
-        f"{response.text}",
-        file=sys.stderr,
-    )
-    return False
 
 
 def collect_touched_item(issue_number: int | None) -> None:
@@ -427,164 +326,39 @@ def get_issue_or_pr_labels(issue_number: int) -> set[str] | None:
 
 
 def request_reviewer_assignment(issue_number: int, username: str) -> AssignmentAttempt:
-    """Request reviewer/assignee with status-aware handling and retries."""
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-
-    if is_pr:
-        endpoint = f"pulls/{issue_number}/requested_reviewers"
-        payload = {"reviewers": [username]}
-        assignment_target = "PR reviewer"
-    else:
-        endpoint = f"issues/{issue_number}/assignees"
-        payload = {"assignees": [username]}
-        assignment_target = "issue assignee"
-
-    for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
-        response = github_api_request("POST", endpoint, payload, suppress_error_log=True)
-
-        if response.status_code in {200, 201}:
-            return AssignmentAttempt(success=True, status_code=response.status_code)
-
-        if response.status_code == 422:
-            # Queue policy remains permissive: reviewer is still designated in bot state.
-            return AssignmentAttempt(success=False, status_code=422)
-
-        if response.status_code in {401, 403}:
-            raise RuntimeError(
-                f"Permission denied requesting {assignment_target} @{username} on "
-                f"#{issue_number} (status {response.status_code}): {response.text}"
-            )
-
-        if response.status_code == 429 or response.status_code >= 500:
-            if attempt < LOCK_API_RETRY_LIMIT:
-                delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
-                print(
-                    f"Retryable {assignment_target} API failure for @{username} on #{issue_number} "
-                    f"(status {response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})"
-                )
-                time.sleep(delay)
-                continue
-            return AssignmentAttempt(
-                success=False,
-                status_code=response.status_code,
-                exhausted_retryable_failure=True,
-            )
-
-        print(
-            f"WARNING: Unexpected {assignment_target} API status {response.status_code} "
-            f"for @{username} on #{issue_number}: {response.text}",
-            file=sys.stderr,
-        )
-        return AssignmentAttempt(success=False, status_code=response.status_code)
-
-    return AssignmentAttempt(success=False, status_code=None, exhausted_retryable_failure=True)
+    return github_api_module.request_reviewer_assignment(sys.modules[__name__], issue_number, username)
 
 
 def assign_reviewer(issue_number: int, username: str) -> bool:
-    """Backward-compatible reviewer assignment boolean wrapper."""
-    attempt = request_reviewer_assignment(issue_number, username)
-    return attempt.success
+    return github_api_module.assign_reviewer(sys.modules[__name__], issue_number, username)
 
 
 def get_assignment_failure_comment(reviewer: str, attempt: AssignmentAttempt) -> str | None:
-    """Return truthful assignment warning comment text when GitHub assignment fails."""
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-
-    if attempt.status_code == 422:
-        if is_pr:
-            return REVIEWER_REQUEST_422_TEMPLATE.format(reviewer=reviewer)
-        return (
-            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not "
-            "add them as an assignee automatically (API 422)."
-        )
-
-    if attempt.exhausted_retryable_failure:
-        return (
-            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not "
-            f"add them to PR Reviewers automatically after retries (status {attempt.status_code}). "
-            "A triage+ approver may still be required before merge queue."
-        )
-
-    return None
+    return github_api_module.get_assignment_failure_comment(sys.modules[__name__], reviewer, attempt)
 
 
 def get_issue_assignees(issue_number: int) -> list[str]:
-    """Get current reviewers for an issue/PR.
-    
-    For issues: returns assignees
-    For PRs: returns only requested_reviewers (NOT assignees, as those are typically the author)
-    """
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    
-    if is_pr:
-        # For PRs, ONLY check requested_reviewers (assignees are typically the author)
-        result = github_api("GET", f"pulls/{issue_number}")
-        if result and "requested_reviewers" in result:
-            return [r["login"] for r in result["requested_reviewers"]]
-    else:
-        # For issues, check assignees
-        result = github_api("GET", f"issues/{issue_number}")
-        if result and "assignees" in result:
-            return [a["login"] for a in result["assignees"]]
-    
-    return []
+    return github_api_module.get_issue_assignees(sys.modules[__name__], issue_number)
 
 
 def add_reaction(comment_id: int, reaction: str) -> bool:
-    """Add a reaction to a comment."""
-    result = github_api("POST", f"issues/comments/{comment_id}/reactions",
-                       {"content": reaction})
-    return result is not None
+    return github_api_module.add_reaction(sys.modules[__name__], comment_id, reaction)
 
 
 def remove_assignee(issue_number: int, username: str) -> bool:
-    """Remove a user from assignees."""
-    result = github_api("DELETE", f"issues/{issue_number}/assignees",
-                       {"assignees": [username]})
-    return result is not None
+    return github_api_module.remove_assignee(sys.modules[__name__], issue_number, username)
 
 
 def remove_pr_reviewer(issue_number: int, username: str) -> bool:
-    """Remove a requested reviewer from a PR."""
-    result = github_api("DELETE", f"pulls/{issue_number}/requested_reviewers",
-                       {"reviewers": [username]})
-    return result is not None
+    return github_api_module.remove_pr_reviewer(sys.modules[__name__], issue_number, username)
 
 
 def unassign_reviewer(issue_number: int, username: str) -> bool:
-    """Remove a user as reviewer (handles both issues and PRs)."""
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-
-    if is_pr:
-        # For PRs, remove from requested reviewers
-        remove_pr_reviewer(issue_number, username)
-    
-    # Always try to remove from assignees (works for both)
-    return remove_assignee(issue_number, username)
+    return github_api_module.unassign_reviewer(sys.modules[__name__], issue_number, username)
 
 
 def check_user_permission(username: str, required_permission: str = "triage") -> bool:
-    """
-    Check if a user has at least the required permission level on the repo.
-    
-    Permission levels (lowest to highest): read, triage, write, maintain, admin
-    The permissions object has boolean flags for each level, and higher levels
-    include all lower permissions (e.g., admin has triage=True).
-    
-    Args:
-        username: GitHub username to check
-        required_permission: Permission level required ("triage", "push", "maintain", "admin")
-    
-    Returns:
-        True if user has the required permission, False otherwise.
-    """
-    result = github_api("GET", f"collaborators/{username}/permission")
-    if not result:
-        return False
-    
-    # The API returns a permissions object with boolean flags
-    permissions = result.get("user", {}).get("permissions", {})
-    return permissions.get(required_permission, False)
+    return github_api_module.check_user_permission(sys.modules[__name__], username, required_permission)
 
 
 # ==============================================================================
