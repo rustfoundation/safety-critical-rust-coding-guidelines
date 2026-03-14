@@ -54,7 +54,6 @@ All commands must be prefixed with @guidelines-bot /<command>:
     - Show all available commands
 """
 
-import subprocess
 import sys
 from collections.abc import Iterable
 from datetime import datetime, timezone
@@ -64,6 +63,7 @@ from typing import Any
 # GitHub API interaction
 
 try:
+    import scripts.reviewer_bot_lib.automation as automation_module
     import scripts.reviewer_bot_lib.commands as commands_module
     import scripts.reviewer_bot_lib.events as events_module
     import scripts.reviewer_bot_lib.github_api as github_api_module
@@ -137,6 +137,7 @@ try:
     )
 except ImportError:
     import reviewer_bot_lib.app as app_module
+    import reviewer_bot_lib.automation as automation_module
     import reviewer_bot_lib.commands as commands_module
     import reviewer_bot_lib.events as events_module
     import reviewer_bot_lib.github_api as github_api_module
@@ -597,24 +598,24 @@ def parse_issue_labels() -> list[str]:
     return commands_module.parse_issue_labels()
 
 
-def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
-    return commands_module.run_command(command, cwd, check=check)
+def run_command(command: list[str], cwd: Path, check: bool = True) -> Any:
+    return automation_module.run_command(command, cwd, check=check)
 
 
-def summarize_output(result: subprocess.CompletedProcess, limit: int = 20) -> str:
-    return commands_module.summarize_output(result, limit=limit)
+def summarize_output(result: Any, limit: int = 20) -> str:
+    return automation_module.summarize_output(result, limit=limit)
 
 
 def list_changed_files(repo_root: Path) -> list[str]:
-    return commands_module.list_changed_files(repo_root)
+    return automation_module.list_changed_files(repo_root)
 
 
 def get_default_branch() -> str:
-    return commands_module.get_default_branch(sys.modules[__name__])
+    return automation_module.get_default_branch(sys.modules[__name__])
 
 
 def find_open_pr_for_branch(branch: str) -> dict | None:
-    return commands_module.find_open_pr_for_branch(sys.modules[__name__], branch)
+    return automation_module.find_open_pr_for_branch(sys.modules[__name__], branch)
 
 
 def resolve_workflow_run_pr_number() -> int:
@@ -622,11 +623,11 @@ def resolve_workflow_run_pr_number() -> int:
 
 
 def create_pull_request(branch: str, base: str, issue_number: int) -> dict | None:
-    return commands_module.create_pull_request(sys.modules[__name__], branch, base, issue_number)
+    return automation_module.create_pull_request(sys.modules[__name__], branch, base, issue_number)
 
 
 def handle_accept_no_fls_changes_command(issue_number: int, comment_author: str) -> tuple[str, bool]:
-    return commands_module.handle_accept_no_fls_changes_command(sys.modules[__name__], issue_number, comment_author)
+    return automation_module.handle_accept_no_fls_changes_command(sys.modules[__name__], issue_number, comment_author)
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
