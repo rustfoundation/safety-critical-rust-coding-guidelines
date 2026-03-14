@@ -63,7 +63,6 @@ from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 # GitHub API interaction
 import yaml
@@ -71,6 +70,7 @@ import yaml
 try:
     import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
+    import scripts.reviewer_bot_lib.reviews as reviews_module
     import scripts.reviewer_bot_lib.state_store as state_store_module
     from scripts.reviewer_bot_lib import app as app_module
     from scripts.reviewer_bot_lib.config import (  # noqa: F401
@@ -141,6 +141,7 @@ except ImportError:
     import reviewer_bot_lib.app as app_module
     import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
+    import reviewer_bot_lib.reviews as reviews_module
     import reviewer_bot_lib.state_store as state_store_module
     from reviewer_bot_lib.config import (  # noqa: F401
         BOT_MENTION,
@@ -1577,141 +1578,16 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 
 
 def ensure_review_entry(state: dict, issue_number: int, create: bool = False) -> dict | None:
-    """Ensure the active review entry exists and has required fields."""
-    issue_key = str(issue_number)
-
-    if "active_reviews" not in state:
-        state["active_reviews"] = {}
-
-    review_entry = state["active_reviews"].get(issue_key)
-    if review_entry is None:
-        if not create:
-            return None
-        review_entry = {
-            "skipped": [],
-            "current_reviewer": None,
-            "cycle_started_at": None,
-            "assigned_at": None,
-            "last_reviewer_activity": None,
-            "transition_warning_sent": None,
-            "assignment_method": None,
-            "review_completed_at": None,
-            "review_completed_by": None,
-            "review_completion_source": None,
-            "mandatory_approver_required": False,
-            "mandatory_approver_label_applied_at": None,
-            "mandatory_approver_pinged_at": None,
-            "mandatory_approver_satisfied_by": None,
-            "mandatory_approver_satisfied_at": None,
-        }
-        state["active_reviews"][issue_key] = review_entry
-    elif isinstance(review_entry, list):
-        review_entry = {
-            "skipped": review_entry,
-            "current_reviewer": None,
-            "cycle_started_at": None,
-            "assigned_at": None,
-            "last_reviewer_activity": None,
-            "transition_warning_sent": None,
-            "assignment_method": None,
-            "review_completed_at": None,
-            "review_completed_by": None,
-            "review_completion_source": None,
-            "mandatory_approver_required": False,
-            "mandatory_approver_label_applied_at": None,
-            "mandatory_approver_pinged_at": None,
-            "mandatory_approver_satisfied_by": None,
-            "mandatory_approver_satisfied_at": None,
-        }
-        state["active_reviews"][issue_key] = review_entry
-
-    if not isinstance(review_entry, dict):
-        return None
-
-    if not isinstance(review_entry.get("skipped"), list):
-        review_entry["skipped"] = []
-
-    required_fields = {
-        "current_reviewer": None,
-        "cycle_started_at": None,
-        "assigned_at": None,
-        "last_reviewer_activity": None,
-        "transition_warning_sent": None,
-        "assignment_method": None,
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "mandatory_approver_required": False,
-        "mandatory_approver_label_applied_at": None,
-        "mandatory_approver_pinged_at": None,
-        "mandatory_approver_satisfied_by": None,
-        "mandatory_approver_satisfied_at": None,
-    }
-
-    for field, default in required_fields.items():
-        if field not in review_entry:
-            review_entry[field] = default
-
-    return review_entry
+    return reviews_module.ensure_review_entry(state, issue_number, create=create)
 
 
 def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
                         assignment_method: str = "round-robin") -> None:
-    """Track the designated reviewer for an issue/PR in our state.
-    
-    Args:
-        state: Bot state dict
-        issue_number: Issue/PR number
-        reviewer: GitHub username of the reviewer
-        assignment_method: How they were assigned - 'round-robin', 'claim', or 'manual'
-    """
-    now = datetime.now(timezone.utc).isoformat()
-
-    review_data = ensure_review_entry(state, issue_number, create=True)
-    if review_data is None:
-        return
-
-    # Set the reviewer and timestamps
-    review_data["current_reviewer"] = reviewer
-    review_data["cycle_started_at"] = now
-    review_data["assigned_at"] = now
-    review_data["last_reviewer_activity"] = now
-    review_data["transition_warning_sent"] = None  # Clear any previous warning
-    review_data["assignment_method"] = assignment_method
-    review_data["review_completed_at"] = None
-    review_data["review_completed_by"] = None
-    review_data["review_completion_source"] = None
-    review_data["mandatory_approver_required"] = False
-    review_data["mandatory_approver_label_applied_at"] = None
-    review_data["mandatory_approver_pinged_at"] = None
-    review_data["mandatory_approver_satisfied_by"] = None
-    review_data["mandatory_approver_satisfied_at"] = None
+    reviews_module.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
 
 
 def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
-    """
-    Update the last activity timestamp when the current reviewer comments.
-    
-    Returns True if activity was recorded (reviewer matched), False otherwise.
-    """
-    review_data = ensure_review_entry(state, issue_number)
-    if review_data is None:
-        return False
-
-    if review_data.get("review_completed_at"):
-        return False
-    
-    current_reviewer = review_data.get("current_reviewer")
-    if not current_reviewer or current_reviewer.lower() != reviewer.lower():
-        return False
-    
-    # Update activity timestamp and clear any transition warning
-    now = datetime.now(timezone.utc).isoformat()
-    review_data["last_reviewer_activity"] = now
-    review_data["transition_warning_sent"] = None
-    
-    print(f"Updated reviewer activity for #{issue_number} by @{reviewer}")
-    return True
+    return reviews_module.update_reviewer_activity(state, issue_number, reviewer)
 
 
 def mark_review_complete(
@@ -1720,70 +1596,15 @@ def mark_review_complete(
     reviewer: str | None,
     source: str,
 ) -> bool:
-    """Mark a review as complete and stop reminder timers."""
-    review_data = ensure_review_entry(state, issue_number, create=True)
-    if review_data is None:
-        return False
-
-    if review_data.get("review_completed_at"):
-        return False
-
-    now = datetime.now(timezone.utc).isoformat()
-    review_data["review_completed_at"] = now
-    review_data["review_completed_by"] = reviewer or None
-    review_data["review_completion_source"] = source
-    review_data["last_reviewer_activity"] = now
-    review_data["transition_warning_sent"] = None
-
-    reviewer_text = f" by @{reviewer}" if reviewer else ""
-    print(f"Marked review complete for #{issue_number}{reviewer_text} ({source})")
-    return True
+    return reviews_module.mark_review_complete(state, issue_number, reviewer, source)
 
 
 def is_triage_or_higher(username: str) -> bool:
-    """Return True when user has triage+ permissions."""
-    return check_user_permission(username, "triage")
+    return reviews_module.is_triage_or_higher(sys.modules[__name__], username)
 
 
 def trigger_mandatory_approver_escalation(state: dict, issue_number: int) -> bool:
-    """Open mandatory triage-approval escalation for a PR review cycle."""
-    review_data = ensure_review_entry(state, issue_number, create=True)
-    if review_data is None:
-        return False
-
-    now = datetime.now(timezone.utc).isoformat()
-    state_changed = False
-
-    if not review_data.get("mandatory_approver_required"):
-        review_data["mandatory_approver_required"] = True
-        review_data["mandatory_approver_satisfied_by"] = None
-        review_data["mandatory_approver_satisfied_at"] = None
-        state_changed = True
-
-    label_ensure_ok = ensure_label_exists(MANDATORY_TRIAGE_APPROVER_LABEL)
-    if label_ensure_ok:
-        try:
-            if add_label_with_status(issue_number, MANDATORY_TRIAGE_APPROVER_LABEL):
-                if review_data.get("mandatory_approver_label_applied_at") is None:
-                    review_data["mandatory_approver_label_applied_at"] = now
-                    state_changed = True
-        except RuntimeError as exc:
-            print(
-                f"WARNING: Unable to apply escalation label on #{issue_number}: {exc}",
-                file=sys.stderr,
-            )
-    else:
-        print(
-            "WARNING: Escalation label ensure/create failed; proceeding with comment-only escalation",
-            file=sys.stderr,
-        )
-
-    if review_data.get("mandatory_approver_pinged_at") is None:
-        if post_comment(issue_number, MANDATORY_TRIAGE_ESCALATION_TEMPLATE):
-            review_data["mandatory_approver_pinged_at"] = now
-            state_changed = True
-
-    return state_changed
+    return reviews_module.trigger_mandatory_approver_escalation(sys.modules[__name__], state, issue_number)
 
 
 def satisfy_mandatory_approver_requirement(
@@ -1791,32 +1612,9 @@ def satisfy_mandatory_approver_requirement(
     issue_number: int,
     approver: str,
 ) -> bool:
-    """Close mandatory triage escalation after first triage+ approval."""
-    review_data = ensure_review_entry(state, issue_number, create=True)
-    if review_data is None:
-        return False
-
-    if not review_data.get("mandatory_approver_required"):
-        return False
-
-    if review_data.get("mandatory_approver_satisfied_at"):
-        return False
-
-    now = datetime.now(timezone.utc).isoformat()
-    review_data["mandatory_approver_required"] = False
-    review_data["mandatory_approver_satisfied_by"] = approver
-    review_data["mandatory_approver_satisfied_at"] = now
-
-    try:
-        remove_label_with_status(issue_number, MANDATORY_TRIAGE_APPROVER_LABEL)
-    except RuntimeError as exc:
-        print(
-            f"WARNING: Unable to remove escalation label on #{issue_number}: {exc}",
-            file=sys.stderr,
-        )
-
-    post_comment(issue_number, MANDATORY_TRIAGE_SATISFIED_TEMPLATE.format(approver=approver))
-    return True
+    return reviews_module.satisfy_mandatory_approver_requirement(
+        sys.modules[__name__], state, issue_number, approver
+    )
 
 
 def handle_pr_approved_review(
@@ -1825,107 +1623,25 @@ def handle_pr_approved_review(
     review_author: str,
     completion_source: str,
 ) -> bool:
-    """Apply approval transitions for designated and mandatory triage flows."""
-    review_data = ensure_review_entry(state, issue_number)
-    if review_data is None:
-        print(f"No active review entry for #{issue_number}")
-        return False
-
-    current_reviewer = review_data.get("current_reviewer")
-    author_is_designated = (
-        isinstance(current_reviewer, str)
-        and current_reviewer.lower() == review_author.lower()
+    return reviews_module.handle_pr_approved_review(
+        sys.modules[__name__], state, issue_number, review_author, completion_source
     )
-
-    author_is_triage = is_triage_or_higher(review_author)
-    state_changed = False
-
-    if author_is_designated:
-        if mark_review_complete(state, issue_number, review_author, completion_source):
-            state_changed = True
-
-        if author_is_triage:
-            if satisfy_mandatory_approver_requirement(state, issue_number, review_author):
-                state_changed = True
-            return state_changed
-
-        if trigger_mandatory_approver_escalation(state, issue_number):
-            state_changed = True
-        return state_changed
-
-    if review_data.get("mandatory_approver_required") and author_is_triage:
-        if satisfy_mandatory_approver_requirement(state, issue_number, review_author):
-            state_changed = True
-        return state_changed
-
-    print(
-        f"Ignoring approved review from @{review_author} on #{issue_number}; "
-        f"designated reviewer is @{current_reviewer}"
-    )
-    return state_changed
 
 
 def parse_github_timestamp(value: str | None) -> datetime | None:
-    """Parse a GitHub timestamp string into a datetime."""
-    if not isinstance(value, str) or not value:
-        return None
-
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
+    return reviews_module.parse_github_timestamp(value)
 
 
 def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
-    """Fetch submitted reviews for a pull request with pagination."""
-    reviews: list[dict] = []
-    page = 1
-
-    while True:
-        result = github_api("GET", f"pulls/{issue_number}/reviews?per_page=100&page={page}")
-        if result is None:
-            return None
-        if not isinstance(result, list):
-            return reviews
-
-        page_reviews = [review for review in result if isinstance(review, dict)]
-        reviews.extend(page_reviews)
-
-        if len(result) < 100:
-            return reviews
-
-        page += 1
+    return reviews_module.get_pull_request_reviews(sys.modules[__name__], issue_number)
 
 
 def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
-    """Collapse reviews to the latest submitted review per login."""
-    latest_by_login: dict[str, tuple[datetime, int, dict]] = {}
-
-    for index, review in enumerate(reviews):
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author.strip():
-            continue
-
-        submitted_at = parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None:
-            continue
-
-        key = author.lower()
-        review_key = (submitted_at, index)
-        current = latest_by_login.get(key)
-        if current is None or review_key >= (current[0], current[1]):
-            latest_by_login[key] = (submitted_at, index, review)
-
-    return {login: item[2] for login, item in latest_by_login.items()}
+    return reviews_module.collapse_latest_reviews_by_login(reviews)
 
 
 def get_current_cycle_boundary(review_data: dict) -> datetime | None:
-    """Return the conservative current-cycle boundary for PR approval checks."""
-    for field in ("cycle_started_at", "assigned_at", "review_completed_at"):
-        boundary = parse_iso8601_timestamp(review_data.get(field))
-        if boundary is not None:
-            return boundary
-    return None
+    return reviews_module.get_current_cycle_boundary(sys.modules[__name__], review_data)
 
 
 def pr_has_current_write_approval(
@@ -1934,37 +1650,13 @@ def pr_has_current_write_approval(
     permission_cache: dict[str, bool] | None = None,
     reviews: list[dict] | None = None,
 ) -> bool | None:
-    """Return whether the PR has a visible in-cycle approval from a write+ user."""
-    boundary = get_current_cycle_boundary(review_data)
-    if boundary is None:
-        return False
-
-    if reviews is None:
-        reviews = get_pull_request_reviews(issue_number)
-    if reviews is None:
-        return None
-
-    permission_cache = permission_cache if permission_cache is not None else {}
-    latest_reviews = collapse_latest_reviews_by_login(reviews)
-
-    for login, review in latest_reviews.items():
-        submitted_at = parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None or submitted_at < boundary:
-            continue
-
-        if str(review.get("state", "")).upper() != "APPROVED":
-            continue
-
-        if login not in permission_cache:
-            author = review.get("user", {}).get("login")
-            if not isinstance(author, str) or not author.strip():
-                return None
-            permission_cache[login] = check_user_permission(author, "push")
-
-        if permission_cache[login]:
-            return True
-
-    return False
+    return reviews_module.pr_has_current_write_approval(
+        sys.modules[__name__],
+        issue_number,
+        review_data,
+        permission_cache=permission_cache,
+        reviews=reviews,
+    )
 
 
 def project_status_labels_for_item(
@@ -1973,146 +1665,21 @@ def project_status_labels_for_item(
     *,
     issue_snapshot: dict | None = None,
 ) -> tuple[set[str] | None, dict[str, str | None]]:
-    """Project desired status labels for one issue or PR.
-
-    Returns (desired_labels, metadata). desired_labels is None when projection fails closed.
-    """
-    if issue_snapshot is None:
-        issue_snapshot = get_issue_or_pr_snapshot(issue_number)
-
-    if not isinstance(issue_snapshot, dict):
-        return None, {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
-
-    is_pr = isinstance(issue_snapshot.get("pull_request"), dict)
-    state_name = str(issue_snapshot.get("state", "")).lower()
-    if state_name == "closed":
-        return set(), {"state": "closed", "reason": None}
-
-    review_data = ensure_review_entry(state, issue_number)
-    if review_data is None:
-        return set(), {"state": "untracked", "reason": "no_review_entry"}
-
-    current_reviewer = review_data.get("current_reviewer")
-    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
-        return set(), {"state": "untracked", "reason": "no_current_reviewer"}
-
-    if not review_data.get("review_completed_at"):
-        return (
-            {STATUS_AWAITING_REVIEW_COMPLETION_LABEL},
-            {"state": "awaiting_review_completion", "reason": None},
-        )
-
-    if not is_pr:
-        return set(), {"state": "done", "reason": None}
-
-    permission_cache: dict[str, bool] = {}
-    has_write_approval = pr_has_current_write_approval(
-        issue_number,
-        review_data,
-        permission_cache=permission_cache,
-    )
-    if has_write_approval is None:
-        return None, {"state": "projection_failed", "reason": "write_approval_unknown"}
-    if has_write_approval:
-        return set(), {"state": "done", "reason": "write_approval_present"}
-    return (
-        {STATUS_AWAITING_WRITE_APPROVAL_LABEL},
-        {"state": "awaiting_write_approval", "reason": "write_approval_missing"},
+    return reviews_module.project_status_labels_for_item(
+        sys.modules[__name__], issue_number, state, issue_snapshot=issue_snapshot
     )
 
 
 def sync_status_labels(issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
-    """Apply the desired reviewer-bot status labels to one issue or PR."""
-    actual_status_labels = {label for label in actual_labels if label in STATUS_LABELS}
-    to_add = desired_labels - actual_status_labels
-    to_remove = actual_status_labels - desired_labels
-
-    if not to_add and not to_remove:
-        return False
-
-    for label in STATUS_LABELS:
-        if not ensure_label_exists(label):
-            raise RuntimeError(f"Unable to ensure reviewer-bot status label exists: {label}")
-
-    changed = False
-    for label in sorted(to_remove):
-        if not remove_label_with_status(issue_number, label):
-            raise RuntimeError(f"Unable to remove reviewer-bot status label '{label}' from #{issue_number}")
-        changed = True
-    for label in sorted(to_add):
-        if not add_label_with_status(issue_number, label):
-            raise RuntimeError(f"Unable to add reviewer-bot status label '{label}' to #{issue_number}")
-        changed = True
-    return changed
+    return reviews_module.sync_status_labels(sys.modules[__name__], issue_number, desired_labels, actual_labels)
 
 
 def sync_status_labels_for_items(state: dict, issue_numbers: Iterable[int]) -> bool:
-    """Recompute and apply reviewer-bot status labels for the given items."""
-    changed = False
-
-    for issue_number in sorted({n for n in issue_numbers if isinstance(n, int) and n > 0}):
-        issue_snapshot = get_issue_or_pr_snapshot(issue_number)
-        desired_labels, metadata = project_status_labels_for_item(
-            issue_number,
-            state,
-            issue_snapshot=issue_snapshot,
-        )
-        if desired_labels is None:
-            reason = metadata.get("reason") if isinstance(metadata, dict) else "unknown"
-            raise RuntimeError(
-                f"Failed to derive reviewer-bot status labels for #{issue_number}: {reason}"
-            )
-
-        if not isinstance(issue_snapshot, dict):
-            raise RuntimeError(f"Failed to refresh issue/PR snapshot for #{issue_number}")
-
-        labels = issue_snapshot.get("labels", [])
-        actual_labels = set()
-        if isinstance(labels, list):
-            for label in labels:
-                if isinstance(label, dict):
-                    name = label.get("name")
-                    if isinstance(name, str):
-                        actual_labels.add(name)
-
-        print(
-            f"Status label projection for #{issue_number}: state={metadata.get('state')} "
-            f"desired={sorted(desired_labels)} actual={sorted(actual_labels & STATUS_LABELS)}"
-        )
-        if sync_status_labels(issue_number, desired_labels, actual_labels):
-            changed = True
-
-    return changed
+    return reviews_module.sync_status_labels_for_items(sys.modules[__name__], state, issue_numbers)
 
 
 def list_open_items_with_status_labels() -> list[int]:
-    """List open issues/PRs that already carry reviewer-bot status labels."""
-    numbers: set[int] = set()
-
-    for label in sorted(STATUS_LABELS):
-        page = 1
-        encoded_label = quote(label, safe="")
-        while True:
-            result = github_api(
-                "GET",
-                f"issues?state=open&labels={encoded_label}&per_page=100&page={page}",
-            )
-            if result is None:
-                raise RuntimeError(f"Failed to list open items for status label '{label}'")
-            if not isinstance(result, list):
-                break
-
-            for item in result:
-                if isinstance(item, dict):
-                    number = item.get("number")
-                    if isinstance(number, int):
-                        numbers.add(number)
-
-            if len(result) < 100:
-                break
-            page += 1
-
-    return sorted(numbers)
+    return reviews_module.list_open_items_with_status_labels(sys.modules[__name__])
 
 
 def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | None:
