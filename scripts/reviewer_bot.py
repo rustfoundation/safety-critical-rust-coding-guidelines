@@ -73,7 +73,9 @@ import requests
 import yaml
 
 try:
-    from scripts.reviewer_bot_lib.config import (
+    import scripts.reviewer_bot_lib.state_store as state_store_module
+    from scripts.reviewer_bot_lib import app as app_module
+    from scripts.reviewer_bot_lib.config import (  # noqa: F401
         BOT_MENTION,
         COMMANDS,
         EVENT_INTENT_MUTATING,
@@ -121,9 +123,26 @@ try:
         get_issue_guidance,
         get_pr_guidance,
     )
-    from scripts.reviewer_bot_lib.members import fetch_members
+    from scripts.reviewer_bot_lib.members import fetch_members  # noqa: F401
+    from scripts.reviewer_bot_lib.queue import (
+        get_next_reviewer as queue_get_next_reviewer,
+    )
+    from scripts.reviewer_bot_lib.queue import (
+        process_pass_until_expirations as queue_process_pass_until_expirations,
+    )
+    from scripts.reviewer_bot_lib.queue import (
+        record_assignment as queue_record_assignment,
+    )
+    from scripts.reviewer_bot_lib.queue import (
+        reposition_member_as_next as queue_reposition_member_as_next,
+    )
+    from scripts.reviewer_bot_lib.queue import (
+        sync_members_with_queue as queue_sync_members_with_queue,
+    )
 except ImportError:
-    from reviewer_bot_lib.config import (
+    import reviewer_bot_lib.app as app_module
+    import reviewer_bot_lib.state_store as state_store_module
+    from reviewer_bot_lib.config import (  # noqa: F401
         BOT_MENTION,
         COMMANDS,
         EVENT_INTENT_MUTATING,
@@ -171,7 +190,22 @@ except ImportError:
         get_issue_guidance,
         get_pr_guidance,
     )
-    from reviewer_bot_lib.members import fetch_members
+    from reviewer_bot_lib.members import fetch_members  # noqa: F401
+    from reviewer_bot_lib.queue import (
+        get_next_reviewer as queue_get_next_reviewer,
+    )
+    from reviewer_bot_lib.queue import (
+        process_pass_until_expirations as queue_process_pass_until_expirations,
+    )
+    from reviewer_bot_lib.queue import (
+        record_assignment as queue_record_assignment,
+    )
+    from reviewer_bot_lib.queue import (
+        reposition_member_as_next as queue_reposition_member_as_next,
+    )
+    from reviewer_bot_lib.queue import (
+        sync_members_with_queue as queue_sync_members_with_queue,
+    )
 
 # ==============================================================================
 # GitHub API Helpers
@@ -559,204 +593,31 @@ def check_user_permission(username: str, required_permission: str = "triage") ->
 
 
 def get_state_issue() -> dict | None:
-    """Fetch the state issue from GitHub with retry for transient failures."""
-    if not STATE_ISSUE_NUMBER:
-        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
-        return None
-
-    for attempt in range(1, STATE_READ_RETRY_LIMIT + 1):
-        response = github_api_request(
-            "GET",
-            f"issues/{STATE_ISSUE_NUMBER}",
-            suppress_error_log=True,
-        )
-
-        if response.status_code == 200:
-            if not isinstance(response.payload, dict):
-                print(
-                    "ERROR: State issue response payload was not an object",
-                    file=sys.stderr,
-                )
-                return None
-            return response.payload
-
-        if response.status_code in {401, 403, 404}:
-            print(
-                "ERROR: Failed to fetch state issue "
-                f"#{STATE_ISSUE_NUMBER} (status {response.status_code}): {response.text}",
-                file=sys.stderr,
-            )
-            return None
-
-        if response.status_code == 429 or response.status_code >= 500:
-            if attempt < STATE_READ_RETRY_LIMIT:
-                delay = STATE_READ_RETRY_BASE_SECONDS + random.uniform(0, STATE_READ_RETRY_BASE_SECONDS)
-                print(
-                    "WARNING: Retryable state issue read failure "
-                    f"(status {response.status_code}); retrying ({attempt}/{STATE_READ_RETRY_LIMIT})",
-                    file=sys.stderr,
-                )
-                time.sleep(delay)
-                continue
-            print(
-                "ERROR: Exhausted retries while fetching state issue "
-                f"#{STATE_ISSUE_NUMBER}; last status {response.status_code}: {response.text}",
-                file=sys.stderr,
-            )
-            return None
-
-        print(
-            "ERROR: Unexpected status while fetching state issue "
-            f"#{STATE_ISSUE_NUMBER}: {response.status_code} {response.text}",
-            file=sys.stderr,
-        )
-        return None
-
-    print(
-        f"ERROR: Failed to fetch state issue #{STATE_ISSUE_NUMBER} after retries",
-        file=sys.stderr,
-    )
-    return None
+    return state_store_module.get_state_issue(sys.modules[__name__])
 
 
 def default_state_issue_prefix() -> str:
-    """Return canonical prefix text for state issue layout."""
-    return (
-        "## Reviewer Bot State\n\n"
-        "> WARNING: DO NOT EDIT MANUALLY - This issue is automatically maintained by the reviewer bot.\n"
-        "> Use bot commands instead (see "
-        "[CONTRIBUTING.md](https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/blob/main/CONTRIBUTING.md) "
-        "for details).\n\n"
-        "This issue tracks the round-robin assignment of reviewers for coding guidelines.\n\n"
-        "### Current State\n\n"
-    )
+    return state_store_module.default_state_issue_prefix()
 
 
 def split_state_issue_body(body: str) -> StateIssueBodyParts:
-    """Split state issue body into prefix, state block, lock block, and suffix."""
-    if not body:
-        return StateIssueBodyParts(
-            prefix=default_state_issue_prefix(),
-            state_block_inner=None,
-            between_state_and_lock="\n\n",
-            lock_block_inner=None,
-            suffix="\n",
-            has_state_markers=False,
-            has_lock_markers=False,
-        )
-
-    state_start = body.find(STATE_BLOCK_START_MARKER)
-    state_end = body.find(STATE_BLOCK_END_MARKER)
-    lock_start = body.find(LOCK_BLOCK_START_MARKER)
-    lock_end = body.find(LOCK_BLOCK_END_MARKER)
-
-    has_state_markers = state_start >= 0 and state_end > state_start
-    has_lock_markers = lock_start >= 0 and lock_end > lock_start
-
-    if has_state_markers and has_lock_markers and state_end < lock_start:
-        return StateIssueBodyParts(
-            prefix=body[:state_start],
-            state_block_inner=body[state_start + len(STATE_BLOCK_START_MARKER):state_end],
-            between_state_and_lock=body[state_end + len(STATE_BLOCK_END_MARKER):lock_start],
-            lock_block_inner=body[lock_start + len(LOCK_BLOCK_START_MARKER):lock_end],
-            suffix=body[lock_end + len(LOCK_BLOCK_END_MARKER):],
-            has_state_markers=True,
-            has_lock_markers=True,
-        )
-
-    # Partial/legacy format fallback: migrate to canonical marker layout.
-    return StateIssueBodyParts(
-        prefix=default_state_issue_prefix(),
-        state_block_inner=None,
-        between_state_and_lock="\n\n",
-        lock_block_inner=None,
-        suffix="\n",
-        has_state_markers=False,
-        has_lock_markers=False,
-    )
+    return state_store_module.split_state_issue_body(body)
 
 
 def extract_fenced_block(inner_block: str, language_pattern: str) -> str | None:
-    """Extract fenced block content from marker inner block."""
-    if not inner_block:
-        return None
-
-    match = re.search(
-        rf"```(?:{language_pattern})\n(.*?)\n```",
-        inner_block,
-        re.DOTALL,
-    )
-    if match:
-        return match.group(1)
-    return None
+    return state_store_module.extract_fenced_block(inner_block, language_pattern)
 
 
 def normalize_lock_metadata(lock_meta: dict | None) -> dict:
-    """Normalize lock metadata to schema v1 keys."""
-    normalized: dict[str, Any] = dict.fromkeys(LOCK_METADATA_KEYS)
-    normalized["schema_version"] = LOCK_SCHEMA_VERSION
-
-    if not isinstance(lock_meta, dict):
-        return normalized
-
-    for key in LOCK_METADATA_KEYS:
-        if key == "schema_version":
-            schema_value = lock_meta.get("schema_version")
-            if isinstance(schema_value, int):
-                normalized["schema_version"] = schema_value
-            continue
-        if key in lock_meta:
-            normalized[key] = lock_meta.get(key)
-
-    return normalized
+    return state_store_module.normalize_lock_metadata(lock_meta)
 
 
 def parse_state_yaml_from_issue_body(body: str) -> dict:
-    """Parse YAML state from issue body markers or legacy YAML block."""
-    parts = split_state_issue_body(body)
-
-    yaml_content = None
-    if parts.has_state_markers and parts.state_block_inner is not None:
-        yaml_content = extract_fenced_block(parts.state_block_inner, "ya?ml")
-
-    if yaml_content is None:
-        yaml_match = re.search(r"```ya?ml\n(.*?)\n```", body, re.DOTALL)
-        if yaml_match:
-            yaml_content = yaml_match.group(1)
-        else:
-            yaml_content = body
-
-    try:
-        state = yaml.safe_load(yaml_content) or {}
-    except yaml.YAMLError as exc:
-        print(f"WARNING: Failed to parse state YAML: {exc}", file=sys.stderr)
-        state = {}
-
-    if not isinstance(state, dict):
-        return {}
-    return state
+    return state_store_module.parse_state_yaml_from_issue_body(body)
 
 
 def parse_lock_metadata_from_issue_body(body: str) -> dict:
-    """Parse lock metadata JSON block from issue body markers."""
-    parts = split_state_issue_body(body)
-    if not parts.has_lock_markers or parts.lock_block_inner is None:
-        return normalize_lock_metadata(None)
-
-    lock_json = extract_fenced_block(parts.lock_block_inner, "json")
-    if lock_json is None:
-        return normalize_lock_metadata(None)
-
-    try:
-        parsed = json.loads(lock_json)
-    except json.JSONDecodeError as exc:
-        print(f"WARNING: Failed to parse lock metadata JSON: {exc}", file=sys.stderr)
-        return normalize_lock_metadata(None)
-
-    if not isinstance(parsed, dict):
-        return normalize_lock_metadata(None)
-
-    return normalize_lock_metadata(parsed)
+    return state_store_module.parse_lock_metadata_from_issue_body(body)
 
 
 def render_marked_fenced_block(
@@ -765,9 +626,7 @@ def render_marked_fenced_block(
     language: str,
     content: str,
 ) -> str:
-    """Render a marker-delimited fenced block."""
-    normalized = content.rstrip("\n")
-    return f"{start_marker}\n```{language}\n{normalized}\n```\n{end_marker}"
+    return state_store_module.render_marked_fenced_block(start_marker, end_marker, language, content)
 
 
 def render_state_issue_body(
@@ -777,244 +636,40 @@ def render_state_issue_body(
     *,
     preserve_state_block: bool = False,
 ) -> str:
-    """Render full issue body preserving markers and surrounding text."""
-    parts = split_state_issue_body(base_body or "")
-
-    if preserve_state_block and parts.has_state_markers and parts.state_block_inner is not None:
-        state_section = f"{STATE_BLOCK_START_MARKER}{parts.state_block_inner}{STATE_BLOCK_END_MARKER}"
-    else:
-        yaml_content = yaml.dump(
-            state,
-            default_flow_style=False,
-            sort_keys=False,
-            allow_unicode=True,
-        )
-        state_section = render_marked_fenced_block(
-            STATE_BLOCK_START_MARKER,
-            STATE_BLOCK_END_MARKER,
-            "yaml",
-            yaml_content,
-        )
-
-    lock_json = json.dumps(normalize_lock_metadata(lock_meta), indent=2, sort_keys=False)
-    lock_section = render_marked_fenced_block(
-        LOCK_BLOCK_START_MARKER,
-        LOCK_BLOCK_END_MARKER,
-        "json",
-        lock_json,
+    return state_store_module.render_state_issue_body(
+        state,
+        lock_meta,
+        base_body,
+        preserve_state_block=preserve_state_block,
     )
-
-    prefix = parts.prefix or default_state_issue_prefix()
-    between = parts.between_state_and_lock if parts.has_state_markers and parts.has_lock_markers else "\n\n"
-    suffix = parts.suffix if parts.has_lock_markers else "\n"
-
-    return f"{prefix}{state_section}{between}{lock_section}{suffix}"
 
 
 def parse_state_from_issue(issue: dict) -> dict:
-    """Parse YAML state from issue payload."""
-    body = issue.get("body", "") or ""
-    return parse_state_yaml_from_issue_body(body)
+    return state_store_module.parse_state_from_issue(issue)
 
 
 def get_state_issue_snapshot() -> StateIssueSnapshot | None:
-    """Fetch state issue body plus metadata for state writes."""
-    if not STATE_ISSUE_NUMBER:
-        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
-        return None
-
-    response = github_api_request(
-        "GET",
-        f"issues/{STATE_ISSUE_NUMBER}",
-        suppress_error_log=True,
-    )
-    if response.status_code != 200:
-        print(
-            "ERROR: Failed to fetch state issue "
-            f"#{STATE_ISSUE_NUMBER} (status {response.status_code}): {response.text}",
-            file=sys.stderr,
-        )
-        return None
-
-    if not isinstance(response.payload, dict):
-        print("ERROR: State issue response payload was not an object", file=sys.stderr)
-        return None
-
-    body = response.payload.get("body")
-    if not isinstance(body, str):
-        body = ""
-
-    html_url = response.payload.get("html_url")
-    if not isinstance(html_url, str) or not html_url:
-        repo = f"{os.environ.get('REPO_OWNER', '')}/{os.environ.get('REPO_NAME', '')}".strip("/")
-        html_url = f"https://github.com/{repo}/issues/{STATE_ISSUE_NUMBER}" if repo else ""
-
-    return StateIssueSnapshot(
-        body=body,
-        etag=response.headers.get("etag"),
-        html_url=html_url,
-    )
+    return state_store_module.get_state_issue_snapshot(sys.modules[__name__])
 
 
 def conditional_patch_state_issue(body: str, etag: str | None = None) -> GitHubApiResult:
-    """Patch state issue body.
-
-    The `etag` argument is retained for compatibility with tests and call sites,
-    but state serialization is handled by the dedicated lock backend.
-    """
-    return github_api_request(
-        "PATCH",
-        f"issues/{STATE_ISSUE_NUMBER}",
-        {"body": body},
-        suppress_error_log=True,
-    )
+    return state_store_module.conditional_patch_state_issue(sys.modules[__name__], body, etag)
 
 
 def assert_lock_held(operation: str) -> None:
-    """Fail fast when mutating state outside the lock boundary."""
-    if ACTIVE_LEASE_CONTEXT is None:
-        raise RuntimeError(f"Mutating path reached without lease lock: {operation}")
+    state_store_module.assert_lock_held(sys.modules[__name__], operation)
 
 
 def load_state(*, fail_on_unavailable: bool = False) -> dict:
-    """Load the current state from the state issue.
-
-    When fail_on_unavailable=True, inability to fetch state is a hard failure.
-    """
-    default_state = {
-        "last_updated": None,
-        "current_index": 0,
-        "queue": [],
-        "pass_until": [],
-        "recent_assignments": [],
-        "active_reviews": {},  # Tracks review state per issue/PR: {number: {skipped: [], current_reviewer: str}}
-    }
-    
-    issue = get_state_issue()
-    if not issue:
-        if fail_on_unavailable:
-            raise RuntimeError(
-                "State issue is unavailable for a mutating event; refusing to continue "
-                "with fallback defaults."
-            )
-        print("WARNING: Could not fetch state issue, using defaults", file=sys.stderr)
-        return default_state
-    
-    state = parse_state_from_issue(issue)
-    
-    # Ensure all required keys exist AND are not None
-    # (YAML parses empty values as None, not as empty lists)
-    if state.get("last_updated") is None:
-        state["last_updated"] = None  # This one can be None
-    if not isinstance(state.get("current_index"), int):
-        state["current_index"] = 0
-    if not isinstance(state.get("queue"), list):
-        state["queue"] = []
-    if not isinstance(state.get("pass_until"), list):
-        state["pass_until"] = []
-    if not isinstance(state.get("recent_assignments"), list):
-        state["recent_assignments"] = []
-    if not isinstance(state.get("active_reviews"), dict):
-        state["active_reviews"] = {}
-
-    return state
+    return state_store_module.load_state(sys.modules[__name__], fail_on_unavailable=fail_on_unavailable)
 
 
 def save_state(state: dict) -> bool:
-    """Save the state to the state issue. Returns True on success."""
-    assert_lock_held("save_state")
-
-    if not STATE_ISSUE_NUMBER:
-        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
-        return False
-
-    state["last_updated"] = datetime.now(timezone.utc).isoformat()
-
-    for attempt in range(1, LOCK_API_RETRY_LIMIT + 1):
-        if not ensure_state_issue_lease_lock_fresh():
-            print("ERROR: Failed to refresh reviewer-bot lease lock before save", file=sys.stderr)
-            return False
-
-        snapshot = get_state_issue_snapshot()
-        if snapshot is None:
-            return False
-
-        lock_meta = parse_lock_metadata_from_issue_body(snapshot.body)
-        body = render_state_issue_body(state, lock_meta, snapshot.body)
-
-        response = conditional_patch_state_issue(body, snapshot.etag)
-        if response.status_code == 200:
-            print(f"State saved to issue #{STATE_ISSUE_NUMBER}")
-            return True
-
-        if response.status_code in {409, 412}:
-            print(
-                "WARNING: State save hit conflict "
-                f"(status {response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
-                file=sys.stderr,
-            )
-            delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
-            time.sleep(delay)
-            continue
-
-        if response.status_code == 404:
-            print(
-                f"ERROR: State issue #{STATE_ISSUE_NUMBER} not found during save_state",
-                file=sys.stderr,
-            )
-            return False
-
-        if response.status_code in {401, 403}:
-            print(
-                "ERROR: Permission failure while saving state issue "
-                f"#{STATE_ISSUE_NUMBER} (status {response.status_code}): {response.text}",
-                file=sys.stderr,
-            )
-            return False
-
-        if response.status_code == 429 or response.status_code >= 500:
-            if attempt < LOCK_API_RETRY_LIMIT:
-                delay = LOCK_RETRY_BASE_SECONDS + random.uniform(0, LOCK_RETRY_BASE_SECONDS)
-                print(
-                    "WARNING: Retryable state issue write failure "
-                    f"(status {response.status_code}); retrying ({attempt}/{LOCK_API_RETRY_LIMIT})",
-                    file=sys.stderr,
-                )
-                time.sleep(delay)
-                continue
-            print(
-                "ERROR: Exhausted retries while saving state issue "
-                f"#{STATE_ISSUE_NUMBER}; last status {response.status_code}: {response.text}",
-                file=sys.stderr,
-            )
-            return False
-
-        print(
-            f"ERROR: Unexpected status {response.status_code} while saving state issue: {response.text}",
-            file=sys.stderr,
-        )
-        return False
-
-    print(
-        f"ERROR: Failed to save state to issue #{STATE_ISSUE_NUMBER} after retries",
-        file=sys.stderr,
-    )
-    return False
+    return state_store_module.save_state(sys.modules[__name__], state)
 
 
 def parse_iso8601_timestamp(value: Any) -> datetime | None:
-    """Parse an ISO8601 timestamp and normalize to UTC timezone."""
-    if not isinstance(value, str) or not value:
-        return None
-
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+    return state_store_module.parse_iso8601_timestamp(value)
 
 
 def lock_is_currently_valid(lock_meta: dict, now: datetime | None = None) -> bool:
@@ -1621,142 +1276,15 @@ def release_state_issue_lease_lock() -> bool:
 
 
 def sync_members_with_queue(state: dict) -> tuple[dict, list[str]]:
-    """
-    Sync the queue with the current members.md file from the consortium repo.
-
-    Returns the updated state and a list of changes made.
-    """
-    producers = fetch_members()
-    current_queue = {m["github"]: m for m in state["queue"]}
-    pass_until_users = {m["github"] for m in state.get("pass_until", [])}
-
-    changes = []
-
-    # Find new producers to add
-    for producer in producers:
-        github = producer["github"]
-        if github not in current_queue and github not in pass_until_users:
-            state["queue"].append(producer)
-            changes.append(f"Added {github} to queue")
-
-    # Find removed producers
-    current_producer_usernames = {p["github"] for p in producers}
-    state["queue"] = [
-        m for m in state["queue"]
-        if m["github"] in current_producer_usernames
-    ]
-
-    # Also clean up pass_until for removed producers
-    removed_from_queue = [
-        m["github"] for m in current_queue.values()
-        if m["github"] not in current_producer_usernames
-    ]
-    for username in removed_from_queue:
-        changes.append(f"Removed {username} from queue (no longer a Producer)")
-
-    # Update names in case they changed
-    producer_names = {p["github"]: p["name"] for p in producers}
-    for member in state["queue"]:
-        if member["github"] in producer_names:
-            member["name"] = producer_names[member["github"]]
-
-    # Ensure current_index is valid
-    if state["queue"]:
-        state["current_index"] = state["current_index"] % len(state["queue"])
-    else:
-        state["current_index"] = 0
-
-    return state, changes
+    return queue_sync_members_with_queue(sys.modules[__name__], state)
 
 
 def reposition_member_as_next(state: dict, username: str) -> bool:
-    """
-    Move a queue member to current_index so they're next up.
-    
-    Used when undoing or passing an assignment to maintain fairness -
-    the person who didn't complete their assignment should be next,
-    but people behind them in the queue shouldn't be pushed further back.
-    
-    Algorithm:
-    1. Remove the user from their current position
-    2. Adjust current_index if we removed before it
-    3. Insert at current_index (so they're next up)
-    
-    Returns True if successful, False if user not in queue (e.g., went /away).
-    """
-    # Find the user
-    user_index = None
-    user_entry = None
-    for i, member in enumerate(state["queue"]):
-        if member["github"].lower() == username.lower():
-            user_index = i
-            user_entry = member
-            break
-    
-    if user_entry is None:
-        return False
-    
-    # Remove from current position
-    state["queue"].pop(user_index)
-    
-    # Adjust current_index if we removed before it
-    if user_index < state["current_index"]:
-        state["current_index"] -= 1
-    
-    # Ensure current_index is valid after removal
-    if state["queue"]:
-        state["current_index"] = state["current_index"] % len(state["queue"])
-    else:
-        state["current_index"] = 0
-    
-    # Insert at current_index (so they're next up)
-    state["queue"].insert(state["current_index"], user_entry)
-    
-    return True
+    return queue_reposition_member_as_next(state, username)
 
 
 def process_pass_until_expirations(state: dict) -> tuple[dict, list[str]]:
-    """
-    Check for expired pass-until entries and restore them to the queue.
-
-    Returning members are repositioned to be next up in the queue.
-
-    Returns the updated state and a list of users restored.
-    """
-    now = datetime.now(timezone.utc).date()
-    restored = []
-    still_away = []
-
-    for entry in state.get("pass_until", []):
-        return_date = entry.get("return_date")
-        if return_date:
-            if isinstance(return_date, str):
-                try:
-                    return_date = datetime.strptime(return_date, "%Y-%m-%d").date()
-                except ValueError:
-                    return_date = datetime.fromisoformat(return_date).date()
-            elif isinstance(return_date, datetime):
-                return_date = return_date.date()
-
-            if return_date <= now:
-                # Restore to queue
-                restored_member = {
-                    "github": entry["github"],
-                    "name": entry.get("name", entry["github"]),
-                }
-                
-                # Add to end of queue, then reposition as next
-                state["queue"].append(restored_member)
-                reposition_member_as_next(state, entry["github"])
-                
-                restored.append(entry["github"])
-            else:
-                still_away.append(entry)
-        else:
-            still_away.append(entry)
-
-    state["pass_until"] = still_away
-    return state, restored
+    return queue_process_pass_until_expirations(state)
 
 
 # ==============================================================================
@@ -1765,48 +1293,18 @@ def process_pass_until_expirations(state: dict) -> tuple[dict, list[str]]:
 
 
 def get_next_reviewer(state: dict, skip_usernames: set[str] | None = None) -> str | None:
-    """
-    Get the next reviewer from the queue using round-robin.
-
-    Args:
-        state: Current bot state
-        skip_usernames: Set of usernames to skip (e.g., issue author)
-
-    Returns the username of the next reviewer, or None if queue is empty.
-    """
-    if not state["queue"]:
-        return None
-
-    skip_usernames = skip_usernames or set()
-    queue_size = len(state["queue"])
-    start_index = state["current_index"]
-
-    # Try each person in the queue starting from current_index
-    for i in range(queue_size):
-        index = (start_index + i) % queue_size
-        candidate = state["queue"][index]
-
-        if candidate["github"] not in skip_usernames:
-            # Found a valid reviewer - advance the index
-            state["current_index"] = (index + 1) % queue_size
-            return candidate["github"]
-
-    # Everyone in queue is in skip list
-    return None
+    return queue_get_next_reviewer(state, skip_usernames)
 
 
 def record_assignment(state: dict, github: str, issue_number: int,
                      issue_type: str) -> None:
-    """Record an assignment in the recent_assignments list."""
-    assignment = {
-        "github": github,
-        "issue_number": issue_number,
-        "type": issue_type,
-        "assigned_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    state["recent_assignments"].insert(0, assignment)
-    state["recent_assignments"] = state["recent_assignments"][:MAX_RECENT_ASSIGNMENTS]
+    queue_record_assignment(
+        state,
+        github,
+        issue_number,
+        issue_type,
+        max_recent_assignments=MAX_RECENT_ASSIGNMENTS,
+    )
 
 
 # ==============================================================================
@@ -4321,216 +3819,16 @@ def handle_scheduled_check(state: dict) -> bool:
 
 
 def classify_event_intent(event_name: str, event_action: str) -> str:
-    """Classify whether a run can mutate reviewer-bot state."""
-    if event_name in {"issues", "pull_request_target"}:
-        if event_action in {"opened", "labeled", "closed"}:
-            return EVENT_INTENT_MUTATING
-        return EVENT_INTENT_NON_MUTATING_READONLY
-
-    if event_name == "issue_comment":
-        if event_action == "created":
-            return EVENT_INTENT_MUTATING
-        return EVENT_INTENT_NON_MUTATING_READONLY
-
-    if event_name == "pull_request_review":
-        if event_action not in {"submitted", "dismissed"}:
-            return EVENT_INTENT_NON_MUTATING_READONLY
-        is_cross_repo = os.environ.get("PR_IS_CROSS_REPOSITORY", "false").lower() == "true"
-        if is_cross_repo:
-            return EVENT_INTENT_NON_MUTATING_DEFER
-        return EVENT_INTENT_MUTATING
-
-    if event_name == "workflow_run":
-        if event_action != "completed":
-            return EVENT_INTENT_NON_MUTATING_READONLY
-        workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
-        workflow_run_event_action = os.environ.get("WORKFLOW_RUN_EVENT_ACTION", "").strip().lower()
-        if (
-            workflow_run_event == "pull_request_review"
-            and workflow_run_event_action in {"submitted", "dismissed"}
-        ):
-            return EVENT_INTENT_MUTATING
-        return EVENT_INTENT_NON_MUTATING_READONLY
-
-    if event_name == "workflow_dispatch":
-        action = os.environ.get("MANUAL_ACTION", "").strip()
-        if action == "show-state":
-            return EVENT_INTENT_NON_MUTATING_READONLY
-        return EVENT_INTENT_MUTATING
-
-    if event_name == "schedule":
-        return EVENT_INTENT_MUTATING
-
-    return EVENT_INTENT_NON_MUTATING_READONLY
+    return app_module.classify_event_intent(sys.modules[__name__], event_name, event_action)
 
 
 def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
     """Backwards-compatible helper for tests and call sites."""
-    return classify_event_intent(event_name, event_action) == EVENT_INTENT_MUTATING
+    return app_module.event_requires_lease_lock(sys.modules[__name__], event_name, event_action)
 
 
 def main():
-    """Main entry point for the reviewer bot."""
-    event_name = os.environ.get("EVENT_NAME", "")
-    event_action = os.environ.get("EVENT_ACTION", "")
-    drain_touched_items()
-
-    event_intent = classify_event_intent(event_name, event_action)
-    lock_required = event_intent == EVENT_INTENT_MUTATING
-    print(
-        f"Event: {event_name}, Action: {event_action}, Intent: {event_intent}, "
-        f"Lock Required: {lock_required}"
-    )
-
-    lock_acquired = False
-    release_failed = False
-    exit_code = 0
-
-    state_changed = False
-    status_labels_changed = False
-    sync_changes: list[str] = []
-    restored: list[str] = []
-    loaded_active_reviews_count = 0
-    touched_items: list[int] = []
-
-    try:
-        if lock_required:
-            acquire_state_issue_lease_lock()
-            lock_acquired = True
-
-        # Load current state
-        state = load_state(fail_on_unavailable=lock_required)
-        active_reviews = state.get("active_reviews")
-        if isinstance(active_reviews, dict):
-            loaded_active_reviews_count = len(active_reviews)
-
-        if lock_required:
-            # Process any expired pass-until entries
-            state, restored = process_pass_until_expirations(state)
-            if restored:
-                print(f"Restored from pass-until: {restored}")
-
-            # Always sync members on mutating paths
-            state, sync_changes = sync_members_with_queue(state)
-            if sync_changes:
-                print(f"Members sync changes: {sync_changes}")
-
-        # Handle the event
-        if event_name == "issues":
-            if event_action == "opened":
-                state_changed = handle_issue_or_pr_opened(state)
-            elif event_action == "labeled":
-                state_changed = handle_labeled_event(state)
-            elif event_action == "closed":
-                state_changed = handle_closed_event(state)
-
-        elif event_name == "pull_request_target":
-            if event_action == "opened":
-                state_changed = handle_issue_or_pr_opened(state)
-            elif event_action == "labeled":
-                state_changed = handle_labeled_event(state)
-            elif event_action == "closed":
-                state_changed = handle_closed_event(state)
-
-        elif event_name == "pull_request_review":
-            if event_action in {"submitted", "dismissed"}:
-                state_changed = handle_pull_request_review_event(state)
-
-        elif event_name == "issue_comment":
-            if event_action == "created":
-                state_changed = handle_comment_event(state)
-
-        elif event_name == "workflow_dispatch":
-            state_changed = handle_manual_dispatch(state)
-
-        elif event_name == "schedule":
-            # Nightly check for overdue reviews
-            state_changed = handle_scheduled_check(state)
-
-        elif event_name == "workflow_run":
-            if event_action == "completed":
-                if os.environ.get("WORKFLOW_RUN_EVENT", "").strip() == "pull_request_review":
-                    state_changed = handle_workflow_run_event(state)
-                else:
-                    print(
-                        "Ignoring workflow_run event with unsupported source event: "
-                        f"{os.environ.get('WORKFLOW_RUN_EVENT', '').strip() or '<missing>'}"
-                    )
-
-        touched_items = drain_touched_items()
-
-        # Save state if changed (or if we synced members/pass-until)
-        if state_changed or sync_changes or restored:
-            if not lock_acquired:
-                raise RuntimeError(
-                    "State mutation reached save path without lease lock. "
-                    "Acquire lock before mutating state."
-                )
-
-            if event_name == "schedule":
-                current_active_reviews = state.get("active_reviews")
-                current_active_reviews_count = (
-                    len(current_active_reviews) if isinstance(current_active_reviews, dict) else 0
-                )
-                allow_empty_override = (
-                    os.environ.get("ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE", "").strip().lower() == "true"
-                )
-                if (
-                    loaded_active_reviews_count > 0
-                    and current_active_reviews_count == 0
-                    and not allow_empty_override
-                ):
-                    raise RuntimeError(
-                        "STATE_GUARD_BLOCKED_EMPTY_ACTIVE_REVIEWS: refusing to persist schedule "
-                        f"state update that drops active_reviews from {loaded_active_reviews_count} "
-                        "to 0. Set ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE=true to override."
-                    )
-
-            print("State updates detected; attempting to persist reviewer-bot state.")
-            if not save_state(state):
-                raise RuntimeError(
-                    "State updates were computed but could not be persisted. "
-                    "Failing this run to avoid silent success."
-                )
-
-            if touched_items:
-                state = load_state(fail_on_unavailable=True)
-
-        if touched_items:
-            if not lock_acquired:
-                raise RuntimeError(
-                    "Status-label projection reached apply path without lease lock. "
-                    "Acquire lock before mutating labels."
-                )
-            status_labels_changed = sync_status_labels_for_items(state, touched_items)
-
-        with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
-            f.write(
-                "state_changed=true\n"
-                if (state_changed or bool(sync_changes) or bool(restored) or status_labels_changed)
-                else "state_changed=false\n"
-            )
-
-    except RuntimeError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        exit_code = 1
-    except Exception as exc:  # pragma: no cover - defensive hard-fail path
-        print(f"ERROR: Unexpected reviewer-bot failure: {exc}", file=sys.stderr)
-        exit_code = 1
-    finally:
-        if lock_acquired:
-            if not release_state_issue_lease_lock():
-                release_failed = True
-
-    if release_failed:
-        print(
-            "ERROR: Failed to release reviewer-bot lease lock after processing event.",
-            file=sys.stderr,
-        )
-        exit_code = 1
-
-    if exit_code:
-        sys.exit(exit_code)
+    app_module.main(sys.modules[__name__])
 
 
 if __name__ == "__main__":
