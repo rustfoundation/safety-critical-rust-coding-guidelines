@@ -54,8 +54,6 @@ All commands must be prefixed with @guidelines-bot /<command>:
     - Show all available commands
 """
 
-import json
-import os
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -64,10 +62,10 @@ from pathlib import Path
 from typing import Any
 
 # GitHub API interaction
-import yaml
 
 try:
     import scripts.reviewer_bot_lib.commands as commands_module
+    import scripts.reviewer_bot_lib.events as events_module
     import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
     import scripts.reviewer_bot_lib.reviews as reviews_module
@@ -116,7 +114,7 @@ try:
         StateIssueSnapshot,
         get_commands_help,
     )
-    from scripts.reviewer_bot_lib.guidance import (
+    from scripts.reviewer_bot_lib.guidance import (  # noqa: F401
         get_fls_audit_guidance,
         get_issue_guidance,
         get_pr_guidance,
@@ -140,6 +138,7 @@ try:
 except ImportError:
     import reviewer_bot_lib.app as app_module
     import reviewer_bot_lib.commands as commands_module
+    import reviewer_bot_lib.events as events_module
     import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
     import reviewer_bot_lib.reviews as reviews_module
@@ -186,11 +185,6 @@ except ImportError:
         StateIssueBodyParts,
         StateIssueSnapshot,
         get_commands_help,
-    )
-    from reviewer_bot_lib.guidance import (
-        get_fls_audit_guidance,
-        get_issue_guidance,
-        get_pr_guidance,
     )
     from reviewer_bot_lib.members import fetch_members  # noqa: F401
     from reviewer_bot_lib.queue import (
@@ -777,25 +771,7 @@ def list_open_items_with_status_labels() -> list[int]:
 
 
 def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | None:
-    """Return the latest review authored by the given reviewer."""
-    latest_review = None
-    latest_key = (datetime.min.replace(tzinfo=timezone.utc), -1)
-
-    for index, review in enumerate(reviews):
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or author.lower() != reviewer.lower():
-            continue
-
-        submitted_at = parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None:
-            submitted_at = datetime.min.replace(tzinfo=timezone.utc)
-
-        review_key = (submitted_at, index)
-        if review_key >= latest_key:
-            latest_key = review_key
-            latest_review = review
-
-    return latest_review
+    return events_module.get_latest_review_by_reviewer(sys.modules[__name__], reviews, reviewer)
 
 
 def find_triage_approval_after(
@@ -843,101 +819,13 @@ def reconcile_active_review_entry(
     require_pull_request_context: bool = True,
     completion_source: str = "rectify:reconcile-pr-review",
 ) -> tuple[str, bool, bool]:
-    """Reconcile one active review entry from current GitHub PR review state.
-
-    Returns (message, success, state_changed).
-    """
-    review_data = ensure_review_entry(state, issue_number)
-    if review_data is None:
-        return f"ℹ️ No active review entry exists for #{issue_number}; nothing to rectify.", True, False
-
-    assigned_reviewer = review_data.get("current_reviewer")
-    if not assigned_reviewer:
-        return (
-            f"ℹ️ #{issue_number} has no tracked assigned reviewer; nothing to rectify.",
-            True,
-            False,
-        )
-
-    if review_data.get("review_completed_at") and not review_data.get("mandatory_approver_required"):
-        return f"ℹ️ Review for #{issue_number} is already marked complete; no changes made.", True, False
-
-    if require_pull_request_context:
-        is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-        if not is_pr:
-            return (
-                f"ℹ️ #{issue_number} is not a pull request in this event context; `/rectify` only "
-                "reconciles PR reviews.",
-                True,
-                False,
-            )
-
-    reviews = get_pull_request_reviews(issue_number)
-    if reviews is None:
-        return f"❌ Failed to fetch reviews for PR #{issue_number}; cannot run `/rectify`.", False, False
-
-    state_changed = False
-    messages: list[str] = []
-
-    latest_review = get_latest_review_by_reviewer(reviews, assigned_reviewer)
-    if latest_review is None:
-        messages.append(
-            f"No review by assigned reviewer @{assigned_reviewer} was found on PR #{issue_number}."
-        )
-    else:
-        latest_state = str(latest_review.get("state", "")).upper()
-        if latest_state == "APPROVED":
-            changed = handle_pr_approved_review(
-                state,
-                issue_number,
-                assigned_reviewer,
-                completion_source,
-            )
-            if changed:
-                state_changed = True
-                messages.append(
-                    f"latest review by @{assigned_reviewer} is `APPROVED`; applied approval transitions"
-                )
-            else:
-                messages.append(
-                    f"latest review by @{assigned_reviewer} is `APPROVED`, but state already reflected it"
-                )
-        elif latest_state in {"COMMENTED", "CHANGES_REQUESTED"}:
-            changed = update_reviewer_activity(state, issue_number, assigned_reviewer)
-            if changed:
-                state_changed = True
-                messages.append(
-                    f"latest review by @{assigned_reviewer} is `{latest_state}`; refreshed reviewer activity"
-                )
-            else:
-                messages.append(
-                    f"latest assigned-reviewer state is `{latest_state}` and no update was needed"
-                )
-        else:
-            state_name = latest_state or "UNKNOWN"
-            messages.append(
-                f"latest review by @{assigned_reviewer} is `{state_name}` and no reconciliation transition applies"
-            )
-
-    review_data = ensure_review_entry(state, issue_number, create=True)
-    if review_data and review_data.get("mandatory_approver_required"):
-        escalation_opened_at = (
-            parse_iso8601_timestamp(review_data.get("mandatory_approver_pinged_at"))
-            or parse_iso8601_timestamp(review_data.get("mandatory_approver_label_applied_at"))
-        )
-        triage_approval = find_triage_approval_after(reviews, escalation_opened_at)
-        if triage_approval is not None:
-            approver, _ = triage_approval
-            if satisfy_mandatory_approver_requirement(state, issue_number, approver):
-                state_changed = True
-                messages.append(f"mandatory triage approval satisfied by @{approver}")
-
-    if state_changed:
-        detail = "; ".join(messages) if messages else "applied state reconciliation transitions"
-        return f"✅ Rectified PR #{issue_number}: {detail}.", True, True
-
-    detail = "; ".join(messages) if messages else "no reconciliation transitions applied"
-    return f"ℹ️ Rectify checked PR #{issue_number}: {detail}.", True, False
+    return events_module.reconcile_active_review_entry(
+        sys.modules[__name__],
+        state,
+        issue_number,
+        require_pull_request_context=require_pull_request_context,
+        completion_source=completion_source,
+    )
 
 
 def handle_rectify_command(state: dict, issue_number: int, comment_author: str) -> tuple[str, bool, bool]:
@@ -1105,636 +993,39 @@ _Life happens! If you're dealing with something, just let us know._"""
 
 
 def handle_transition_notice(state: dict, issue_number: int, reviewer: str) -> bool:
-    """
-    Post a notice that the transition period has ended.
-    
-    This does NOT automatically change their status - that requires manual intervention.
-    Returns True if notice was posted, False otherwise.
-    """
-    # Post transition notice
-    notice_message = f"""🔔 **Transition Period Ended**
-
-@{reviewer}, the {TRANSITION_PERIOD_DAYS}-day transition period has passed without activity on this review.
-
-Per our [contribution guidelines](CONTRIBUTING.md#review-deadlines), this may result in a transition from Producer to Observer status.
-
-**The review will now be reassigned to the next person in the queue.**
-
-_If you believe this is in error or have extenuating circumstances, please reach out to the subcommittee._"""
-    
-    post_comment(issue_number, notice_message)
-    
-    print(f"Posted transition notice for #{issue_number} to @{reviewer}")
-    return True
+    return events_module.handle_transition_notice(sys.modules[__name__], state, issue_number, reviewer)
 
 
 def handle_issue_or_pr_opened(state: dict) -> bool:
-    """
-    Handle when an issue or PR is opened with a review label.
-
-    Returns True if we took action, False otherwise.
-    """
-    assert_lock_held("handle_issue_or_pr_opened")
-
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
-    if not issue_number:
-        print("No issue number found")
-        return False
-
-    print(f"Processing opened event for #{issue_number}")
-    collect_touched_item(issue_number)
-
-    # Check if already has a reviewer (check our tracked state first, then GitHub)
-    issue_key = str(issue_number)
-    tracked_reviewer = None
-    if "active_reviews" in state and issue_key in state["active_reviews"]:
-        review_data = state["active_reviews"][issue_key]
-        if isinstance(review_data, dict):
-            tracked_reviewer = review_data.get("current_reviewer")
-    
-    if tracked_reviewer:
-        print(f"Issue #{issue_number} already has tracked reviewer: {tracked_reviewer}")
-        return False
-    
-    current_assignees = get_issue_assignees(issue_number)
-    if current_assignees:
-        print(f"Issue #{issue_number} already has reviewers/assignees: {current_assignees}")
-        return False
-
-    # Check for review labels
-    labels_json = os.environ.get("ISSUE_LABELS", "[]")
-    print(f"ISSUE_LABELS env: {labels_json}")
-    try:
-        labels = json.loads(labels_json)
-    except json.JSONDecodeError:
-        print("Failed to parse ISSUE_LABELS as JSON")
-        labels = []
-
-    if not any(label in REVIEW_LABELS for label in labels):
-        print(
-            f"Issue #{issue_number} does not have review labels {sorted(REVIEW_LABELS)} "
-            f"(labels: {labels})"
-        )
-        return False
-
-    # Get issue author to skip them
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
-    skip_set = {issue_author} if issue_author else set()
-
-    # Get next reviewer
-    reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-
-    if not reviewer:
-        post_comment(issue_number,
-                    f"⚠️ No reviewers available in the queue. "
-                    f"Please use `{BOT_MENTION} /sync-members` to update the queue.")
-        return False
-
-    # Assign the reviewer.
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = request_reviewer_assignment(issue_number, reviewer)
-    
-    # Track the reviewer in our state (source of truth for pass command)
-    set_current_reviewer(state, issue_number, reviewer)
-
-    # Record the assignment
-    record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
-
-    failure_comment = get_assignment_failure_comment(reviewer, assignment_attempt)
-    if failure_comment:
-        post_comment(issue_number, failure_comment)
-
-    # Post guidance comment
-    if is_pr:
-        if assignment_attempt.success:
-            guidance = get_pr_guidance(reviewer, issue_author)
-            post_comment(issue_number, guidance)
-    else:
-        if FLS_AUDIT_LABEL in labels:
-            guidance = get_fls_audit_guidance(reviewer, issue_author)
-        else:
-            guidance = get_issue_guidance(reviewer, issue_author)
-        post_comment(issue_number, guidance)
-
-    return True
+    return events_module.handle_issue_or_pr_opened(sys.modules[__name__], state)
 
 
 def handle_labeled_event(state: dict) -> bool:
-    """
-    Handle when an issue or PR is labeled with a review label.
-
-    We already know from LABEL_NAME that the correct label was added,
-    so we skip the label check that handle_issue_or_pr_opened does.
-    """
-    assert_lock_held("handle_labeled_event")
-
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
-    if not issue_number:
-        print("No issue number found")
-        return False
-
-    label_name = os.environ.get("LABEL_NAME", "")
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    collect_touched_item(issue_number)
-
-    if label_name == "sign-off: create pr":
-        if is_pr:
-            print("Sign-off label applied to PR; ignoring")
-            return False
-        review_data = ensure_review_entry(state, issue_number)
-        reviewer = None
-        if review_data:
-            reviewer = review_data.get("current_reviewer")
-        return mark_review_complete(
-            state,
-            issue_number,
-            reviewer,
-            "issue_label: sign-off: create pr",
-        )
-
-    if label_name not in REVIEW_LABELS:
-        print(f"Label '{label_name}' is not a review label, skipping")
-        return False
-
-    # Check if already has a reviewer (check our tracked state first, then GitHub)
-    issue_key = str(issue_number)
-    tracked_reviewer = None
-    if "active_reviews" in state and issue_key in state["active_reviews"]:
-        review_data = state["active_reviews"][issue_key]
-        if isinstance(review_data, dict):
-            tracked_reviewer = review_data.get("current_reviewer")
-    
-    if tracked_reviewer:
-        print(f"Issue #{issue_number} already has tracked reviewer: {tracked_reviewer}")
-        return False
-    
-    current_assignees = get_issue_assignees(issue_number)
-    if current_assignees:
-        print(f"Issue #{issue_number} already has reviewers: {current_assignees}")
-        return False
-
-    print(f"Processing labeled event for #{issue_number}, author: {os.environ.get('ISSUE_AUTHOR', '')}")
-
-    # Get issue author to skip them
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
-    skip_set = {issue_author} if issue_author else set()
-
-    # Get next reviewer
-    reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-    print(f"Selected reviewer for #{issue_number}: {reviewer}")
-
-    if not reviewer:
-        post_comment(issue_number,
-                    f"⚠️ No reviewers available in the queue. "
-                    f"Please use `{BOT_MENTION} /sync-members` to update the queue.")
-        return False
-
-    # Assign the reviewer.
-    assignment_attempt = request_reviewer_assignment(issue_number, reviewer)
-    
-    # Track the reviewer in our state
-    set_current_reviewer(state, issue_number, reviewer)
-
-    # Record the assignment
-    record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
-
-    failure_comment = get_assignment_failure_comment(reviewer, assignment_attempt)
-    if failure_comment:
-        post_comment(issue_number, failure_comment)
-
-    # Post guidance comment
-    if is_pr:
-        if assignment_attempt.success:
-            guidance = get_pr_guidance(reviewer, issue_author)
-            post_comment(issue_number, guidance)
-    else:
-        if label_name == FLS_AUDIT_LABEL:
-            guidance = get_fls_audit_guidance(reviewer, issue_author)
-        else:
-            guidance = get_issue_guidance(reviewer, issue_author)
-        post_comment(issue_number, guidance)
-
-    return True
+    return events_module.handle_labeled_event(sys.modules[__name__], state)
 
 
 def handle_pull_request_review_event(state: dict) -> bool:
-    """Handle submitted PR reviews for activity and completion tracking."""
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
-    if not issue_number:
-        print("No issue number found")
-        return False
-
-    review_state = os.environ.get("REVIEW_STATE", "").strip().upper()
-    review_author = os.environ.get("REVIEW_AUTHOR", "").strip()
-    if not review_state or not review_author:
-        print("Missing review context")
-        return False
-
-    collect_touched_item(issue_number)
-
-    review_action = os.environ.get("EVENT_ACTION", "").strip().lower()
-
-    is_cross_repo = os.environ.get("PR_IS_CROSS_REPOSITORY", "false").lower() == "true"
-    if is_cross_repo:
-        print(
-            "Deferring cross-repo pull_request_review reconciliation for "
-            f"#{issue_number}: this event may have read-only permissions. "
-            "A trusted workflow_run reconcile will persist state after this run succeeds. "
-            "If needed, use `@guidelines-bot /rectify` as manual fallback."
-        )
-        return False
-
-    assert_lock_held("handle_pull_request_review_event")
-
-    review_data = ensure_review_entry(state, issue_number)
-    if review_data is None:
-        print(f"No active review entry for #{issue_number}")
-        return False
-
-    current_reviewer = review_data.get("current_reviewer")
-    if review_action == "dismissed" or review_state == "DISMISSED":
-        print(f"Observed dismissed review on #{issue_number}; deferring to status-label projection")
-        return False
-
-    if review_state == "APPROVED":
-        return handle_pr_approved_review(
-            state,
-            issue_number,
-            review_author,
-            "pull_request_review",
-        )
-
-    if review_state in {"COMMENTED", "CHANGES_REQUESTED"}:
-        if not current_reviewer or current_reviewer.lower() != review_author.lower():
-            print(
-                f"Ignoring review from @{review_author} on #{issue_number}; "
-                f"current reviewer is @{current_reviewer}"
-            )
-            return False
-        return update_reviewer_activity(state, issue_number, review_author)
-
-    print(f"Ignoring review state '{review_state}' for #{issue_number}")
-    return False
+    return events_module.handle_pull_request_review_event(sys.modules[__name__], state)
 
 
 def handle_workflow_run_event(state: dict) -> bool:
-    """Handle trusted second-hop workflow_run reconciliation."""
-    assert_lock_held("handle_workflow_run_event")
-
-    workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
-    workflow_run_event_action = os.environ.get("WORKFLOW_RUN_EVENT_ACTION", "").strip().lower()
-    if workflow_run_event != "pull_request_review":
-        observed = workflow_run_event or "<missing>"
-        print(
-            "Ignoring workflow_run reconcile event with unsupported source event: "
-            f"{observed}"
-        )
-        return False
-
-    if workflow_run_event_action not in {"submitted", "dismissed"}:
-        observed = workflow_run_event_action or "<missing>"
-        print(
-            "Ignoring workflow_run reconcile event with unsupported source action: "
-            f"{observed}"
-        )
-        return False
-
-    issue_number = resolve_workflow_run_pr_number()
-    collect_touched_item(issue_number)
-
-    if workflow_run_event_action == "dismissed":
-        print(f"Workflow_run observed dismissed review for #{issue_number}; projecting labels only")
-        return False
-
-    message, success, state_changed = reconcile_active_review_entry(
-        state,
-        issue_number,
-        require_pull_request_context=False,
-        completion_source="workflow_run:pull_request_review",
-    )
-    print(message)
-
-    if not success:
-        raise RuntimeError(
-            f"Workflow_run reconcile failed for pull request #{issue_number}: {message}"
-        )
-
-    if state_changed and not post_comment(issue_number, message):
-        print(
-            "WARNING: Workflow_run reconcile changed state but failed to post "
-            f"comment on pull request #{issue_number}.",
-            file=sys.stderr,
-        )
-
-    return state_changed
+    return events_module.handle_workflow_run_event(sys.modules[__name__], state)
 
 
 def handle_closed_event(state: dict) -> bool:
-    """
-    Handle when an issue or PR is closed.
-    
-    Cleans up the active_reviews entry to prevent state from growing indefinitely.
-
-    Returns True if we modified state, False otherwise.
-    """
-    assert_lock_held("handle_closed_event")
-
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
-    if not issue_number:
-        print("No issue number found for closed event")
-        return False
-
-    collect_touched_item(issue_number)
-
-    issue_key = str(issue_number)
-    
-    if "active_reviews" in state and issue_key in state["active_reviews"]:
-        del state["active_reviews"][issue_key]
-        print(f"Cleaned up active_reviews entry for #{issue_number}")
-        return True
-    
-    print(f"No active_reviews entry found for #{issue_number}")
-    return False
+    return events_module.handle_closed_event(sys.modules[__name__], state)
 
 
 def handle_comment_event(state: dict) -> bool:
-    """
-    Handle a comment event - check for bot commands and track reviewer activity.
-
-    Returns True if we took action, False otherwise.
-    """
-    assert_lock_held("handle_comment_event")
-
-    comment_body = os.environ.get("COMMENT_BODY", "")
-    comment_author = os.environ.get("COMMENT_AUTHOR", "")
-    comment_id = os.environ.get("COMMENT_ID", "")
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
-
-    if not comment_body or not issue_number:
-        return False
-
-    # Check if comment author is the current reviewer - if so, update their activity
-    # This resets the 14-day deadline clock
-    activity_updated = update_reviewer_activity(state, issue_number, comment_author)
-    
-    # Parse for bot command
-    sanitized_body = strip_code_blocks(comment_body)
-    parsed = parse_command(sanitized_body)
-    if not parsed:
-        # No bot command, but we may have updated activity
-        return activity_updated
-
-    command, args = parsed
-    print(f"Parsed command: {command}, args: {args}")
-
-    response = ""
-    success = False
-    state_changed = False
-    status_projection_commands = {"pass", "away", "claim", "release", "rectify", "r?-user", "assign-from-queue"}
-
-    if command == "_multiple_commands":
-        response = ("⚠️ Multiple bot commands in one comment are ignored. "
-                    "Please post a single command per comment. "
-                    f"For a list of commands, use `{BOT_MENTION} /commands`.")
-        success = False
-    # Handle each command
-    elif command == "pass":
-        reason = " ".join(args) if args else None
-        response, success = handle_pass_command(state, issue_number, comment_author, reason)
-        state_changed = success
-
-    elif command == "away":
-        if not args:
-            response = (f"❌ Missing date. Usage: `{BOT_MENTION} /away YYYY-MM-DD [reason]`")
-            success = False
-        else:
-            return_date = args[0]
-            reason = " ".join(args[1:]) if len(args) > 1 else None
-            response, success = handle_pass_until_command(
-                state, issue_number, comment_author, return_date, reason
-            )
-            state_changed = success
-
-    elif command == "label":
-        if not args:
-            response = (f"❌ Missing label. Usage: `{BOT_MENTION} /label +label-name` or "
-                       f"`{BOT_MENTION} /label -label-name`")
-            success = False
-        else:
-            # Rejoin all args to handle labels with spaces
-            # Then parse for +label and -label patterns
-            full_arg = " ".join(args)
-            response, success = handle_label_command(issue_number, full_arg)
-
-    elif command == "accept-no-fls-changes":
-        response, success = handle_accept_no_fls_changes_command(issue_number, comment_author)
-
-    elif command == "sync-members":
-        response, success = handle_sync_members_command(state)
-        state_changed = success
-
-    elif command == "queue":
-        response, success = handle_queue_command(state)
-
-    elif command == "commands":
-        response, success = handle_commands_command()
-
-    elif command == "claim":
-        response, success = handle_claim_command(state, issue_number, comment_author)
-        state_changed = success
-
-    elif command == "release":
-        # Pass args to handle_release_command for @username parsing
-        response, success = handle_release_command(state, issue_number, comment_author, args)
-        state_changed = success
-
-    elif command == "rectify":
-        response, success, state_changed = handle_rectify_command(
-            state,
-            issue_number,
-            comment_author,
-        )
-
-    elif command == "r?-user":
-        # Handle "/r? @username" - assign specific user
-        username = args[0] if args else ""
-        response, success = handle_assign_command(state, issue_number, username)
-        state_changed = success
-
-    elif command == "assign-from-queue":
-        # Handle "/r? producers" - assign next from round-robin queue
-        response, success = handle_assign_from_queue_command(state, issue_number)
-        state_changed = success
-
-    elif command == "r?":
-        # Handle "/r?" with no target - show usage error
-        response = (f"❌ Missing target. Usage:\n"
-                   f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
-                   f"- `{BOT_MENTION} /r? producers` - Assign next reviewer from queue")
-        success = False
-
-    elif command == "_malformed_known":
-        # User typed a known command but forgot the / prefix
-        attempted = args[0] if args else "command"
-        response = (f"⚠️ Did you mean `{BOT_MENTION} /{attempted}`?\n\n"
-                   f"Commands require a `/` prefix.")
-        success = False
-
-    elif command == "_malformed_unknown":
-        # User typed something after @guidelines-bot but it's not a known command
-        attempted = args[0] if args else ""
-        response = (f"⚠️ Unknown command `{attempted}`. Commands require a `/` prefix.\n\n"
-                   f"Try `{BOT_MENTION} /commands` to see available commands.")
-        success = False
-
-    else:
-        response = (f"❌ Unknown command: `/{command}`\n\n"
-                   f"Available commands:\n{get_commands_help()}")
-        success = False
-
-    if command in status_projection_commands:
-        collect_touched_item(issue_number)
-
-    # React to the command comment
-    if comment_id and command != "_multiple_commands":
-        add_reaction(int(comment_id), "eyes")
-        if success:
-            add_reaction(int(comment_id), "+1")
-
-    # Post response
-    if response:
-        post_comment(issue_number, response)
-
-    return state_changed
+    return events_module.handle_comment_event(sys.modules[__name__], state)
 
 
 def handle_manual_dispatch(state: dict) -> bool:
-    """Handle manual workflow dispatch."""
-    action = os.environ.get("MANUAL_ACTION", "")
-
-    if action == "show-state":
-        print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
-        return False
-
-    assert_lock_held("handle_manual_dispatch")
-
-    if action == "sync-members":
-        state, changes = sync_members_with_queue(state)
-        if changes:
-            print(f"Sync changes: {changes}")
-        return True
-
-    elif action == "repair-review-status-labels":
-        tracked_numbers = []
-        active_reviews = state.get("active_reviews", {})
-        if isinstance(active_reviews, dict):
-            for issue_key in active_reviews:
-                try:
-                    tracked_numbers.append(int(issue_key))
-                except (TypeError, ValueError):
-                    continue
-
-        for issue_number in tracked_numbers:
-            collect_touched_item(issue_number)
-        for issue_number in list_open_items_with_status_labels():
-            collect_touched_item(issue_number)
-        print(f"Collected {len(TOUCHED_ISSUE_NUMBERS)} item(s) for status-label repair")
-        return False
-
-    elif action == "check-overdue":
-        # Manually trigger the overdue review check
-        return handle_scheduled_check(state)
-
-    return False
+    return events_module.handle_manual_dispatch(sys.modules[__name__], state)
 
 
 def handle_scheduled_check(state: dict) -> bool:
-    """
-    Handle the scheduled (nightly) check for overdue reviews.
-    
-    This function:
-    1. Checks all active reviews for overdue ones
-    2. Posts warnings for reviews that are 14+ days overdue
-    3. Posts transition notices and reassigns for 28+ days overdue
-
-    Returns True if any action was taken, False otherwise.
-    """
-    assert_lock_held("handle_scheduled_check")
-
-    print("Running scheduled check for overdue reviews...")
-    
-    overdue_reviews = check_overdue_reviews(state)
-    
-    if not overdue_reviews:
-        print("No overdue reviews found.")
-        return False
-    
-    print(f"Found {len(overdue_reviews)} overdue review(s)")
-    
-    state_changed = False
-    
-    for review in overdue_reviews:
-        issue_number = review["issue_number"]
-        reviewer = review["reviewer"]
-        
-        if review["needs_warning"]:
-            # First warning - 14 days overdue
-            print(f"Sending warning for #{issue_number} to @{reviewer} "
-                  f"({review['days_overdue']} days overdue)")
-            if handle_overdue_review_warning(state, issue_number, reviewer):
-                state_changed = True
-        
-        elif review["needs_transition"]:
-            # Transition period ended - 28 days total
-            print(f"Transition period ended for #{issue_number}, @{reviewer} "
-                  f"({review['days_since_warning']} days since warning)")
-            
-            # Post the transition notice
-            handle_transition_notice(state, issue_number, reviewer)
-            
-            # Reassign to next in queue
-            issue_key = str(issue_number)
-            review_data = state["active_reviews"].get(issue_key, {})
-            skipped = review_data.get("skipped", [])
-            
-            # Get issue author to skip
-            # Note: We don't have easy access to issue author here, so we'll skip the current reviewer
-            skip_set = set(skipped) | {reviewer}
-            
-            next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-            
-            if next_reviewer:
-                # Unassign old reviewer
-                unassign_reviewer(issue_number, reviewer)
-                
-                # Assign new reviewer
-                assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
-                set_current_reviewer(state, issue_number, next_reviewer)
-                
-                # Track the skip
-                if issue_key in state["active_reviews"]:
-                    if reviewer not in state["active_reviews"][issue_key].get("skipped", []):
-                        state["active_reviews"][issue_key]["skipped"].append(reviewer)
-                
-                # Post assignment comment (assume issue since we don't track type here)
-                failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
-                if failure_comment:
-                    post_comment(issue_number, failure_comment)
-
-                guidance = get_issue_guidance(next_reviewer, "the contributor")
-                post_comment(issue_number, guidance)
-                
-                # Record assignment
-                record_assignment(state, next_reviewer, issue_number, "issue")
-                
-                print(f"Reassigned #{issue_number} from @{reviewer} to @{next_reviewer}")
-            else:
-                print(f"No available reviewers to reassign #{issue_number}")
-
-            collect_touched_item(issue_number)
-            state_changed = True
-    
-    return state_changed
+    return events_module.handle_scheduled_check(sys.modules[__name__], state)
 
 
 # ==============================================================================
