@@ -56,7 +56,6 @@ All commands must be prefixed with @guidelines-bot /<command>:
 
 import json
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Iterable
@@ -68,6 +67,7 @@ from typing import Any
 import yaml
 
 try:
+    import scripts.reviewer_bot_lib.commands as commands_module
     import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
     import scripts.reviewer_bot_lib.reviews as reviews_module
@@ -139,6 +139,7 @@ try:
     )
 except ImportError:
     import reviewer_bot_lib.app as app_module
+    import reviewer_bot_lib.commands as commands_module
     import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
     import reviewer_bot_lib.reviews as reviews_module
@@ -577,999 +578,92 @@ def record_assignment(state: dict, github: str, issue_number: int,
 
 
 def strip_code_blocks(comment_body: str) -> str:
-    """Remove fenced, indented, and inline code blocks from text."""
-    sanitized = comment_body
-
-    def strip_fenced_blocks(text: str, fence: str) -> str:
-        pattern = re.compile(re.escape(fence) + r".*?" + re.escape(fence), re.DOTALL)
-        stripped = pattern.sub("", text)
-        last_fence = stripped.rfind(fence)
-        if last_fence != -1:
-            stripped = stripped[:last_fence]
-        return stripped
-
-    sanitized = strip_fenced_blocks(sanitized, "```")
-    sanitized = strip_fenced_blocks(sanitized, "~~~")
-    sanitized = re.sub(r"^(?: {4}|\t).*$", "", sanitized, flags=re.MULTILINE)
-    sanitized = re.sub(r"`[^`]*`", "", sanitized)
-
-    return sanitized
+    return commands_module.strip_code_blocks(comment_body)
 
 
 def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
-    """
-    Parse a bot command from a comment body.
-
-    Returns (command, args) or None if no command found.
-
-    Special return values:
-    - ("_multiple_commands", []) - Multiple commands found in a single comment
-    - ("_malformed_known", [attempted_cmd]) - Missing / prefix on known command
-    - ("_malformed_unknown", [attempted_word]) - Missing / prefix on unknown word
-
-    All commands must be prefixed with @guidelines-bot /<command>:
-    - @guidelines-bot /pass [reason]
-    - @guidelines-bot /r? @username (assign specific user)
-    - @guidelines-bot /r? producers (assign next from queue)
-    """
-    # Look for @guidelines-bot /<command> pattern (correct syntax)
-    mention_pattern = rf"{re.escape(BOT_MENTION)}\s+/\S+"
-    pattern = rf"{re.escape(BOT_MENTION)}\s+/(\S+)(.*)$"
-    matches = re.findall(mention_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
-
-    if len(matches) > 1:
-        return "_multiple_commands", []
-
-    match = re.search(pattern, comment_body, re.IGNORECASE | re.MULTILINE)
-
-    if not match:
-        # Check for malformed command (missing / prefix)
-        malformed_pattern = rf"{re.escape(BOT_MENTION)}\s+(\S+)"
-        malformed_match = re.search(malformed_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
-
-        if malformed_match:
-            attempted = malformed_match.group(1).lower()
-            # Check if it looks like a command (not just random text after mention)
-            # Ignore if it starts with common conversational words
-            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could",
-                            "would", "should", "please", "thanks", "thank", "hi", "hello", "hey"}
-            if attempted in conversational:
-                return None
-
-            # Check if it's a known command without the /
-            if attempted in COMMANDS or attempted in {"r?-user", "assign-from-queue"}:
-                return "_malformed_known", [attempted]
-            else:
-                return "_malformed_unknown", [attempted]
-
-        return None
-
-    command = match.group(1).lower()
-    args_str = match.group(2).strip()
-
-    # Special handling for "/r? <target>" syntax
-    if command == "r?":
-        target = args_str.split()[0] if args_str else ""
-        if target.lower() == "producers":
-            return "assign-from-queue", []
-        elif target:
-            username = target.lstrip("@")
-            return "r?-user", [f"@{username}"]
-        else:
-            # No target specified, return as-is to show error
-            return "r?", []
-
-    # Parse arguments (handle quoted strings)
-    args = []
-    if args_str:
-        # Simple argument parsing - split on whitespace but respect quotes
-        current_arg = ""
-        in_quotes = False
-        quote_char = None
-
-        for char in args_str:
-            if char in ('"', "'") and not in_quotes:
-                in_quotes = True
-                quote_char = char
-            elif char == quote_char and in_quotes:
-                in_quotes = False
-                quote_char = None
-            elif char.isspace() and not in_quotes:
-                if current_arg:
-                    args.append(current_arg)
-                    current_arg = ""
-            else:
-                current_arg += char
-
-        if current_arg:
-            args.append(current_arg)
-
-    return command, args
+    return commands_module.parse_command(sys.modules[__name__], comment_body)
 
 
 def handle_pass_command(state: dict, issue_number: int, comment_author: str,
                        reason: str | None) -> tuple[str, bool]:
-    """
-    Handle the pass! command - skip current reviewer for this issue only.
-
-    Tracks who has passed on each issue to prevent re-assignment.
-    The passer is repositioned to be next up for future issues.
-
-    Returns (response_message, success).
-    """
-    # Get or create the tracking entry for this issue
-    issue_data = ensure_review_entry(state, issue_number, create=True)
-    if issue_data is None:
-        return "❌ Unable to load review state.", False
-    
-    # Determine who the current reviewer is:
-    # 1. First check our tracked state
-    # 2. Fall back to GitHub assignees
-    passed_reviewer = issue_data.get("current_reviewer")
-    if not passed_reviewer:
-        current_assignees = get_issue_assignees(issue_number)
-        passed_reviewer = current_assignees[0] if current_assignees else None
-
-    if not passed_reviewer:
-        return "❌ No reviewer is currently assigned to pass.", False
-
-    if passed_reviewer.lower() != comment_author.lower():
-        return "❌ Only the currently assigned reviewer can use `/pass`.", False
-
-
-    # Check if this is the first pass on this issue (for messaging only)
-    is_first_pass = len(issue_data["skipped"]) == 0
-    
-    # Record this reviewer as having passed on this issue
-    if passed_reviewer not in issue_data["skipped"]:
-        issue_data["skipped"].append(passed_reviewer)
-
-    # Get the issue author to skip them
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
-
-    # Build skip set: everyone who has passed on this issue + issue author
-    skip_set = set(issue_data["skipped"])
-    if issue_author:
-        skip_set.add(issue_author)
-
-    # Find next reviewer, skipping all who have passed
-    # This advances current_index past the substitute
-    next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-
-    if not next_reviewer:
-        return ("❌ No other reviewers available. Everyone in the queue has either "
-                "passed on this issue or is the author."), False
-
-    # Reposition the passer to be next up for future issues
-    # (get_next_reviewer already advanced the index past the substitute)
-    reposition_member_as_next(state, passed_reviewer)
-
-    # Unassign the passed reviewer first (best effort - may fail if no permissions)
-    unassign_reviewer(issue_number, passed_reviewer)
-
-    # Assign the substitute to this issue.
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
-    
-    # Track the new reviewer in our state (this is the source of truth)
-    set_current_reviewer(state, issue_number, next_reviewer)
-
-    # Record the assignment
-    record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
-
-    assignment_line = f"@{next_reviewer} is now assigned as the reviewer."
-    if not assignment_attempt.success:
-        failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
-        if failure_comment:
-            assignment_line = failure_comment
-        else:
-            status_text = assignment_attempt.status_code or "unknown"
-            assignment_line = (
-                f"@{next_reviewer} is designated as reviewer in bot state, but GitHub "
-                f"assignment could not be confirmed (status {status_text})."
-            )
-
-    reason_text = f" Reason: {reason}" if reason else ""
-    if is_first_pass:
-        return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
-                f"{assignment_line}\n\n"
-                f"_@{passed_reviewer} is next in queue for future issues._"), True
-    else:
-        # Get the original passer (first in the skip list)
-        original_passer = issue_data["skipped"][0]
-        return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n"
-                f"{assignment_line}\n\n"
-                f"_@{original_passer} remains next in queue for future issues._"), True
+    return commands_module.handle_pass_command(sys.modules[__name__], state, issue_number, comment_author, reason)
 
 
 def handle_pass_until_command(state: dict, issue_number: int, comment_author: str,
                               return_date: str, reason: str | None) -> tuple[str, bool]:
-    """
-    Handle the pass-until! command - remove user from queue until date.
-
-    Returns (response_message, success).
-    """
-    # Validate date format
-    try:
-        parsed_date = datetime.strptime(return_date, "%Y-%m-%d").date()
-    except ValueError:
-        return (f"❌ Invalid date format: `{return_date}`. "
-                f"Please use YYYY-MM-DD format (e.g., 2025-02-01)."), False
-
-    # Check date is in the future
-    if parsed_date <= datetime.now(timezone.utc).date():
-        return "❌ Return date must be in the future.", False
-
-    # Find the user in the queue
-    user_in_queue = None
-    user_index = None
-    for i, member in enumerate(state["queue"]):
-        if member["github"].lower() == comment_author.lower():
-            user_in_queue = member
-            user_index = i
-            break
-
-    if not user_in_queue:
-        # Check if they're already in pass_until
-        for entry in state.get("pass_until", []):
-            if entry["github"].lower() == comment_author.lower():
-                # Update their return date
-                entry["return_date"] = return_date
-                if reason:
-                    entry["reason"] = reason
-                return (f"✅ Updated your return date to {return_date}.\n\n"
-                        f"You're already marked as away."), True
-
-        return (f"❌ @{comment_author} is not in the reviewer queue. "
-                f"Only Producers can use this command."), False
-
-    # Move from queue to pass_until
-    state["queue"].remove(user_in_queue)
-
-    pass_entry = {
-        "github": user_in_queue["github"],
-        "name": user_in_queue.get("name", user_in_queue["github"]),
-        "return_date": return_date,
-        "original_queue_position": user_index,
-    }
-    if reason:
-        pass_entry["reason"] = reason
-
-    state["pass_until"].append(pass_entry)
-
-    # Adjust current_index if needed
-    if state["queue"]:
-        if user_index is not None and user_index < state["current_index"]:
-            state["current_index"] = max(0, state["current_index"] - 1)
-        state["current_index"] = state["current_index"] % len(state["queue"])
-    else:
-        state["current_index"] = 0
-
-    # Check if this user was assigned to the current issue
-    # Check both our tracked state and GitHub assignees
-    issue_key = str(issue_number)
-    tracked_reviewer = None
-    if "active_reviews" in state and issue_key in state["active_reviews"]:
-        issue_data = state["active_reviews"][issue_key]
-        if isinstance(issue_data, dict):
-            tracked_reviewer = issue_data.get("current_reviewer")
-    
-    current_assignees = get_issue_assignees(issue_number)
-    is_current_reviewer = (
-        (tracked_reviewer and tracked_reviewer.lower() == comment_author.lower()) or
-        comment_author.lower() in [a.lower() for a in current_assignees]
-    )
-    
-    reassigned_msg = ""
-
-    if is_current_reviewer:
-        # Need to reassign
-        unassign_reviewer(issue_number, comment_author)
-        
-        issue_author = os.environ.get("ISSUE_AUTHOR", "")
-        skip_set = {issue_author} if issue_author else set()
-        next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-
-        if next_reviewer:
-            is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-            assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
-            set_current_reviewer(state, issue_number, next_reviewer)
-            record_assignment(state, next_reviewer, issue_number,
-                            "pr" if is_pr else "issue")
-            if assignment_attempt.success:
-                reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
-            else:
-                failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
-                if failure_comment:
-                    reassigned_msg = f"\n\n{failure_comment}"
-                else:
-                    status_text = assignment_attempt.status_code or "unknown"
-                    reassigned_msg = (
-                        "\n\n"
-                        f"@{next_reviewer} is designated as the new reviewer in bot state, but "
-                        f"GitHub assignment is not confirmed (status {status_text})."
-                    )
-        else:
-            # Clear the current reviewer
-            if "active_reviews" in state and issue_key in state["active_reviews"]:
-                if isinstance(state["active_reviews"][issue_key], dict):
-                    state["active_reviews"][issue_key]["current_reviewer"] = None
-            reassigned_msg = "\n\n⚠️ No other reviewers available to assign."
-
-    reason_text = f" ({reason})" if reason else ""
-    return (f"✅ @{comment_author} is now away until {return_date}{reason_text}.\n\n"
-            f"You'll be automatically added back to the queue on that date."
-            f"{reassigned_msg}"), True
+    return commands_module.handle_pass_until_command(sys.modules[__name__], state, issue_number, comment_author, return_date, reason)
 
 
 def handle_label_command(issue_number: int, label_string: str) -> tuple[str, bool]:
-    """
-    Handle the label command - add or remove labels.
-    
-    Parses a string like "+chapter: expressions -chapter: values +decidability: decidable"
-    and applies each label operation.
-
-    Returns (response_message, success).
-    """
-    import re
-    
-    # Find +label and -label patterns where the operator starts a label token.
-    # Operators must be at the start or preceded by whitespace to avoid splitting on hyphens.
-    pattern = r'(?:(?<=^)|(?<=\s))([+-])(.+?)(?=\s[+-]|\s*$)'
-    matches = re.findall(pattern, label_string)
-    
-    if not matches:
-        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
-    
-    # Get existing repo labels to validate additions
-    existing_labels = get_repo_labels()
-    
-    results = []
-    all_success = True
-    
-    for action, label in matches:
-        label = label.strip()
-        if not label:
-            continue
-            
-        if action == "+":
-            # Check if label exists in repo before adding
-            if label not in existing_labels:
-                results.append(f"⚠️ Label `{label}` does not exist in this repository")
-                all_success = False
-            elif add_label(issue_number, label):
-                results.append(f"✅ Added label `{label}`")
-            else:
-                results.append(f"❌ Failed to add label `{label}`")
-                all_success = False
-        elif action == "-":
-            if remove_label(issue_number, label):
-                results.append(f"✅ Removed label `{label}`")
-            else:
-                results.append(f"❌ Failed to remove label `{label}`")
-                all_success = False
-    
-    if not results:
-        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
-    
-    return "\n".join(results), all_success
+    return commands_module.handle_label_command(sys.modules[__name__], issue_number, label_string)
 
 
 def parse_issue_labels() -> list[str]:
-    labels_json = os.environ.get("ISSUE_LABELS", "[]")
-    try:
-        labels = json.loads(labels_json)
-    except json.JSONDecodeError:
-        labels = []
-    if not isinstance(labels, list):
-        return []
-    return [str(label) for label in labels]
+    return commands_module.parse_issue_labels()
 
 
 def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-    )
-    if check and result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout or "Command failed").strip())
-    return result
+    return commands_module.run_command(command, cwd, check=check)
 
 
 def summarize_output(result: subprocess.CompletedProcess, limit: int = 20) -> str:
-    combined = "\n".join(
-        [line for line in [result.stdout, result.stderr] if line]
-    ).strip()
-    if not combined:
-        return ""
-    lines = combined.splitlines()
-    return "\n".join(lines[-limit:])
+    return commands_module.summarize_output(result, limit=limit)
 
 
 def list_changed_files(repo_root: Path) -> list[str]:
-    result = run_command(["git", "status", "--porcelain"], cwd=repo_root)
-    files = []
-    for line in result.stdout.splitlines():
-        if not line:
-            continue
-        path = line[3:]
-        if " -> " in path:
-            path = path.split(" -> ")[-1]
-        files.append(path)
-    return files
+    return commands_module.list_changed_files(repo_root)
 
 
 def get_default_branch() -> str:
-    repo_info = github_api("GET", "")
-    if isinstance(repo_info, dict):
-        return repo_info.get("default_branch", "main")
-    return "main"
+    return commands_module.get_default_branch(sys.modules[__name__])
 
 
 def find_open_pr_for_branch(branch: str) -> dict | None:
-    owner = os.environ.get("REPO_OWNER", "").strip()
-    branch = branch.strip()
-    if not owner or not branch:
-        return None
-
-    response = github_api("GET", f"pulls?state=open&head={owner}:{branch}")
-    if isinstance(response, list) and response:
-        first = response[0]
-        if isinstance(first, dict):
-            return first
-    return None
+    return commands_module.find_open_pr_for_branch(sys.modules[__name__], branch)
 
 
 def resolve_workflow_run_pr_number() -> int:
-    """Resolve and validate PR number for workflow_run reconcile execution."""
-    pr_number_raw = os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
-    if not pr_number_raw:
-        raise RuntimeError(
-            "Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER in workflow_run reconcile context"
-        )
-
-    try:
-        pr_number = int(pr_number_raw)
-    except ValueError as exc:
-        raise RuntimeError(
-            "WORKFLOW_RUN_RECONCILE_PR_NUMBER must be a positive integer"
-        ) from exc
-
-    if pr_number <= 0:
-        raise RuntimeError(
-            "WORKFLOW_RUN_RECONCILE_PR_NUMBER must be a positive integer"
-        )
-
-    reconcile_head_sha = os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip()
-    if not reconcile_head_sha:
-        raise RuntimeError(
-            "Missing WORKFLOW_RUN_RECONCILE_HEAD_SHA in workflow_run reconcile context"
-        )
-
-    workflow_run_head_sha = os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip()
-    if not workflow_run_head_sha:
-        raise RuntimeError("Missing WORKFLOW_RUN_HEAD_SHA for workflow_run reconcile")
-
-    if reconcile_head_sha != workflow_run_head_sha:
-        raise RuntimeError(
-            "Workflow_run reconcile context SHA mismatch between artifact and workflow payload"
-        )
-
-    pull_request = github_api("GET", f"pulls/{pr_number}")
-    if not isinstance(pull_request, dict):
-        raise RuntimeError(f"Failed to fetch pull request #{pr_number} during workflow_run reconcile")
-
-    head = pull_request.get("head")
-    pull_request_head_sha = ""
-    if isinstance(head, dict):
-        head_sha = head.get("sha")
-        if isinstance(head_sha, str):
-            pull_request_head_sha = head_sha.strip()
-
-    if not pull_request_head_sha:
-        raise RuntimeError(f"Pull request #{pr_number} is missing a valid head SHA")
-
-    if pull_request_head_sha != reconcile_head_sha:
-        raise RuntimeError(
-            f"Pull request #{pr_number} head SHA does not match workflow_run reconcile context"
-        )
-
-    print(f"Resolved workflow_run PR from reconcile context: #{pr_number}")
-    return pr_number
+    return commands_module.resolve_workflow_run_pr_number(sys.modules[__name__])
 
 
 def create_pull_request(branch: str, base: str, issue_number: int) -> dict | None:
-    existing = find_open_pr_for_branch(branch)
-    if existing:
-        return existing
-    title = "chore: update spec.lock (no guideline impact)"
-    body = (
-        "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n"
-        f"Closes #{issue_number}"
-    )
-    response = github_api(
-        "POST",
-        "pulls",
-        {
-            "title": title,
-            "head": branch,
-            "base": base,
-            "body": body,
-        },
-    )
-    if isinstance(response, dict):
-        return response
-    return None
+    return commands_module.create_pull_request(sys.modules[__name__], branch, base, issue_number)
 
 
 def handle_accept_no_fls_changes_command(issue_number: int, comment_author: str) -> tuple[str, bool]:
-    if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
-        return "❌ This command can only be used on issues, not PRs.", False
-
-    labels = parse_issue_labels()
-    if FLS_AUDIT_LABEL not in labels:
-        return "❌ This command is only available on issues labeled `fls-audit`.", False
-
-    if not check_user_permission(comment_author, "triage"):
-        return "❌ You must have triage permissions to run this command.", False
-
-    repo_root = Path(__file__).resolve().parents[1]
-    if list_changed_files(repo_root):
-        return "❌ Working tree is not clean; refusing to update spec.lock.", False
-
-    audit_result = run_command(
-        ["uv", "run", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
-        cwd=repo_root,
-        check=False,
-    )
-    if audit_result.returncode == 2:
-        return (
-            "❌ The audit reports affected guidelines. Please review and open a PR with "
-            "the necessary guideline updates instead.",
-            False,
-        )
-    if audit_result.returncode != 0:
-        details = summarize_output(audit_result)
-        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
-        return (f"❌ Audit command failed.{detail_text}", False)
-
-    update_result = run_command(
-        ["uv", "run", "python", "./make.py", "--update-spec-lock-file"],
-        cwd=repo_root,
-        check=False,
-    )
-    if update_result.returncode != 0:
-        details = summarize_output(update_result)
-        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
-        return (f"❌ Failed to update spec.lock.{detail_text}", False)
-
-    changed_files = list_changed_files(repo_root)
-    if not changed_files:
-        return "✅ `src/spec.lock` is already up to date; no PR needed.", True
-
-    unexpected = {path for path in changed_files if path != "src/spec.lock"}
-    if unexpected:
-        paths = ", ".join(sorted(unexpected))
-        return (
-            "❌ Unexpected tracked file changes detected; refusing to open a PR. "
-            f"Please review: {paths}",
-            False,
-        )
-
-    branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    base_branch = get_default_branch()
-    branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
-    if run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
-        suffix = datetime.now(timezone.utc).strftime("%H%M%S")
-        branch_name = f"{branch_name}-{suffix}"
-
-    try:
-        run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
-        run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
-        run_command(
-            [
-                "git",
-                "-c",
-                "user.name=guidelines-bot",
-                "-c",
-                "user.email=guidelines-bot@users.noreply.github.com",
-                "commit",
-                "-m",
-                "chore: update spec.lock; no affected guidelines",
-            ],
-            cwd=repo_root,
-        )
-        run_command(["git", "push", "origin", branch_name], cwd=repo_root)
-    except RuntimeError as exc:
-        return (f"❌ Failed to create branch or push changes: {exc}", False)
-
-    pr = create_pull_request(branch_name, base_branch, issue_number)
-    if not pr or "html_url" not in pr:
-        return "❌ Failed to open a pull request for the spec.lock update.", False
-
-    return (f"✅ Opened PR {pr['html_url']}", True)
+    return commands_module.handle_accept_no_fls_changes_command(sys.modules[__name__], issue_number, comment_author)
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
-    """
-    Handle the sync-members command - sync queue with members.md.
-
-    Returns (response_message, success).
-    """
-    state, changes = sync_members_with_queue(state)
-
-    if changes:
-        changes_text = "\n".join(f"- {c}" for c in changes)
-        return f"✅ Queue synced with members.md:\n\n{changes_text}", True
-    else:
-        return "✅ Queue is already in sync with members.md.", True
+    return commands_module.handle_sync_members_command(sys.modules[__name__], state)
 
 
 def handle_queue_command(state: dict) -> tuple[str, bool]:
-    """
-    Handle the queue command - show current queue status.
-
-    Returns (response_message, success).
-    """
-    queue_size = len(state["queue"])
-    
-    # Build link to state issue
-    repo_owner = os.environ.get("REPO_OWNER", "")
-    repo_name = os.environ.get("REPO_NAME", "")
-    state_issue_link = ""
-    if repo_owner and repo_name and STATE_ISSUE_NUMBER:
-        state_issue_link = f"\n\n[View full state details](https://github.com/{repo_owner}/{repo_name}/issues/{STATE_ISSUE_NUMBER})"
-
-    if queue_size == 0:
-        return f"📊 **Queue Status**: No reviewers in queue.{state_issue_link}", True
-
-    current_index = state["current_index"]
-    next_up = state["queue"][current_index]["github"]
-
-    # Build queue list
-    queue_list = []
-    for i, member in enumerate(state["queue"]):
-        marker = "→" if i == current_index else " "
-        queue_list.append(f"{marker} {i + 1}. @{member['github']}")
-
-    queue_text = "\n".join(queue_list)
-
-    # Build pass_until list
-    away_text = ""
-    if state.get("pass_until"):
-        away_list = []
-        for entry in state["pass_until"]:
-            reason = f" ({entry['reason']})" if entry.get("reason") else ""
-            away_list.append(
-                f"- @{entry['github']} until {entry['return_date']}{reason}"
-            )
-        away_text = "\n\n**Currently Away:**\n" + "\n".join(away_list)
-
-    return (f"📊 **Queue Status**\n\n"
-            f"**Next up:** @{next_up}\n\n"
-            f"**Queue ({queue_size} reviewers):**\n```\n{queue_text}\n```"
-            f"{away_text}{state_issue_link}"), True
+    return commands_module.handle_queue_command(sys.modules[__name__], state)
 
 
 def handle_commands_command() -> tuple[str, bool]:
-    """
-    Handle the status command - show all available commands.
-
-    Returns (response_message, success).
-    """
-    return (f"ℹ️ **Available Commands**\n\n"
-            f"**Pass or step away:**\n"
-            f"- `{BOT_MENTION} /pass [reason]` - Pass this review to next in queue (current reviewer only)\n"
-            f"- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n"
-            f"- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n"
-            f"**Assign reviewers:**\n"
-            f"- `{BOT_MENTION} /r? @username` - Assign a specific reviewer\n"
-            f"- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n"
-            f"- `{BOT_MENTION} /claim` - Claim this review for yourself\n\n"
-        f"**Other:**\n"
-        f"- `{BOT_MENTION} /label +label-name` - Add a label\n"
-        f"- `{BOT_MENTION} /label -label-name` - Remove a label\n"
-        f"- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub\n"
-        f"- `{BOT_MENTION} /accept-no-fls-changes` - Update spec.lock and open a PR when no guidelines are impacted\n"
-        f"- `{BOT_MENTION} /queue` - Show current queue status\n"
-        f"- `{BOT_MENTION} /sync-members` - Sync queue with members.md"), True
+    return commands_module.handle_commands_command(sys.modules[__name__])
 
 
 def handle_claim_command(state: dict, issue_number: int,
                         comment_author: str) -> tuple[str, bool]:
-    """
-    Handle the claim command - assign yourself as reviewer.
-
-    Returns (response_message, success).
-    """
-    # Check if user is in the queue (is a Producer)
-    is_producer = any(
-        m["github"].lower() == comment_author.lower()
-        for m in state["queue"]
-    )
-    is_away = any(
-        m["github"].lower() == comment_author.lower()
-        for m in state.get("pass_until", [])
-    )
-
-    if not is_producer and not is_away:
-        return (f"❌ @{comment_author} is not in the reviewer queue. "
-                f"Only Producers can claim reviews."), False
-
-    if is_away:
-        return (f"❌ @{comment_author} is currently marked as away. "
-                f"Please use `{BOT_MENTION} /away YYYY-MM-DD` to update your return date first, "
-                f"or wait until your scheduled return."), False
-
-    # Get current assignees
-    current_assignees = get_issue_assignees(issue_number)
-
-    # Remove existing assignees
-    for assignee in current_assignees:
-        unassign_reviewer(issue_number, assignee)
-
-    # Assign the claimer.
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = request_reviewer_assignment(issue_number, comment_author)
-    
-    # Track the reviewer in our state
-    set_current_reviewer(state, issue_number, comment_author, assignment_method="claim")
-
-    # Record the assignment
-    record_assignment(state, comment_author, issue_number, "pr" if is_pr else "issue")
-
-    if current_assignees:
-        prev_text = f" (previously: @{', @'.join(current_assignees)})"
-    else:
-        prev_text = ""
-
-    response = f"✅ @{comment_author} has claimed this review{prev_text}."
-    if not assignment_attempt.success:
-        failure_comment = get_assignment_failure_comment(comment_author, assignment_attempt)
-        if failure_comment:
-            response = f"{response}\n\n{failure_comment}"
-
-    return response, True
+    return commands_module.handle_claim_command(sys.modules[__name__], state, issue_number, comment_author)
 
 
 def handle_release_command(state: dict, issue_number: int,
                           comment_author: str, args: list | None = None) -> tuple[str, bool]:
-    """
-    Handle the release command - release an assignment without auto-reassigning.
-
-    Unlike pass, this does NOT automatically assign the next reviewer.
-    Use this when you want to unassign yourself or someone else but leave it
-    open for someone to claim.
-
-    Syntax:
-    - /release [reason] - Release yourself
-    - /release @username [reason] - Release someone else (requires triage+ permission)
-
-    Returns (response_message, success).
-    """
-    args = args or []
-    
-    # Determine if targeting self or someone else
-    target_username = None
-    reason = None
-    releasing_other = False
-    
-    if args and args[0].startswith("@"):
-        # Releasing someone else
-        target_username = args[0].lstrip("@")
-        reason = " ".join(args[1:]) if len(args) > 1 else None
-        releasing_other = target_username.lower() != comment_author.lower()
-        
-        if releasing_other:
-            # Check if comment author has triage+ permission
-            if not check_user_permission(comment_author, "triage"):
-                return (f"❌ @{comment_author} does not have permission to release "
-                        f"other reviewers. Triage access or higher is required."), False
-    else:
-        # Releasing self (original behavior)
-        target_username = comment_author
-        reason = " ".join(args) if args else None
-    
-    # Check who the current reviewer is (from our state first, then GitHub)
-    issue_key = str(issue_number)
-    tracked_reviewer = None
-    assignment_method = None
-    if "active_reviews" in state and issue_key in state["active_reviews"]:
-        issue_data = state["active_reviews"][issue_key]
-        if isinstance(issue_data, dict):
-            tracked_reviewer = issue_data.get("current_reviewer")
-            assignment_method = issue_data.get("assignment_method")
-    
-    # Also check GitHub assignees
-    current_assignees = get_issue_assignees(issue_number)
-
-    # Determine if the target is the current reviewer
-    is_tracked = tracked_reviewer and tracked_reviewer.lower() == target_username.lower()
-    is_assigned = target_username.lower() in [a.lower() for a in current_assignees]
-
-    if not is_tracked and not is_assigned:
-        if releasing_other:
-            # Trying to release someone who isn't assigned
-            if tracked_reviewer:
-                return (f"❌ @{target_username} is not the current reviewer. "
-                        f"Current reviewer: @{tracked_reviewer}"), False
-            elif current_assignees:
-                return (f"❌ @{target_username} is not assigned to this issue/PR. "
-                        f"Current assignee(s): @{', @'.join(current_assignees)}"), False
-            else:
-                return f"❌ @{target_username} is not assigned to this issue/PR.", False
-        else:
-            # Trying to release self when not assigned
-            if tracked_reviewer:
-                return (f"❌ @{comment_author} is not the current reviewer. "
-                        f"Current reviewer: @{tracked_reviewer}"), False
-            elif current_assignees:
-                return (f"❌ @{comment_author} is not assigned to this issue/PR. "
-                        f"Current assignee(s): @{', @'.join(current_assignees)}"), False
-            else:
-                return "❌ No reviewer is currently assigned to release.", False
-
-    # Remove the assignment (best effort)
-    unassign_reviewer(issue_number, target_username)
-
-    # Clear the current reviewer in our state
-    if "active_reviews" in state and issue_key in state["active_reviews"]:
-        if isinstance(state["active_reviews"][issue_key], dict):
-            state["active_reviews"][issue_key]["current_reviewer"] = None
-
-    # If this was a round-robin assignment, reposition the released user in the queue
-    # so they're next up (since they didn't complete the review they were assigned)
-    # For 'claim' or 'manual' assignments, don't touch the queue - they volunteered
-    # or were specifically requested
-    if assignment_method == "round-robin":
-        reposition_member_as_next(state, target_username)
-
-    reason_text = f" Reason: {reason}" if reason else ""
-    
-    if releasing_other:
-        # Someone else released this reviewer - notify them
-        return (f"✅ @{comment_author} has released @{target_username} from this review.{reason_text}\n\n"
-                f"_This issue/PR is now unassigned. Use `{BOT_MENTION} /r? producers` to assign "
-                f"the next reviewer from the queue, or `{BOT_MENTION} /claim` to claim it._"), True
-    else:
-        # Self-release
-        return (f"✅ @{target_username} has released this review.{reason_text}\n\n"
-                f"_This issue/PR is now unassigned. Use `{BOT_MENTION} /r? producers` to assign "
-                f"the next reviewer from the queue, or `{BOT_MENTION} /claim` to claim it._"), True
+    return commands_module.handle_release_command(sys.modules[__name__], state, issue_number, comment_author, args)
 
 
 def handle_assign_command(state: dict, issue_number: int,
                          username: str) -> tuple[str, bool]:
-    """
-    Handle assigning a specific person as reviewer.
-
-    Used by /r? @username command.
-
-    Returns (response_message, success).
-    """
-    # Clean up username (remove @ if present)
-    username = username.lstrip("@")
-
-    if not username:
-        return (f"❌ Missing username. Usage: `{BOT_MENTION} /r? @username`"), False
-
-    # Check if user is in the queue (is a Producer)
-    is_producer = any(
-        m["github"].lower() == username.lower()
-        for m in state["queue"]
-    )
-    is_away = any(
-        m["github"].lower() == username.lower()
-        for m in state.get("pass_until", [])
-    )
-
-    if not is_producer and not is_away:
-        return (f"⚠️ @{username} is not in the reviewer queue (not a Producer). "
-                f"Assigning anyway, but they may not have review permissions."), False
-
-    if is_away:
-        # Find their return date
-        for entry in state.get("pass_until", []):
-            if entry["github"].lower() == username.lower():
-                return_date = entry.get("return_date", "unknown")
-                return (f"⚠️ @{username} is currently marked as away until {return_date}. "
-                        f"Consider assigning someone else or waiting."), False
-
-    # Get current assignees and remove them
-    current_assignees = get_issue_assignees(issue_number)
-    for assignee in current_assignees:
-        unassign_reviewer(issue_number, assignee)
-
-    # Assign the specified user.
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = request_reviewer_assignment(issue_number, username)
-    
-    # Track the reviewer in our state
-    set_current_reviewer(state, issue_number, username, assignment_method="manual")
-
-    # Record the assignment (but don't advance queue - this is manual assignment)
-    record_assignment(state, username, issue_number, "pr" if is_pr else "issue")
-
-    if current_assignees:
-        prev_text = f" (previously: @{', @'.join(current_assignees)})"
-    else:
-        prev_text = ""
-
-    if assignment_attempt.success:
-        return f"✅ @{username} has been assigned as reviewer{prev_text}.", True
-
-    response = (
-        f"✅ @{username} remains designated as reviewer in bot state{prev_text}. "
-        "GitHub reviewer assignment could not be completed."
-    )
-    failure_comment = get_assignment_failure_comment(username, assignment_attempt)
-    if failure_comment:
-        response = f"{response}\n\n{failure_comment}"
-
-    return response, True
+    return commands_module.handle_assign_command(sys.modules[__name__], state, issue_number, username)
 
 
 def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[str, bool]:
-    """
-    Handle the assign-from-queue command (r? producers) - assign next from queue.
-
-    This advances the round-robin queue, unlike manual assignment.
-
-    Returns (response_message, success).
-    """
-    # Get current assignees and remove them
-    current_assignees = get_issue_assignees(issue_number)
-    for assignee in current_assignees:
-        unassign_reviewer(issue_number, assignee)
-
-    # Get the issue author to skip them
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
-    skip_set = {issue_author} if issue_author else set()
-
-    # Get next reviewer from the queue (this advances the queue)
-    next_reviewer = get_next_reviewer(state, skip_usernames=skip_set)
-
-    if not next_reviewer:
-        return ("❌ No reviewers available in the queue. "
-                f"Please use `{BOT_MENTION} /sync-members` to update the queue."), False
-
-    # Assign the reviewer.
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = request_reviewer_assignment(issue_number, next_reviewer)
-
-    # Track the reviewer in our state (source of truth for pass command)
-    set_current_reviewer(state, issue_number, next_reviewer)
-
-    # Record the assignment
-    record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
-
-    if current_assignees:
-        prev_text = f" (previously: @{', @'.join(current_assignees)})"
-    else:
-        prev_text = ""
-
-    failure_comment = get_assignment_failure_comment(next_reviewer, assignment_attempt)
-    if failure_comment:
-        post_comment(issue_number, failure_comment)
-
-    # Post the appropriate guidance
-    if is_pr:
-        if assignment_attempt.success:
-            guidance = get_pr_guidance(next_reviewer, issue_author)
-            post_comment(issue_number, guidance)
-    else:
-        guidance = get_issue_guidance(next_reviewer, issue_author)
-        post_comment(issue_number, guidance)
-
-    if assignment_attempt.success:
-        return f"✅ @{next_reviewer} (next in queue) has been assigned as reviewer{prev_text}.", True
-
-    return (
-        f"✅ @{next_reviewer} remains designated as reviewer in bot state{prev_text}."
-        " GitHub reviewer assignment could not be completed."
-    ), True
+    return commands_module.handle_assign_from_queue_command(sys.modules[__name__], state, issue_number)
 
 
 # ==============================================================================
