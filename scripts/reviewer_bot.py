@@ -63,7 +63,6 @@ import sys
 import time
 import uuid
 from collections.abc import Iterable
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -73,177 +72,110 @@ from urllib.parse import quote
 import requests
 import yaml
 
-# ==============================================================================
-# Configuration
-# ==============================================================================
-
-BOT_NAME = "guidelines-bot"
-BOT_MENTION = f"@{BOT_NAME}"
-CODING_GUIDELINE_LABEL = "coding guideline"
-FLS_AUDIT_LABEL = "fls-audit"
-REVIEW_LABELS = {CODING_GUIDELINE_LABEL, FLS_AUDIT_LABEL}
-# State is stored in a dedicated GitHub issue body (set via environment variable)
-STATE_ISSUE_NUMBER = int(os.environ.get("STATE_ISSUE_NUMBER", "0"))
-# Members file is in the consortium repo, not this repo
-MEMBERS_URL = "https://raw.githubusercontent.com/rustfoundation/safety-critical-rust-consortium/main/subcommittee/coding-guidelines/members.md"
-MAX_RECENT_ASSIGNMENTS = 20
-
-STATE_BLOCK_START_MARKER = "<!-- REVIEWER_BOT_STATE_START -->"
-STATE_BLOCK_END_MARKER = "<!-- REVIEWER_BOT_STATE_END -->"
-LOCK_BLOCK_START_MARKER = "<!-- REVIEWER_BOT_LOCK_START -->"
-LOCK_BLOCK_END_MARKER = "<!-- REVIEWER_BOT_LOCK_END -->"
-
-LOCK_SCHEMA_VERSION = 1
-LOCK_LEASE_TTL_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_TTL_SECONDS", "300"))
-LOCK_RETRY_BASE_SECONDS = float(os.environ.get("REVIEWER_BOT_LOCK_RETRY_SECONDS", "2"))
-LOCK_MAX_WAIT_SECONDS = int(os.environ.get("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "1200"))
-LOCK_API_RETRY_LIMIT = int(os.environ.get("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "5"))
-STATE_READ_RETRY_LIMIT = int(os.environ.get("REVIEWER_BOT_STATE_READ_RETRY_LIMIT", "4"))
-STATE_READ_RETRY_BASE_SECONDS = float(
-    os.environ.get("REVIEWER_BOT_STATE_READ_RETRY_SECONDS", "1")
-)
-LOCK_RENEWAL_WINDOW_SECONDS = int(
-    os.environ.get("REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS", "60")
-)
-LOCK_REF_NAME = os.environ.get("REVIEWER_BOT_LOCK_REF_NAME", "heads/reviewer-bot-state-lock")
-LOCK_REF_BOOTSTRAP_BRANCH = os.environ.get("REVIEWER_BOT_LOCK_BOOTSTRAP_BRANCH", "main")
-LOCK_COMMIT_MARKER = "reviewer-bot-lock-v1"
-
-EVENT_INTENT_MUTATING = "mutating"
-EVENT_INTENT_NON_MUTATING_DEFER = "non_mutating_defer"
-EVENT_INTENT_NON_MUTATING_READONLY = "non_mutating_readonly"
-
-MANDATORY_TRIAGE_APPROVER_LABEL = "triage approver required"
-STATUS_AWAITING_REVIEW_COMPLETION_LABEL = "status: awaiting review completion"
-STATUS_AWAITING_WRITE_APPROVAL_LABEL = "status: awaiting write approval"
-STATUS_LABELS = {
-    STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
-    STATUS_AWAITING_WRITE_APPROVAL_LABEL,
-}
-STATUS_LABEL_CONFIG = {
-    STATUS_AWAITING_REVIEW_COMPLETION_LABEL: {
-        "color": "fbca04",
-        "description": "Reviewer-bot tracks an open assigned review obligation",
-    },
-    STATUS_AWAITING_WRITE_APPROVAL_LABEL: {
-        "color": "0e8a16",
-        "description": "Assigned review is complete but no visible write+ approval is present",
-    },
-    MANDATORY_TRIAGE_APPROVER_LABEL: {
-        "color": "d73a4a",
-        "description": "Indicates triage+ approval is required before merge queue",
-    },
-}
-MANDATORY_TRIAGE_PING_TARGETS = [
-    "@PLeVasseur",
-    "@felix91gr",
-    "@rcseacord",
-    "@plaindocs",
-    "@AlexCeleste",
-    "@sei-dsvoboda",
-]
-
-REVIEWER_REQUEST_422_TEMPLATE = (
-    "@{reviewer} is designated as reviewer by queue rotation, but GitHub could not add them to PR "
-    "Reviewers automatically (API 422). A triage+ approver may still be required before merge queue."
-)
-MANDATORY_TRIAGE_ESCALATION_TEMPLATE = (
-    "Mandatory triage approval required before merge queue. Pinging "
-    f"{' '.join(MANDATORY_TRIAGE_PING_TARGETS)}. "
-    "Label applied: `triage approver required`."
-)
-MANDATORY_TRIAGE_SATISFIED_TEMPLATE = (
-    "Mandatory triage approval satisfied by @{approver}; removed `triage approver required`."
-)
-
-LOCK_METADATA_KEYS = [
-    "schema_version",
-    "lock_state",
-    "lock_owner_run_id",
-    "lock_owner_workflow",
-    "lock_owner_job",
-    "lock_token",
-    "lock_acquired_at",
-    "lock_expires_at",
-]
-
-# Review deadline configuration
-REVIEW_DEADLINE_DAYS = 14  # Days before first warning
-TRANSITION_PERIOD_DAYS = 14  # Days after warning before transition to Observer
-
-# Command definitions - single source of truth for command names and descriptions
-# Format: "command": "description"
-COMMANDS = {
-    "pass": "Pass this review to next in queue",
-    "away": "Step away from queue until date (YYYY-MM-DD)",
-    "release": "Release assignment (yours, or @username with triage+ permission)",
-    "rectify": "Reconcile this issue/PR's review state from GitHub",
-    "claim": "Claim this review for yourself",
-    "r?": "Assign a reviewer (@username or 'producers')",
-    "label": "Add/remove labels (+label-name or -label-name)",
-    "accept-no-fls-changes": "Update spec.lock and open PR for a clean audit",
-    "sync-members": "Sync queue with members.md",
-    "queue": "Show reviewer queue and who's next",
-    "commands": "Show all available commands",
-}
-
-
-def get_commands_help() -> str:
-    """Generate help text from COMMANDS dict."""
-    lines = []
-    for cmd, desc in COMMANDS.items():
-        lines.append(f"- `{BOT_MENTION} /{cmd}` - {desc}")
-    return "\n".join(lines)
-
+try:
+    from scripts.reviewer_bot_lib.config import (
+        BOT_MENTION,
+        COMMANDS,
+        EVENT_INTENT_MUTATING,
+        EVENT_INTENT_NON_MUTATING_DEFER,
+        EVENT_INTENT_NON_MUTATING_READONLY,
+        FLS_AUDIT_LABEL,
+        LOCK_API_RETRY_LIMIT,
+        LOCK_BLOCK_END_MARKER,
+        LOCK_BLOCK_START_MARKER,
+        LOCK_COMMIT_MARKER,
+        LOCK_LEASE_TTL_SECONDS,
+        LOCK_MAX_WAIT_SECONDS,
+        LOCK_METADATA_KEYS,
+        LOCK_REF_BOOTSTRAP_BRANCH,
+        LOCK_REF_NAME,
+        LOCK_RENEWAL_WINDOW_SECONDS,
+        LOCK_RETRY_BASE_SECONDS,
+        LOCK_SCHEMA_VERSION,
+        MANDATORY_TRIAGE_APPROVER_LABEL,
+        MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
+        MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
+        MAX_RECENT_ASSIGNMENTS,
+        REVIEW_DEADLINE_DAYS,
+        REVIEW_LABELS,
+        REVIEWER_REQUEST_422_TEMPLATE,
+        STATE_BLOCK_END_MARKER,
+        STATE_BLOCK_START_MARKER,
+        STATE_ISSUE_NUMBER,
+        STATE_READ_RETRY_BASE_SECONDS,
+        STATE_READ_RETRY_LIMIT,
+        STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+        STATUS_AWAITING_WRITE_APPROVAL_LABEL,
+        STATUS_LABEL_CONFIG,
+        STATUS_LABELS,
+        TRANSITION_PERIOD_DAYS,
+        AssignmentAttempt,
+        GitHubApiResult,
+        LeaseContext,
+        StateIssueBodyParts,
+        StateIssueSnapshot,
+        get_commands_help,
+    )
+    from scripts.reviewer_bot_lib.guidance import (
+        get_fls_audit_guidance,
+        get_issue_guidance,
+        get_pr_guidance,
+    )
+    from scripts.reviewer_bot_lib.members import fetch_members
+except ImportError:
+    from reviewer_bot_lib.config import (
+        BOT_MENTION,
+        COMMANDS,
+        EVENT_INTENT_MUTATING,
+        EVENT_INTENT_NON_MUTATING_DEFER,
+        EVENT_INTENT_NON_MUTATING_READONLY,
+        FLS_AUDIT_LABEL,
+        LOCK_API_RETRY_LIMIT,
+        LOCK_BLOCK_END_MARKER,
+        LOCK_BLOCK_START_MARKER,
+        LOCK_COMMIT_MARKER,
+        LOCK_LEASE_TTL_SECONDS,
+        LOCK_MAX_WAIT_SECONDS,
+        LOCK_METADATA_KEYS,
+        LOCK_REF_BOOTSTRAP_BRANCH,
+        LOCK_REF_NAME,
+        LOCK_RENEWAL_WINDOW_SECONDS,
+        LOCK_RETRY_BASE_SECONDS,
+        LOCK_SCHEMA_VERSION,
+        MANDATORY_TRIAGE_APPROVER_LABEL,
+        MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
+        MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
+        MAX_RECENT_ASSIGNMENTS,
+        REVIEW_DEADLINE_DAYS,
+        REVIEW_LABELS,
+        REVIEWER_REQUEST_422_TEMPLATE,
+        STATE_BLOCK_END_MARKER,
+        STATE_BLOCK_START_MARKER,
+        STATE_ISSUE_NUMBER,
+        STATE_READ_RETRY_BASE_SECONDS,
+        STATE_READ_RETRY_LIMIT,
+        STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+        STATUS_AWAITING_WRITE_APPROVAL_LABEL,
+        STATUS_LABEL_CONFIG,
+        STATUS_LABELS,
+        TRANSITION_PERIOD_DAYS,
+        AssignmentAttempt,
+        GitHubApiResult,
+        LeaseContext,
+        StateIssueBodyParts,
+        StateIssueSnapshot,
+        get_commands_help,
+    )
+    from reviewer_bot_lib.guidance import (
+        get_fls_audit_guidance,
+        get_issue_guidance,
+        get_pr_guidance,
+    )
+    from reviewer_bot_lib.members import fetch_members
 
 # ==============================================================================
 # GitHub API Helpers
 # ==============================================================================
-
-
-@dataclass
-class GitHubApiResult:
-    status_code: int
-    payload: Any
-    headers: dict[str, str]
-    text: str
-    ok: bool
-
-
-@dataclass
-class AssignmentAttempt:
-    success: bool
-    status_code: int | None
-    exhausted_retryable_failure: bool = False
-
-
-@dataclass
-class StateIssueSnapshot:
-    body: str
-    etag: str | None
-    html_url: str
-
-
-@dataclass
-class StateIssueBodyParts:
-    prefix: str
-    state_block_inner: str | None
-    between_state_and_lock: str
-    lock_block_inner: str | None
-    suffix: str
-    has_state_markers: bool
-    has_lock_markers: bool
-
-
-@dataclass
-class LeaseContext:
-    lock_token: str
-    lock_owner_run_id: str
-    lock_owner_workflow: str
-    lock_owner_job: str
-    state_issue_url: str
-    lock_ref: str = ""
-    lock_expires_at: str | None = None
 
 
 ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
@@ -619,74 +551,6 @@ def check_user_permission(username: str, required_permission: str = "triage") ->
     # The API returns a permissions object with boolean flags
     permissions = result.get("user", {}).get("permissions", {})
     return permissions.get(required_permission, False)
-
-
-# ==============================================================================
-# Members Parsing
-# ==============================================================================
-
-
-def fetch_members() -> list[dict]:
-    """
-    Fetch and parse members.md from the consortium repo to extract Producers.
-
-    Returns a list of dicts with 'github' and 'name' keys.
-    """
-    try:
-        response = requests.get(MEMBERS_URL, timeout=10)
-        response.raise_for_status()
-        content = response.text
-    except requests.RequestException as e:
-        print(f"WARNING: Failed to fetch members file from {MEMBERS_URL}: {e}", file=sys.stderr)
-        return []
-
-    producers = []
-
-    # Find the table in the markdown
-    lines = content.split("\n")
-    in_table = False
-    headers = []
-
-    for line in lines:
-        line = line.strip()
-
-        # Skip empty lines
-        if not line:
-            continue
-
-        # Check if this is a table row
-        if line.startswith("|") and line.endswith("|"):
-            cells = [c.strip() for c in line.split("|")[1:-1]]
-
-            # Check if this is the header row
-            if not in_table and "Member Name" in cells:
-                headers = [h.lower().replace(" ", "_") for h in cells]
-                in_table = True
-                continue
-
-            # Skip separator row
-            if in_table and all(c.replace("-", "").replace(":", "") == "" for c in cells):
-                continue
-
-            # Parse data row
-            if in_table and len(cells) == len(headers):
-                row = dict(zip(headers, cells))
-
-                # Check if this is a Producer (role contains "Producer" anywhere)
-                role = row.get("role", "").strip()
-                if "Producer" in role:
-                    github_username = row.get("github_username", "").strip()
-                    # Remove @ prefix if present
-                    if github_username.startswith("@"):
-                        github_username = github_username[1:]
-
-                    if github_username:
-                        producers.append({
-                            "github": github_username,
-                            "name": row.get("member_name", "").strip(),
-                        })
-
-    return producers
 
 
 # ==============================================================================
@@ -1943,130 +1807,6 @@ def record_assignment(state: dict, github: str, issue_number: int,
 
     state["recent_assignments"].insert(0, assignment)
     state["recent_assignments"] = state["recent_assignments"][:MAX_RECENT_ASSIGNMENTS]
-
-
-# ==============================================================================
-# Guidance Text
-# ==============================================================================
-
-
-def get_issue_guidance(reviewer: str, issue_author: str) -> str:
-    """Generate guidance text for an issue reviewer."""
-    return f"""👋 Hey @{reviewer}! You've been assigned to review this coding guideline issue.
-
-## Your Role as Reviewer
-
-As outlined in our [contribution guide](CONTRIBUTING.md), please:
-
-1. **Provide initial feedback within 14 days**
-2. **Work with @{issue_author}** to flesh out the concept and ensure the guideline is well-prepared for a Pull Request
-3. **Check the prerequisites** before the issue is ready to become a PR:
-   - The new rule isn't already covered by another rule
-   - All sections contain some content
-   - Content written may be *incomplete*, but must not be *incorrect*
-   - The `🧪 Code Example Test Results` section shows all example code compiles
-
-4. When ready, **add the `sign-off: create pr` label** to signal the contributor should create a PR
-
-## Bot Commands
-
-If you need to pass this review:
-- `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
-- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
-
-To assign someone else:
-- `{BOT_MENTION} /r? @username` - Assign a specific reviewer
-- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue
-
-Other commands:
-- `{BOT_MENTION} /claim` - Claim this review for yourself
-- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub
-- `{BOT_MENTION} /label +label-name` - Add a label
-- `{BOT_MENTION} /label -label-name` - Remove a label
-- `{BOT_MENTION} /queue` - Show reviewer queue
-- `{BOT_MENTION} /commands` - Show all available commands
-"""
-
-
-def get_fls_audit_guidance(reviewer: str, issue_author: str) -> str:
-    """Generate guidance text for an FLS audit issue reviewer."""
-    return f"""👋 Hey @{reviewer}! You've been assigned to review this FLS audit issue.
-
-## Your Role as Reviewer
-
-Please review the audit report in the issue body and determine whether any
-guideline changes are required.
-
-If the changes do **not** affect any guidelines:
-- Comment `{BOT_MENTION} /accept-no-fls-changes` to open a PR that updates `src/spec.lock`.
-
-If the changes **do** affect guidelines:
-- Open a PR with the necessary guideline updates and reference this issue.
-
-## Bot Commands
-
-If you need to pass this review:
-- `{BOT_MENTION} /pass [reason]` - Pass just this issue to the next reviewer
-- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
-
-To assign someone else:
-- `{BOT_MENTION} /r? @username` - Assign a specific reviewer
-- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue
-
-Other commands:
-- `{BOT_MENTION} /claim` - Claim this review for yourself
-- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub
-- `{BOT_MENTION} /label +label-name` - Add a label
-- `{BOT_MENTION} /label -label-name` - Remove a label
-- `{BOT_MENTION} /queue` - Show reviewer queue
-- `{BOT_MENTION} /commands` - Show all available commands
-"""
-
-
-def get_pr_guidance(reviewer: str, pr_author: str) -> str:
-    """Generate guidance text for a PR reviewer."""
-    return f"""👋 Hey @{reviewer}! You've been assigned to review this coding guideline PR.
-
-## Your Role as Reviewer
-
-As outlined in our [contribution guide](CONTRIBUTING.md), please:
-
-1. **Begin your review within 14 days**
-2. **Provide constructive feedback** on the guideline content, examples, and formatting
-3. **Iterate with @{pr_author}** - they may update the PR based on your feedback
-4. When the guideline is ready, **approve and add to the merge queue**
-
-## Review Checklist
-
-- [ ] Guideline title is clear and follows conventions
-- [ ] Amplification section expands on the title appropriately
-- [ ] Rationale explains the "why" effectively
-- [ ] Non-compliant example(s) clearly show the problem
-- [ ] Compliant example(s) clearly show the solution
-- [ ] Code examples compile (check the CI results)
-- [ ] FLS paragraph ID is correct
-
-## Bot Commands
-
-If you need to pass this review:
-- `{BOT_MENTION} /pass [reason]` - Pass just this PR to the next reviewer
-- `{BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from the queue until a date
-- `{BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)
-
-To assign someone else:
-- `{BOT_MENTION} /r? @username` - Assign a specific reviewer
-- `{BOT_MENTION} /r? producers` - Request the next reviewer from the queue
-
-Other commands:
-- `{BOT_MENTION} /claim` - Claim this review for yourself
-- `{BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub
-- `{BOT_MENTION} /label +label-name` - Add a label
-- `{BOT_MENTION} /label -label-name` - Remove a label
-- `{BOT_MENTION} /queue` - Show reviewer queue
-- `{BOT_MENTION} /commands` - Show all available commands
-"""
 
 
 # ==============================================================================
