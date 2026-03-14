@@ -87,7 +87,7 @@ jobs:
             print("Reconcile context event_name mismatch", file=sys.stderr)
             raise SystemExit(1)
 
-          if payload["event_action"] != "submitted":
+          if payload["event_action"] not in {"submitted", "dismissed"}:
             print("Reconcile context event_action mismatch", file=sys.stderr)
             raise SystemExit(1)
 
@@ -128,6 +128,7 @@ jobs:
           with open(github_env, "a", encoding="utf-8") as env_file:
             env_file.write(f"WORKFLOW_RUN_RECONCILE_PR_NUMBER={pr_number}\n")
             env_file.write(f"WORKFLOW_RUN_RECONCILE_HEAD_SHA={artifact_head_sha}\n")
+            env_file.write(f"WORKFLOW_RUN_EVENT_ACTION={payload['event_action']}\n")
           PY
 
       - name: Run reviewer bot reconcile
@@ -137,6 +138,7 @@ jobs:
           EVENT_NAME: workflow_run
           EVENT_ACTION: ${{ github.event.action }}
           WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW_RUN_EVENT_ACTION: ${{ env.WORKFLOW_RUN_EVENT_ACTION }}
           WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}

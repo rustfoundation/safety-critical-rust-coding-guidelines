@@ -44,12 +44,16 @@ def clear_env():
         "ISSUE_NUMBER",
         "ISSUE_AUTHOR",
         "IS_PULL_REQUEST",
+        "ISSUE_LABELS",
+        "LABEL_NAME",
+        "MANUAL_ACTION",
         "PR_IS_CROSS_REPOSITORY",
         "REVIEW_AUTHOR",
         "REVIEW_STATE",
         "REPO_OWNER",
         "REPO_NAME",
         "WORKFLOW_RUN_EVENT",
+        "WORKFLOW_RUN_EVENT_ACTION",
         "WORKFLOW_RUN_HEAD_SHA",
         "WORKFLOW_RUN_RECONCILE_PR_NUMBER",
         "WORKFLOW_RUN_RECONCILE_HEAD_SHA",
@@ -118,6 +122,24 @@ def captured_comments(monkeypatch):
 
     monkeypatch.setattr(reviewer_bot, "post_comment", record_comment)
     return comments
+
+
+@pytest.fixture
+def captured_status_label_ops(monkeypatch):
+    operations = []
+
+    def record_add(issue_number, label):
+        operations.append(("add", issue_number, label))
+        return True
+
+    def record_remove(issue_number, label):
+        operations.append(("remove", issue_number, label))
+        return True
+
+    monkeypatch.setattr(reviewer_bot, "add_label_with_status", record_add)
+    monkeypatch.setattr(reviewer_bot, "remove_label_with_status", record_remove)
+    monkeypatch.setattr(reviewer_bot, "ensure_label_exists", lambda *args, **kwargs: True)
+    return operations
 
 
 def test_parse_state_from_issue_yaml_block():
@@ -1315,6 +1337,118 @@ def test_resolve_workflow_run_pr_number_pr_head_sha_mismatch_raises(monkeypatch)
         reviewer_bot.resolve_workflow_run_pr_number()
 
 
+def test_project_status_labels_for_open_issue_returns_label_a(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2026-02-01T00:00:00+00:00",
+        "last_reviewer_activity": "2026-02-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "labels": []},
+    )
+
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEW_COMPLETION_LABEL}
+    assert metadata["state"] == "awaiting_review_completion"
+
+
+def test_project_status_labels_for_completed_pr_without_write_approval_returns_label_b(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2026-02-01T00:00:00+00:00",
+        "review_completed_at": "2026-02-02T00:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {
+            "number": issue_number,
+            "state": "open",
+            "pull_request": {},
+            "labels": [],
+        },
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "state": "APPROVED",
+                "submitted_at": "2026-02-03T00:00:00Z",
+                "user": {"login": "bob"},
+            }
+        ],
+    )
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
+
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL}
+    assert metadata["state"] == "awaiting_write_approval"
+
+
+def test_project_status_labels_for_completed_pr_with_write_approval_returns_no_labels(monkeypatch):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2026-02-01T00:00:00+00:00",
+        "review_completed_at": "2026-02-02T00:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {
+            "number": issue_number,
+            "state": "open",
+            "pull_request": {},
+            "labels": [],
+        },
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "state": "APPROVED",
+                "submitted_at": "2026-02-03T00:00:00Z",
+                "user": {"login": "bob"},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "check_user_permission",
+        lambda username, required_permission="triage": username == "bob" and required_permission == "push",
+    )
+
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+
+    assert desired_labels == set()
+    assert metadata["reason"] == "write_approval_present"
+
+
+def test_sync_status_labels_repairs_dual_label_drift(captured_status_label_ops):
+    changed = reviewer_bot.sync_status_labels(
+        42,
+        {reviewer_bot.STATUS_AWAITING_REVIEW_COMPLETION_LABEL},
+        {
+            reviewer_bot.STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+            reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL,
+            "coding guideline",
+        },
+    )
+
+    assert changed is True
+    assert captured_status_label_ops == [
+        ("remove", 42, reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL)
+    ]
+
+
 def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
     state = make_state()
     state["active_reviews"]["42"] = {
@@ -1329,6 +1463,7 @@ def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
         "skipped": [],
     }
     os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
     os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
     os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
     os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
@@ -1385,6 +1520,7 @@ def test_handle_workflow_run_event_idempotent_when_review_already_complete(monke
         "skipped": [],
     }
     os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
     os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
     os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
     os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
@@ -1430,6 +1566,7 @@ def test_handle_workflow_run_event_comment_failure_is_non_fatal(monkeypatch, cap
         "skipped": [],
     }
     os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
     os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
     os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
     os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
@@ -1470,6 +1607,7 @@ def test_handle_workflow_run_event_comment_failure_is_non_fatal(monkeypatch, cap
 def test_handle_workflow_run_event_raises_on_invalid_context():
     state = make_state()
     os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
 
     with pytest.raises(RuntimeError, match="Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER"):
         reviewer_bot.handle_workflow_run_event(state)
@@ -1483,11 +1621,32 @@ def test_handle_workflow_run_event_ignores_non_review_events():
         "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
     }
     os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_target"
+    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
 
     handled = reviewer_bot.handle_workflow_run_event(state)
 
     assert handled is False
     assert state["active_reviews"]["42"].get("review_completed_at") is None
+
+
+def test_handle_workflow_run_event_dismissed_projects_only(monkeypatch):
+    state = make_state()
+    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
+    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "dismissed"
+    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
+    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
+    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
+        if method == "GET" and endpoint == "pulls/42"
+        else {},
+    )
+
+    handled = reviewer_bot.handle_workflow_run_event(state)
+
+    assert handled is False
 
 
 def test_handle_pull_request_review_event_approval_marks_complete(stub_api):
@@ -1658,6 +1817,24 @@ def test_handle_pull_request_review_event_cross_repo_defers(stub_api):
     assert state["active_reviews"]["42"].get("review_completed_at") is None
 
 
+def test_handle_pull_request_review_event_dismissed_is_projection_only(stub_api):
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "current_reviewer": "alice",
+        "assigned_at": "2000-01-01T00:00:00+00:00",
+        "review_completed_at": "2000-01-02T00:00:00+00:00",
+    }
+    os.environ["EVENT_ACTION"] = "dismissed"
+    os.environ["ISSUE_NUMBER"] = "42"
+    os.environ["REVIEW_STATE"] = "dismissed"
+    os.environ["REVIEW_AUTHOR"] = "bob"
+
+    handled = reviewer_bot.handle_pull_request_review_event(state)
+
+    assert handled is False
+    assert state["active_reviews"]["42"]["review_completed_at"] == "2000-01-02T00:00:00+00:00"
+
+
 def test_handle_closed_event_clears_active_review():
     state = make_state()
     state["active_reviews"]["42"] = {"current_reviewer": "alice"}
@@ -1724,6 +1901,19 @@ def test_handle_transition_notice_posts_comment(stub_api, captured_comments):
     assert "Transition Period Ended" in captured_comments[0]["body"]
 
 
+def test_handle_manual_dispatch_repair_collects_tracked_and_labeled_items(monkeypatch):
+    state = make_state()
+    state["active_reviews"] = {"42": {"current_reviewer": "alice"}}
+    monkeypatch.setenv("MANUAL_ACTION", "repair-review-status-labels")
+    monkeypatch.setattr(reviewer_bot, "list_open_items_with_status_labels", lambda: [42, 77])
+
+    handled = reviewer_bot.handle_manual_dispatch(state)
+    touched = reviewer_bot.drain_touched_items()
+
+    assert handled is False
+    assert touched == [42, 77]
+
+
 def test_handle_scheduled_check_posts_transition(stub_api, captured_comments, monkeypatch):
     state = make_state()
     state["active_reviews"]["42"] = {
@@ -1784,6 +1974,19 @@ def test_classify_event_intent_same_repo_review_is_mutating(monkeypatch):
     assert intent == reviewer_bot.EVENT_INTENT_MUTATING
 
 
+def test_classify_event_intent_same_repo_dismissed_review_is_mutating(monkeypatch):
+    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "false")
+    intent = reviewer_bot.classify_event_intent("pull_request_review", "dismissed")
+    assert intent == reviewer_bot.EVENT_INTENT_MUTATING
+
+
+def test_classify_event_intent_workflow_run_dismissed_review_is_mutating(monkeypatch):
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT_ACTION", "dismissed")
+    intent = reviewer_bot.classify_event_intent("workflow_run", "completed")
+    assert intent == reviewer_bot.EVENT_INTENT_MUTATING
+
+
 def test_main_cross_repo_review_does_not_acquire_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_review")
     monkeypatch.setenv("EVENT_ACTION", "submitted")
@@ -1835,6 +2038,53 @@ def test_main_same_repo_review_acquires_lock(monkeypatch):
     assert acquire_called["value"] is True
 
 
+def test_main_reloads_state_before_syncing_status_labels(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "issue_comment")
+    monkeypatch.setenv("EVENT_ACTION", "created")
+
+    initial_state = make_state()
+    reloaded_state = make_state()
+    load_calls = {"count": 0}
+    call_order = []
+
+    def fake_load_state(*, fail_on_unavailable=False):
+        load_calls["count"] += 1
+        call_order.append(f"load:{load_calls['count']}")
+        if load_calls["count"] == 1:
+            return initial_state
+        return reloaded_state
+
+    def fake_handle_comment_event(state):
+        assert state is initial_state
+        reviewer_bot.collect_touched_item(42)
+        call_order.append("handle")
+        return True
+
+    def fake_save_state(state):
+        assert state is initial_state
+        call_order.append("save")
+        return True
+
+    def fake_sync_status_labels_for_items(state, issue_numbers):
+        call_order.append("sync")
+        assert state is reloaded_state
+        assert list(issue_numbers) == [42]
+        return True
+
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+    monkeypatch.setattr(reviewer_bot, "load_state", fake_load_state)
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "handle_comment_event", fake_handle_comment_event)
+    monkeypatch.setattr(reviewer_bot, "save_state", fake_save_state)
+    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", fake_sync_status_labels_for_items)
+
+    reviewer_bot.main()
+
+    assert call_order == ["load:1", "handle", "save", "load:2", "sync"]
+
+
 def test_main_fails_when_save_state_fails(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
@@ -1856,6 +2106,7 @@ def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
     monkeypatch.setenv("EVENT_ACTION", "completed")
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT_ACTION", "submitted")
     monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
     monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
     monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())

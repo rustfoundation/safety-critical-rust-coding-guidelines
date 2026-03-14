@@ -62,10 +62,12 @@ import subprocess
 import sys
 import time
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 # GitHub API interaction
 import requests
@@ -112,6 +114,26 @@ EVENT_INTENT_NON_MUTATING_DEFER = "non_mutating_defer"
 EVENT_INTENT_NON_MUTATING_READONLY = "non_mutating_readonly"
 
 MANDATORY_TRIAGE_APPROVER_LABEL = "triage approver required"
+STATUS_AWAITING_REVIEW_COMPLETION_LABEL = "status: awaiting review completion"
+STATUS_AWAITING_WRITE_APPROVAL_LABEL = "status: awaiting write approval"
+STATUS_LABELS = {
+    STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+    STATUS_AWAITING_WRITE_APPROVAL_LABEL,
+}
+STATUS_LABEL_CONFIG = {
+    STATUS_AWAITING_REVIEW_COMPLETION_LABEL: {
+        "color": "fbca04",
+        "description": "Reviewer-bot tracks an open assigned review obligation",
+    },
+    STATUS_AWAITING_WRITE_APPROVAL_LABEL: {
+        "color": "0e8a16",
+        "description": "Assigned review is complete but no visible write+ approval is present",
+    },
+    MANDATORY_TRIAGE_APPROVER_LABEL: {
+        "color": "d73a4a",
+        "description": "Indicates triage+ approval is required before merge queue",
+    },
+}
 MANDATORY_TRIAGE_PING_TARGETS = [
     "@PLeVasseur",
     "@felix91gr",
@@ -225,6 +247,7 @@ class LeaseContext:
 
 
 ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
+TOUCHED_ISSUE_NUMBERS: set[int] = set()
 
 
 def get_github_token() -> str:
@@ -315,7 +338,7 @@ def add_label(issue_number: int, label: str) -> bool:
 
 def remove_label(issue_number: int, label: str) -> bool:
     """Remove a label from an issue or PR."""
-    github_api("DELETE", f"issues/{issue_number}/labels/{label}")
+    github_api("DELETE", f"issues/{issue_number}/labels/{quote(label, safe='')}")
     # 404 is ok - label might not exist
     return True
 
@@ -346,7 +369,7 @@ def remove_label_with_status(issue_number: int, label: str) -> bool:
     """Remove a label with explicit HTTP status handling."""
     response = github_api_request(
         "DELETE",
-        f"issues/{issue_number}/labels/{label}",
+        f"issues/{issue_number}/labels/{quote(label, safe='')}",
         suppress_error_log=True,
     )
     if response.status_code in {200, 204, 404}:
@@ -363,15 +386,21 @@ def remove_label_with_status(issue_number: int, label: str) -> bool:
     return False
 
 
-def ensure_label_exists(label: str) -> bool:
+def ensure_label_exists(
+    label: str,
+    *,
+    color: str | None = None,
+    description: str | None = None,
+) -> bool:
     """Create label if missing; treat 422 as already exists."""
+    label_config = STATUS_LABEL_CONFIG.get(label, {})
     response = github_api_request(
         "POST",
         "labels",
         {
             "name": label,
-            "color": "d73a4a",
-            "description": "Indicates triage+ approval is required before merge queue",
+            "color": color or label_config.get("color", "d73a4a"),
+            "description": description or label_config.get("description", ""),
         },
         suppress_error_log=True,
     )
@@ -387,6 +416,48 @@ def ensure_label_exists(label: str) -> bool:
         file=sys.stderr,
     )
     return False
+
+
+def collect_touched_item(issue_number: int | None) -> None:
+    """Record an issue/PR number for centralized status-label sync."""
+    if isinstance(issue_number, int) and issue_number > 0:
+        TOUCHED_ISSUE_NUMBERS.add(issue_number)
+
+
+def drain_touched_items() -> list[int]:
+    """Return touched issue numbers and clear the collector."""
+    touched = sorted(TOUCHED_ISSUE_NUMBERS)
+    TOUCHED_ISSUE_NUMBERS.clear()
+    return touched
+
+
+def get_issue_or_pr_snapshot(issue_number: int) -> dict | None:
+    """Fetch issue metadata used for derived status labels."""
+    result = github_api("GET", f"issues/{issue_number}")
+    if isinstance(result, dict):
+        return result
+    return None
+
+
+def get_issue_or_pr_labels(issue_number: int) -> set[str] | None:
+    """Fetch the current label set for an issue or PR."""
+    item = get_issue_or_pr_snapshot(issue_number)
+    if not isinstance(item, dict):
+        return None
+
+    labels = item.get("labels", [])
+    if not isinstance(labels, list):
+        return set()
+
+    result = set()
+    for label in labels:
+        if isinstance(label, dict):
+            name = label.get("name")
+            if isinstance(name, str):
+                result.add(name)
+        elif isinstance(label, str):
+            result.add(label)
+    return result
 
 
 def request_reviewer_assignment(issue_number: int, username: str) -> AssignmentAttempt:
@@ -3018,6 +3089,7 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
         review_entry = {
             "skipped": [],
             "current_reviewer": None,
+            "cycle_started_at": None,
             "assigned_at": None,
             "last_reviewer_activity": None,
             "transition_warning_sent": None,
@@ -3036,6 +3108,7 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
         review_entry = {
             "skipped": review_entry,
             "current_reviewer": None,
+            "cycle_started_at": None,
             "assigned_at": None,
             "last_reviewer_activity": None,
             "transition_warning_sent": None,
@@ -3059,6 +3132,7 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
 
     required_fields = {
         "current_reviewer": None,
+        "cycle_started_at": None,
         "assigned_at": None,
         "last_reviewer_activity": None,
         "transition_warning_sent": None,
@@ -3098,6 +3172,7 @@ def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
 
     # Set the reviewer and timestamps
     review_data["current_reviewer"] = reviewer
+    review_data["cycle_started_at"] = now
     review_data["assigned_at"] = now
     review_data["last_reviewer_activity"] = now
     review_data["transition_warning_sent"] = None  # Clear any previous warning
@@ -3301,13 +3376,242 @@ def parse_github_timestamp(value: str | None) -> datetime | None:
 
 
 def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
-    """Fetch submitted reviews for a pull request."""
-    result = github_api("GET", f"pulls/{issue_number}/reviews?per_page=100")
-    if result is None:
+    """Fetch submitted reviews for a pull request with pagination."""
+    reviews: list[dict] = []
+    page = 1
+
+    while True:
+        result = github_api("GET", f"pulls/{issue_number}/reviews?per_page=100&page={page}")
+        if result is None:
+            return None
+        if not isinstance(result, list):
+            return reviews
+
+        page_reviews = [review for review in result if isinstance(review, dict)]
+        reviews.extend(page_reviews)
+
+        if len(result) < 100:
+            return reviews
+
+        page += 1
+
+
+def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
+    """Collapse reviews to the latest submitted review per login."""
+    latest_by_login: dict[str, tuple[datetime, int, dict]] = {}
+
+    for index, review in enumerate(reviews):
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or not author.strip():
+            continue
+
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None:
+            continue
+
+        key = author.lower()
+        review_key = (submitted_at, index)
+        current = latest_by_login.get(key)
+        if current is None or review_key >= (current[0], current[1]):
+            latest_by_login[key] = (submitted_at, index, review)
+
+    return {login: item[2] for login, item in latest_by_login.items()}
+
+
+def get_current_cycle_boundary(review_data: dict) -> datetime | None:
+    """Return the conservative current-cycle boundary for PR approval checks."""
+    for field in ("cycle_started_at", "assigned_at", "review_completed_at"):
+        boundary = parse_iso8601_timestamp(review_data.get(field))
+        if boundary is not None:
+            return boundary
+    return None
+
+
+def pr_has_current_write_approval(
+    issue_number: int,
+    review_data: dict,
+    permission_cache: dict[str, bool] | None = None,
+    reviews: list[dict] | None = None,
+) -> bool | None:
+    """Return whether the PR has a visible in-cycle approval from a write+ user."""
+    boundary = get_current_cycle_boundary(review_data)
+    if boundary is None:
+        return False
+
+    if reviews is None:
+        reviews = get_pull_request_reviews(issue_number)
+    if reviews is None:
         return None
-    if not isinstance(result, list):
-        return []
-    return [review for review in result if isinstance(review, dict)]
+
+    permission_cache = permission_cache if permission_cache is not None else {}
+    latest_reviews = collapse_latest_reviews_by_login(reviews)
+
+    for login, review in latest_reviews.items():
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None or submitted_at < boundary:
+            continue
+
+        if str(review.get("state", "")).upper() != "APPROVED":
+            continue
+
+        if login not in permission_cache:
+            author = review.get("user", {}).get("login")
+            if not isinstance(author, str) or not author.strip():
+                return None
+            permission_cache[login] = check_user_permission(author, "push")
+
+        if permission_cache[login]:
+            return True
+
+    return False
+
+
+def project_status_labels_for_item(
+    issue_number: int,
+    state: dict,
+    *,
+    issue_snapshot: dict | None = None,
+) -> tuple[set[str] | None, dict[str, str | None]]:
+    """Project desired status labels for one issue or PR.
+
+    Returns (desired_labels, metadata). desired_labels is None when projection fails closed.
+    """
+    if issue_snapshot is None:
+        issue_snapshot = get_issue_or_pr_snapshot(issue_number)
+
+    if not isinstance(issue_snapshot, dict):
+        return None, {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
+
+    is_pr = isinstance(issue_snapshot.get("pull_request"), dict)
+    state_name = str(issue_snapshot.get("state", "")).lower()
+    if state_name == "closed":
+        return set(), {"state": "closed", "reason": None}
+
+    review_data = ensure_review_entry(state, issue_number)
+    if review_data is None:
+        return set(), {"state": "untracked", "reason": "no_review_entry"}
+
+    current_reviewer = review_data.get("current_reviewer")
+    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
+        return set(), {"state": "untracked", "reason": "no_current_reviewer"}
+
+    if not review_data.get("review_completed_at"):
+        return (
+            {STATUS_AWAITING_REVIEW_COMPLETION_LABEL},
+            {"state": "awaiting_review_completion", "reason": None},
+        )
+
+    if not is_pr:
+        return set(), {"state": "done", "reason": None}
+
+    permission_cache: dict[str, bool] = {}
+    has_write_approval = pr_has_current_write_approval(
+        issue_number,
+        review_data,
+        permission_cache=permission_cache,
+    )
+    if has_write_approval is None:
+        return None, {"state": "projection_failed", "reason": "write_approval_unknown"}
+    if has_write_approval:
+        return set(), {"state": "done", "reason": "write_approval_present"}
+    return (
+        {STATUS_AWAITING_WRITE_APPROVAL_LABEL},
+        {"state": "awaiting_write_approval", "reason": "write_approval_missing"},
+    )
+
+
+def sync_status_labels(issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
+    """Apply the desired reviewer-bot status labels to one issue or PR."""
+    actual_status_labels = {label for label in actual_labels if label in STATUS_LABELS}
+    to_add = desired_labels - actual_status_labels
+    to_remove = actual_status_labels - desired_labels
+
+    if not to_add and not to_remove:
+        return False
+
+    for label in STATUS_LABELS:
+        if not ensure_label_exists(label):
+            raise RuntimeError(f"Unable to ensure reviewer-bot status label exists: {label}")
+
+    changed = False
+    for label in sorted(to_remove):
+        if not remove_label_with_status(issue_number, label):
+            raise RuntimeError(f"Unable to remove reviewer-bot status label '{label}' from #{issue_number}")
+        changed = True
+    for label in sorted(to_add):
+        if not add_label_with_status(issue_number, label):
+            raise RuntimeError(f"Unable to add reviewer-bot status label '{label}' to #{issue_number}")
+        changed = True
+    return changed
+
+
+def sync_status_labels_for_items(state: dict, issue_numbers: Iterable[int]) -> bool:
+    """Recompute and apply reviewer-bot status labels for the given items."""
+    changed = False
+
+    for issue_number in sorted({n for n in issue_numbers if isinstance(n, int) and n > 0}):
+        issue_snapshot = get_issue_or_pr_snapshot(issue_number)
+        desired_labels, metadata = project_status_labels_for_item(
+            issue_number,
+            state,
+            issue_snapshot=issue_snapshot,
+        )
+        if desired_labels is None:
+            reason = metadata.get("reason") if isinstance(metadata, dict) else "unknown"
+            raise RuntimeError(
+                f"Failed to derive reviewer-bot status labels for #{issue_number}: {reason}"
+            )
+
+        if not isinstance(issue_snapshot, dict):
+            raise RuntimeError(f"Failed to refresh issue/PR snapshot for #{issue_number}")
+
+        labels = issue_snapshot.get("labels", [])
+        actual_labels = set()
+        if isinstance(labels, list):
+            for label in labels:
+                if isinstance(label, dict):
+                    name = label.get("name")
+                    if isinstance(name, str):
+                        actual_labels.add(name)
+
+        print(
+            f"Status label projection for #{issue_number}: state={metadata.get('state')} "
+            f"desired={sorted(desired_labels)} actual={sorted(actual_labels & STATUS_LABELS)}"
+        )
+        if sync_status_labels(issue_number, desired_labels, actual_labels):
+            changed = True
+
+    return changed
+
+
+def list_open_items_with_status_labels() -> list[int]:
+    """List open issues/PRs that already carry reviewer-bot status labels."""
+    numbers: set[int] = set()
+
+    for label in sorted(STATUS_LABELS):
+        page = 1
+        encoded_label = quote(label, safe="")
+        while True:
+            result = github_api(
+                "GET",
+                f"issues?state=open&labels={encoded_label}&per_page=100&page={page}",
+            )
+            if result is None:
+                raise RuntimeError(f"Failed to list open items for status label '{label}'")
+            if not isinstance(result, list):
+                break
+
+            for item in result:
+                if isinstance(item, dict):
+                    number = item.get("number")
+                    if isinstance(number, int):
+                        numbers.add(number)
+
+            if len(result) < 100:
+                break
+            page += 1
+
+    return sorted(numbers)
 
 
 def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | None:
@@ -3676,6 +3980,7 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
         return False
 
     print(f"Processing opened event for #{issue_number}")
+    collect_touched_item(issue_number)
 
     # Check if already has a reviewer (check our tracked state first, then GitHub)
     issue_key = str(issue_number)
@@ -3768,6 +4073,7 @@ def handle_labeled_event(state: dict) -> bool:
 
     label_name = os.environ.get("LABEL_NAME", "")
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    collect_touched_item(issue_number)
 
     if label_name == "sign-off: create pr":
         if is_pr:
@@ -3862,6 +4168,10 @@ def handle_pull_request_review_event(state: dict) -> bool:
         print("Missing review context")
         return False
 
+    collect_touched_item(issue_number)
+
+    review_action = os.environ.get("EVENT_ACTION", "").strip().lower()
+
     is_cross_repo = os.environ.get("PR_IS_CROSS_REPOSITORY", "false").lower() == "true"
     if is_cross_repo:
         print(
@@ -3880,6 +4190,10 @@ def handle_pull_request_review_event(state: dict) -> bool:
         return False
 
     current_reviewer = review_data.get("current_reviewer")
+    if review_action == "dismissed" or review_state == "DISMISSED":
+        print(f"Observed dismissed review on #{issue_number}; deferring to status-label projection")
+        return False
+
     if review_state == "APPROVED":
         return handle_pr_approved_review(
             state,
@@ -3906,6 +4220,7 @@ def handle_workflow_run_event(state: dict) -> bool:
     assert_lock_held("handle_workflow_run_event")
 
     workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
+    workflow_run_event_action = os.environ.get("WORKFLOW_RUN_EVENT_ACTION", "").strip().lower()
     if workflow_run_event != "pull_request_review":
         observed = workflow_run_event or "<missing>"
         print(
@@ -3914,7 +4229,20 @@ def handle_workflow_run_event(state: dict) -> bool:
         )
         return False
 
+    if workflow_run_event_action not in {"submitted", "dismissed"}:
+        observed = workflow_run_event_action or "<missing>"
+        print(
+            "Ignoring workflow_run reconcile event with unsupported source action: "
+            f"{observed}"
+        )
+        return False
+
     issue_number = resolve_workflow_run_pr_number()
+    collect_touched_item(issue_number)
+
+    if workflow_run_event_action == "dismissed":
+        print(f"Workflow_run observed dismissed review for #{issue_number}; projecting labels only")
+        return False
 
     message, success, state_changed = reconcile_active_review_entry(
         state,
@@ -3953,6 +4281,8 @@ def handle_closed_event(state: dict) -> bool:
     if not issue_number:
         print("No issue number found for closed event")
         return False
+
+    collect_touched_item(issue_number)
 
     issue_key = str(issue_number)
     
@@ -3998,6 +4328,7 @@ def handle_comment_event(state: dict) -> bool:
     response = ""
     success = False
     state_changed = False
+    status_projection_commands = {"pass", "away", "claim", "release", "rectify", "r?-user", "assign-from-queue"}
 
     if command == "_multiple_commands":
         response = ("⚠️ Multiple bot commands in one comment are ignored. "
@@ -4099,6 +4430,9 @@ def handle_comment_event(state: dict) -> bool:
                    f"Available commands:\n{get_commands_help()}")
         success = False
 
+    if command in status_projection_commands:
+        collect_touched_item(issue_number)
+
     # React to the command comment
     if comment_id and command != "_multiple_commands":
         add_reaction(int(comment_id), "eyes")
@@ -4127,6 +4461,23 @@ def handle_manual_dispatch(state: dict) -> bool:
         if changes:
             print(f"Sync changes: {changes}")
         return True
+
+    elif action == "repair-review-status-labels":
+        tracked_numbers = []
+        active_reviews = state.get("active_reviews", {})
+        if isinstance(active_reviews, dict):
+            for issue_key in active_reviews:
+                try:
+                    tracked_numbers.append(int(issue_key))
+                except (TypeError, ValueError):
+                    continue
+
+        for issue_number in tracked_numbers:
+            collect_touched_item(issue_number)
+        for issue_number in list_open_items_with_status_labels():
+            collect_touched_item(issue_number)
+        print(f"Collected {len(TOUCHED_ISSUE_NUMBERS)} item(s) for status-label repair")
+        return False
 
     elif action == "check-overdue":
         # Manually trigger the overdue review check
@@ -4217,7 +4568,8 @@ def handle_scheduled_check(state: dict) -> bool:
                 print(f"Reassigned #{issue_number} from @{reviewer} to @{next_reviewer}")
             else:
                 print(f"No available reviewers to reassign #{issue_number}")
-            
+
+            collect_touched_item(issue_number)
             state_changed = True
     
     return state_changed
@@ -4241,7 +4593,7 @@ def classify_event_intent(event_name: str, event_action: str) -> str:
         return EVENT_INTENT_NON_MUTATING_READONLY
 
     if event_name == "pull_request_review":
-        if event_action != "submitted":
+        if event_action not in {"submitted", "dismissed"}:
             return EVENT_INTENT_NON_MUTATING_READONLY
         is_cross_repo = os.environ.get("PR_IS_CROSS_REPOSITORY", "false").lower() == "true"
         if is_cross_repo:
@@ -4252,7 +4604,11 @@ def classify_event_intent(event_name: str, event_action: str) -> str:
         if event_action != "completed":
             return EVENT_INTENT_NON_MUTATING_READONLY
         workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
-        if workflow_run_event == "pull_request_review":
+        workflow_run_event_action = os.environ.get("WORKFLOW_RUN_EVENT_ACTION", "").strip().lower()
+        if (
+            workflow_run_event == "pull_request_review"
+            and workflow_run_event_action in {"submitted", "dismissed"}
+        ):
             return EVENT_INTENT_MUTATING
         return EVENT_INTENT_NON_MUTATING_READONLY
 
@@ -4277,6 +4633,7 @@ def main():
     """Main entry point for the reviewer bot."""
     event_name = os.environ.get("EVENT_NAME", "")
     event_action = os.environ.get("EVENT_ACTION", "")
+    drain_touched_items()
 
     event_intent = classify_event_intent(event_name, event_action)
     lock_required = event_intent == EVENT_INTENT_MUTATING
@@ -4290,9 +4647,11 @@ def main():
     exit_code = 0
 
     state_changed = False
+    status_labels_changed = False
     sync_changes: list[str] = []
     restored: list[str] = []
     loaded_active_reviews_count = 0
+    touched_items: list[int] = []
 
     try:
         if lock_required:
@@ -4334,7 +4693,7 @@ def main():
                 state_changed = handle_closed_event(state)
 
         elif event_name == "pull_request_review":
-            if event_action == "submitted":
+            if event_action in {"submitted", "dismissed"}:
                 state_changed = handle_pull_request_review_event(state)
 
         elif event_name == "issue_comment":
@@ -4357,6 +4716,8 @@ def main():
                         "Ignoring workflow_run event with unsupported source event: "
                         f"{os.environ.get('WORKFLOW_RUN_EVENT', '').strip() or '<missing>'}"
                     )
+
+        touched_items = drain_touched_items()
 
         # Save state if changed (or if we synced members/pass-until)
         if state_changed or sync_changes or restored:
@@ -4392,11 +4753,23 @@ def main():
                     "Failing this run to avoid silent success."
                 )
 
-            with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
-                f.write("state_changed=true\n")
-        else:
-            with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
-                f.write("state_changed=false\n")
+            if touched_items:
+                state = load_state(fail_on_unavailable=True)
+
+        if touched_items:
+            if not lock_acquired:
+                raise RuntimeError(
+                    "Status-label projection reached apply path without lease lock. "
+                    "Acquire lock before mutating labels."
+                )
+            status_labels_changed = sync_status_labels_for_items(state, touched_items)
+
+        with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
+            f.write(
+                "state_changed=true\n"
+                if (state_changed or bool(sync_changes) or bool(restored) or status_labels_changed)
+                else "state_changed=false\n"
+            )
 
     except RuntimeError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

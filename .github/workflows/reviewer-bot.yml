@@ -16,7 +16,7 @@ on:
 
   # Trigger on PR review submissions
   pull_request_review:
-    types: [submitted]
+    types: [submitted, dismissed]
 
   # Nightly check for overdue reviews (runs at 9 AM UTC daily)
   schedule:
@@ -34,6 +34,7 @@ on:
           - sync-members
           - show-state
           - check-overdue
+          - repair-review-status-labels
 
 permissions:
   issues: write
@@ -104,7 +105,7 @@ jobs:
           uv run python scripts/reviewer_bot.py
 
       - name: Write reconcile context artifact
-        if: ${{ success() && github.event_name == 'pull_request_review' && github.event.action == 'submitted' }}
+        if: ${{ success() && github.event_name == 'pull_request_review' && (github.event.action == 'submitted' || github.event.action == 'dismissed') }}
         env:
           RECONCILE_CONTEXT_PATH: ${{ runner.temp }}/reviewer-bot/reconcile-context.json
           RECONCILE_EVENT_NAME: ${{ github.event_name }}
@@ -126,7 +127,7 @@ jobs:
           EOF
 
       - name: Upload reconcile context artifact
-        if: ${{ success() && github.event_name == 'pull_request_review' && github.event.action == 'submitted' }}
+        if: ${{ success() && github.event_name == 'pull_request_review' && (github.event.action == 'submitted' || github.event.action == 'dismissed') }}
         uses: actions/upload-artifact@v4
         with:
           name: reviewer-bot-reconcile-context-${{ github.run_id }}
