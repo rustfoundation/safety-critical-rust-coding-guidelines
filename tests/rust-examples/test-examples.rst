@@ -123,12 +123,15 @@ Channel Examples
    .. rust-example::
        :channel: nightly
 
-      #![feature(test)]
+       #![feature(test)]
 
-      fn main() {
-          // The test feature is permanently unstable
-          println!("This requires nightly");
-      }
+       extern crate test;
+
+       fn main() {
+           // The test crate is permanently unstable and requires nightly.
+           let value = test::black_box("This requires nightly");
+           println!("{value}");
+       }
 
 Combined Options
 ================
