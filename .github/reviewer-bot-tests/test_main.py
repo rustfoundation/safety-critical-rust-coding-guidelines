@@ -5,6 +5,8 @@ from scripts import reviewer_bot
 
 def make_state():
     return {
+        "schema_version": reviewer_bot.STATE_SCHEMA_VERSION,
+        "freshness_runtime_epoch": reviewer_bot.FRESHNESS_RUNTIME_EPOCH_V18,
         "last_updated": None,
         "current_index": 0,
         "queue": [
@@ -24,16 +26,14 @@ def test_classify_event_intent_cross_repo_review_is_non_mutating_defer(monkeypat
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
 
 
-def test_classify_event_intent_same_repo_review_is_mutating(monkeypatch):
-    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "false")
+def test_classify_event_intent_same_repo_review_is_non_mutating_defer(monkeypatch):
     intent = reviewer_bot.classify_event_intent("pull_request_review", "submitted")
-    assert intent == reviewer_bot.EVENT_INTENT_MUTATING
+    assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
 
 
-def test_classify_event_intent_same_repo_dismissed_review_is_mutating(monkeypatch):
-    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "false")
+def test_classify_event_intent_same_repo_dismissed_review_is_non_mutating_defer(monkeypatch):
     intent = reviewer_bot.classify_event_intent("pull_request_review", "dismissed")
-    assert intent == reviewer_bot.EVENT_INTENT_MUTATING
+    assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
 
 
 def test_classify_event_intent_workflow_run_dismissed_review_is_mutating(monkeypatch):
@@ -63,10 +63,31 @@ def test_main_cross_repo_review_does_not_acquire_lock(monkeypatch):
     assert acquire_called["value"] is False
 
 
-def test_main_same_repo_review_acquires_lock(monkeypatch):
+def test_main_same_repo_review_does_not_acquire_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_review")
     monkeypatch.setenv("EVENT_ACTION", "submitted")
-    monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "false")
+
+    acquire_called = {"value": False}
+
+    def fail_if_called():
+        acquire_called["value"] = True
+        raise AssertionError("acquire_state_issue_lease_lock should not be called")
+
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", fail_if_called)
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
+
+    reviewer_bot.main()
+
+    assert acquire_called["value"] is False
+
+
+def test_main_workflow_run_reconcile_acquires_lock(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "workflow_run")
+    monkeypatch.setenv("EVENT_ACTION", "completed")
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
 
     acquire_called = {"value": False}
 
@@ -87,7 +108,7 @@ def test_main_same_repo_review_acquires_lock(monkeypatch):
     monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
     monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
-    monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
+    monkeypatch.setattr(reviewer_bot, "handle_workflow_run_event", lambda state: False)
 
     reviewer_bot.main()
 
@@ -138,7 +159,15 @@ def test_main_reloads_state_before_syncing_status_labels(monkeypatch):
 
     reviewer_bot.main()
 
-    assert call_order == ["load:1", "handle", "save", "load:2", "sync"]
+    assert call_order == [
+        "load:1",
+        "handle",
+        "load:2",
+        "save",
+        "load:3",
+        "load:4",
+        "sync",
+    ]
 
 
 def test_main_fails_when_save_state_fails(monkeypatch):
@@ -168,6 +197,11 @@ def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
     monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
     monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
+    monkeypatch.setattr(
+        reviewer_bot,
+        "handle_workflow_run_event",
+        lambda state: (_ for _ in ()).throw(RuntimeError("invalid deferred context")),
+    )
 
     with pytest.raises(SystemExit) as excinfo:
         reviewer_bot.main()
