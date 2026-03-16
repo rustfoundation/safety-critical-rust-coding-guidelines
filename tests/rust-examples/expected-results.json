@@ -59,7 +59,7 @@
       "channel": "nightly"
     },
     {
-      "line": 144,
+      "line": 147,
       "name": "Combined edition + version",
       "expected": {
         "stable": "pass",
@@ -69,7 +69,7 @@
       "version": "1.79"
     },
     {
-      "line": 170,
+      "line": 173,
       "name": "Standard example (no options)",
       "expected": {
         "stable": "pass",
