@@ -72,12 +72,20 @@ try:
     import scripts.reviewer_bot_lib.state_store as state_store_module
     from scripts.reviewer_bot_lib import app as app_module
     from scripts.reviewer_bot_lib.config import (  # noqa: F401
+        AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
         BOT_MENTION,
+        BOT_NAME,
         COMMANDS,
+        DEFERRED_ARTIFACT_RETENTION_DAYS,
+        DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS,
+        DEFERRED_DISCOVERY_OVERLAP_SECONDS,
+        DEFERRED_MISSING_RUN_WINDOW_SECONDS,
         EVENT_INTENT_MUTATING,
         EVENT_INTENT_NON_MUTATING_DEFER,
         EVENT_INTENT_NON_MUTATING_READONLY,
         FLS_AUDIT_LABEL,
+        FRESHNESS_RUNTIME_EPOCH_LEGACY,
+        FRESHNESS_RUNTIME_EPOCH_V18,
         LOCK_API_RETRY_LIMIT,
         LOCK_BLOCK_END_MARKER,
         LOCK_BLOCK_START_MARKER,
@@ -95,6 +103,7 @@ try:
         MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
         MAX_RECENT_ASSIGNMENTS,
         REVIEW_DEADLINE_DAYS,
+        REVIEW_FRESHNESS_RUNBOOK_PATH,
         REVIEW_LABELS,
         REVIEWER_REQUEST_422_TEMPLATE,
         STATE_BLOCK_END_MARKER,
@@ -102,7 +111,10 @@ try:
         STATE_ISSUE_NUMBER,
         STATE_READ_RETRY_BASE_SECONDS,
         STATE_READ_RETRY_LIMIT,
+        STATE_SCHEMA_VERSION,
+        STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
         STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+        STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
         STATUS_AWAITING_WRITE_APPROVAL_LABEL,
         STATUS_LABEL_CONFIG,
         STATUS_LABELS,
@@ -145,12 +157,20 @@ except ImportError:
     import reviewer_bot_lib.reviews as reviews_module
     import reviewer_bot_lib.state_store as state_store_module
     from reviewer_bot_lib.config import (  # noqa: F401
+        AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
         BOT_MENTION,
+        BOT_NAME,
         COMMANDS,
+        DEFERRED_ARTIFACT_RETENTION_DAYS,
+        DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS,
+        DEFERRED_DISCOVERY_OVERLAP_SECONDS,
+        DEFERRED_MISSING_RUN_WINDOW_SECONDS,
         EVENT_INTENT_MUTATING,
         EVENT_INTENT_NON_MUTATING_DEFER,
         EVENT_INTENT_NON_MUTATING_READONLY,
         FLS_AUDIT_LABEL,
+        FRESHNESS_RUNTIME_EPOCH_LEGACY,
+        FRESHNESS_RUNTIME_EPOCH_V18,
         LOCK_API_RETRY_LIMIT,
         LOCK_BLOCK_END_MARKER,
         LOCK_BLOCK_START_MARKER,
@@ -168,6 +188,7 @@ except ImportError:
         MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
         MAX_RECENT_ASSIGNMENTS,
         REVIEW_DEADLINE_DAYS,
+        REVIEW_FRESHNESS_RUNBOOK_PATH,
         REVIEW_LABELS,
         REVIEWER_REQUEST_422_TEMPLATE,
         STATE_BLOCK_END_MARKER,
@@ -175,7 +196,10 @@ except ImportError:
         STATE_ISSUE_NUMBER,
         STATE_READ_RETRY_BASE_SECONDS,
         STATE_READ_RETRY_LIMIT,
+        STATE_SCHEMA_VERSION,
+        STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
         STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+        STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
         STATUS_AWAITING_WRITE_APPROVAL_LABEL,
         STATUS_LABEL_CONFIG,
         STATUS_LABELS,
@@ -813,6 +837,75 @@ def find_triage_approval_after(
     return None
 
 
+def classify_comment_payload(comment_body: str) -> dict:
+    return events_module.classify_comment_payload(sys.modules[__name__], comment_body)
+
+
+def classify_issue_comment_actor() -> str:
+    return events_module.classify_issue_comment_actor()
+
+
+def route_issue_comment_trust(issue_number: int) -> str:
+    return events_module.route_issue_comment_trust(sys.modules[__name__], issue_number)
+
+
+def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
+    return events_module.observer_run_reason_from_details(run_details, runbook_signature)
+
+
+def can_mark_observer_run_missing(gap: dict, now: datetime | None = None) -> bool:
+    return events_module.can_mark_observer_run_missing(gap, now)
+
+
+def classify_artifact_gap_reason(gap: dict, now: datetime | None = None) -> str:
+    return events_module.classify_artifact_gap_reason(gap, now)
+
+
+def sweep_deferred_gaps(state: dict) -> bool:
+    return events_module.sweep_deferred_gaps(sys.modules[__name__], state)
+
+
+def correlate_candidate_observer_runs(
+    source_event_key: str,
+    *,
+    source_event_kind: str,
+    source_event_created_at: str,
+    pr_number: int,
+    workflow_file: str,
+    workflow_runs: list[dict] | None,
+) -> dict:
+    return events_module.correlate_candidate_observer_runs(
+        source_event_key,
+        source_event_kind=source_event_kind,
+        source_event_created_at=source_event_created_at,
+        pr_number=pr_number,
+        workflow_file=workflow_file,
+        workflow_runs=workflow_runs,
+    )
+
+
+def correlate_run_artifacts_exact(
+    payloads_by_run: dict[int, list[dict]] | None,
+    source_event_key: str,
+    *,
+    pr_number: int,
+) -> dict:
+    return events_module.correlate_run_artifacts_exact(
+        payloads_by_run,
+        source_event_key,
+        pr_number=pr_number,
+    )
+
+
+def evaluate_deferred_gap_state(
+    existing_gap: dict,
+    run_correlation: dict,
+    run_detail: dict | None,
+    artifact_correlation: dict | None,
+) -> tuple[str, str]:
+    return events_module.evaluate_deferred_gap_state(existing_gap, run_correlation, run_detail, artifact_correlation)
+
+
 def reconcile_active_review_entry(
     state: dict,
     issue_number: int,
@@ -1003,6 +1096,14 @@ def handle_issue_or_pr_opened(state: dict) -> bool:
 
 def handle_labeled_event(state: dict) -> bool:
     return events_module.handle_labeled_event(sys.modules[__name__], state)
+
+
+def handle_issue_edited_event(state: dict) -> bool:
+    return events_module.handle_issue_edited_event(sys.modules[__name__], state)
+
+
+def handle_pull_request_target_synchronize(state: dict) -> bool:
+    return events_module.handle_pull_request_target_synchronize(sys.modules[__name__], state)
 
 
 def handle_pull_request_review_event(state: dict) -> bool:

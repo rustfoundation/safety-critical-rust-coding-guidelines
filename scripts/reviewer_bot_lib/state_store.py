@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 
 from .config import (
+    FRESHNESS_RUNTIME_EPOCH_LEGACY,
     LOCK_API_RETRY_LIMIT,
     LOCK_BLOCK_END_MARKER,
     LOCK_BLOCK_START_MARKER,
@@ -22,6 +23,7 @@ from .config import (
     STATE_ISSUE_NUMBER,
     STATE_READ_RETRY_BASE_SECONDS,
     STATE_READ_RETRY_LIMIT,
+    STATE_SCHEMA_VERSION,
     StateIssueBodyParts,
     StateIssueSnapshot,
 )
@@ -319,6 +321,8 @@ def assert_lock_held(bot, operation: str) -> None:
 
 def load_state(bot, *, fail_on_unavailable: bool = False) -> dict:
     default_state = {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "freshness_runtime_epoch": FRESHNESS_RUNTIME_EPOCH_LEGACY,
         "last_updated": None,
         "current_index": 0,
         "queue": [],
@@ -338,6 +342,10 @@ def load_state(bot, *, fail_on_unavailable: bool = False) -> dict:
         return default_state
 
     state = parse_state_from_issue(issue)
+    if not isinstance(state.get("schema_version"), int):
+        state["schema_version"] = STATE_SCHEMA_VERSION
+    if not isinstance(state.get("freshness_runtime_epoch"), str) or not state.get("freshness_runtime_epoch"):
+        state["freshness_runtime_epoch"] = FRESHNESS_RUNTIME_EPOCH_LEGACY
     if state.get("last_updated") is None:
         state["last_updated"] = None
     if not isinstance(state.get("current_index"), int):

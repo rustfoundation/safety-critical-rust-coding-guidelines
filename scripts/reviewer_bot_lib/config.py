@@ -41,20 +41,37 @@ EVENT_INTENT_MUTATING = "mutating"
 EVENT_INTENT_NON_MUTATING_DEFER = "non_mutating_defer"
 EVENT_INTENT_NON_MUTATING_READONLY = "non_mutating_readonly"
 
+STATE_SCHEMA_VERSION = 18
+FRESHNESS_RUNTIME_EPOCH_LEGACY = "legacy_v14"
+FRESHNESS_RUNTIME_EPOCH_V18 = "freshness_v15"
+REVIEW_FRESHNESS_RUNBOOK_PATH = "docs/reviewer-bot-review-freshness-operator-runbook.md"
+AUTHOR_ASSOCIATION_TRUST_ALLOWLIST = {"OWNER", "MEMBER", "COLLABORATOR"}
+DEFERRED_ARTIFACT_RETENTION_DAYS = 7
+DEFERRED_MISSING_RUN_WINDOW_SECONDS = 24 * 60 * 60
+DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS = 7 * 24 * 60 * 60
+DEFERRED_DISCOVERY_OVERLAP_SECONDS = 60 * 60
+
 MANDATORY_TRIAGE_APPROVER_LABEL = "triage approver required"
-STATUS_AWAITING_REVIEW_COMPLETION_LABEL = "status: awaiting review completion"
+STATUS_AWAITING_REVIEWER_RESPONSE_LABEL = "status: awaiting reviewer response"
+STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL = "status: awaiting contributor response"
 STATUS_AWAITING_WRITE_APPROVAL_LABEL = "status: awaiting write approval"
+STATUS_AWAITING_REVIEW_COMPLETION_LABEL = STATUS_AWAITING_REVIEWER_RESPONSE_LABEL
 STATUS_LABELS = {
-    STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+    STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
+    STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
     STATUS_AWAITING_WRITE_APPROVAL_LABEL,
 }
 STATUS_LABEL_CONFIG = {
-    STATUS_AWAITING_REVIEW_COMPLETION_LABEL: {
+    STATUS_AWAITING_REVIEWER_RESPONSE_LABEL: {
         "color": "fbca04",
-        "description": "Reviewer-bot tracks an open assigned review obligation",
+        "description": "Reviewer-bot is waiting on reviewer freshness or current-head review",
+    },
+    STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL: {
+        "color": "0e8a16",
+        "description": "Reviewer-bot is waiting on contributor follow-up or completion",
     },
     STATUS_AWAITING_WRITE_APPROVAL_LABEL: {
-        "color": "0e8a16",
+        "color": "1d76db",
         "description": "Assigned review is complete but no visible write+ approval is present",
     },
     MANDATORY_TRIAGE_APPROVER_LABEL: {
