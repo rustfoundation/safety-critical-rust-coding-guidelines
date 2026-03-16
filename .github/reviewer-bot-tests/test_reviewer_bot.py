@@ -1,1841 +1,667 @@
+import json
 import os
+from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts import reviewer_bot
 
 
-def make_state():
+def make_state(epoch: str = "freshness_v15"):
     return {
+        "schema_version": reviewer_bot.STATE_SCHEMA_VERSION,
+        "freshness_runtime_epoch": epoch,
         "last_updated": None,
         "current_index": 0,
-        "queue": [
-            {"github": "alice", "name": "Alice"},
-            {"github": "bob", "name": "Bob"},
-            {"github": "carol", "name": "Carol"},
-        ],
+        "queue": [],
         "pass_until": [],
         "recent_assignments": [],
         "active_reviews": {},
     }
 
 
-def test_parse_state_from_issue_yaml_block():
-    issue = {
-        "body": """## State\n\n```yaml\nqueue:\n  - github: alice\n    name: Alice\ncurrent_index: 1\n```
-"""
-    }
-    state = reviewer_bot.parse_state_from_issue(issue)
-    assert state["queue"][0]["github"] == "alice"
-    assert state["current_index"] == 1
-
-
-def test_parse_state_from_issue_raw_yaml():
-    issue = {"body": "queue:\n  - github: bob\n    name: Bob\ncurrent_index: 2\n"}
-    state = reviewer_bot.parse_state_from_issue(issue)
-    assert state["queue"][0]["github"] == "bob"
-    assert state["current_index"] == 2
-
-
-def test_parse_state_invalid_yaml_returns_empty():
-    issue = {"body": "queue: ["}
-    state = reviewer_bot.parse_state_from_issue(issue)
-    assert state == {}
-
-
-def test_load_state_applies_defaults(monkeypatch):
-    issue = {"body": "current_index: 3\nqueue: null\npass_until: null\nrecent_assignments: null\nactive_reviews: null\n"}
-    monkeypatch.setattr(reviewer_bot, "get_state_issue", lambda: issue)
-    state = reviewer_bot.load_state()
-    assert state["current_index"] == 3
-    assert state["queue"] == []
-    assert state["pass_until"] == []
-    assert state["recent_assignments"] == []
-    assert state["active_reviews"] == {}
-
-
-def test_load_state_fails_closed_when_required_and_unavailable(monkeypatch):
-    monkeypatch.setattr(reviewer_bot, "get_state_issue", lambda: None)
-
-    with pytest.raises(RuntimeError):
-        reviewer_bot.load_state(fail_on_unavailable=True)
-
-
-def test_get_state_issue_retries_then_succeeds(monkeypatch):
-    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
-
-    responses = [
-        reviewer_bot.GitHubApiResult(
-            status_code=502,
-            payload=None,
-            headers={},
-            text="bad gateway",
-            ok=False,
-        ),
-        reviewer_bot.GitHubApiResult(
-            status_code=503,
-            payload=None,
-            headers={},
-            text="service unavailable",
-            ok=False,
-        ),
-        reviewer_bot.GitHubApiResult(
-            status_code=200,
-            payload={"body": "ok"},
-            headers={},
-            text="",
-            ok=True,
-        ),
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch):
+    keys = [
+        "EVENT_NAME",
+        "EVENT_ACTION",
+        "ISSUE_NUMBER",
+        "ISSUE_AUTHOR",
+        "IS_PULL_REQUEST",
+        "COMMENT_BODY",
+        "COMMENT_AUTHOR",
+        "COMMENT_ID",
+        "COMMENT_CREATED_AT",
+        "COMMENT_USER_TYPE",
+        "COMMENT_AUTHOR_ASSOCIATION",
+        "COMMENT_SENDER_TYPE",
+        "COMMENT_INSTALLATION_ID",
+        "COMMENT_PERFORMED_VIA_GITHUB_APP",
+        "CURRENT_WORKFLOW_FILE",
+        "GITHUB_REPOSITORY",
+        "GITHUB_REF",
+        "ISSUE_BODY",
+        "ISSUE_UPDATED_AT",
+        "ISSUE_CHANGES_TITLE_FROM",
+        "ISSUE_CHANGES_BODY_FROM",
+        "SENDER_LOGIN",
+        "DEFERRED_CONTEXT_PATH",
+        "DEFERRED_ARTIFACT_RETENTION_DAYS",
+        "WORKFLOW_RUN_TRIGGERING_NAME",
+        "WORKFLOW_RUN_TRIGGERING_ID",
+        "WORKFLOW_RUN_TRIGGERING_ATTEMPT",
+        "WORKFLOW_RUN_TRIGGERING_CONCLUSION",
+        "MANUAL_ACTION",
+        "PRIVILEGED_SOURCE_EVENT_KEY",
     ]
-    calls = {"value": 0}
-    sleeps: list[float] = []
-
-    def fake_request(*args, **kwargs):
-        calls["value"] += 1
-        return responses.pop(0)
-
-    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
-    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda seconds: sleeps.append(seconds))
-
-    issue = reviewer_bot.get_state_issue()
-
-    assert isinstance(issue, dict)
-    assert issue.get("body") == "ok"
-    assert calls["value"] == 3
-    assert len(sleeps) == 2
-
-
-def test_get_state_issue_retry_exhaustion_returns_none(monkeypatch):
-    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
-
-    calls = {"value": 0}
-    sleeps: list[float] = []
-
-    def fake_request(*args, **kwargs):
-        calls["value"] += 1
-        return reviewer_bot.GitHubApiResult(
-            status_code=502,
-            payload=None,
-            headers={},
-            text="bad gateway",
-            ok=False,
-        )
-
-    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
-    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda seconds: sleeps.append(seconds))
-
-    issue = reviewer_bot.get_state_issue()
-
-    assert issue is None
-    assert calls["value"] == reviewer_bot.STATE_READ_RETRY_LIMIT
-    assert len(sleeps) == reviewer_bot.STATE_READ_RETRY_LIMIT - 1
-
-
-def test_save_state_formats_issue_body(monkeypatch):
-    payload = {}
-    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
-
-    initial_body = reviewer_bot.render_state_issue_body(make_state(), reviewer_bot.clear_lock_metadata())
-
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_state_issue_snapshot",
-        lambda: reviewer_bot.StateIssueSnapshot(
-            body=initial_body,
-            etag='"abc123"',
-            html_url="https://example.com/issues/314",
-        ),
-    )
-
-    def capture_patch(body, etag):
-        payload["body"] = body
-        payload["etag"] = etag
-        return reviewer_bot.GitHubApiResult(
-            status_code=200,
-            payload={"ok": True},
-            headers={},
-            text="",
-            ok=True,
-        )
-
-    monkeypatch.setattr(reviewer_bot, "conditional_patch_state_issue", capture_patch)
-    state = make_state()
-    assert reviewer_bot.save_state(state) is True
-    assert payload["etag"] == '"abc123"'
-    assert reviewer_bot.STATE_BLOCK_START_MARKER in payload["body"]
-    assert reviewer_bot.LOCK_BLOCK_START_MARKER in payload["body"]
-    assert "```yaml" in payload["body"]
-
-
-def test_parse_lock_metadata_from_issue_body_uses_markers():
-    lock_meta = reviewer_bot.normalize_lock_metadata(
-        {
-            "schema_version": 1,
-            "lock_owner_run_id": "123",
-            "lock_owner_workflow": "Reviewer Bot",
-            "lock_owner_job": "reviewer-bot",
-            "lock_token": "abcdef",
-            "lock_acquired_at": "2026-02-11T00:00:00+00:00",
-            "lock_expires_at": "2026-02-11T00:05:00+00:00",
-        }
-    )
-    body = reviewer_bot.render_state_issue_body(make_state(), lock_meta)
-
-    parsed = reviewer_bot.parse_lock_metadata_from_issue_body(body)
-
-    assert parsed == lock_meta
-
-
-def test_save_state_preserves_lock_metadata_across_save(monkeypatch):
-    payload = {}
-    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 314)
-    expected_lock_meta = reviewer_bot.normalize_lock_metadata(
-        {
-            "schema_version": 1,
-            "lock_owner_run_id": "run-42",
-            "lock_owner_workflow": "Reviewer Bot",
-            "lock_owner_job": "reviewer-bot",
-            "lock_token": "lock-token-42",
-            "lock_acquired_at": "2026-02-11T10:00:00+00:00",
-            "lock_expires_at": "2026-02-11T10:05:00+00:00",
-        }
-    )
-    initial_body = reviewer_bot.render_state_issue_body(make_state(), expected_lock_meta)
-
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_state_issue_snapshot",
-        lambda: reviewer_bot.StateIssueSnapshot(
-            body=initial_body,
-            etag='"etag-state"',
-            html_url="https://example.com/issues/314",
-        ),
-    )
-
-    def capture_patch(body, etag):
-        payload["body"] = body
-        payload["etag"] = etag
-        return reviewer_bot.GitHubApiResult(
-            status_code=200,
-            payload={"ok": True},
-            headers={},
-            text="",
-            ok=True,
-        )
-
-    monkeypatch.setattr(reviewer_bot, "conditional_patch_state_issue", capture_patch)
-
-    state = make_state()
-    assert reviewer_bot.save_state(state) is True
-    assert payload["etag"] == '"etag-state"'
-    parsed_lock = reviewer_bot.parse_lock_metadata_from_issue_body(payload["body"])
-    assert parsed_lock == expected_lock_meta
-
-
-def test_strip_code_blocks_removes_fenced_indented_inline():
-    body = """
-Here is a command:
-```
-@guidelines-bot /pass
-```
-    @guidelines-bot /queue
-And `@guidelines-bot /commands` inline.
-"""
-    sanitized = reviewer_bot.strip_code_blocks(body)
-    assert "/pass" not in sanitized
-    assert "/queue" not in sanitized
-    assert "/commands" not in sanitized
-
-
-def test_parse_command_single_command():
-    command, args = reviewer_bot.parse_command("@guidelines-bot /queue")
-    assert command == "queue"
-    assert args == []
-
-
-def test_parse_command_pass_reason():
-    command, args = reviewer_bot.parse_command("@guidelines-bot /pass reason here")
-    assert command == "pass"
-    assert args == ["reason", "here"]
-
-
-def test_parse_command_rectify():
-    command, args = reviewer_bot.parse_command("@guidelines-bot /rectify")
-    assert command == "rectify"
-    assert args == []
-
-
-def test_parse_command_multiple_commands():
-    command, args = reviewer_bot.parse_command(
-        "@guidelines-bot /queue\n@guidelines-bot /commands"
-    )
-    assert command == "_multiple_commands"
-    assert args == []
-
-
-def test_parse_command_malformed_known():
-    command, args = reviewer_bot.parse_command("@guidelines-bot pass")
-    assert command == "_malformed_known"
-    assert args == ["pass"]
-
-
-def test_parse_command_malformed_unknown():
-    command, args = reviewer_bot.parse_command("@guidelines-bot greetings")
-    assert command == "_malformed_unknown"
-    assert args == ["greetings"]
-
-
-def test_github_api_error_handling(monkeypatch):
-    class FakeResponse:
-        def __init__(self, status_code, content):
-            self.status_code = status_code
-            self.content = content
-            self.text = "error"
-            self.headers = {}
-
-        def json(self):
-            return {"ok": True}
-
-    monkeypatch.setattr(reviewer_bot, "get_github_token", lambda: "token")
-    monkeypatch.setenv("REPO_OWNER", "owner")
-    monkeypatch.setenv("REPO_NAME", "repo")
-
-    def fake_request(*args, **kwargs):
-        return FakeResponse(500, b"error")
-
-    monkeypatch.setattr(reviewer_bot.requests, "request", fake_request)
-    assert reviewer_bot.github_api("GET", "issues/1") is None
-
-
-def test_acquire_state_issue_lease_lock_success(monkeypatch):
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-    monkeypatch.setenv("WORKFLOW_RUN_ID", "9001")
-    monkeypatch.setenv("WORKFLOW_NAME", "Reviewer Bot")
-    monkeypatch.setenv("WORKFLOW_JOB_NAME", "reviewer-bot")
-    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
-    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_lock_ref_snapshot",
-        lambda: ("parent-sha", "tree-sha", reviewer_bot.clear_lock_metadata()),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "create_lock_commit",
-        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
-            status_code=201,
-            payload={"sha": "new-lock-commit-sha"},
-            headers={},
-            text="",
-            ok=True,
-        ),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "cas_update_lock_ref",
-        lambda new_sha: reviewer_bot.GitHubApiResult(
-            status_code=200,
-            payload={"ok": True},
-            headers={},
-            text="",
-            ok=True,
-        ),
-    )
-
-    ctx = reviewer_bot.acquire_state_issue_lease_lock()
-
-    assert ctx.lock_owner_run_id == "9001"
-    assert ctx.lock_owner_workflow == "Reviewer Bot"
-    assert ctx.lock_owner_job == "reviewer-bot"
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is not None
-    assert ctx.lock_ref == "refs/heads/reviewer-bot-state-lock"
-    assert isinstance(ctx.lock_expires_at, str)
-
-
-def test_acquire_state_issue_lease_lock_retries_on_conflict(monkeypatch):
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
-    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
-
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_lock_ref_snapshot",
-        lambda: ("parent-sha", "tree-sha", reviewer_bot.clear_lock_metadata()),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "create_lock_commit",
-        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
-            status_code=201,
-            payload={"sha": "new-lock-commit-sha"},
-            headers={},
-            text="",
-            ok=True,
-        ),
-    )
-    statuses = iter([409, 200])
-    monkeypatch.setattr(
-        reviewer_bot,
-        "cas_update_lock_ref",
-        lambda new_sha: reviewer_bot.GitHubApiResult(
-            status_code=next(statuses),
-            payload={"ok": True},
-            headers={},
-            text="",
-            ok=True,
-        ),
-    )
-
-    ctx = reviewer_bot.acquire_state_issue_lease_lock()
-    assert ctx.lock_token
-
-
-def test_acquire_state_issue_lease_lock_takes_over_expired_lock(monkeypatch):
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
-    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
-
-    expired_lock = reviewer_bot.normalize_lock_metadata(
-        {
-            "schema_version": 1,
-            "lock_owner_run_id": "123",
-            "lock_owner_workflow": "Reviewer Bot",
-            "lock_owner_job": "reviewer-bot",
-            "lock_state": "locked",
-            "lock_token": "stale-lock",
-            "lock_acquired_at": "2020-01-01T00:00:00+00:00",
-            "lock_expires_at": "2020-01-01T00:01:00+00:00",
-        }
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_lock_ref_snapshot",
-        lambda: ("parent-sha", "tree-sha", expired_lock),
-    )
-
-    monkeypatch.setattr(
-        reviewer_bot,
-        "create_lock_commit",
-        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
-            status_code=201,
-            payload={"sha": "new-lock-commit-sha"},
-            headers={},
-            text="",
-            ok=True,
-        ),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "cas_update_lock_ref",
-        lambda new_sha: reviewer_bot.GitHubApiResult(
-            status_code=200,
-            payload={"ok": True},
-            headers={},
-            text="",
-            ok=True,
-        ),
-    )
-
-    ctx = reviewer_bot.acquire_state_issue_lease_lock()
-    assert ctx.lock_token != "stale-lock"
-
-
-def test_acquire_state_issue_lease_lock_times_out(monkeypatch):
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-    monkeypatch.setattr(reviewer_bot, "LOCK_MAX_WAIT_SECONDS", 1)
-    monkeypatch.setattr(reviewer_bot.random, "uniform", lambda a, b: 0.0)
-    monkeypatch.setattr(reviewer_bot.time, "sleep", lambda _: None)
-
-    valid_lock = reviewer_bot.normalize_lock_metadata(
-        {
-            "schema_version": 1,
-            "lock_owner_run_id": "other-run",
-            "lock_owner_workflow": "Reviewer Bot",
-            "lock_owner_job": "reviewer-bot",
-            "lock_state": "locked",
-            "lock_token": "active-lock",
-            "lock_acquired_at": "2999-01-01T00:00:00+00:00",
-            "lock_expires_at": "2999-01-01T00:10:00+00:00",
-        }
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_lock_ref_snapshot",
-        lambda: ("parent-sha", "tree-sha", valid_lock),
-    )
-
-    monotonic_values = iter([0.0, 0.0, 2.0])
-    monkeypatch.setattr(reviewer_bot.time, "monotonic", lambda: next(monotonic_values))
-
-    with pytest.raises(RuntimeError, match="Timed out waiting for reviewer-bot lease lock"):
-        reviewer_bot.acquire_state_issue_lease_lock()
-
-
-def test_handle_pass_command_requires_current_reviewer(stub_api, monkeypatch):
-    state = make_state()
-    issue_number = 123
-    state["active_reviews"][str(issue_number)] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-    }
-    response, success = reviewer_bot.handle_pass_command(
-        state, issue_number, "bob", None
-    )
-    assert success is False
-    assert "Only the currently assigned reviewer" in response
-    assert state["active_reviews"][str(issue_number)]["skipped"] == []
-
-
-def test_handle_pass_command_allows_current_reviewer(stub_api, monkeypatch):
-    state = make_state()
-    issue_number = 123
-    state["active_reviews"][str(issue_number)] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-    }
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "bob")
-    response, success = reviewer_bot.handle_pass_command(
-        state, issue_number, "alice", None
-    )
-    assert success is True
-    assert "has passed" in response
-    assert "bob" in response
-    assert "alice" in state["active_reviews"][str(issue_number)]["skipped"]
-
-
-def test_reposition_member_as_next_moves_user():
-    state = make_state()
-    state["current_index"] = 2
-    assert reviewer_bot.reposition_member_as_next(state, "alice") is True
-    assert state["queue"][state["current_index"]]["github"] == "alice"
-
-
-def test_reposition_member_as_next_missing_user():
-    state = make_state()
-    assert reviewer_bot.reposition_member_as_next(state, "zoe") is False
-
-
-def test_get_next_reviewer_skips_and_advances():
-    state = make_state()
-    state["current_index"] = 0
-    reviewer = reviewer_bot.get_next_reviewer(state, skip_usernames={"alice"})
-    assert reviewer == "bob"
-    assert state["current_index"] == 2
-
-
-def test_record_assignment_caps_list(monkeypatch):
-    state = make_state()
-    monkeypatch.setattr(reviewer_bot, "MAX_RECENT_ASSIGNMENTS", 2)
-    reviewer_bot.record_assignment(state, "alice", 1, "issue")
-    reviewer_bot.record_assignment(state, "bob", 2, "issue")
-    reviewer_bot.record_assignment(state, "carol", 3, "issue")
-    assert len(state["recent_assignments"]) == 2
-    assert state["recent_assignments"][0]["github"] == "carol"
-
-
-def test_handle_comment_event_ignores_multiple_commands(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /queue\n@guidelines-bot /commands"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    reviewer_bot.handle_comment_event(state)
-    assert len(captured_comments) == 1
-    assert "Multiple bot commands" in captured_comments[0]["body"]
-    assert "/commands" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_ignores_commands_in_code_block(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-        "last_reviewer_activity": None,
-        "assigned_at": None,
-    }
-    os.environ["COMMENT_BODY"] = """
-Example:
-```
-@guidelines-bot /queue
-```
-"""
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert captured_comments == []
-
-
-def test_handle_comment_event_pass_command(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-    }
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /pass" 
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "bob")
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "has passed" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_rectify_command(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /rectify"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-
-    observed = {}
-
-    def fake_handle_rectify(passed_state, issue_number, comment_author):
-        observed["state"] = passed_state
-        observed["issue_number"] = issue_number
-        observed["comment_author"] = comment_author
-        return "rectified", True, True
-
-    monkeypatch.setattr(reviewer_bot, "handle_rectify_command", fake_handle_rectify)
-
-    handled = reviewer_bot.handle_comment_event(state)
-
-    assert handled is True
-    assert observed["state"] is state
-    assert observed["issue_number"] == 42
-    assert observed["comment_author"] == "alice"
-    assert len(captured_comments) == 1
-    assert captured_comments[0]["body"] == "rectified"
-
-
-def test_handle_comment_event_claim_command(stub_api, captured_comments):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /claim"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "has claimed" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_label_command(stub_api, captured_comments):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /label +a -b"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "Added label" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_label_command_with_hyphen(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /label +sign-off: create pr -sign-off: create pr"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_repo_labels",
-        lambda *args, **kwargs: {"sign-off: create pr"},
-    )
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "Added label `sign-off: create pr`" in captured_comments[0]["body"]
-    assert "Removed label `sign-off: create pr`" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_accept_no_fls_changes(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /accept-no-fls-changes"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "handle_accept_no_fls_changes_command",
-        lambda *args, **kwargs: ("ok", True),
-    )
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert captured_comments[0]["body"] == "ok"
-
-
-def test_handle_comment_event_queue_command(stub_api, captured_comments):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /queue"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "Queue Status" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_commands_command(stub_api, captured_comments):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /commands"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "Available Commands" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_away_command(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-    }
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /away 2099-01-01"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "bob")
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "now away until" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_release_command_self(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-        "assignment_method": "round-robin",
-    }
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: ["alice"])
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /release"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "has released" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_release_command_other_requires_permission(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-        "assignment_method": "round-robin",
-    }
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: ["alice"])
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /release @alice"
-    os.environ["COMMENT_AUTHOR"] = "bob"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "does not have permission" in captured_comments[0]["body"]
-
-
-def test_handle_release_command_other_with_permission(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "skipped": [],
-        "current_reviewer": "alice",
-        "assignment_method": "round-robin",
-    }
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: ["alice"])
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /release @alice"
-    os.environ["COMMENT_AUTHOR"] = "bob"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "has released @alice" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_assign_user(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /r? @bob"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "has been assigned" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_assign_from_queue(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /r? producers"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "bob")
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is True
-    assert len(captured_comments) == 2
-    assert "assigned as reviewer" in captured_comments[1]["body"]
-
-
-def test_handle_assign_from_queue_truthful_when_pr_request_returns_422(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    os.environ["IS_PULL_REQUEST"] = "true"
-    os.environ["ISSUE_AUTHOR"] = "dana"
-
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "request_reviewer_assignment",
-        lambda *args, **kwargs: reviewer_bot.AssignmentAttempt(success=False, status_code=422),
-    )
-
-    response, success = reviewer_bot.handle_assign_from_queue_command(state, 42)
-
-    assert success is True
-    assert "has been assigned as reviewer" not in response
-    assert "remains designated as reviewer" in response
-    assert len(captured_comments) == 1
-    assert captured_comments[0]["body"] == reviewer_bot.REVIEWER_REQUEST_422_TEMPLATE.format(reviewer="alice")
-
-
-def test_handle_issue_or_pr_opened_pr_request_422_posts_truthful_message(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["ISSUE_AUTHOR"] = "dana"
-    os.environ["ISSUE_LABELS"] = '["coding guideline"]'
-    os.environ["IS_PULL_REQUEST"] = "true"
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "request_reviewer_assignment",
-        lambda *args, **kwargs: reviewer_bot.AssignmentAttempt(success=False, status_code=422),
-    )
-
-    handled = reviewer_bot.handle_issue_or_pr_opened(state)
-
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert captured_comments[0]["body"] == reviewer_bot.REVIEWER_REQUEST_422_TEMPLATE.format(reviewer="alice")
-
-
-def test_handle_issue_or_pr_opened_assigns_reviewer(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["ISSUE_AUTHOR"] = "dana"
-    os.environ["ISSUE_LABELS"] = "[\"coding guideline\"]"
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
-    handled = reviewer_bot.handle_issue_or_pr_opened(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "assigned to review" in captured_comments[0]["body"]
-
-
-def test_handle_issue_or_pr_opened_assigns_reviewer_for_fls_audit(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["ISSUE_AUTHOR"] = "dana"
-    os.environ["ISSUE_LABELS"] = "[\"fls-audit\"]"
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
-    handled = reviewer_bot.handle_issue_or_pr_opened(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "assigned to review" in captured_comments[0]["body"]
-
-
-def test_handle_issue_or_pr_opened_missing_label(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["ISSUE_AUTHOR"] = "dana"
-    os.environ["ISSUE_LABELS"] = "[]"
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
-    handled = reviewer_bot.handle_issue_or_pr_opened(state)
-    assert handled is False
-    assert captured_comments == []
-
-
-def test_handle_labeled_event_assigns_reviewer(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["LABEL_NAME"] = "coding guideline"
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["ISSUE_AUTHOR"] = "dana"
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
-    handled = reviewer_bot.handle_labeled_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "assigned to review" in captured_comments[0]["body"]
-
-
-def test_handle_labeled_event_assigns_reviewer_for_fls_audit(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    os.environ["LABEL_NAME"] = "fls-audit"
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["ISSUE_AUTHOR"] = "dana"
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda *args, **kwargs: [])
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "alice")
-    handled = reviewer_bot.handle_labeled_event(state)
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "assigned to review" in captured_comments[0]["body"]
-
-
-def test_handle_labeled_event_wrong_label(stub_api, captured_comments):
-    state = make_state()
-    os.environ["LABEL_NAME"] = "not-it"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_labeled_event(state)
-    assert handled is False
-    assert captured_comments == []
-
-
-def test_handle_labeled_event_sign_off_marks_completion(stub_api):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["LABEL_NAME"] = "sign-off: create pr"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_labeled_event(state)
-    assert handled is True
-    review_data = state["active_reviews"]["42"]
-    assert review_data["review_completed_at"] is not None
-    assert review_data["review_completed_by"] == "alice"
-    assert review_data["review_completion_source"] == "issue_label: sign-off: create pr"
-
-
-def test_handle_labeled_event_sign_off_ignored_for_pr(stub_api):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["LABEL_NAME"] = "sign-off: create pr"
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["IS_PULL_REQUEST"] = "true"
-    handled = reviewer_bot.handle_labeled_event(state)
-    assert handled is False
-    review_data = state["active_reviews"]["42"]
-    assert review_data.get("review_completed_at") is None
-
-
-def test_handle_rectify_command_allows_assigned_reviewer(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": None,
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    monkeypatch.setattr(
-        reviewer_bot,
-        "reconcile_active_review_entry",
-        lambda *args, **kwargs: ("ok", True, True),
-    )
-
-    message, success, state_changed = reviewer_bot.handle_rectify_command(state, 42, "alice")
-
-    assert message == "ok"
-    assert success is True
-    assert state_changed is True
-
-
-def test_handle_rectify_command_allows_triage(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": None,
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "reconcile_active_review_entry",
-        lambda *args, **kwargs: ("ok", True, False),
-    )
-
-    message, success, state_changed = reviewer_bot.handle_rectify_command(state, 42, "bob")
-
-    assert message == "ok"
-    assert success is True
-    assert state_changed is False
-
-
-def test_handle_rectify_command_denies_unauthorized(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": None,
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
-
-    message, success, state_changed = reviewer_bot.handle_rectify_command(state, 42, "bob")
-
-    assert success is False
-    assert state_changed is False
-    assert "Only the assigned reviewer" in message
-
-
-def test_reconcile_active_review_entry_marks_complete_for_approved(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    os.environ["IS_PULL_REQUEST"] = "true"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "state": "COMMENTED",
-                "submitted_at": "2026-02-01T00:00:00Z",
-                "user": {"login": "alice"},
-            },
-            {
-                "state": "APPROVED",
-                "submitted_at": "2026-02-02T00:00:00Z",
-                "user": {"login": "alice"},
-            },
-        ],
-    )
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
-
-    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
-
-    assert success is True
-    assert state_changed is True
-    assert "applied approval transitions" in message
-    review_data = state["active_reviews"]["42"]
-    assert review_data["review_completed_at"] is not None
-    assert review_data["review_completed_by"] == "alice"
-    assert review_data["review_completion_source"] == "rectify:reconcile-pr-review"
-    assert review_data["transition_warning_sent"] is None
-
-
-@pytest.mark.parametrize("latest_state", ["COMMENTED", "CHANGES_REQUESTED"])
-def test_reconcile_active_review_entry_updates_activity_for_non_approval(monkeypatch, latest_state):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    os.environ["IS_PULL_REQUEST"] = "true"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "state": latest_state,
-                "submitted_at": "2026-02-02T00:00:00Z",
-                "user": {"login": "alice"},
-            }
-        ],
-    )
-
-    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
-
-    assert success is True
-    assert state_changed is True
-    assert latest_state in message
-    review_data = state["active_reviews"]["42"]
-    assert review_data["review_completed_at"] is None
-    assert review_data["transition_warning_sent"] is None
-    assert review_data["last_reviewer_activity"] != "2000-01-01T00:00:00+00:00"
-
-
-def test_reconcile_active_review_entry_ignores_non_assigned_reviews(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": None,
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    os.environ["IS_PULL_REQUEST"] = "true"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "state": "APPROVED",
-                "submitted_at": "2026-02-02T00:00:00Z",
-                "user": {"login": "bob"},
-            }
-        ],
-    )
-
-    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
-
-    assert success is True
-    assert state_changed is False
-    assert "No review by assigned reviewer @alice" in message
-    assert state["active_reviews"]["42"]["review_completed_at"] is None
-
-
-def test_reconcile_active_review_entry_idempotent_when_already_completed(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": None,
-        "review_completed_at": "2000-01-02T00:00:00+00:00",
-        "review_completed_by": "alice",
-        "review_completion_source": "pull_request_review",
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    os.environ["IS_PULL_REQUEST"] = "true"
-
-    called = {"api": False}
-
-    def should_not_be_called(*args, **kwargs):
-        called["api"] = True
-        return []
-
-    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", should_not_be_called)
-
-    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
-
-    assert success is True
-    assert state_changed is False
-    assert "already marked complete" in message
-    assert called["api"] is False
-
-
-def test_reconcile_active_review_entry_missing_entry_returns_noop():
-    state = make_state()
-
-    message, success, state_changed = reviewer_bot.reconcile_active_review_entry(state, 42)
-
-    assert success is True
-    assert state_changed is False
-    assert "No active review entry exists" in message
-
-
-def test_resolve_workflow_run_pr_number_from_artifact_context(monkeypatch):
-    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
-    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
-
+    for key in keys:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", object())
+
+
+def test_load_state_sets_schema_and_epoch_defaults(monkeypatch):
+    monkeypatch.setattr(reviewer_bot, "get_state_issue", lambda: {"body": "queue: []\n"})
+    state = reviewer_bot.load_state()
+    assert state["schema_version"] == reviewer_bot.STATE_SCHEMA_VERSION
+    assert state["freshness_runtime_epoch"] == reviewer_bot.FRESHNESS_RUNTIME_EPOCH_LEGACY
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ({"COMMENT_USER_TYPE": "Bot", "COMMENT_AUTHOR": "dependabot[bot]"}, "bot_account"),
+        ({"COMMENT_USER_TYPE": "User", "COMMENT_AUTHOR": "alice", "COMMENT_INSTALLATION_ID": "7"}, "github_app_or_other_automation"),
+        ({"COMMENT_USER_TYPE": "User", "COMMENT_AUTHOR": "alice"}, "repo_user_principal"),
+        ({"COMMENT_AUTHOR": "mystery"}, "unknown_actor"),
+    ],
+)
+def test_classify_issue_comment_actor(monkeypatch, env, expected):
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    assert reviewer_bot.classify_issue_comment_actor() == expected
+
+
+def test_classify_comment_payload_distinguishes_command_plus_text():
+    payload = reviewer_bot.classify_comment_payload("hello\n@guidelines-bot /queue")
+    assert payload["comment_class"] == "command_plus_text"
+    assert payload["has_non_command_text"] is True
+
+
+def test_route_issue_comment_trust_allows_only_same_repo_repo_user_principal(monkeypatch):
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
+    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
+    monkeypatch.setenv("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
     monkeypatch.setattr(
         reviewer_bot,
         "github_api",
-        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
-        if method == "GET" and endpoint == "pulls/42"
-        else None,
-    )
-
-    assert reviewer_bot.resolve_workflow_run_pr_number() == 42
-
-
-def test_resolve_workflow_run_pr_number_missing_artifact_env_raises():
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
-
-    with pytest.raises(RuntimeError, match="Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER"):
-        reviewer_bot.resolve_workflow_run_pr_number()
-
-
-def test_resolve_workflow_run_pr_number_sha_mismatch_raises():
-    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
-    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "def456"
-
-    with pytest.raises(RuntimeError, match="SHA mismatch"):
-        reviewer_bot.resolve_workflow_run_pr_number()
-
-
-def test_resolve_workflow_run_pr_number_pr_head_sha_mismatch_raises(monkeypatch):
-    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
-    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
-
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {"head": {"sha": "def456"}}
-        if method == "GET" and endpoint == "pulls/42"
-        else None,
-    )
-
-    with pytest.raises(RuntimeError, match="head SHA does not match"):
-        reviewer_bot.resolve_workflow_run_pr_number()
-
-
-def test_project_status_labels_for_open_issue_returns_label_a(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2026-02-01T00:00:00+00:00",
-        "last_reviewer_activity": "2026-02-01T00:00:00+00:00",
-    }
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "labels": []},
-    )
-
-    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
-
-    assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEW_COMPLETION_LABEL}
-    assert metadata["state"] == "awaiting_review_completion"
-
-
-def test_project_status_labels_for_completed_pr_without_write_approval_returns_label_b(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2026-02-01T00:00:00+00:00",
-        "review_completed_at": "2026-02-02T00:00:00+00:00",
-    }
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_issue_or_pr_snapshot",
-        lambda issue_number: {
-            "number": issue_number,
-            "state": "open",
-            "pull_request": {},
-            "labels": [],
+        lambda method, endpoint, data=None: {
+            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+            "user": {"login": "carol"},
         },
     )
+    assert reviewer_bot.route_issue_comment_trust(42) == "pr_trusted_direct"
+
+
+def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypatch):
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "")
+    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
+    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
+    monkeypatch.setenv("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+            "user": {"login": "carol"},
+        },
+    )
+    with pytest.raises(RuntimeError, match="Ambiguous same-repo PR comment trust posture"):
+        reviewer_bot.route_issue_comment_trust(42)
+
+
+def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypatch):
+    state = make_state()
+    entry = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert entry is not None
+    entry["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /accept-no-fls-changes")
+    monkeypatch.setattr(reviewer_bot, "parse_issue_labels", lambda: [reviewer_bot.FLS_AUDIT_LABEL])
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
+    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda *args, **kwargs: True)
+    assert reviewer_bot.handle_comment_event(state) is True
+    pending = state["active_reviews"]["42"]["pending_privileged_commands"]
+    assert pending["issue_comment:100"]["command_name"] == "accept-no-fls-changes"
+    assert pending["issue_comment:100"]["authorization"]["authorized"] is True
+
+
+def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
+    state = make_state(epoch="legacy_v14")
+    entry = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert entry is not None
+    entry["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
+    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "hello")
+    monkeypatch.setenv("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+            "user": {"login": "dana"},
+        },
+    )
+    assert reviewer_bot.handle_comment_event(state) is False
+
+
+def test_issue_edit_by_author_records_contributor_freshness(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("SENDER_LOGIN", "dana")
+    monkeypatch.setenv("ISSUE_TITLE", "New title")
+    monkeypatch.setenv("ISSUE_BODY", "body")
+    monkeypatch.setenv("ISSUE_CHANGES_TITLE_FROM", "Old title")
+    monkeypatch.setenv("ISSUE_CHANGES_BODY_FROM", "body")
+    monkeypatch.setenv("ISSUE_UPDATED_AT", "2026-03-17T10:00:00Z")
+    assert reviewer_bot.handle_issue_edited_event(state) is True
+    accepted = review["contributor_comment"]["accepted"]
+    assert accepted["semantic_key"].startswith("issues_edit_title:42:")
+
+
+def test_project_status_labels_uses_commit_id_and_comment_freshness(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_comment",
+        semantic_key="issue_comment:1",
+        timestamp="2026-03-17T10:00:00Z",
+        actor="alice",
+    )
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-17T10:01:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-2"}} if endpoint == "pulls/42" else None,
+    )
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}
+    assert metadata["reason"] == "review_head_stale"
+
+
+def test_project_status_labels_emits_awaiting_write_approval_only_after_completion(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_comment",
+        semantic_key="issue_comment:1",
+        timestamp="2026-03-17T10:00:00Z",
+        actor="alice",
+    )
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-17T10:01:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+
+    def fake_api(method, endpoint, data=None):
+        if endpoint == "pulls/42":
+            return {"head": {"sha": "head-1"}}
+        return None
+
+    monkeypatch.setattr(reviewer_bot, "github_api", fake_api)
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
         lambda issue_number: [
             {
+                "id": 10,
                 "state": "APPROVED",
-                "submitted_at": "2026-02-03T00:00:00Z",
+                "submitted_at": "2026-03-17T10:01:00Z",
+                "commit_id": "head-1",
                 "user": {"login": "bob"},
             }
         ],
     )
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
-
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": False)
     desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
-
     assert desired_labels == {reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL}
     assert metadata["state"] == "awaiting_write_approval"
+    review["mandatory_approver_required"] = True
+    desired_labels_again, _ = reviewer_bot.project_status_labels_for_item(42, state)
+    assert desired_labels_again == {reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL}
 
 
-def test_project_status_labels_for_completed_pr_with_write_approval_returns_no_labels(monkeypatch):
+def test_handle_workflow_run_event_rebuilds_completion_from_live_review_commit_id(tmp_path, monkeypatch):
     state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2026-02-01T00:00:00+00:00",
-        "review_completed_at": "2026-02-02T00:00:00+00:00",
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    payload_path = tmp_path / "deferred.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "source_workflow_name": "Reviewer Bot PR Review Submitted Observer",
+                "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+                "source_run_id": 500,
+                "source_run_attempt": 2,
+                "source_event_name": "pull_request_review",
+                "source_event_action": "submitted",
+                "source_event_key": "pull_request_review:11",
+                "pr_number": 42,
+                "review_id": 11,
+                "source_submitted_at": "2026-03-17T10:00:00Z",
+                "source_review_state": "APPROVED",
+                "source_commit_id": "head-1",
+                "actor_login": "alice",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Review Submitted Observer")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "500")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "2")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "pulls/42": {"head": {"sha": "head-2"}},
+            "pulls/42/reviews/11": {
+                "id": 11,
+                "submitted_at": "2026-03-17T10:00:00Z",
+                "state": "APPROVED",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            },
+        }.get(endpoint),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 11,
+                "submitted_at": "2026-03-17T10:00:00Z",
+                "state": "APPROVED",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    assert reviewer_bot.handle_workflow_run_event(state) is True
+    assert state["active_reviews"]["42"]["current_cycle_completion"]["completed"] is False
+
+
+def test_deferred_comment_missing_live_object_preserves_source_time_freshness(tmp_path, monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    payload_path = tmp_path / "deferred-comment.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "source_workflow_name": "Reviewer Bot PR Comment Observer",
+                "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+                "source_run_id": 501,
+                "source_run_attempt": 1,
+                "source_event_name": "issue_comment",
+                "source_event_action": "created",
+                "source_event_key": "issue_comment:99",
+                "pr_number": 42,
+                "comment_id": 99,
+                "comment_class": "plain_text",
+                "has_non_command_text": True,
+                "source_body_digest": "abc",
+                "source_created_at": "2026-03-17T10:00:00Z",
+                "actor_login": "alice",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "501")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    monkeypatch.setattr(reviewer_bot, "github_api", lambda method, endpoint, data=None: None)
+    assert reviewer_bot.handle_workflow_run_event(state) is True
+    assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"]["semantic_key"] == "issue_comment:99"
+    assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:99"]["reason"] == "reconcile_failed_closed"
+
+
+def test_execute_pending_privileged_command_revalidates_live_state(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["pending_privileged_commands"]["issue_comment:100"] = {
+        "source_event_key": "issue_comment:100",
+        "command_name": "accept-no-fls-changes",
+        "issue_number": 42,
+        "actor": "alice",
+        "status": "pending",
     }
+    monkeypatch.setenv("MANUAL_ACTION", "execute-pending-privileged-command")
+    monkeypatch.setenv("PRIVILEGED_SOURCE_EVENT_KEY", "issue_comment:100")
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {
-            "number": issue_number,
-            "state": "open",
-            "pull_request": {},
-            "labels": [],
-        },
+        lambda issue_number: {"number": issue_number, "labels": [{"name": reviewer_bot.FLS_AUDIT_LABEL}]},
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
+    monkeypatch.setattr(reviewer_bot, "handle_accept_no_fls_changes_command", lambda issue_number, actor: ("ok", True))
+    assert reviewer_bot.handle_manual_dispatch(state) is True
+    assert review["pending_privileged_commands"]["issue_comment:100"]["status"] == "executed"
+
+
+def test_observer_run_reason_mapping_and_near_miss_signature():
+    signature = {"status": "waiting", "conclusion": None, "name": "approval_pending"}
+    assert reviewer_bot.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"
+    assert reviewer_bot.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "almost"}, signature) == "observer_state_unknown"
+
+
+def test_negative_missing_run_requires_full_scan_and_recheck():
+    gap = {
+        "source_event_created_at": "2026-03-15T00:00:00Z",
+        "full_scan_complete": True,
+        "later_recheck_complete": True,
+        "correlated_run_found": False,
+        "approval_pending_evidence_retained": False,
+    }
+    assert reviewer_bot.can_mark_observer_run_missing(gap) is True
+    gap["later_recheck_complete"] = False
+    assert reviewer_bot.can_mark_observer_run_missing(gap) is False
+
+
+def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_window():
+    os.environ["GITHUB_REPOSITORY"] = "rustfoundation/safety-critical-rust-coding-guidelines"
+    result = reviewer_bot.correlate_candidate_observer_runs(
+        "issue_comment:101",
+        source_event_kind="issue_comment:created",
+        source_event_created_at="2026-03-17T10:00:00Z",
+        pr_number=42,
+        workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+        workflow_runs=[
             {
-                "state": "APPROVED",
-                "submitted_at": "2026-02-03T00:00:00Z",
-                "user": {"login": "bob"},
-            }
+                "id": 1,
+                "event": "issue_comment",
+                "path": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+                "created_at": "2026-03-17T10:05:00Z",
+                "repository": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"},
+                "pull_requests": [{"number": 42}],
+            },
+            {
+                "id": 2,
+                "event": "issue_comment",
+                "path": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+                "created_at": "2026-03-17T10:40:00Z",
+                "repository": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"},
+                "pull_requests": [{"number": 42}],
+            },
         ],
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "check_user_permission",
-        lambda username, required_permission="triage": username == "bob" and required_permission == "push",
-    )
-
-    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
-
-    assert desired_labels == set()
-    assert metadata["reason"] == "write_approval_present"
+    assert result["candidate_run_ids"] == [1]
 
 
-def test_sync_status_labels_repairs_dual_label_drift(captured_status_label_ops):
-    changed = reviewer_bot.sync_status_labels(
-        42,
-        {reviewer_bot.STATUS_AWAITING_REVIEW_COMPLETION_LABEL},
+def test_stage_b_artifact_correlation_rejects_ambiguous_exact_matches():
+    result = reviewer_bot.correlate_run_artifacts_exact(
         {
-            reviewer_bot.STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
-            reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL,
-            "coding guideline",
+            10: [{"source_event_key": "issue_comment:101", "source_run_id": 10, "source_run_attempt": 1, "pr_number": 42}],
+            11: [{"source_event_key": "issue_comment:101", "source_run_id": 11, "source_run_attempt": 1, "pr_number": 42}],
         },
+        "issue_comment:101",
+        pr_number=42,
     )
-
-    assert changed is True
-    assert captured_status_label_ops == [
-        ("remove", 42, reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL)
-    ]
+    assert result["status"] == "observer_state_unknown"
+    assert result["reason"] == "ambiguous_exact_artifact_matches"
 
 
-def test_handle_workflow_run_event_reconciles_approval(monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
+def test_evaluate_gap_state_only_emits_missing_after_negative_inference_contract():
+    reason, diagnostic = reviewer_bot.evaluate_deferred_gap_state(
+        {
+            "source_event_created_at": "2026-03-15T00:00:00Z",
+            "full_scan_complete": True,
+            "later_recheck_complete": True,
+            "correlated_run_found": False,
+            "approval_pending_evidence_retained": False,
+        },
+        {
+            "status": "no_candidate_runs",
+            "full_scan_complete": True,
+            "later_recheck_complete": True,
+            "correlated_run": None,
+        },
+        None,
+        None,
+    )
+    assert reason == "observer_run_missing"
+    assert diagnostic == "negative_inference_satisfied"
+
+
+def test_evaluate_gap_state_completed_success_without_exact_artifact_is_artifact_missing():
+    reason, diagnostic = reviewer_bot.evaluate_deferred_gap_state(
+        {"source_event_created_at": "2026-03-17T00:00:00Z"},
+        {"status": "candidate_runs_found", "correlated_run": 10},
+        {"status": "completed", "conclusion": "success"},
+        {"status": "no_exact_artifact_match", "reason": "no_exact_source_event_key_match"},
+    )
+    assert reason == "artifact_missing"
+    assert diagnostic == "no_exact_source_event_key_match"
+
+
+def test_evaluate_gap_state_completed_success_with_expired_artifact_marks_artifact_expired():
+    reason, diagnostic = reviewer_bot.evaluate_deferred_gap_state(
+        {"source_event_created_at": "2026-03-17T00:00:00Z"},
+        {"status": "candidate_runs_found", "correlated_run": 10},
+        {"status": "completed", "conclusion": "success"},
+        {"status": "no_exact_artifact_match", "artifact_scan_outcomes": {10: "expired"}},
+    )
+    assert reason == "artifact_expired"
+    assert diagnostic == "prior_visibility_or_retention_proof_required"
+
+
+def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention():
+    expired = {
+        "artifact_seen_at": "2026-03-10T00:00:00Z",
+        "run_created_at": "2026-03-10T00:00:00Z",
     }
-    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
-    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
-    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
-    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
+    assert reviewer_bot.classify_artifact_gap_reason(expired) == "artifact_expired"
+    missing = {
+        "artifact_inspection_complete": True,
+        "run_created_at": "2026-03-17T00:00:00Z",
+    }
+    assert reviewer_bot.classify_artifact_gap_reason(missing) == "artifact_missing"
+
+
+def test_sweeper_creates_keyed_deferred_gaps_only_for_visible_comments_and_submitted_reviews(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
     monkeypatch.setattr(
         reviewer_bot,
         "github_api",
-        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
-        if method == "GET" and endpoint == "pulls/42"
-        else {},
+        lambda method, endpoint, data=None: {
+            "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
+            "issues/42/comments?per_page=100&page=1": [{"id": 101, "created_at": "2026-03-17T10:00:00Z"}],
+        }.get(endpoint),
     )
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "state": "APPROVED",
-                "submitted_at": "2026-02-02T00:00:00Z",
-                "user": {"login": "alice"},
-            }
-        ],
+        lambda issue_number: [{"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"}],
     )
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
-
-    posted_comments = []
-
-    def record_comment(issue_number, body):
-        posted_comments.append((issue_number, body))
-        return True
-
-    monkeypatch.setattr(reviewer_bot, "post_comment", record_comment)
-
-    handled = reviewer_bot.handle_workflow_run_event(state)
-
-    assert handled is True
-    review_data = state["active_reviews"]["42"]
-    assert review_data["review_completed_at"] is not None
-    assert review_data["review_completed_by"] == "alice"
-    assert review_data["review_completion_source"] == "workflow_run:pull_request_review"
-    assert len(posted_comments) == 1
-    assert posted_comments[0][0] == 42
-    assert "Rectified PR #42" in posted_comments[0][1]
+    assert reviewer_bot.sweep_deferred_gaps(state) is True
+    gaps = state["active_reviews"]["42"]["deferred_gaps"]
+    assert "issue_comment:101" in gaps
+    assert "pull_request_review:202" in gaps
+    assert not any(key.startswith("pull_request_review_dismissed:") for key in gaps)
 
 
-def test_handle_workflow_run_event_idempotent_when_review_already_complete(monkeypatch):
+def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch):
     state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "review_completed_at": "2000-01-02T00:00:00+00:00",
-        "review_completed_by": "alice",
-        "review_completion_source": "workflow_run:pull_request_review",
-        "assignment_method": "round-robin",
-        "skipped": [],
-    }
-    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
-    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
-    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
-    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
-
-    called = {"reviews": False, "comment": False}
-
-    def should_not_fetch_reviews(*args, **kwargs):
-        called["reviews"] = True
-        return []
-
-    def should_not_post_comment(*args, **kwargs):
-        called["comment"] = True
-        return True
-
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["reconciled_source_events"] = ["issue_comment:101", "pull_request_review:202"]
     monkeypatch.setattr(
         reviewer_bot,
         "github_api",
-        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
-        if method == "GET" and endpoint == "pulls/42"
-        else {},
+        lambda method, endpoint, data=None: {
+            "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
+            "issues/42/comments?per_page=100&page=1": [{"id": 101, "created_at": "2026-03-17T10:00:00Z"}],
+        }.get(endpoint),
     )
-    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", should_not_fetch_reviews)
-    monkeypatch.setattr(reviewer_bot, "post_comment", should_not_post_comment)
-
-    handled = reviewer_bot.handle_workflow_run_event(state)
-
-    assert handled is False
-    assert called["reviews"] is False
-    assert called["comment"] is False
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [{"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"}])
+    assert reviewer_bot.sweep_deferred_gaps(state) is False
+    assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
-def test_handle_workflow_run_event_comment_failure_is_non_fatal(monkeypatch, capsys):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "assignment_method": "round-robin",
-        "skipped": [],
+def test_workflow_policy_split_and_lock_only_boundaries():
+    workflows_dir = Path(".github/workflows")
+    required = {
+        "reviewer-bot-issues.yml",
+        "reviewer-bot-issue-comment-direct.yml",
+        "reviewer-bot-sweeper-repair.yml",
+        "reviewer-bot-pr-metadata.yml",
+        "reviewer-bot-pr-comment-trusted.yml",
+        "reviewer-bot-pr-comment-observer.yml",
+        "reviewer-bot-pr-review-submitted-observer.yml",
+        "reviewer-bot-pr-review-dismissed-observer.yml",
+        "reviewer-bot-reconcile.yml",
+        "reviewer-bot-privileged-commands.yml",
     }
-    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
-    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
-    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
-    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
-        if method == "GET" and endpoint == "pulls/42"
-        else {},
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "state": "APPROVED",
-                "submitted_at": "2026-02-02T00:00:00Z",
-                "user": {"login": "alice"},
-            }
-        ],
-    )
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: True)
-    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: False)
-
-    handled = reviewer_bot.handle_workflow_run_event(state)
-
-    assert handled is True
-    review_data = state["active_reviews"]["42"]
-    assert review_data["review_completed_at"] is not None
-    assert review_data["review_completion_source"] == "workflow_run:pull_request_review"
-    captured = capsys.readouterr()
-    assert (
-        "WARNING: Workflow_run reconcile changed state but failed to post comment "
-        "on pull request #42." in captured.err
-    )
+    assert required.issubset({path.name for path in workflows_dir.glob("reviewer-bot-*.yml")})
+    for path in required:
+        data = yaml.safe_load((workflows_dir / path).read_text(encoding="utf-8"))
+        jobs = data.get("jobs", {})
+        for job in jobs.values():
+            permissions = job.get("permissions", {})
+            steps = job.get("steps", [])
+            uses_values = [step.get("uses", "") for step in steps if isinstance(step, dict)]
+            text = (workflows_dir / path).read_text(encoding="utf-8")
+            if "observer" in path:
+                assert permissions.get("contents") == "read"
+                assert all("checkout" not in value for value in uses_values)
+            if permissions.get("contents") == "write" and path != "reviewer-bot-privileged-commands.yml":
+                assert all("checkout" not in value for value in uses_values)
+                assert "Temporary lock debt" in text
+            for value in uses_values:
+                if value:
+                    assert "@" in value and len(value.split("@", 1)[1]) == 40
 
 
-def test_handle_workflow_run_event_raises_on_invalid_context():
+def test_workflow_summaries_and_runbook_references_exist():
+    runbook = Path("docs/reviewer-bot-review-freshness-operator-runbook.md")
+    assert runbook.exists()
+    reconcile = Path(".github/workflows/reviewer-bot-reconcile.yml").read_text(encoding="utf-8")
+    assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
+
+
+def test_classify_event_intent_treats_supported_workflow_run_sources_as_mutating(monkeypatch):
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "issue_comment")
+    assert reviewer_bot.classify_event_intent("workflow_run", "completed") == reviewer_bot.EVENT_INTENT_MUTATING
+
+
+def test_main_records_repair_needed_when_projection_fails(monkeypatch, tmp_path):
     state = make_state()
-    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
-    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("EVENT_NAME", "issue_comment")
+    monkeypatch.setenv("EVENT_ACTION", "created")
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "plain text")
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+    saved_states = []
 
-    with pytest.raises(RuntimeError, match="Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER"):
-        reviewer_bot.handle_workflow_run_event(state)
+    def fake_load_state(*, fail_on_unavailable=False):
+        return json.loads(json.dumps(state))
 
-
-def test_handle_workflow_run_event_ignores_non_review_events():
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_target"
-    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "submitted"
-
-    handled = reviewer_bot.handle_workflow_run_event(state)
-
-    assert handled is False
-    assert state["active_reviews"]["42"].get("review_completed_at") is None
-
-
-def test_handle_workflow_run_event_dismissed_projects_only(monkeypatch):
-    state = make_state()
-    os.environ["WORKFLOW_RUN_EVENT"] = "pull_request_review"
-    os.environ["WORKFLOW_RUN_EVENT_ACTION"] = "dismissed"
-    os.environ["WORKFLOW_RUN_RECONCILE_PR_NUMBER"] = "42"
-    os.environ["WORKFLOW_RUN_RECONCILE_HEAD_SHA"] = "abc123"
-    os.environ["WORKFLOW_RUN_HEAD_SHA"] = "abc123"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {"head": {"sha": "abc123"}}
-        if method == "GET" and endpoint == "pulls/42"
-        else {},
-    )
-
-    handled = reviewer_bot.handle_workflow_run_event(state)
-
-    assert handled is False
-
-
-def test_handle_pull_request_review_event_approval_marks_complete(stub_api):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = "approved"
-    os.environ["REVIEW_AUTHOR"] = "alice"
-    handled = reviewer_bot.handle_pull_request_review_event(state)
-    assert handled is True
-    review_data = state["active_reviews"]["42"]
-    assert review_data["review_completed_at"] is not None
-    assert review_data["review_completed_by"] == "alice"
-    assert review_data["review_completion_source"] == "pull_request_review"
-    assert review_data["last_reviewer_activity"] != "2000-01-01T00:00:00+00:00"
-
-
-def test_read_level_designated_approval_triggers_mandatory_escalation(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = "approved"
-    os.environ["REVIEW_AUTHOR"] = "alice"
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
-
-    handled = reviewer_bot.handle_pull_request_review_event(state)
-
-    assert handled is True
-    review_data = state["active_reviews"]["42"]
-    assert review_data["review_completed_at"] is not None
-    assert review_data["mandatory_approver_required"] is True
-    assert review_data["mandatory_approver_pinged_at"] is not None
-    assert any(
-        c["body"] == reviewer_bot.MANDATORY_TRIAGE_ESCALATION_TEMPLATE
-        for c in captured_comments
-    )
-
-
-def test_read_level_escalation_comment_posts_once_per_review_cycle(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = "approved"
-    os.environ["REVIEW_AUTHOR"] = "alice"
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda *args, **kwargs: False)
-
-    assert reviewer_bot.handle_pull_request_review_event(state) is True
-    assert reviewer_bot.handle_pull_request_review_event(state) is False
-
-    escalation_comments = [
-        c for c in captured_comments if c["body"] == reviewer_bot.MANDATORY_TRIAGE_ESCALATION_TEMPLATE
-    ]
-    assert len(escalation_comments) == 1
-
-
-def test_triage_approval_clears_mandatory_escalation(
-    stub_api, captured_comments, monkeypatch
-):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "mandatory_approver_required": True,
-        "mandatory_approver_pinged_at": "2026-02-11T10:00:00+00:00",
-        "mandatory_approver_label_applied_at": "2026-02-11T10:00:00+00:00",
-    }
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = "approved"
-    os.environ["REVIEW_AUTHOR"] = "bob"
-
-    removed = {"called": False}
-
-    def fake_remove_label(issue_number, label):
-        removed["called"] = True
-        assert issue_number == 42
-        assert label == reviewer_bot.MANDATORY_TRIAGE_APPROVER_LABEL
+    def fake_save_state(updated_state):
+        saved_states.append(json.loads(json.dumps(updated_state)))
+        state.clear()
+        state.update(json.loads(json.dumps(updated_state)))
         return True
 
-    monkeypatch.setattr(
-        reviewer_bot,
-        "check_user_permission",
-        lambda username, required_permission="triage": username.lower() == "bob",
-    )
-    monkeypatch.setattr(reviewer_bot, "remove_label_with_status", fake_remove_label)
-
-    handled = reviewer_bot.handle_pull_request_review_event(state)
-
-    assert handled is True
-    review_data = state["active_reviews"]["42"]
-    assert review_data["mandatory_approver_required"] is False
-    assert review_data["mandatory_approver_satisfied_by"] == "bob"
-    assert review_data["mandatory_approver_satisfied_at"] is not None
-    assert removed["called"] is True
-    assert any(
-        c["body"] == reviewer_bot.MANDATORY_TRIAGE_SATISFIED_TEMPLATE.format(approver="bob")
-        for c in captured_comments
-    )
-
-
-@pytest.mark.parametrize("review_state", ["commented", "changes_requested"])
-def test_handle_pull_request_review_event_updates_activity(stub_api, review_state):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
-    }
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = review_state
-    os.environ["REVIEW_AUTHOR"] = "alice"
-    handled = reviewer_bot.handle_pull_request_review_event(state)
-    assert handled is True
-    review_data = state["active_reviews"]["42"]
-    assert review_data["last_reviewer_activity"] != "2000-01-01T00:00:00+00:00"
-    assert review_data.get("review_completed_at") is None
-    assert review_data.get("transition_warning_sent") is None
-
-
-def test_handle_pull_request_review_event_ignores_non_assigned(stub_api):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = "approved"
-    os.environ["REVIEW_AUTHOR"] = "bob"
-    handled = reviewer_bot.handle_pull_request_review_event(state)
-    assert handled is False
-    review_data = state["active_reviews"]["42"]
-    assert review_data.get("review_completed_at") is None
-
-
-def test_handle_pull_request_review_event_cross_repo_defers(stub_api):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = "approved"
-    os.environ["REVIEW_AUTHOR"] = "alice"
-    os.environ["PR_IS_CROSS_REPOSITORY"] = "true"
-
-    handled = reviewer_bot.handle_pull_request_review_event(state)
-
-    assert handled is False
-    assert state["active_reviews"]["42"].get("review_completed_at") is None
-
-
-def test_handle_pull_request_review_event_dismissed_is_projection_only(stub_api):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "review_completed_at": "2000-01-02T00:00:00+00:00",
-    }
-    os.environ["EVENT_ACTION"] = "dismissed"
-    os.environ["ISSUE_NUMBER"] = "42"
-    os.environ["REVIEW_STATE"] = "dismissed"
-    os.environ["REVIEW_AUTHOR"] = "bob"
-
-    handled = reviewer_bot.handle_pull_request_review_event(state)
-
-    assert handled is False
-    assert state["active_reviews"]["42"]["review_completed_at"] == "2000-01-02T00:00:00+00:00"
-
-
-def test_handle_closed_event_clears_active_review():
-    state = make_state()
-    state["active_reviews"]["42"] = {"current_reviewer": "alice"}
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_closed_event(state)
-    assert handled is True
-    assert "42" not in state["active_reviews"]
-
-
-def test_process_pass_until_expirations_restores_member(monkeypatch):
-    state = make_state()
-    state["queue"] = []
-    state["pass_until"] = [
-        {"github": "alice", "name": "Alice", "return_date": "2000-01-01"},
-    ]
-    updated_state, restored = reviewer_bot.process_pass_until_expirations(state)
-    assert restored == ["alice"]
-    assert updated_state["queue"][0]["github"] == "alice"
-    assert updated_state["pass_until"] == []
-
-
-def test_check_overdue_reviews_detects_warning():
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    overdue = reviewer_bot.check_overdue_reviews(state)
-    assert overdue
-    assert overdue[0]["needs_warning"] is True
-
-
-def test_check_overdue_reviews_skips_completed():
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "review_completed_at": "2000-01-02T00:00:00+00:00",
-    }
-    overdue = reviewer_bot.check_overdue_reviews(state)
-    assert overdue == []
-
-
-def test_handle_overdue_review_warning_posts_comment(stub_api, captured_comments):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-    }
-    handled = reviewer_bot.handle_overdue_review_warning(state, 42, "alice")
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "Review Reminder" in captured_comments[0]["body"]
-
-
-def test_handle_transition_notice_posts_comment(stub_api, captured_comments):
-    state = make_state()
-    handled = reviewer_bot.handle_transition_notice(state, 42, "alice")
-    assert handled is True
-    assert len(captured_comments) == 1
-    assert "Transition Period Ended" in captured_comments[0]["body"]
-
-
-def test_handle_manual_dispatch_repair_collects_tracked_and_labeled_items(monkeypatch):
-    state = make_state()
-    state["active_reviews"] = {"42": {"current_reviewer": "alice"}}
-    monkeypatch.setenv("MANUAL_ACTION", "repair-review-status-labels")
-    monkeypatch.setattr(reviewer_bot, "list_open_items_with_status_labels", lambda: [42, 77])
-
-    handled = reviewer_bot.handle_manual_dispatch(state)
-    touched = reviewer_bot.drain_touched_items()
-
-    assert handled is False
-    assert touched == [42, 77]
-
-
-def test_handle_scheduled_check_posts_transition(stub_api, captured_comments, monkeypatch):
-    state = make_state()
-    state["active_reviews"]["42"] = {
-        "current_reviewer": "alice",
-        "assigned_at": "2000-01-01T00:00:00+00:00",
-        "last_reviewer_activity": "2000-01-01T00:00:00+00:00",
-        "transition_warning_sent": "2000-01-02T00:00:00+00:00",
-        "skipped": [],
-    }
-    monkeypatch.setattr(reviewer_bot, "get_next_reviewer", lambda *args, **kwargs: "bob")
-    handled = reviewer_bot.handle_scheduled_check(state)
-    assert handled is True
-    assert any("Transition Period Ended" in c["body"] for c in captured_comments)
-
-
-def test_handle_comment_event_malformed_known_command(stub_api, captured_comments):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot pass"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "Did you mean" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_malformed_unknown_command(stub_api, captured_comments):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot whatever"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "Unknown command" in captured_comments[0]["body"]
-
-
-def test_handle_comment_event_unknown_command(stub_api, captured_comments):
-    state = make_state()
-    os.environ["COMMENT_BODY"] = "@guidelines-bot /nope"
-    os.environ["COMMENT_AUTHOR"] = "alice"
-    os.environ["ISSUE_NUMBER"] = "42"
-    handled = reviewer_bot.handle_comment_event(state)
-    assert handled is False
-    assert len(captured_comments) == 1
-    assert "Unknown command" in captured_comments[0]["body"]
-
+    monkeypatch.setattr(reviewer_bot, "load_state", fake_load_state)
+    monkeypatch.setattr(reviewer_bot, "save_state", fake_save_state)
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current_state: (current_state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current_state: (current_state, []))
+    monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"number": issue_number, "state": "open", "labels": [], "pull_request": None})
+    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current_state, issue_numbers: (_ for _ in ()).throw(RuntimeError("projection failed")))
+    output_path = tmp_path / "github-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output_path))
+    reviewer_bot.app_module.main(reviewer_bot)
+    assert state["active_reviews"]["42"]["repair_needed"]["kind"] == "projection_failure"
+    assert len(saved_states) >= 2
