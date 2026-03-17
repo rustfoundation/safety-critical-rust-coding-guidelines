@@ -73,6 +73,7 @@ try:
     import scripts.reviewer_bot_lib.reconcile as reconcile_module
     import scripts.reviewer_bot_lib.reviews as reviews_module
     import scripts.reviewer_bot_lib.state_store as state_store_module
+    import scripts.reviewer_bot_lib.sweeper as sweeper_module
     from scripts.reviewer_bot_lib import app as app_module
     from scripts.reviewer_bot_lib.config import (  # noqa: F401
         AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
@@ -162,6 +163,7 @@ except ImportError:
     import reviewer_bot_lib.reconcile as reconcile_module
     import reviewer_bot_lib.reviews as reviews_module
     import reviewer_bot_lib.state_store as state_store_module
+    import reviewer_bot_lib.sweeper as sweeper_module
     from reviewer_bot_lib.config import (  # noqa: F401
         AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
         BOT_MENTION,
@@ -887,19 +889,19 @@ def _handle_comment_command(
 
 
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
-    return events_module.observer_run_reason_from_details(run_details, runbook_signature)
+    return sweeper_module.observer_run_reason_from_details(run_details, runbook_signature)
 
 
 def can_mark_observer_run_missing(gap: dict, now: datetime | None = None) -> bool:
-    return events_module.can_mark_observer_run_missing(gap, now)
+    return sweeper_module.can_mark_observer_run_missing(gap, now)
 
 
 def classify_artifact_gap_reason(gap: dict, now: datetime | None = None) -> str:
-    return events_module.classify_artifact_gap_reason(gap, now)
+    return sweeper_module.classify_artifact_gap_reason(gap, now)
 
 
 def sweep_deferred_gaps(state: dict) -> bool:
-    return events_module.sweep_deferred_gaps(_runtime_bot(), state)
+    return sweeper_module.sweep_deferred_gaps(_runtime_bot(), state)
 
 
 def correlate_candidate_observer_runs(
@@ -911,7 +913,7 @@ def correlate_candidate_observer_runs(
     workflow_file: str,
     workflow_runs: list[dict] | None,
 ) -> dict:
-    return events_module.correlate_candidate_observer_runs(
+    return sweeper_module.correlate_candidate_observer_runs(
         source_event_key,
         source_event_kind=source_event_kind,
         source_event_created_at=source_event_created_at,
@@ -927,7 +929,7 @@ def correlate_run_artifacts_exact(
     *,
     pr_number: int,
 ) -> dict:
-    return events_module.correlate_run_artifacts_exact(
+    return sweeper_module.correlate_run_artifacts_exact(
         payloads_by_run,
         source_event_key,
         pr_number=pr_number,
@@ -940,7 +942,7 @@ def evaluate_deferred_gap_state(
     run_detail: dict | None,
     artifact_correlation: dict | None,
 ) -> tuple[str, str]:
-    return events_module.evaluate_deferred_gap_state(existing_gap, run_correlation, run_detail, artifact_correlation)
+    return sweeper_module.evaluate_deferred_gap_state(existing_gap, run_correlation, run_detail, artifact_correlation)
 
 
 def reconcile_active_review_entry(
