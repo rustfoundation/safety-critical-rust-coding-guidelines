@@ -56,11 +56,14 @@ All commands must be prefixed with @guidelines-bot /<command>:
 
 import sys
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone as _timezone
 from pathlib import Path
 from typing import Any
 
 # GitHub API interaction
+
+timezone = _timezone
 
 try:
     import scripts.reviewer_bot_lib.automation as automation_module
@@ -825,131 +828,6 @@ def handle_rectify_command(state: dict, issue_number: int, comment_author: str) 
         state,
         issue_number,
     )
-
-
-def check_overdue_reviews(state: dict) -> list[dict]:
-    """
-    Check all active reviews for overdue ones.
-    
-    Returns a list of overdue reviews with their status:
-    [
-        {
-            "issue_number": 123,
-            "reviewer": "username",
-            "days_overdue": 5,
-            "needs_warning": True,  # First warning needed
-            "needs_transition": False,  # 28 days passed, transition needed
-        },
-        ...
-    ]
-    """
-    if "active_reviews" not in state:
-        return []
-    
-    now = datetime.now(timezone.utc)
-    overdue = []
-    
-    for issue_key, review_data in state["active_reviews"].items():
-        if not isinstance(review_data, dict):
-            continue
-
-        if review_data.get("review_completed_at"):
-            continue
-        
-        current_reviewer = review_data.get("current_reviewer")
-        if not current_reviewer:
-            continue
-        
-        last_activity = review_data.get("last_reviewer_activity")
-        if not last_activity:
-            # No activity recorded, use assigned_at
-            last_activity = review_data.get("assigned_at")
-        if not last_activity:
-            continue
-        
-        # Parse the timestamp
-        try:
-            last_activity_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
-            continue
-        
-        days_since_activity = (now - last_activity_dt).days
-        
-        if days_since_activity < REVIEW_DEADLINE_DAYS:
-            continue  # Not overdue yet
-        
-        # Check if we've already sent a warning
-        transition_warning_sent = review_data.get("transition_warning_sent")
-        
-        if transition_warning_sent:
-            # Warning already sent - check if transition period has passed
-            try:
-                warning_dt = datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
-                days_since_warning = (now - warning_dt).days
-                
-                if days_since_warning >= TRANSITION_PERIOD_DAYS:
-                    overdue.append({
-                        "issue_number": int(issue_key),
-                        "reviewer": current_reviewer,
-                        "days_overdue": days_since_activity,
-                        "days_since_warning": days_since_warning,
-                        "needs_warning": False,
-                        "needs_transition": True,
-                    })
-            except (ValueError, AttributeError):
-                pass
-        else:
-            # First warning needed
-            overdue.append({
-                "issue_number": int(issue_key),
-                "reviewer": current_reviewer,
-                "days_overdue": days_since_activity - REVIEW_DEADLINE_DAYS,
-                "days_since_warning": 0,
-                "needs_warning": True,
-                "needs_transition": False,
-            })
-    
-    return overdue
-
-
-def handle_overdue_review_warning(state: dict, issue_number: int, reviewer: str) -> bool:
-    """
-    Post a warning comment and record that we've warned the reviewer.
-    
-    Returns True if warning was posted, False otherwise.
-    """
-    issue_key = str(issue_number)
-    
-    if "active_reviews" not in state or issue_key not in state["active_reviews"]:
-        return False
-    
-    review_data = state["active_reviews"][issue_key]
-    if not isinstance(review_data, dict):
-        return False
-    
-    # Post warning comment
-    warning_message = f"""⚠️ **Review Reminder**
-
-Hey @{reviewer}, it's been more than {REVIEW_DEADLINE_DAYS} days since you were assigned to review this.
-
-**Please take one of the following actions:**
-
-1. **Begin your review** - Post a comment with your feedback
-2. **Pass the review** - Use `{BOT_MENTION} /pass [reason]` to assign the next reviewer
-3. **Step away temporarily** - Use `{BOT_MENTION} /away YYYY-MM-DD [reason]` if you need time off
-
-If no action is taken within {TRANSITION_PERIOD_DAYS} days, you may be transitioned from Producer to Observer status per our [contribution guidelines](CONTRIBUTING.md#review-deadlines).
-
-_Life happens! If you're dealing with something, just let us know._"""
-    
-    post_comment(issue_number, warning_message)
-    
-    # Record that we've sent the warning
-    now = datetime.now(timezone.utc).isoformat()
-    review_data["transition_warning_sent"] = now
-    
-    print(f"Posted overdue warning for #{issue_number} to @{reviewer}")
-    return True
 
 
 def handle_transition_notice(state: dict, issue_number: int, reviewer: str) -> bool:
