@@ -70,6 +70,7 @@ try:
     import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
     import scripts.reviewer_bot_lib.lifecycle as lifecycle_module
+    import scripts.reviewer_bot_lib.maintenance as maintenance_module
     import scripts.reviewer_bot_lib.reconcile as reconcile_module
     import scripts.reviewer_bot_lib.reviews as reviews_module
     import scripts.reviewer_bot_lib.state_store as state_store_module
@@ -160,6 +161,7 @@ except ImportError:
     import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
     import reviewer_bot_lib.lifecycle as lifecycle_module
+    import reviewer_bot_lib.maintenance as maintenance_module
     import reviewer_bot_lib.reconcile as reconcile_module
     import reviewer_bot_lib.reviews as reviews_module
     import reviewer_bot_lib.state_store as state_store_module
@@ -808,45 +810,14 @@ def list_open_items_with_status_labels() -> list[int]:
 
 
 def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | None:
-    return events_module.get_latest_review_by_reviewer(_runtime_bot(), reviews, reviewer)
+    return reviews_module.get_latest_review_by_reviewer(_runtime_bot(), reviews, reviewer)
 
 
 def find_triage_approval_after(
     reviews: list[dict],
     since: datetime | None,
 ) -> tuple[str, datetime] | None:
-    """Find the first triage+ approval submitted after `since`."""
-    permission_cache: dict[str, bool] = {}
-    approvals: list[tuple[datetime, int, str]] = []
-
-    for index, review in enumerate(reviews):
-        state = str(review.get("state", "")).upper()
-        if state != "APPROVED":
-            continue
-
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author:
-            continue
-
-        submitted_at = parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None:
-            continue
-
-        if since is not None and submitted_at <= since:
-            continue
-
-        approvals.append((submitted_at, index, author))
-
-    approvals.sort(key=lambda item: (item[0], item[1]))
-
-    for submitted_at, _, author in approvals:
-        cache_key = author.lower()
-        if cache_key not in permission_cache:
-            permission_cache[cache_key] = is_triage_or_higher(author)
-        if permission_cache[cache_key]:
-            return author, submitted_at
-
-    return None
+    return reviews_module.find_triage_approval_after(_runtime_bot(), reviews, since)
 
 
 def classify_comment_payload(comment_body: str) -> dict:
@@ -1166,11 +1137,11 @@ def handle_comment_event(state: dict) -> bool:
 
 
 def handle_manual_dispatch(state: dict) -> bool:
-    return events_module.handle_manual_dispatch(_runtime_bot(), state)
+    return maintenance_module.handle_manual_dispatch(_runtime_bot(), state)
 
 
 def handle_scheduled_check(state: dict) -> bool:
-    return events_module.handle_scheduled_check(_runtime_bot(), state)
+    return maintenance_module.handle_scheduled_check(_runtime_bot(), state)
 
 
 # ==============================================================================

@@ -30,6 +30,50 @@ def parse_github_timestamp(value: str | None) -> datetime | None:
         return None
 
 
+def get_latest_review_by_reviewer(bot, reviews: list[dict], reviewer: str) -> dict | None:
+    latest_review = None
+    latest_key = (datetime.min.replace(tzinfo=timezone.utc), "")
+    for review in reviews:
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or author.lower() != reviewer.lower():
+            continue
+        submitted_at = bot.parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None:
+            continue
+        review_id = str(review.get("id", ""))
+        review_key = (submitted_at, review_id)
+        if review_key >= latest_key:
+            latest_key = review_key
+            latest_review = review
+    return latest_review
+
+
+def find_triage_approval_after(bot, reviews: list[dict], since: datetime | None) -> tuple[str, datetime] | None:
+    permission_cache: dict[str, bool] = {}
+    approvals: list[tuple[datetime, str, str]] = []
+    for review in reviews:
+        state = str(review.get("state", "")).upper()
+        if state != "APPROVED":
+            continue
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or not author:
+            continue
+        submitted_at = bot.parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None:
+            continue
+        if since is not None and submitted_at <= since:
+            continue
+        approvals.append((submitted_at, str(review.get("id", "")), author))
+    approvals.sort(key=lambda item: (item[0], item[1]))
+    for submitted_at, _, author in approvals:
+        cache_key = author.lower()
+        if cache_key not in permission_cache:
+            permission_cache[cache_key] = bot.is_triage_or_higher(author)
+        if permission_cache[cache_key]:
+            return author, submitted_at
+    return None
+
+
 def _ensure_channel_map(review_entry: dict, name: str) -> dict:
     value = review_entry.get(name)
     if not isinstance(value, dict):
