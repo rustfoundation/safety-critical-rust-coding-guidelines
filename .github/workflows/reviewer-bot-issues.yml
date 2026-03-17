@@ -71,4 +71,4 @@ jobs:
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
           CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-issues.yml
-        run: uv run python "$BOT_SRC_ROOT/scripts/reviewer_bot.py"
+        run: uv run --project "$BOT_SRC_ROOT" reviewer-bot
