@@ -20,6 +20,34 @@ def make_state():
     }
 
 
+def test_reviewer_bot_exports_compatibility_modules():
+    assert reviewer_bot.json is not None
+    assert reviewer_bot.os is not None
+    assert reviewer_bot.yaml is not None
+    assert reviewer_bot.requests is not None
+    assert reviewer_bot.sys is not None
+    assert reviewer_bot.datetime is not None
+    assert reviewer_bot.timezone is not None
+
+
+def test_render_lock_commit_message_uses_json_compatibility_surface():
+    rendered = reviewer_bot.render_lock_commit_message({"lock_state": "unlocked"})
+    assert reviewer_bot.LOCK_COMMIT_MARKER in rendered
+
+
+def test_main_show_state_uses_yaml_compatibility_surface(monkeypatch, capsys):
+    monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    monkeypatch.setenv("MANUAL_ACTION", "show-state")
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
+
+    reviewer_bot.main()
+
+    output = capsys.readouterr().out
+    assert "Current state:" in output
+    assert "freshness_runtime_epoch" in output
+
+
 def test_classify_event_intent_cross_repo_review_is_non_mutating_defer(monkeypatch):
     monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "true")
     intent = reviewer_bot.classify_event_intent("pull_request_review", "submitted")
