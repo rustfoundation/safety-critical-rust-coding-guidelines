@@ -38,43 +38,59 @@ jobs:
           sender_type = os.environ.get('COMMENT_SENDER_TYPE', '').strip()
           installation_id = os.environ.get('COMMENT_INSTALLATION_ID', '').strip()
           via_github_app = os.environ.get('COMMENT_PERFORMED_VIA_GITHUB_APP', '').strip().lower()
+          noop_reason = None
           if comment_user_type == 'Bot' or comment_author.endswith('[bot]') or comment_author == 'guidelines-bot':
-              raise SystemExit(0)
-          if installation_id or via_github_app == 'true' or (sender_type and sender_type not in {'User', 'Bot'}):
-              raise SystemExit(0)
-          command_pattern = re.compile(r'^@guidelines\-bot\s+/[A-Za-z0-9?_\-]+(?:\s+.*)?$')
-          lines = [line for line in normalized.splitlines() if line.strip()]
-          command_lines = [line for line in lines if command_pattern.match(line.strip())]
-          non_command_lines = [line for line in lines if not command_pattern.match(line.strip())]
-          if not normalized:
-              comment_class = 'empty_or_whitespace'
-          elif command_lines and not non_command_lines:
-              comment_class = 'command_only'
-          elif command_lines and non_command_lines:
-              comment_class = 'command_plus_text'
+              noop_reason = 'ignored_non_human_automation'
+          elif installation_id or via_github_app == 'true' or (sender_type and sender_type not in {'User', 'Bot'}):
+              noop_reason = 'ignored_non_human_automation'
+          if noop_reason is not None:
+              payload = {
+                  'schema_version': 1,
+                  'kind': 'observer_noop',
+                  'reason': noop_reason,
+                  'source_workflow_name': 'Reviewer Bot PR Comment Observer',
+                  'source_workflow_file': '.github/workflows/reviewer-bot-pr-comment-observer.yml',
+                  'source_run_id': int(os.environ['GITHUB_RUN_ID']),
+                  'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+                  'source_event_name': 'issue_comment',
+                  'source_event_action': 'created',
+                  'source_event_key': f"issue_comment:{os.environ['COMMENT_ID']}",
+                  'pr_number': int(os.environ['PR_NUMBER']),
+              }
           else:
-              comment_class = 'plain_text'
-          digest = hashlib.sha256(normalized.encode('utf-8')).hexdigest()
-          payload = {
-              'schema_version': 2,
-              'source_workflow_name': 'Reviewer Bot PR Comment Observer',
-              'source_workflow_file': '.github/workflows/reviewer-bot-pr-comment-observer.yml',
-              'source_run_id': int(os.environ['GITHUB_RUN_ID']),
-              'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
-              'source_event_name': 'issue_comment',
-              'source_event_action': 'created',
-              'source_event_key': f"issue_comment:{os.environ['COMMENT_ID']}",
-              'pr_number': int(os.environ['PR_NUMBER']),
-              'comment_id': int(os.environ['COMMENT_ID']),
-              'comment_class': comment_class,
-              'has_non_command_text': bool(non_command_lines),
-              'source_body_digest': digest,
-              'source_created_at': os.environ['COMMENT_CREATED_AT'],
-              'actor_login': os.environ['COMMENT_AUTHOR'],
-              'actor_id': int(os.environ['COMMENT_AUTHOR_ID']),
-              'actor_class': 'repo_user_principal' if comment_user_type == 'User' else 'unknown_actor',
-              'source_artifact_name': f"reviewer-bot-comment-context-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}",
-          }
+              command_pattern = re.compile(r'^@guidelines\-bot\s+/[A-Za-z0-9?_\-]+(?:\s+.*)?$')
+              lines = [line for line in normalized.splitlines() if line.strip()]
+              command_lines = [line for line in lines if command_pattern.match(line.strip())]
+              non_command_lines = [line for line in lines if not command_pattern.match(line.strip())]
+              if not normalized:
+                  comment_class = 'empty_or_whitespace'
+              elif command_lines and not non_command_lines:
+                  comment_class = 'command_only'
+              elif command_lines and non_command_lines:
+                  comment_class = 'command_plus_text'
+              else:
+                  comment_class = 'plain_text'
+              digest = hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+              payload = {
+                  'schema_version': 2,
+                  'source_workflow_name': 'Reviewer Bot PR Comment Observer',
+                  'source_workflow_file': '.github/workflows/reviewer-bot-pr-comment-observer.yml',
+                  'source_run_id': int(os.environ['GITHUB_RUN_ID']),
+                  'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+                  'source_event_name': 'issue_comment',
+                  'source_event_action': 'created',
+                  'source_event_key': f"issue_comment:{os.environ['COMMENT_ID']}",
+                  'pr_number': int(os.environ['PR_NUMBER']),
+                  'comment_id': int(os.environ['COMMENT_ID']),
+                  'comment_class': comment_class,
+                  'has_non_command_text': bool(non_command_lines),
+                  'source_body_digest': digest,
+                  'source_created_at': os.environ['COMMENT_CREATED_AT'],
+                  'actor_login': os.environ['COMMENT_AUTHOR'],
+                  'actor_id': int(os.environ['COMMENT_AUTHOR_ID']),
+                  'actor_class': 'repo_user_principal' if comment_user_type == 'User' else 'unknown_actor',
+                  'source_artifact_name': f"reviewer-bot-comment-context-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}",
+              }
           with open(os.environ['PAYLOAD_PATH'], 'w', encoding='utf-8') as handle:
               json.dump(payload, handle)
           PY
