@@ -70,6 +70,7 @@ try:
     import scripts.reviewer_bot_lib.commands as commands_module
     import scripts.reviewer_bot_lib.events as events_module
     import scripts.reviewer_bot_lib.github_api as github_api_module
+    import scripts.reviewer_bot_lib.guidance as guidance_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
     import scripts.reviewer_bot_lib.reviews as reviews_module
     import scripts.reviewer_bot_lib.state_store as state_store_module
@@ -156,6 +157,7 @@ except ImportError:
     import reviewer_bot_lib.commands as commands_module
     import reviewer_bot_lib.events as events_module
     import reviewer_bot_lib.github_api as github_api_module
+    import reviewer_bot_lib.guidance as guidance_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
     import reviewer_bot_lib.reviews as reviews_module
     import reviewer_bot_lib.state_store as state_store_module
@@ -623,6 +625,18 @@ def handle_label_command(issue_number: int, label_string: str) -> tuple[str, boo
 
 def parse_issue_labels() -> list[str]:
     return commands_module.parse_issue_labels()
+
+
+def get_issue_guidance(reviewer: str, issue_author: str) -> str:
+    return guidance_module.get_issue_guidance(reviewer, issue_author)
+
+
+def get_pr_guidance(reviewer: str, pr_author: str) -> str:
+    return guidance_module.get_pr_guidance(reviewer, pr_author)
+
+
+def get_fls_audit_guidance(reviewer: str, issue_author: str) -> str:
+    return guidance_module.get_fls_audit_guidance(reviewer, issue_author)
 
 
 def run_command(command: list[str], cwd: Path, check: bool = True) -> Any:
