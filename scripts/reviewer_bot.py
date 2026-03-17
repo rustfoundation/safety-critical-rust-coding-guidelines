@@ -54,8 +54,6 @@ All commands must be prefixed with @guidelines-bot /<command>:
     - Show all available commands
 """
 
-import json  # noqa: F401
-import os  # noqa: F401
 import sys
 from collections.abc import Iterable
 from datetime import datetime, timezone
@@ -63,7 +61,6 @@ from pathlib import Path
 from typing import Any
 
 # GitHub API interaction
-import yaml  # noqa: F401
 
 try:
     import scripts.reviewer_bot_lib.automation as automation_module

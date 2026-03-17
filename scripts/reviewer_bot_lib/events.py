@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote
 
+import yaml
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -1343,7 +1345,7 @@ def handle_closed_event(bot, state: dict) -> bool:
 def handle_manual_dispatch(bot, state: dict) -> bool:
     action = os.environ.get("MANUAL_ACTION", "")
     if action == "show-state":
-        print(f"Current state:\n{bot.yaml.dump(state, default_flow_style=False)}")
+        print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
         return False
     bot.assert_lock_held("handle_manual_dispatch")
     if action == "sync-members":

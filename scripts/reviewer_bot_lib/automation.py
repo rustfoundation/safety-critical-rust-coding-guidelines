@@ -1,5 +1,6 @@
 """Automation-heavy reviewer-bot helpers."""
 
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,7 +42,7 @@ def get_default_branch(bot) -> str:
 
 
 def find_open_pr_for_branch(bot, branch: str) -> dict | None:
-    owner = bot.os.environ.get("REPO_OWNER", "").strip()
+    owner = os.environ.get("REPO_OWNER", "").strip()
     branch = branch.strip()
     if not owner or not branch:
         return None
@@ -73,7 +74,7 @@ def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict 
 
 
 def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author: str) -> tuple[str, bool]:
-    if bot.os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
+    if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
         return "❌ This command can only be used on issues, not PRs.", False
     labels = bot.parse_issue_labels()
     if bot.FLS_AUDIT_LABEL not in labels:

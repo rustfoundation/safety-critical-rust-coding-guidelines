@@ -20,17 +20,14 @@ def make_state():
     }
 
 
-def test_reviewer_bot_exports_compatibility_modules():
-    assert reviewer_bot.json is not None
-    assert reviewer_bot.os is not None
-    assert reviewer_bot.yaml is not None
+def test_reviewer_bot_exports_runtime_modules():
     assert reviewer_bot.requests is not None
     assert reviewer_bot.sys is not None
     assert reviewer_bot.datetime is not None
     assert reviewer_bot.timezone is not None
 
 
-def test_render_lock_commit_message_uses_json_compatibility_surface():
+def test_render_lock_commit_message_uses_direct_json_import():
     rendered = reviewer_bot.render_lock_commit_message({"lock_state": "unlocked"})
     assert reviewer_bot.LOCK_COMMIT_MARKER in rendered
 
@@ -41,7 +38,7 @@ def test_reviewer_bot_exports_guidance_helpers():
     assert reviewer_bot.get_fls_audit_guidance is not None
 
 
-def test_main_show_state_uses_yaml_compatibility_surface(monkeypatch, capsys):
+def test_main_show_state_uses_direct_yaml_import(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("EVENT_ACTION", "")
     monkeypatch.setenv("MANUAL_ACTION", "show-state")
