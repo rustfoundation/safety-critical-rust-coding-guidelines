@@ -1,5 +1,6 @@
 """Reviewer-bot lease lock helpers."""
 
+import json
 import os
 import random
 import time
@@ -128,7 +129,7 @@ def extract_commit_sha(payload: Any) -> str | None:
 
 
 def render_lock_commit_message(bot, lock_meta: dict) -> str:
-    lock_json = bot.json.dumps(bot.normalize_lock_metadata(lock_meta), sort_keys=False)
+    lock_json = json.dumps(bot.normalize_lock_metadata(lock_meta), sort_keys=False)
     return f"{LOCK_COMMIT_MARKER}\n{lock_json}"
 
 
@@ -137,8 +138,8 @@ def parse_lock_metadata_from_lock_commit_message(bot, message: str) -> dict:
         return bot.clear_lock_metadata()
     lock_json = message.split("\n", 1)[1]
     try:
-        parsed = bot.json.loads(lock_json)
-    except bot.json.JSONDecodeError:
+        parsed = json.loads(lock_json)
+    except json.JSONDecodeError:
         return bot.clear_lock_metadata()
     return bot.normalize_lock_metadata(parsed if isinstance(parsed, dict) else None)
 
