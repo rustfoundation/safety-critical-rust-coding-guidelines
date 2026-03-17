@@ -763,29 +763,6 @@ def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
     return reviews_module.get_pull_request_reviews(_runtime_bot(), issue_number)
 
 
-def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
-    return reviews_module.collapse_latest_reviews_by_login(reviews)
-
-
-def get_current_cycle_boundary(review_data: dict) -> datetime | None:
-    return reviews_module.get_current_cycle_boundary(_runtime_bot(), review_data)
-
-
-def pr_has_current_write_approval(
-    issue_number: int,
-    review_data: dict,
-    permission_cache: dict[str, bool] | None = None,
-    reviews: list[dict] | None = None,
-) -> bool | None:
-    return reviews_module.pr_has_current_write_approval(
-        _runtime_bot(),
-        issue_number,
-        review_data,
-        permission_cache=permission_cache,
-        reviews=reviews,
-    )
-
-
 def project_status_labels_for_item(
     issue_number: int,
     state: dict,
@@ -807,17 +784,6 @@ def sync_status_labels_for_items(state: dict, issue_numbers: Iterable[int]) -> b
 
 def list_open_items_with_status_labels() -> list[int]:
     return reviews_module.list_open_items_with_status_labels(_runtime_bot())
-
-
-def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | None:
-    return reviews_module.get_latest_review_by_reviewer(_runtime_bot(), reviews, reviewer)
-
-
-def find_triage_approval_after(
-    reviews: list[dict],
-    since: datetime | None,
-) -> tuple[str, datetime] | None:
-    return reviews_module.find_triage_approval_after(_runtime_bot(), reviews, since)
 
 
 def classify_comment_payload(comment_body: str) -> dict:
