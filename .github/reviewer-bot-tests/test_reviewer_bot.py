@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import comment_routing
+from scripts.reviewer_bot_lib import comment_routing, sweeper
 
 
 def make_state(epoch: str = "freshness_v15"):
@@ -451,8 +451,8 @@ def test_execute_pending_privileged_command_revalidates_live_state(monkeypatch):
 
 def test_observer_run_reason_mapping_and_near_miss_signature():
     signature = {"status": "waiting", "conclusion": None, "name": "approval_pending"}
-    assert reviewer_bot.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"
-    assert reviewer_bot.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "almost"}, signature) == "observer_state_unknown"
+    assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"
+    assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "almost"}, signature) == "observer_state_unknown"
 
 
 def test_negative_missing_run_requires_full_scan_and_recheck():
@@ -463,14 +463,14 @@ def test_negative_missing_run_requires_full_scan_and_recheck():
         "correlated_run_found": False,
         "approval_pending_evidence_retained": False,
     }
-    assert reviewer_bot.can_mark_observer_run_missing(gap) is True
+    assert sweeper.can_mark_observer_run_missing(gap) is True
     gap["later_recheck_complete"] = False
-    assert reviewer_bot.can_mark_observer_run_missing(gap) is False
+    assert sweeper.can_mark_observer_run_missing(gap) is False
 
 
 def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_window():
     os.environ["GITHUB_REPOSITORY"] = "rustfoundation/safety-critical-rust-coding-guidelines"
-    result = reviewer_bot.correlate_candidate_observer_runs(
+    result = sweeper.correlate_candidate_observer_runs(
         "issue_comment:101",
         source_event_kind="issue_comment:created",
         source_event_created_at="2026-03-17T10:00:00Z",
@@ -499,7 +499,7 @@ def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_win
 
 
 def test_stage_b_artifact_correlation_rejects_ambiguous_exact_matches():
-    result = reviewer_bot.correlate_run_artifacts_exact(
+    result = sweeper.correlate_run_artifacts_exact(
         {
             10: [{"source_event_key": "issue_comment:101", "source_run_id": 10, "source_run_attempt": 1, "pr_number": 42}],
             11: [{"source_event_key": "issue_comment:101", "source_run_id": 11, "source_run_attempt": 1, "pr_number": 42}],
@@ -512,7 +512,7 @@ def test_stage_b_artifact_correlation_rejects_ambiguous_exact_matches():
 
 
 def test_evaluate_gap_state_only_emits_missing_after_negative_inference_contract():
-    reason, diagnostic = reviewer_bot.evaluate_deferred_gap_state(
+    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
         {
             "source_event_created_at": "2026-03-15T00:00:00Z",
             "full_scan_complete": True,
@@ -534,7 +534,7 @@ def test_evaluate_gap_state_only_emits_missing_after_negative_inference_contract
 
 
 def test_evaluate_gap_state_completed_success_without_exact_artifact_is_artifact_missing():
-    reason, diagnostic = reviewer_bot.evaluate_deferred_gap_state(
+    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
         {"source_event_created_at": "2026-03-17T00:00:00Z"},
         {"status": "candidate_runs_found", "correlated_run": 10},
         {"status": "completed", "conclusion": "success"},
@@ -545,7 +545,7 @@ def test_evaluate_gap_state_completed_success_without_exact_artifact_is_artifact
 
 
 def test_evaluate_gap_state_completed_success_with_expired_artifact_marks_artifact_expired():
-    reason, diagnostic = reviewer_bot.evaluate_deferred_gap_state(
+    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
         {"source_event_created_at": "2026-03-17T00:00:00Z"},
         {"status": "candidate_runs_found", "correlated_run": 10},
         {"status": "completed", "conclusion": "success"},
@@ -560,12 +560,12 @@ def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention()
         "artifact_seen_at": "2026-03-10T00:00:00Z",
         "run_created_at": "2026-03-10T00:00:00Z",
     }
-    assert reviewer_bot.classify_artifact_gap_reason(expired) == "artifact_expired"
+    assert sweeper.classify_artifact_gap_reason(expired) == "artifact_expired"
     missing = {
         "artifact_inspection_complete": True,
         "run_created_at": "2026-03-17T00:00:00Z",
     }
-    assert reviewer_bot.classify_artifact_gap_reason(missing) == "artifact_missing"
+    assert sweeper.classify_artifact_gap_reason(missing) == "artifact_missing"
 
 
 def test_sweeper_creates_keyed_deferred_gaps_only_for_visible_comments_and_submitted_reviews(monkeypatch):
@@ -586,7 +586,7 @@ def test_sweeper_creates_keyed_deferred_gaps_only_for_visible_comments_and_submi
         "get_pull_request_reviews",
         lambda issue_number: [{"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"}],
     )
-    assert reviewer_bot.sweep_deferred_gaps(state) is True
+    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
     gaps = state["active_reviews"]["42"]["deferred_gaps"]
     assert "issue_comment:101" in gaps
     assert "pull_request_review:202" in gaps
@@ -608,7 +608,7 @@ def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch
         }.get(endpoint),
     )
     monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [{"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"}])
-    assert reviewer_bot.sweep_deferred_gaps(state) is False
+    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is False
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
