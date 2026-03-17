@@ -21,6 +21,9 @@ dependencies = [
     "pyyaml>=6.0.1",
 ]
 
+[project.scripts]
+reviewer-bot = "scripts.reviewer_bot:main"
+
 [tool.uv.workspace]
 members = ["builder", "exts"]
 
