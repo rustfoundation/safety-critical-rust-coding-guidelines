@@ -7,6 +7,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .guidance import get_issue_guidance, get_pr_guidance
+
 
 def strip_code_blocks(comment_body: str) -> str:
     sanitized = comment_body
@@ -535,10 +537,10 @@ def handle_assign_from_queue_command(bot, state: dict, issue_number: int) -> tup
         bot.post_comment(issue_number, failure_comment)
     if is_pr:
         if assignment_attempt.success:
-            guidance = bot.get_pr_guidance(next_reviewer, issue_author)
+            guidance = get_pr_guidance(next_reviewer, issue_author)
             bot.post_comment(issue_number, guidance)
     else:
-        guidance = bot.get_issue_guidance(next_reviewer, issue_author)
+        guidance = get_issue_guidance(next_reviewer, issue_author)
         bot.post_comment(issue_number, guidance)
     if assignment_attempt.success:
         return f"✅ @{next_reviewer} (next in queue) has been assigned as reviewer{prev_text}.", True
