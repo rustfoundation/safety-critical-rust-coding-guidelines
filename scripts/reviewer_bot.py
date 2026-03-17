@@ -65,6 +65,7 @@ from typing import Any
 try:
     import scripts.reviewer_bot_lib.automation as automation_module
     import scripts.reviewer_bot_lib.commands as commands_module
+    import scripts.reviewer_bot_lib.comment_routing as comment_routing_module
     import scripts.reviewer_bot_lib.events as events_module
     import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
@@ -152,6 +153,7 @@ except ImportError:
     import reviewer_bot_lib.app as app_module
     import reviewer_bot_lib.automation as automation_module
     import reviewer_bot_lib.commands as commands_module
+    import reviewer_bot_lib.comment_routing as comment_routing_module
     import reviewer_bot_lib.events as events_module
     import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
@@ -844,15 +846,15 @@ def find_triage_approval_after(
 
 
 def classify_comment_payload(comment_body: str) -> dict:
-    return events_module.classify_comment_payload(_runtime_bot(), comment_body)
+    return comment_routing_module.classify_comment_payload(_runtime_bot(), comment_body)
 
 
 def classify_issue_comment_actor() -> str:
-    return events_module.classify_issue_comment_actor()
+    return comment_routing_module.classify_issue_comment_actor()
 
 
 def route_issue_comment_trust(issue_number: int) -> str:
-    return events_module.route_issue_comment_trust(_runtime_bot(), issue_number)
+    return comment_routing_module.route_issue_comment_trust(_runtime_bot(), issue_number)
 
 
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
@@ -1125,7 +1127,7 @@ def handle_closed_event(state: dict) -> bool:
 
 
 def handle_comment_event(state: dict) -> bool:
-    return events_module.handle_comment_event(_runtime_bot(), state)
+    return comment_routing_module.handle_comment_event(_runtime_bot(), state)
 
 
 def handle_manual_dispatch(state: dict) -> bool:
