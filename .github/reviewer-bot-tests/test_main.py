@@ -1,6 +1,7 @@
 import pytest
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib.context import ReviewerBotContext
 
 
 def make_state():
@@ -25,6 +26,10 @@ def test_reviewer_bot_exports_runtime_modules():
     assert reviewer_bot.sys is not None
     assert reviewer_bot.datetime is not None
     assert reviewer_bot.timezone is not None
+
+
+def test_reviewer_bot_satisfies_runtime_context_protocol():
+    assert isinstance(reviewer_bot, ReviewerBotContext)
 
 
 def test_render_lock_commit_message_uses_direct_json_import():
