@@ -68,6 +68,7 @@ try:
     import scripts.reviewer_bot_lib.events as events_module
     import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
+    import scripts.reviewer_bot_lib.lifecycle as lifecycle_module
     import scripts.reviewer_bot_lib.reviews as reviews_module
     import scripts.reviewer_bot_lib.state_store as state_store_module
     from scripts.reviewer_bot_lib import app as app_module
@@ -154,6 +155,7 @@ except ImportError:
     import reviewer_bot_lib.events as events_module
     import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
+    import reviewer_bot_lib.lifecycle as lifecycle_module
     import reviewer_bot_lib.reviews as reviews_module
     import reviewer_bot_lib.state_store as state_store_module
     from reviewer_bot_lib.config import (  # noqa: F401
@@ -241,6 +243,10 @@ ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
 TOUCHED_ISSUE_NUMBERS: set[int] = set()
 
 
+def _runtime_bot() -> Any:
+    return sys.modules[__name__]
+
+
 def get_github_token() -> str:
     return github_api_module.get_github_token()
 
@@ -254,7 +260,7 @@ def github_api_request(
     suppress_error_log: bool = False,
 ) -> GitHubApiResult:
     return github_api_module.github_api_request(
-        sys.modules[__name__],
+        _runtime_bot(),
         method,
         endpoint,
         data,
@@ -264,31 +270,31 @@ def github_api_request(
 
 
 def github_api(method: str, endpoint: str, data: dict | None = None) -> Any | None:
-    return github_api_module.github_api(sys.modules[__name__], method, endpoint, data)
+    return github_api_module.github_api(_runtime_bot(), method, endpoint, data)
 
 
 def post_comment(issue_number: int, body: str) -> bool:
-    return github_api_module.post_comment(sys.modules[__name__], issue_number, body)
+    return github_api_module.post_comment(_runtime_bot(), issue_number, body)
 
 
 def get_repo_labels() -> set[str]:
-    return github_api_module.get_repo_labels(sys.modules[__name__])
+    return github_api_module.get_repo_labels(_runtime_bot())
 
 
 def add_label(issue_number: int, label: str) -> bool:
-    return github_api_module.add_label(sys.modules[__name__], issue_number, label)
+    return github_api_module.add_label(_runtime_bot(), issue_number, label)
 
 
 def remove_label(issue_number: int, label: str) -> bool:
-    return github_api_module.remove_label(sys.modules[__name__], issue_number, label)
+    return github_api_module.remove_label(_runtime_bot(), issue_number, label)
 
 
 def add_label_with_status(issue_number: int, label: str) -> bool:
-    return github_api_module.add_label_with_status(sys.modules[__name__], issue_number, label)
+    return github_api_module.add_label_with_status(_runtime_bot(), issue_number, label)
 
 
 def remove_label_with_status(issue_number: int, label: str) -> bool:
-    return github_api_module.remove_label_with_status(sys.modules[__name__], issue_number, label)
+    return github_api_module.remove_label_with_status(_runtime_bot(), issue_number, label)
 
 
 def ensure_label_exists(
@@ -298,7 +304,7 @@ def ensure_label_exists(
     description: str | None = None,
 ) -> bool:
     return github_api_module.ensure_label_exists(
-        sys.modules[__name__],
+        _runtime_bot(),
         label,
         color=color,
         description=description,
@@ -348,39 +354,39 @@ def get_issue_or_pr_labels(issue_number: int) -> set[str] | None:
 
 
 def request_reviewer_assignment(issue_number: int, username: str) -> AssignmentAttempt:
-    return github_api_module.request_reviewer_assignment(sys.modules[__name__], issue_number, username)
+    return github_api_module.request_reviewer_assignment(_runtime_bot(), issue_number, username)
 
 
 def assign_reviewer(issue_number: int, username: str) -> bool:
-    return github_api_module.assign_reviewer(sys.modules[__name__], issue_number, username)
+    return github_api_module.assign_reviewer(_runtime_bot(), issue_number, username)
 
 
 def get_assignment_failure_comment(reviewer: str, attempt: AssignmentAttempt) -> str | None:
-    return github_api_module.get_assignment_failure_comment(sys.modules[__name__], reviewer, attempt)
+    return github_api_module.get_assignment_failure_comment(_runtime_bot(), reviewer, attempt)
 
 
 def get_issue_assignees(issue_number: int) -> list[str]:
-    return github_api_module.get_issue_assignees(sys.modules[__name__], issue_number)
+    return github_api_module.get_issue_assignees(_runtime_bot(), issue_number)
 
 
 def add_reaction(comment_id: int, reaction: str) -> bool:
-    return github_api_module.add_reaction(sys.modules[__name__], comment_id, reaction)
+    return github_api_module.add_reaction(_runtime_bot(), comment_id, reaction)
 
 
 def remove_assignee(issue_number: int, username: str) -> bool:
-    return github_api_module.remove_assignee(sys.modules[__name__], issue_number, username)
+    return github_api_module.remove_assignee(_runtime_bot(), issue_number, username)
 
 
 def remove_pr_reviewer(issue_number: int, username: str) -> bool:
-    return github_api_module.remove_pr_reviewer(sys.modules[__name__], issue_number, username)
+    return github_api_module.remove_pr_reviewer(_runtime_bot(), issue_number, username)
 
 
 def unassign_reviewer(issue_number: int, username: str) -> bool:
-    return github_api_module.unassign_reviewer(sys.modules[__name__], issue_number, username)
+    return github_api_module.unassign_reviewer(_runtime_bot(), issue_number, username)
 
 
 def check_user_permission(username: str, required_permission: str = "triage") -> bool:
-    return github_api_module.check_user_permission(sys.modules[__name__], username, required_permission)
+    return github_api_module.check_user_permission(_runtime_bot(), username, required_permission)
 
 
 # ==============================================================================
@@ -389,7 +395,7 @@ def check_user_permission(username: str, required_permission: str = "triage") ->
 
 
 def get_state_issue() -> dict | None:
-    return state_store_module.get_state_issue(sys.modules[__name__])
+    return state_store_module.get_state_issue(_runtime_bot())
 
 
 def default_state_issue_prefix() -> str:
@@ -445,23 +451,23 @@ def parse_state_from_issue(issue: dict) -> dict:
 
 
 def get_state_issue_snapshot() -> StateIssueSnapshot | None:
-    return state_store_module.get_state_issue_snapshot(sys.modules[__name__])
+    return state_store_module.get_state_issue_snapshot(_runtime_bot())
 
 
 def conditional_patch_state_issue(body: str, etag: str | None = None) -> GitHubApiResult:
-    return state_store_module.conditional_patch_state_issue(sys.modules[__name__], body, etag)
+    return state_store_module.conditional_patch_state_issue(_runtime_bot(), body, etag)
 
 
 def assert_lock_held(operation: str) -> None:
-    state_store_module.assert_lock_held(sys.modules[__name__], operation)
+    state_store_module.assert_lock_held(_runtime_bot(), operation)
 
 
 def load_state(*, fail_on_unavailable: bool = False) -> dict:
-    return state_store_module.load_state(sys.modules[__name__], fail_on_unavailable=fail_on_unavailable)
+    return state_store_module.load_state(_runtime_bot(), fail_on_unavailable=fail_on_unavailable)
 
 
 def save_state(state: dict) -> bool:
-    return state_store_module.save_state(sys.modules[__name__], state)
+    return state_store_module.save_state(_runtime_bot(), state)
 
 
 def parse_iso8601_timestamp(value: Any) -> datetime | None:
@@ -469,7 +475,7 @@ def parse_iso8601_timestamp(value: Any) -> datetime | None:
 
 
 def lock_is_currently_valid(lock_meta: dict, now: datetime | None = None) -> bool:
-    return lease_lock_module.lock_is_currently_valid(sys.modules[__name__], lock_meta, now)
+    return lease_lock_module.lock_is_currently_valid(_runtime_bot(), lock_meta, now)
 
 
 def get_lock_owner_context() -> tuple[str, str, str]:
@@ -483,12 +489,12 @@ def build_lock_metadata(
     lock_owner_job: str,
 ) -> dict:
     return lease_lock_module.build_lock_metadata(
-        sys.modules[__name__], lock_token, lock_owner_run_id, lock_owner_workflow, lock_owner_job
+        _runtime_bot(), lock_token, lock_owner_run_id, lock_owner_workflow, lock_owner_job
     )
 
 
 def clear_lock_metadata() -> dict:
-    return lease_lock_module.clear_lock_metadata(sys.modules[__name__])
+    return lease_lock_module.clear_lock_metadata(_runtime_bot())
 
 
 def normalize_lock_ref_name(ref_name: str) -> str:
@@ -496,15 +502,15 @@ def normalize_lock_ref_name(ref_name: str) -> str:
 
 
 def get_lock_ref_name() -> str:
-    return lease_lock_module.get_lock_ref_name(sys.modules[__name__])
+    return lease_lock_module.get_lock_ref_name(_runtime_bot())
 
 
 def get_lock_ref_display() -> str:
-    return lease_lock_module.get_lock_ref_display(sys.modules[__name__])
+    return lease_lock_module.get_lock_ref_display(_runtime_bot())
 
 
 def get_state_issue_html_url() -> str:
-    return lease_lock_module.get_state_issue_html_url(sys.modules[__name__])
+    return lease_lock_module.get_state_issue_html_url(_runtime_bot())
 
 
 def extract_ref_sha(payload: Any) -> str | None:
@@ -520,47 +526,47 @@ def extract_commit_sha(payload: Any) -> str | None:
 
 
 def render_lock_commit_message(lock_meta: dict) -> str:
-    return lease_lock_module.render_lock_commit_message(sys.modules[__name__], lock_meta)
+    return lease_lock_module.render_lock_commit_message(_runtime_bot(), lock_meta)
 
 
 def parse_lock_metadata_from_lock_commit_message(message: str) -> dict:
-    return lease_lock_module.parse_lock_metadata_from_lock_commit_message(sys.modules[__name__], message)
+    return lease_lock_module.parse_lock_metadata_from_lock_commit_message(_runtime_bot(), message)
 
 
 def ensure_lock_ref_exists() -> str:
-    return lease_lock_module.ensure_lock_ref_exists(sys.modules[__name__])
+    return lease_lock_module.ensure_lock_ref_exists(_runtime_bot())
 
 
 def get_lock_ref_snapshot() -> tuple[str, str, dict]:
-    return lease_lock_module.get_lock_ref_snapshot(sys.modules[__name__])
+    return lease_lock_module.get_lock_ref_snapshot(_runtime_bot())
 
 
 def create_lock_commit(parent_sha: str, tree_sha: str, lock_meta: dict) -> GitHubApiResult:
-    return lease_lock_module.create_lock_commit(sys.modules[__name__], parent_sha, tree_sha, lock_meta)
+    return lease_lock_module.create_lock_commit(_runtime_bot(), parent_sha, tree_sha, lock_meta)
 
 
 def cas_update_lock_ref(new_sha: str) -> GitHubApiResult:
-    return lease_lock_module.cas_update_lock_ref(sys.modules[__name__], new_sha)
+    return lease_lock_module.cas_update_lock_ref(_runtime_bot(), new_sha)
 
 
 def ensure_state_issue_lease_lock_fresh() -> bool:
-    return lease_lock_module.ensure_state_issue_lease_lock_fresh(sys.modules[__name__])
+    return lease_lock_module.ensure_state_issue_lease_lock_fresh(_runtime_bot())
 
 
 def renew_state_issue_lease_lock(context: LeaseContext) -> bool:
-    return lease_lock_module.renew_state_issue_lease_lock(sys.modules[__name__], context)
+    return lease_lock_module.renew_state_issue_lease_lock(_runtime_bot(), context)
 
 
 def acquire_state_issue_lease_lock() -> LeaseContext:
-    return lease_lock_module.acquire_state_issue_lease_lock(sys.modules[__name__])
+    return lease_lock_module.acquire_state_issue_lease_lock(_runtime_bot())
 
 
 def release_state_issue_lease_lock() -> bool:
-    return lease_lock_module.release_state_issue_lease_lock(sys.modules[__name__])
+    return lease_lock_module.release_state_issue_lease_lock(_runtime_bot())
 
 
 def sync_members_with_queue(state: dict) -> tuple[dict, list[str]]:
-    return queue_sync_members_with_queue(sys.modules[__name__], state)
+    return queue_sync_members_with_queue(_runtime_bot(), state)
 
 
 def reposition_member_as_next(state: dict, username: str) -> bool:
@@ -601,21 +607,21 @@ def strip_code_blocks(comment_body: str) -> str:
 
 
 def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
-    return commands_module.parse_command(sys.modules[__name__], comment_body)
+    return commands_module.parse_command(_runtime_bot(), comment_body)
 
 
 def handle_pass_command(state: dict, issue_number: int, comment_author: str,
                        reason: str | None) -> tuple[str, bool]:
-    return commands_module.handle_pass_command(sys.modules[__name__], state, issue_number, comment_author, reason)
+    return commands_module.handle_pass_command(_runtime_bot(), state, issue_number, comment_author, reason)
 
 
 def handle_pass_until_command(state: dict, issue_number: int, comment_author: str,
                               return_date: str, reason: str | None) -> tuple[str, bool]:
-    return commands_module.handle_pass_until_command(sys.modules[__name__], state, issue_number, comment_author, return_date, reason)
+    return commands_module.handle_pass_until_command(_runtime_bot(), state, issue_number, comment_author, return_date, reason)
 
 
 def handle_label_command(issue_number: int, label_string: str) -> tuple[str, bool]:
-    return commands_module.handle_label_command(sys.modules[__name__], issue_number, label_string)
+    return commands_module.handle_label_command(_runtime_bot(), issue_number, label_string)
 
 
 def parse_issue_labels() -> list[str]:
@@ -635,54 +641,54 @@ def list_changed_files(repo_root: Path) -> list[str]:
 
 
 def get_default_branch() -> str:
-    return automation_module.get_default_branch(sys.modules[__name__])
+    return automation_module.get_default_branch(_runtime_bot())
 
 
 def find_open_pr_for_branch(branch: str) -> dict | None:
-    return automation_module.find_open_pr_for_branch(sys.modules[__name__], branch)
+    return automation_module.find_open_pr_for_branch(_runtime_bot(), branch)
 
 
 def resolve_workflow_run_pr_number() -> int:
-    return commands_module.resolve_workflow_run_pr_number(sys.modules[__name__])
+    return commands_module.resolve_workflow_run_pr_number(_runtime_bot())
 
 
 def create_pull_request(branch: str, base: str, issue_number: int) -> dict | None:
-    return automation_module.create_pull_request(sys.modules[__name__], branch, base, issue_number)
+    return automation_module.create_pull_request(_runtime_bot(), branch, base, issue_number)
 
 
 def handle_accept_no_fls_changes_command(issue_number: int, comment_author: str) -> tuple[str, bool]:
-    return automation_module.handle_accept_no_fls_changes_command(sys.modules[__name__], issue_number, comment_author)
+    return automation_module.handle_accept_no_fls_changes_command(_runtime_bot(), issue_number, comment_author)
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
-    return commands_module.handle_sync_members_command(sys.modules[__name__], state)
+    return commands_module.handle_sync_members_command(_runtime_bot(), state)
 
 
 def handle_queue_command(state: dict) -> tuple[str, bool]:
-    return commands_module.handle_queue_command(sys.modules[__name__], state)
+    return commands_module.handle_queue_command(_runtime_bot(), state)
 
 
 def handle_commands_command() -> tuple[str, bool]:
-    return commands_module.handle_commands_command(sys.modules[__name__])
+    return commands_module.handle_commands_command(_runtime_bot())
 
 
 def handle_claim_command(state: dict, issue_number: int,
                         comment_author: str) -> tuple[str, bool]:
-    return commands_module.handle_claim_command(sys.modules[__name__], state, issue_number, comment_author)
+    return commands_module.handle_claim_command(_runtime_bot(), state, issue_number, comment_author)
 
 
 def handle_release_command(state: dict, issue_number: int,
                           comment_author: str, args: list | None = None) -> tuple[str, bool]:
-    return commands_module.handle_release_command(sys.modules[__name__], state, issue_number, comment_author, args)
+    return commands_module.handle_release_command(_runtime_bot(), state, issue_number, comment_author, args)
 
 
 def handle_assign_command(state: dict, issue_number: int,
                          username: str) -> tuple[str, bool]:
-    return commands_module.handle_assign_command(sys.modules[__name__], state, issue_number, username)
+    return commands_module.handle_assign_command(_runtime_bot(), state, issue_number, username)
 
 
 def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[str, bool]:
-    return commands_module.handle_assign_from_queue_command(sys.modules[__name__], state, issue_number)
+    return commands_module.handle_assign_from_queue_command(_runtime_bot(), state, issue_number)
 
 
 # ==============================================================================
@@ -713,11 +719,11 @@ def mark_review_complete(
 
 
 def is_triage_or_higher(username: str) -> bool:
-    return reviews_module.is_triage_or_higher(sys.modules[__name__], username)
+    return reviews_module.is_triage_or_higher(_runtime_bot(), username)
 
 
 def trigger_mandatory_approver_escalation(state: dict, issue_number: int) -> bool:
-    return reviews_module.trigger_mandatory_approver_escalation(sys.modules[__name__], state, issue_number)
+    return reviews_module.trigger_mandatory_approver_escalation(_runtime_bot(), state, issue_number)
 
 
 def satisfy_mandatory_approver_requirement(
@@ -726,7 +732,7 @@ def satisfy_mandatory_approver_requirement(
     approver: str,
 ) -> bool:
     return reviews_module.satisfy_mandatory_approver_requirement(
-        sys.modules[__name__], state, issue_number, approver
+        _runtime_bot(), state, issue_number, approver
     )
 
 
@@ -737,7 +743,7 @@ def handle_pr_approved_review(
     completion_source: str,
 ) -> bool:
     return reviews_module.handle_pr_approved_review(
-        sys.modules[__name__], state, issue_number, review_author, completion_source
+        _runtime_bot(), state, issue_number, review_author, completion_source
     )
 
 
@@ -746,7 +752,7 @@ def parse_github_timestamp(value: str | None) -> datetime | None:
 
 
 def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
-    return reviews_module.get_pull_request_reviews(sys.modules[__name__], issue_number)
+    return reviews_module.get_pull_request_reviews(_runtime_bot(), issue_number)
 
 
 def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
@@ -754,7 +760,7 @@ def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
 
 
 def get_current_cycle_boundary(review_data: dict) -> datetime | None:
-    return reviews_module.get_current_cycle_boundary(sys.modules[__name__], review_data)
+    return reviews_module.get_current_cycle_boundary(_runtime_bot(), review_data)
 
 
 def pr_has_current_write_approval(
@@ -764,7 +770,7 @@ def pr_has_current_write_approval(
     reviews: list[dict] | None = None,
 ) -> bool | None:
     return reviews_module.pr_has_current_write_approval(
-        sys.modules[__name__],
+        _runtime_bot(),
         issue_number,
         review_data,
         permission_cache=permission_cache,
@@ -779,24 +785,24 @@ def project_status_labels_for_item(
     issue_snapshot: dict | None = None,
 ) -> tuple[set[str] | None, dict[str, str | None]]:
     return reviews_module.project_status_labels_for_item(
-        sys.modules[__name__], issue_number, state, issue_snapshot=issue_snapshot
+        _runtime_bot(), issue_number, state, issue_snapshot=issue_snapshot
     )
 
 
 def sync_status_labels(issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
-    return reviews_module.sync_status_labels(sys.modules[__name__], issue_number, desired_labels, actual_labels)
+    return reviews_module.sync_status_labels(_runtime_bot(), issue_number, desired_labels, actual_labels)
 
 
 def sync_status_labels_for_items(state: dict, issue_numbers: Iterable[int]) -> bool:
-    return reviews_module.sync_status_labels_for_items(sys.modules[__name__], state, issue_numbers)
+    return reviews_module.sync_status_labels_for_items(_runtime_bot(), state, issue_numbers)
 
 
 def list_open_items_with_status_labels() -> list[int]:
-    return reviews_module.list_open_items_with_status_labels(sys.modules[__name__])
+    return reviews_module.list_open_items_with_status_labels(_runtime_bot())
 
 
 def get_latest_review_by_reviewer(reviews: list[dict], reviewer: str) -> dict | None:
-    return events_module.get_latest_review_by_reviewer(sys.modules[__name__], reviews, reviewer)
+    return events_module.get_latest_review_by_reviewer(_runtime_bot(), reviews, reviewer)
 
 
 def find_triage_approval_after(
@@ -838,7 +844,7 @@ def find_triage_approval_after(
 
 
 def classify_comment_payload(comment_body: str) -> dict:
-    return events_module.classify_comment_payload(sys.modules[__name__], comment_body)
+    return events_module.classify_comment_payload(_runtime_bot(), comment_body)
 
 
 def classify_issue_comment_actor() -> str:
@@ -846,7 +852,7 @@ def classify_issue_comment_actor() -> str:
 
 
 def route_issue_comment_trust(issue_number: int) -> str:
-    return events_module.route_issue_comment_trust(sys.modules[__name__], issue_number)
+    return events_module.route_issue_comment_trust(_runtime_bot(), issue_number)
 
 
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
@@ -862,7 +868,7 @@ def classify_artifact_gap_reason(gap: dict, now: datetime | None = None) -> str:
 
 
 def sweep_deferred_gaps(state: dict) -> bool:
-    return events_module.sweep_deferred_gaps(sys.modules[__name__], state)
+    return events_module.sweep_deferred_gaps(_runtime_bot(), state)
 
 
 def correlate_candidate_observer_runs(
@@ -914,7 +920,7 @@ def reconcile_active_review_entry(
     completion_source: str = "rectify:reconcile-pr-review",
 ) -> tuple[str, bool, bool]:
     return events_module.reconcile_active_review_entry(
-        sys.modules[__name__],
+        _runtime_bot(),
         state,
         issue_number,
         require_pull_request_context=require_pull_request_context,
@@ -1087,47 +1093,47 @@ _Life happens! If you're dealing with something, just let us know._"""
 
 
 def handle_transition_notice(state: dict, issue_number: int, reviewer: str) -> bool:
-    return events_module.handle_transition_notice(sys.modules[__name__], state, issue_number, reviewer)
+    return lifecycle_module.handle_transition_notice(_runtime_bot(), state, issue_number, reviewer)
 
 
 def handle_issue_or_pr_opened(state: dict) -> bool:
-    return events_module.handle_issue_or_pr_opened(sys.modules[__name__], state)
+    return lifecycle_module.handle_issue_or_pr_opened(_runtime_bot(), state)
 
 
 def handle_labeled_event(state: dict) -> bool:
-    return events_module.handle_labeled_event(sys.modules[__name__], state)
+    return lifecycle_module.handle_labeled_event(_runtime_bot(), state)
 
 
 def handle_issue_edited_event(state: dict) -> bool:
-    return events_module.handle_issue_edited_event(sys.modules[__name__], state)
+    return lifecycle_module.handle_issue_edited_event(_runtime_bot(), state)
 
 
 def handle_pull_request_target_synchronize(state: dict) -> bool:
-    return events_module.handle_pull_request_target_synchronize(sys.modules[__name__], state)
+    return lifecycle_module.handle_pull_request_target_synchronize(_runtime_bot(), state)
 
 
 def handle_pull_request_review_event(state: dict) -> bool:
-    return events_module.handle_pull_request_review_event(sys.modules[__name__], state)
+    return events_module.handle_pull_request_review_event(_runtime_bot(), state)
 
 
 def handle_workflow_run_event(state: dict) -> bool:
-    return events_module.handle_workflow_run_event(sys.modules[__name__], state)
+    return events_module.handle_workflow_run_event(_runtime_bot(), state)
 
 
 def handle_closed_event(state: dict) -> bool:
-    return events_module.handle_closed_event(sys.modules[__name__], state)
+    return lifecycle_module.handle_closed_event(_runtime_bot(), state)
 
 
 def handle_comment_event(state: dict) -> bool:
-    return events_module.handle_comment_event(sys.modules[__name__], state)
+    return events_module.handle_comment_event(_runtime_bot(), state)
 
 
 def handle_manual_dispatch(state: dict) -> bool:
-    return events_module.handle_manual_dispatch(sys.modules[__name__], state)
+    return events_module.handle_manual_dispatch(_runtime_bot(), state)
 
 
 def handle_scheduled_check(state: dict) -> bool:
-    return events_module.handle_scheduled_check(sys.modules[__name__], state)
+    return events_module.handle_scheduled_check(_runtime_bot(), state)
 
 
 # ==============================================================================
@@ -1136,16 +1142,16 @@ def handle_scheduled_check(state: dict) -> bool:
 
 
 def classify_event_intent(event_name: str, event_action: str) -> str:
-    return app_module.classify_event_intent(sys.modules[__name__], event_name, event_action)
+    return app_module.classify_event_intent(_runtime_bot(), event_name, event_action)
 
 
 def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
     """Backwards-compatible helper for tests and call sites."""
-    return app_module.event_requires_lease_lock(sys.modules[__name__], event_name, event_action)
+    return app_module.event_requires_lease_lock(_runtime_bot(), event_name, event_action)
 
 
 def main():
-    app_module.main(sys.modules[__name__])
+    app_module.main(_runtime_bot())
 
 
 if __name__ == "__main__":
