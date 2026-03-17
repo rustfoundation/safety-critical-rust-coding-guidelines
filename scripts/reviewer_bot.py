@@ -77,7 +77,11 @@ import scripts.reviewer_bot_lib.reconcile as reconcile_module
 import scripts.reviewer_bot_lib.reviews as reviews_module
 import scripts.reviewer_bot_lib.state_store as state_store_module
 from scripts.reviewer_bot_lib import app as app_module
-from scripts.reviewer_bot_lib.config import (  # noqa: F401
+
+# Exported runtime config surface used by extracted modules and tests.
+# Exported runtime types used by extracted modules and tests.
+# Internal-only config consumed directly by the entrypoint adapter.
+from scripts.reviewer_bot_lib.config import (  # noqa: F401  # noqa: F401
     AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
     BOT_MENTION,
     BOT_NAME,
