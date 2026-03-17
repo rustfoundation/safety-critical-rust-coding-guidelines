@@ -786,45 +786,6 @@ def list_open_items_with_status_labels() -> list[int]:
     return reviews_module.list_open_items_with_status_labels(_runtime_bot())
 
 
-def classify_comment_payload(comment_body: str) -> dict:
-    return comment_routing_module.classify_comment_payload(_runtime_bot(), comment_body)
-
-
-def _digest_body(body: str) -> str:
-    return comment_routing_module._digest_body(body)
-
-
-def classify_issue_comment_actor() -> str:
-    return comment_routing_module.classify_issue_comment_actor()
-
-
-def route_issue_comment_trust(issue_number: int) -> str:
-    return comment_routing_module.route_issue_comment_trust(_runtime_bot(), issue_number)
-
-
-def _record_conversation_freshness(
-    state: dict,
-    issue_number: int,
-    comment_author: str,
-    comment_id: int,
-    created_at: str,
-) -> bool:
-    return comment_routing_module._record_conversation_freshness(
-        _runtime_bot(), state, issue_number, comment_author, comment_id, created_at
-    )
-
-
-def _handle_comment_command(
-    state: dict,
-    issue_number: int,
-    comment_author: str,
-    classified: dict,
-) -> bool:
-    return comment_routing_module._handle_command(
-        _runtime_bot(), state, issue_number, comment_author, classified
-    )
-
-
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
     return sweeper_module.observer_run_reason_from_details(run_details, runbook_signature)
 

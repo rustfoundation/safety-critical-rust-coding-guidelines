@@ -5,6 +5,12 @@ from __future__ import annotations
 import json
 import os
 
+from .comment_routing import (
+    _digest_body,
+    _handle_command,
+    _record_conversation_freshness,
+    classify_comment_payload,
+)
 from .reviews import find_triage_approval_after, get_latest_review_by_reviewer
 
 
@@ -346,25 +352,25 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
             if not isinstance(live_comment, dict):
                 changed = False
                 if source_freshness_eligible:
-                    changed = bot._record_conversation_freshness(state, pr_number, comment_author, comment_id, comment_created_at)
+                    changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
                 _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {payload['comment_id']} is no longer visible; source-time freshness only may be preserved. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
                 return changed
             live_body = live_comment.get("body")
             if not isinstance(live_body, str):
                 raise RuntimeError("Live deferred comment body is unavailable")
-            if bot._digest_body(live_body) != payload.get("source_body_digest"):
+            if _digest_body(live_body) != payload.get("source_body_digest"):
                 changed = False
                 if source_freshness_eligible:
-                    changed = bot._record_conversation_freshness(state, pr_number, comment_author, comment_id, comment_created_at)
+                    changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
                 _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {payload['comment_id']} body digest changed; command execution suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
                 return changed
             changed = False
             if source_freshness_eligible:
-                changed = bot._record_conversation_freshness(state, pr_number, comment_author, comment_id, comment_created_at) or changed
+                changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at) or changed
             if classified in {"command_only", "command_plus_text"}:
-                live_classified = bot.classify_comment_payload(live_body)
+                live_classified = classify_comment_payload(bot, live_body)
                 if int(live_classified.get("command_count", 0)) == 1:
-                    changed = bot._handle_comment_command(state, pr_number, comment_author, live_classified) or changed
+                    changed = _handle_command(bot, state, pr_number, comment_author, live_classified) or changed
             _mark_reconciled_source_event(review_data, source_event_key)
             _clear_source_event_key(review_data, source_event_key)
             return changed
