@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 
+from .reviews import find_triage_approval_after, get_latest_review_by_reviewer
+
 
 def _now_iso(bot) -> str:
     return bot.datetime.now(bot.timezone.utc).isoformat()
@@ -45,7 +47,7 @@ def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dic
     completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data, pull_request=pull_request, reviews=reviews)
     if completion is None:
         raise RuntimeError(f"Unable to rebuild approval state for PR #{issue_number}")
-    latest = bot.get_latest_review_by_reviewer(reviews, str(review_data.get("current_reviewer", "")))
+    latest = get_latest_review_by_reviewer(bot, reviews, str(review_data.get("current_reviewer", "")))
     if latest is not None:
         commit_id = latest.get("commit_id")
         submitted_at = latest.get("submitted_at")
@@ -84,7 +86,7 @@ def reconcile_active_review_entry(
     reviews = bot.get_pull_request_reviews(issue_number)
     if reviews is None:
         return f"❌ Failed to fetch reviews for PR #{issue_number}; cannot run `/rectify`.", False, False
-    latest_review = bot.get_latest_review_by_reviewer(reviews, assigned_reviewer)
+    latest_review = get_latest_review_by_reviewer(bot, reviews, assigned_reviewer)
     messages: list[str] = []
     if latest_review is not None:
         latest_state = str(latest_review.get("state", "")).upper()
@@ -106,7 +108,7 @@ def reconcile_active_review_entry(
         review_data["review_completion_source"] = completion_source
     if review_data.get("mandatory_approver_required"):
         escalation_opened_at = bot.parse_iso8601_timestamp(review_data.get("mandatory_approver_pinged_at")) or bot.parse_iso8601_timestamp(review_data.get("mandatory_approver_label_applied_at"))
-        triage_approval = bot.find_triage_approval_after(reviews, escalation_opened_at)
+        triage_approval = find_triage_approval_after(bot, reviews, escalation_opened_at)
         if triage_approval is not None:
             approver, _ = triage_approval
             if bot.satisfy_mandatory_approver_requirement(state, issue_number, approver):
