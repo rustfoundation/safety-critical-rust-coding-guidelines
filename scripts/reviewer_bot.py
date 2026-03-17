@@ -65,179 +65,94 @@ from typing import Any
 
 timezone = _timezone
 
-try:
-    import scripts.reviewer_bot_lib.automation as automation_module
-    import scripts.reviewer_bot_lib.commands as commands_module
-    import scripts.reviewer_bot_lib.comment_routing as comment_routing_module
-    import scripts.reviewer_bot_lib.events as events_module
-    import scripts.reviewer_bot_lib.github_api as github_api_module
-    import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
-    import scripts.reviewer_bot_lib.lifecycle as lifecycle_module
-    import scripts.reviewer_bot_lib.maintenance as maintenance_module
-    import scripts.reviewer_bot_lib.reconcile as reconcile_module
-    import scripts.reviewer_bot_lib.reviews as reviews_module
-    import scripts.reviewer_bot_lib.state_store as state_store_module
-    from scripts.reviewer_bot_lib import app as app_module
-    from scripts.reviewer_bot_lib.config import (  # noqa: F401
-        AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
-        BOT_MENTION,
-        BOT_NAME,
-        COMMANDS,
-        DEFERRED_ARTIFACT_RETENTION_DAYS,
-        DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS,
-        DEFERRED_DISCOVERY_OVERLAP_SECONDS,
-        DEFERRED_MISSING_RUN_WINDOW_SECONDS,
-        EVENT_INTENT_MUTATING,
-        EVENT_INTENT_NON_MUTATING_DEFER,
-        EVENT_INTENT_NON_MUTATING_READONLY,
-        FLS_AUDIT_LABEL,
-        FRESHNESS_RUNTIME_EPOCH_LEGACY,
-        FRESHNESS_RUNTIME_EPOCH_V18,
-        LOCK_API_RETRY_LIMIT,
-        LOCK_BLOCK_END_MARKER,
-        LOCK_BLOCK_START_MARKER,
-        LOCK_COMMIT_MARKER,
-        LOCK_LEASE_TTL_SECONDS,
-        LOCK_MAX_WAIT_SECONDS,
-        LOCK_METADATA_KEYS,
-        LOCK_REF_BOOTSTRAP_BRANCH,
-        LOCK_REF_NAME,
-        LOCK_RENEWAL_WINDOW_SECONDS,
-        LOCK_RETRY_BASE_SECONDS,
-        LOCK_SCHEMA_VERSION,
-        MANDATORY_TRIAGE_APPROVER_LABEL,
-        MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
-        MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
-        MAX_RECENT_ASSIGNMENTS,
-        REVIEW_DEADLINE_DAYS,
-        REVIEW_FRESHNESS_RUNBOOK_PATH,
-        REVIEW_LABELS,
-        REVIEWER_REQUEST_422_TEMPLATE,
-        STATE_BLOCK_END_MARKER,
-        STATE_BLOCK_START_MARKER,
-        STATE_ISSUE_NUMBER,
-        STATE_READ_RETRY_BASE_SECONDS,
-        STATE_READ_RETRY_LIMIT,
-        STATE_SCHEMA_VERSION,
-        STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
-        STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
-        STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
-        STATUS_AWAITING_WRITE_APPROVAL_LABEL,
-        STATUS_LABEL_CONFIG,
-        STATUS_LABELS,
-        TRANSITION_PERIOD_DAYS,
-        AssignmentAttempt,
-        GitHubApiResult,
-        LeaseContext,
-        StateIssueBodyParts,
-        StateIssueSnapshot,
-        get_commands_help,
-    )
-    from scripts.reviewer_bot_lib.guidance import (  # noqa: F401
-        get_fls_audit_guidance,
-        get_issue_guidance,
-        get_pr_guidance,
-    )
-    from scripts.reviewer_bot_lib.members import fetch_members  # noqa: F401
-    from scripts.reviewer_bot_lib.queue import (
-        get_next_reviewer as queue_get_next_reviewer,
-    )
-    from scripts.reviewer_bot_lib.queue import (
-        process_pass_until_expirations as queue_process_pass_until_expirations,
-    )
-    from scripts.reviewer_bot_lib.queue import (
-        record_assignment as queue_record_assignment,
-    )
-    from scripts.reviewer_bot_lib.queue import (
-        reposition_member_as_next as queue_reposition_member_as_next,
-    )
-    from scripts.reviewer_bot_lib.queue import (
-        sync_members_with_queue as queue_sync_members_with_queue,
-    )
-except ImportError:
-    import reviewer_bot_lib.app as app_module
-    import reviewer_bot_lib.automation as automation_module
-    import reviewer_bot_lib.commands as commands_module
-    import reviewer_bot_lib.comment_routing as comment_routing_module
-    import reviewer_bot_lib.events as events_module
-    import reviewer_bot_lib.github_api as github_api_module
-    import reviewer_bot_lib.lease_lock as lease_lock_module
-    import reviewer_bot_lib.lifecycle as lifecycle_module
-    import reviewer_bot_lib.maintenance as maintenance_module
-    import reviewer_bot_lib.reconcile as reconcile_module
-    import reviewer_bot_lib.reviews as reviews_module
-    import reviewer_bot_lib.state_store as state_store_module
-    from reviewer_bot_lib.config import (  # noqa: F401
-        AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
-        BOT_MENTION,
-        BOT_NAME,
-        COMMANDS,
-        DEFERRED_ARTIFACT_RETENTION_DAYS,
-        DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS,
-        DEFERRED_DISCOVERY_OVERLAP_SECONDS,
-        DEFERRED_MISSING_RUN_WINDOW_SECONDS,
-        EVENT_INTENT_MUTATING,
-        EVENT_INTENT_NON_MUTATING_DEFER,
-        EVENT_INTENT_NON_MUTATING_READONLY,
-        FLS_AUDIT_LABEL,
-        FRESHNESS_RUNTIME_EPOCH_LEGACY,
-        FRESHNESS_RUNTIME_EPOCH_V18,
-        LOCK_API_RETRY_LIMIT,
-        LOCK_BLOCK_END_MARKER,
-        LOCK_BLOCK_START_MARKER,
-        LOCK_COMMIT_MARKER,
-        LOCK_LEASE_TTL_SECONDS,
-        LOCK_MAX_WAIT_SECONDS,
-        LOCK_METADATA_KEYS,
-        LOCK_REF_BOOTSTRAP_BRANCH,
-        LOCK_REF_NAME,
-        LOCK_RENEWAL_WINDOW_SECONDS,
-        LOCK_RETRY_BASE_SECONDS,
-        LOCK_SCHEMA_VERSION,
-        MANDATORY_TRIAGE_APPROVER_LABEL,
-        MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
-        MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
-        MAX_RECENT_ASSIGNMENTS,
-        REVIEW_DEADLINE_DAYS,
-        REVIEW_FRESHNESS_RUNBOOK_PATH,
-        REVIEW_LABELS,
-        REVIEWER_REQUEST_422_TEMPLATE,
-        STATE_BLOCK_END_MARKER,
-        STATE_BLOCK_START_MARKER,
-        STATE_ISSUE_NUMBER,
-        STATE_READ_RETRY_BASE_SECONDS,
-        STATE_READ_RETRY_LIMIT,
-        STATE_SCHEMA_VERSION,
-        STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
-        STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
-        STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
-        STATUS_AWAITING_WRITE_APPROVAL_LABEL,
-        STATUS_LABEL_CONFIG,
-        STATUS_LABELS,
-        TRANSITION_PERIOD_DAYS,
-        AssignmentAttempt,
-        GitHubApiResult,
-        LeaseContext,
-        StateIssueBodyParts,
-        StateIssueSnapshot,
-        get_commands_help,
-    )
-    from reviewer_bot_lib.members import fetch_members  # noqa: F401
-    from reviewer_bot_lib.queue import (
-        get_next_reviewer as queue_get_next_reviewer,
-    )
-    from reviewer_bot_lib.queue import (
-        process_pass_until_expirations as queue_process_pass_until_expirations,
-    )
-    from reviewer_bot_lib.queue import (
-        record_assignment as queue_record_assignment,
-    )
-    from reviewer_bot_lib.queue import (
-        reposition_member_as_next as queue_reposition_member_as_next,
-    )
-    from reviewer_bot_lib.queue import (
-        sync_members_with_queue as queue_sync_members_with_queue,
-    )
+import scripts.reviewer_bot_lib.automation as automation_module
+import scripts.reviewer_bot_lib.commands as commands_module
+import scripts.reviewer_bot_lib.comment_routing as comment_routing_module
+import scripts.reviewer_bot_lib.events as events_module
+import scripts.reviewer_bot_lib.github_api as github_api_module
+import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
+import scripts.reviewer_bot_lib.lifecycle as lifecycle_module
+import scripts.reviewer_bot_lib.maintenance as maintenance_module
+import scripts.reviewer_bot_lib.reconcile as reconcile_module
+import scripts.reviewer_bot_lib.reviews as reviews_module
+import scripts.reviewer_bot_lib.state_store as state_store_module
+from scripts.reviewer_bot_lib import app as app_module
+from scripts.reviewer_bot_lib.config import (  # noqa: F401
+    AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
+    BOT_MENTION,
+    BOT_NAME,
+    COMMANDS,
+    DEFERRED_ARTIFACT_RETENTION_DAYS,
+    DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS,
+    DEFERRED_DISCOVERY_OVERLAP_SECONDS,
+    DEFERRED_MISSING_RUN_WINDOW_SECONDS,
+    EVENT_INTENT_MUTATING,
+    EVENT_INTENT_NON_MUTATING_DEFER,
+    EVENT_INTENT_NON_MUTATING_READONLY,
+    FLS_AUDIT_LABEL,
+    FRESHNESS_RUNTIME_EPOCH_LEGACY,
+    FRESHNESS_RUNTIME_EPOCH_V18,
+    LOCK_API_RETRY_LIMIT,
+    LOCK_BLOCK_END_MARKER,
+    LOCK_BLOCK_START_MARKER,
+    LOCK_COMMIT_MARKER,
+    LOCK_LEASE_TTL_SECONDS,
+    LOCK_MAX_WAIT_SECONDS,
+    LOCK_METADATA_KEYS,
+    LOCK_REF_BOOTSTRAP_BRANCH,
+    LOCK_REF_NAME,
+    LOCK_RENEWAL_WINDOW_SECONDS,
+    LOCK_RETRY_BASE_SECONDS,
+    LOCK_SCHEMA_VERSION,
+    MANDATORY_TRIAGE_APPROVER_LABEL,
+    MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
+    MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
+    MAX_RECENT_ASSIGNMENTS,
+    REVIEW_DEADLINE_DAYS,
+    REVIEW_FRESHNESS_RUNBOOK_PATH,
+    REVIEW_LABELS,
+    REVIEWER_REQUEST_422_TEMPLATE,
+    STATE_BLOCK_END_MARKER,
+    STATE_BLOCK_START_MARKER,
+    STATE_ISSUE_NUMBER,
+    STATE_READ_RETRY_BASE_SECONDS,
+    STATE_READ_RETRY_LIMIT,
+    STATE_SCHEMA_VERSION,
+    STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
+    STATUS_AWAITING_REVIEW_COMPLETION_LABEL,
+    STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
+    STATUS_AWAITING_WRITE_APPROVAL_LABEL,
+    STATUS_LABEL_CONFIG,
+    STATUS_LABELS,
+    TRANSITION_PERIOD_DAYS,
+    AssignmentAttempt,
+    GitHubApiResult,
+    LeaseContext,
+    StateIssueBodyParts,
+    StateIssueSnapshot,
+    get_commands_help,
+)
+from scripts.reviewer_bot_lib.guidance import (  # noqa: F401
+    get_fls_audit_guidance,
+    get_issue_guidance,
+    get_pr_guidance,
+)
+from scripts.reviewer_bot_lib.members import fetch_members  # noqa: F401
+from scripts.reviewer_bot_lib.queue import (
+    get_next_reviewer as queue_get_next_reviewer,
+)
+from scripts.reviewer_bot_lib.queue import (
+    process_pass_until_expirations as queue_process_pass_until_expirations,
+)
+from scripts.reviewer_bot_lib.queue import (
+    record_assignment as queue_record_assignment,
+)
+from scripts.reviewer_bot_lib.queue import (
+    reposition_member_as_next as queue_reposition_member_as_next,
+)
+from scripts.reviewer_bot_lib.queue import (
+    sync_members_with_queue as queue_sync_members_with_queue,
+)
 
 requests = github_api_module.requests
 random = lease_lock_module.random
