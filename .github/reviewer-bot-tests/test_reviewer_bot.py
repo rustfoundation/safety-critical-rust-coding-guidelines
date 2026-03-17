@@ -6,6 +6,7 @@ import pytest
 import yaml
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import comment_routing
 
 
 def make_state(epoch: str = "freshness_v15"):
@@ -79,11 +80,11 @@ def test_load_state_sets_schema_and_epoch_defaults(monkeypatch):
 def test_classify_issue_comment_actor(monkeypatch, env, expected):
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    assert reviewer_bot.classify_issue_comment_actor() == expected
+    assert comment_routing.classify_issue_comment_actor() == expected
 
 
 def test_classify_comment_payload_distinguishes_command_plus_text():
-    payload = reviewer_bot.classify_comment_payload("hello\n@guidelines-bot /queue")
+    payload = comment_routing.classify_comment_payload(reviewer_bot, "hello\n@guidelines-bot /queue")
     assert payload["comment_class"] == "command_plus_text"
     assert payload["has_non_command_text"] is True
 
@@ -104,7 +105,7 @@ def test_route_issue_comment_trust_allows_only_same_repo_repo_user_principal(mon
             "user": {"login": "carol"},
         },
     )
-    assert reviewer_bot.route_issue_comment_trust(42) == "pr_trusted_direct"
+    assert comment_routing.route_issue_comment_trust(reviewer_bot, 42) == "pr_trusted_direct"
 
 
 def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypatch):
@@ -124,7 +125,7 @@ def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypa
         },
     )
     with pytest.raises(RuntimeError, match="Ambiguous same-repo PR comment trust posture"):
-        reviewer_bot.route_issue_comment_trust(42)
+        comment_routing.route_issue_comment_trust(reviewer_bot, 42)
 
 
 def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypatch):
