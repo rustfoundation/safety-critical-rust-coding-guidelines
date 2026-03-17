@@ -9,6 +9,7 @@ from urllib.parse import quote
 import requests
 
 from .config import LOCK_API_RETRY_LIMIT, LOCK_RETRY_BASE_SECONDS, STATUS_LABEL_CONFIG
+from .context import ReviewerBotContext
 
 
 def get_github_token() -> str:
@@ -20,7 +21,7 @@ def get_github_token() -> str:
 
 
 def github_api_request(
-    bot,
+    bot: ReviewerBotContext,
     method: str,
     endpoint: str,
     data: dict | None = None,
@@ -63,7 +64,7 @@ def github_api_request(
     )
 
 
-def github_api(bot, method: str, endpoint: str, data: dict | None = None):
+def github_api(bot: ReviewerBotContext, method: str, endpoint: str, data: dict | None = None):
     response = bot.github_api_request(method, endpoint, data)
     if not response.ok:
         return None
@@ -72,27 +73,27 @@ def github_api(bot, method: str, endpoint: str, data: dict | None = None):
     return response.payload
 
 
-def post_comment(bot, issue_number: int, body: str) -> bool:
+def post_comment(bot: ReviewerBotContext, issue_number: int, body: str) -> bool:
     return bot.github_api("POST", f"issues/{issue_number}/comments", {"body": body}) is not None
 
 
-def get_repo_labels(bot) -> set[str]:
+def get_repo_labels(bot: ReviewerBotContext) -> set[str]:
     result = bot.github_api("GET", "labels?per_page=100")
     if result and isinstance(result, list):
         return {label["name"] for label in result}
     return set()
 
 
-def add_label(bot, issue_number: int, label: str) -> bool:
+def add_label(bot: ReviewerBotContext, issue_number: int, label: str) -> bool:
     return bot.github_api("POST", f"issues/{issue_number}/labels", {"labels": [label]}) is not None
 
 
-def remove_label(bot, issue_number: int, label: str) -> bool:
+def remove_label(bot: ReviewerBotContext, issue_number: int, label: str) -> bool:
     bot.github_api("DELETE", f"issues/{issue_number}/labels/{quote(label, safe='')}")
     return True
 
 
-def add_label_with_status(bot, issue_number: int, label: str) -> bool:
+def add_label_with_status(bot: ReviewerBotContext, issue_number: int, label: str) -> bool:
     response = bot.github_api_request(
         "POST",
         f"issues/{issue_number}/labels",
@@ -113,7 +114,7 @@ def add_label_with_status(bot, issue_number: int, label: str) -> bool:
     return False
 
 
-def remove_label_with_status(bot, issue_number: int, label: str) -> bool:
+def remove_label_with_status(bot: ReviewerBotContext, issue_number: int, label: str) -> bool:
     response = bot.github_api_request(
         "DELETE",
         f"issues/{issue_number}/labels/{quote(label, safe='')}",
@@ -134,7 +135,7 @@ def remove_label_with_status(bot, issue_number: int, label: str) -> bool:
 
 
 def ensure_label_exists(
-    bot,
+    bot: ReviewerBotContext,
     label: str,
     *,
     color: str | None = None,
@@ -163,7 +164,7 @@ def ensure_label_exists(
     return False
 
 
-def request_reviewer_assignment(bot, issue_number: int, username: str):
+def request_reviewer_assignment(bot: ReviewerBotContext, issue_number: int, username: str):
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     if is_pr:
         endpoint = f"pulls/{issue_number}/requested_reviewers"
@@ -213,11 +214,11 @@ def request_reviewer_assignment(bot, issue_number: int, username: str):
     return bot.AssignmentAttempt(success=False, status_code=None, exhausted_retryable_failure=True)
 
 
-def assign_reviewer(bot, issue_number: int, username: str) -> bool:
+def assign_reviewer(bot: ReviewerBotContext, issue_number: int, username: str) -> bool:
     return bot.request_reviewer_assignment(issue_number, username).success
 
 
-def get_assignment_failure_comment(bot, reviewer: str, attempt) -> str | None:
+def get_assignment_failure_comment(bot: ReviewerBotContext, reviewer: str, attempt) -> str | None:
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     if attempt.status_code == 422:
         if is_pr:
@@ -236,7 +237,7 @@ def get_assignment_failure_comment(bot, reviewer: str, attempt) -> str | None:
     return None
 
 
-def get_issue_assignees(bot, issue_number: int) -> list[str]:
+def get_issue_assignees(bot: ReviewerBotContext, issue_number: int) -> list[str]:
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     if is_pr:
         result = bot.github_api("GET", f"pulls/{issue_number}")
@@ -249,21 +250,21 @@ def get_issue_assignees(bot, issue_number: int) -> list[str]:
     return []
 
 
-def add_reaction(bot, comment_id: int, reaction: str) -> bool:
+def add_reaction(bot: ReviewerBotContext, comment_id: int, reaction: str) -> bool:
     return (
         bot.github_api("POST", f"issues/comments/{comment_id}/reactions", {"content": reaction})
         is not None
     )
 
 
-def remove_assignee(bot, issue_number: int, username: str) -> bool:
+def remove_assignee(bot: ReviewerBotContext, issue_number: int, username: str) -> bool:
     return (
         bot.github_api("DELETE", f"issues/{issue_number}/assignees", {"assignees": [username]})
         is not None
     )
 
 
-def remove_pr_reviewer(bot, issue_number: int, username: str) -> bool:
+def remove_pr_reviewer(bot: ReviewerBotContext, issue_number: int, username: str) -> bool:
     return (
         bot.github_api(
             "DELETE",
@@ -274,14 +275,14 @@ def remove_pr_reviewer(bot, issue_number: int, username: str) -> bool:
     )
 
 
-def unassign_reviewer(bot, issue_number: int, username: str) -> bool:
+def unassign_reviewer(bot: ReviewerBotContext, issue_number: int, username: str) -> bool:
     is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
     if is_pr:
         bot.remove_pr_reviewer(issue_number, username)
     return bot.remove_assignee(issue_number, username)
 
 
-def check_user_permission(bot, username: str, required_permission: str = "triage") -> bool:
+def check_user_permission(bot: ReviewerBotContext, username: str, required_permission: str = "triage") -> bool:
     result = bot.github_api("GET", f"collaborators/{username}/permission")
     if not result:
         return False

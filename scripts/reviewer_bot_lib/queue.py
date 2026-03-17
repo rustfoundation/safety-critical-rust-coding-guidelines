@@ -1,6 +1,4 @@
 """Reviewer queue and assignment helpers."""
-
-import sys
 from datetime import datetime, timezone
 
 from .config import MAX_RECENT_ASSIGNMENTS
@@ -146,7 +144,3 @@ def record_assignment(
     state["recent_assignments"].insert(0, assignment)
     state["recent_assignments"] = state["recent_assignments"][:max_recent_assignments]
 
-
-def sync_members_with_queue_wrapper(state: dict) -> tuple[dict, list[str]]:
-    """Compatibility wrapper using the loaded reviewer_bot module."""
-    return sync_members_with_queue(sys.modules["scripts.reviewer_bot"], state)

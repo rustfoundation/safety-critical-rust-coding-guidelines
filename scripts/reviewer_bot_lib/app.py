@@ -3,8 +3,10 @@
 import os
 import sys
 
+from .context import ReviewerBotContext
 
-def _revalidate_epoch(bot, expected_epoch: str | None, phase: str) -> None:
+
+def _revalidate_epoch(bot: ReviewerBotContext, expected_epoch: str | None, phase: str) -> None:
     if expected_epoch is None:
         return
     latest_state = bot.load_state(fail_on_unavailable=True)
@@ -15,7 +17,7 @@ def _revalidate_epoch(bot, expected_epoch: str | None, phase: str) -> None:
         )
 
 
-def _mark_projection_repair_needed(bot, state: dict, issue_numbers: list[int], reason: str) -> bool:
+def _mark_projection_repair_needed(bot: ReviewerBotContext, state: dict, issue_numbers: list[int], reason: str) -> bool:
     changed = False
     active_reviews = state.get("active_reviews")
     if not isinstance(active_reviews, dict):
@@ -33,7 +35,7 @@ def _mark_projection_repair_needed(bot, state: dict, issue_numbers: list[int], r
     return changed
 
 
-def classify_event_intent(bot, event_name: str, event_action: str) -> str:
+def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action: str) -> str:
     """Classify whether a run can mutate reviewer-bot state."""
     if event_name in {"issues", "pull_request_target"}:
         if event_action in {"opened", "labeled", "edited", "closed", "synchronize"}:
@@ -74,12 +76,12 @@ def classify_event_intent(bot, event_name: str, event_action: str) -> str:
     return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
 
-def event_requires_lease_lock(bot, event_name: str, event_action: str) -> bool:
+def event_requires_lease_lock(bot: ReviewerBotContext, event_name: str, event_action: str) -> bool:
     """Backwards-compatible helper for tests and call sites."""
     return classify_event_intent(bot, event_name, event_action) == bot.EVENT_INTENT_MUTATING
 
 
-def main(bot):
+def main(bot: ReviewerBotContext):
     """Main entry point for the reviewer bot."""
     event_name = os.environ.get("EVENT_NAME", "")
     event_action = os.environ.get("EVENT_ACTION", "")
