@@ -32,12 +32,6 @@ def test_render_lock_commit_message_uses_direct_json_import():
     assert reviewer_bot.LOCK_COMMIT_MARKER in rendered
 
 
-def test_reviewer_bot_exports_guidance_helpers():
-    assert reviewer_bot.get_issue_guidance is not None
-    assert reviewer_bot.get_pr_guidance is not None
-    assert reviewer_bot.get_fls_audit_guidance is not None
-
-
 def test_main_show_state_uses_direct_yaml_import(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("EVENT_ACTION", "")

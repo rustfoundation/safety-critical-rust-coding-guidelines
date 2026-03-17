@@ -14,6 +14,8 @@ from urllib.parse import quote
 
 import yaml
 
+from .guidance import get_fls_audit_guidance, get_issue_guidance, get_pr_guidance
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -328,9 +330,9 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
     if failure_comment:
         bot.post_comment(issue_number, failure_comment)
     if is_pr and assignment_attempt.success:
-        bot.post_comment(issue_number, bot.get_pr_guidance(reviewer, issue_author))
+        bot.post_comment(issue_number, get_pr_guidance(reviewer, issue_author))
     if not is_pr:
-        guidance = bot.get_fls_audit_guidance(reviewer, issue_author) if bot.FLS_AUDIT_LABEL in labels else bot.get_issue_guidance(reviewer, issue_author)
+        guidance = get_fls_audit_guidance(reviewer, issue_author) if bot.FLS_AUDIT_LABEL in labels else get_issue_guidance(reviewer, issue_author)
         bot.post_comment(issue_number, guidance)
     return True
 
