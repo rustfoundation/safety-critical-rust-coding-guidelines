@@ -1,7 +1,12 @@
 import pytest
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib.context import ReviewerBotContext
+from scripts.reviewer_bot_lib.context import (
+    GitHubTransportContext,
+    LeaseLockContext,
+    ReviewerBotContext,
+    StateStoreContext,
+)
 
 
 def make_state():
@@ -30,6 +35,12 @@ def test_reviewer_bot_exports_runtime_modules():
 
 def test_reviewer_bot_satisfies_runtime_context_protocol():
     assert isinstance(reviewer_bot, ReviewerBotContext)
+
+
+def test_reviewer_bot_satisfies_narrower_lock_and_state_protocols():
+    assert isinstance(reviewer_bot, GitHubTransportContext)
+    assert isinstance(reviewer_bot, StateStoreContext)
+    assert isinstance(reviewer_bot, LeaseLockContext)
 
 
 def test_render_lock_commit_message_uses_direct_json_import():

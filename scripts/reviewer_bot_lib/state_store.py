@@ -27,10 +27,10 @@ from .config import (
     StateIssueBodyParts,
     StateIssueSnapshot,
 )
-from .context import ReviewerBotContext
+from .context import StateStoreContext
 
 
-def get_state_issue(bot: ReviewerBotContext) -> dict | None:
+def get_state_issue(bot: StateStoreContext) -> dict | None:
     """Fetch the state issue from GitHub with retry for transient failures."""
     state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
     state_read_retry_limit = getattr(bot, "STATE_READ_RETRY_LIMIT", STATE_READ_RETRY_LIMIT)
@@ -270,7 +270,7 @@ def parse_state_from_issue(issue: dict) -> dict:
     return parse_state_yaml_from_issue_body(body)
 
 
-def get_state_issue_snapshot(bot: ReviewerBotContext) -> StateIssueSnapshot | None:
+def get_state_issue_snapshot(bot: StateStoreContext) -> StateIssueSnapshot | None:
     state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
     if not state_issue_number:
         print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
@@ -305,7 +305,7 @@ def get_state_issue_snapshot(bot: ReviewerBotContext) -> StateIssueSnapshot | No
     return StateIssueSnapshot(body=body, etag=response.headers.get("etag"), html_url=html_url)
 
 
-def conditional_patch_state_issue(bot: ReviewerBotContext, body: str, etag: str | None = None):
+def conditional_patch_state_issue(bot: StateStoreContext, body: str, etag: str | None = None):
     state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
     return bot.github_api_request(
         "PATCH",
@@ -315,12 +315,12 @@ def conditional_patch_state_issue(bot: ReviewerBotContext, body: str, etag: str 
     )
 
 
-def assert_lock_held(bot: ReviewerBotContext, operation: str) -> None:
+def assert_lock_held(bot: StateStoreContext, operation: str) -> None:
     if bot.ACTIVE_LEASE_CONTEXT is None:
         raise RuntimeError(f"Mutating path reached without lease lock: {operation}")
 
 
-def load_state(bot: ReviewerBotContext, *, fail_on_unavailable: bool = False) -> dict:
+def load_state(bot: StateStoreContext, *, fail_on_unavailable: bool = False) -> dict:
     default_state = {
         "schema_version": STATE_SCHEMA_VERSION,
         "freshness_runtime_epoch": FRESHNESS_RUNTIME_EPOCH_LEGACY,
@@ -362,7 +362,7 @@ def load_state(bot: ReviewerBotContext, *, fail_on_unavailable: bool = False) ->
     return state
 
 
-def save_state(bot: ReviewerBotContext, state: dict) -> bool:
+def save_state(bot: StateStoreContext, state: dict) -> bool:
     assert_lock_held(bot, "save_state")
 
     state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)

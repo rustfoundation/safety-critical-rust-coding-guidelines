@@ -19,10 +19,10 @@ from .config import (
     LOCK_RETRY_BASE_SECONDS,
     LeaseContext,
 )
-from .context import ReviewerBotContext
+from .context import LeaseLockContext
 
 
-def lock_is_currently_valid(bot: ReviewerBotContext, lock_meta: dict, now: datetime | None = None) -> bool:
+def lock_is_currently_valid(bot: LeaseLockContext, lock_meta: dict, now: datetime | None = None) -> bool:
     if not isinstance(lock_meta, dict):
         return False
     if lock_meta.get("lock_state") != "locked":
@@ -56,7 +56,7 @@ def get_lock_owner_context() -> tuple[str, str, str]:
     return run_id, workflow, job
 
 
-def build_lock_metadata(bot: ReviewerBotContext, lock_token: str, lock_owner_run_id: str, lock_owner_workflow: str, lock_owner_job: str) -> dict:
+def build_lock_metadata(bot: LeaseLockContext, lock_token: str, lock_owner_run_id: str, lock_owner_workflow: str, lock_owner_job: str) -> dict:
     acquired_at = datetime.now(timezone.utc)
     expires_at = acquired_at.timestamp() + getattr(bot, "LOCK_LEASE_TTL_SECONDS", LOCK_LEASE_TTL_SECONDS)
     return bot.normalize_lock_metadata(
@@ -73,7 +73,7 @@ def build_lock_metadata(bot: ReviewerBotContext, lock_token: str, lock_owner_run
     )
 
 
-def clear_lock_metadata(bot: ReviewerBotContext) -> dict:
+def clear_lock_metadata(bot: LeaseLockContext) -> dict:
     return bot.normalize_lock_metadata({"lock_state": "unlocked"})
 
 
@@ -86,15 +86,15 @@ def normalize_lock_ref_name(ref_name: str) -> str:
     return normalized
 
 
-def get_lock_ref_name(bot: ReviewerBotContext) -> str:
+def get_lock_ref_name(bot: LeaseLockContext) -> str:
     return normalize_lock_ref_name(getattr(bot, "LOCK_REF_NAME", LOCK_REF_NAME))
 
 
-def get_lock_ref_display(bot: ReviewerBotContext) -> str:
+def get_lock_ref_display(bot: LeaseLockContext) -> str:
     return f"refs/{get_lock_ref_name(bot)}"
 
 
-def get_state_issue_html_url(bot: ReviewerBotContext) -> str:
+def get_state_issue_html_url(bot: LeaseLockContext) -> str:
     context = bot.ACTIVE_LEASE_CONTEXT
     if context and context.state_issue_url:
         return context.state_issue_url
@@ -129,12 +129,12 @@ def extract_commit_sha(payload: Any) -> str | None:
     return sha if isinstance(sha, str) and sha else None
 
 
-def render_lock_commit_message(bot: ReviewerBotContext, lock_meta: dict) -> str:
+def render_lock_commit_message(bot: LeaseLockContext, lock_meta: dict) -> str:
     lock_json = json.dumps(bot.normalize_lock_metadata(lock_meta), sort_keys=False)
     return f"{LOCK_COMMIT_MARKER}\n{lock_json}"
 
 
-def parse_lock_metadata_from_lock_commit_message(bot: ReviewerBotContext, message: str) -> dict:
+def parse_lock_metadata_from_lock_commit_message(bot: LeaseLockContext, message: str) -> dict:
     if not message.startswith(f"{LOCK_COMMIT_MARKER}\n"):
         return bot.clear_lock_metadata()
     lock_json = message.split("\n", 1)[1]
@@ -145,7 +145,7 @@ def parse_lock_metadata_from_lock_commit_message(bot: ReviewerBotContext, messag
     return bot.normalize_lock_metadata(parsed if isinstance(parsed, dict) else None)
 
 
-def ensure_lock_ref_exists(bot: ReviewerBotContext) -> str:
+def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
     lock_ref = get_lock_ref_name(bot)
     response = bot.github_api_request("GET", f"git/ref/{lock_ref}", suppress_error_log=True)
     if response.status_code == 200:
@@ -200,7 +200,7 @@ def ensure_lock_ref_exists(bot: ReviewerBotContext) -> str:
     return ref_sha
 
 
-def get_lock_ref_snapshot(bot: ReviewerBotContext) -> tuple[str, str, dict]:
+def get_lock_ref_snapshot(bot: LeaseLockContext) -> tuple[str, str, dict]:
     ref_sha = ensure_lock_ref_exists(bot)
     commit_response = bot.github_api_request("GET", f"git/commits/{ref_sha}", suppress_error_log=True)
     if commit_response.status_code != 200:
@@ -219,7 +219,7 @@ def get_lock_ref_snapshot(bot: ReviewerBotContext) -> tuple[str, str, dict]:
     return ref_sha, tree_sha, lock_meta
 
 
-def create_lock_commit(bot: ReviewerBotContext, parent_sha: str, tree_sha: str, lock_meta: dict):
+def create_lock_commit(bot: LeaseLockContext, parent_sha: str, tree_sha: str, lock_meta: dict):
     return bot.github_api_request(
         "POST",
         "git/commits",
@@ -228,7 +228,7 @@ def create_lock_commit(bot: ReviewerBotContext, parent_sha: str, tree_sha: str, 
     )
 
 
-def cas_update_lock_ref(bot: ReviewerBotContext, new_sha: str):
+def cas_update_lock_ref(bot: LeaseLockContext, new_sha: str):
     return bot.github_api_request(
         "PATCH",
         f"git/refs/{get_lock_ref_name(bot)}",
@@ -237,7 +237,7 @@ def cas_update_lock_ref(bot: ReviewerBotContext, new_sha: str):
     )
 
 
-def ensure_state_issue_lease_lock_fresh(bot: ReviewerBotContext) -> bool:
+def ensure_state_issue_lease_lock_fresh(bot: LeaseLockContext) -> bool:
     context = bot.ACTIVE_LEASE_CONTEXT
     if context is None:
         return False
@@ -257,7 +257,7 @@ def ensure_state_issue_lease_lock_fresh(bot: ReviewerBotContext) -> bool:
     return bot.renew_state_issue_lease_lock(context)
 
 
-def renew_state_issue_lease_lock(bot: ReviewerBotContext, context: LeaseContext) -> bool:
+def renew_state_issue_lease_lock(bot: LeaseLockContext, context: LeaseContext) -> bool:
     retry_limit = getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
     retry_base = getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
     for attempt in range(1, retry_limit + 1):
@@ -326,7 +326,7 @@ def renew_state_issue_lease_lock(bot: ReviewerBotContext, context: LeaseContext)
     return False
 
 
-def acquire_state_issue_lease_lock(bot: ReviewerBotContext) -> LeaseContext:
+def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
     if bot.ACTIVE_LEASE_CONTEXT is not None:
         return bot.ACTIVE_LEASE_CONTEXT
     lock_token = uuid.uuid4().hex
@@ -422,7 +422,7 @@ def acquire_state_issue_lease_lock(bot: ReviewerBotContext) -> LeaseContext:
         time.sleep(delay)
 
 
-def release_state_issue_lease_lock(bot: ReviewerBotContext) -> bool:
+def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
     context = bot.ACTIVE_LEASE_CONTEXT
     if context is None:
         return True
