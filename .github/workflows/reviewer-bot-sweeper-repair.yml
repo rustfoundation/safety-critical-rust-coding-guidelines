@@ -1,12 +1,16 @@
-name: Reviewer Bot Reconcile
+name: Reviewer Bot Sweeper Repair
 
 on:
-  workflow_run:
-    workflows:
-      - Reviewer Bot PR Comment Observer
-      - Reviewer Bot PR Review Submitted Observer
-      - Reviewer Bot PR Review Dismissed Observer
-    types: [completed]
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Action to perform
+        required: true
+        default: check-overdue
+        type: choice
+        options: [sync-members, show-state, check-overdue, repair-review-status-labels]
 
 permissions:
   contents: read
@@ -15,8 +19,7 @@ env:
   STATE_ISSUE_NUMBER: '314'
 
 jobs:
-  reconcile:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  reviewer-bot-sweeper-repair:
     concurrency:
       group: reviewer-bot-state-314
       cancel-in-progress: false
@@ -30,13 +33,6 @@ jobs:
     steps:
       - name: Install uv
         run: python -m pip install uv
-      - name: Download deferred artifact
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
-        with:
-          path: ${{ runner.temp }}/observer-artifact
-          run-id: ${{ github.event.workflow_run.id }}
-          repository: ${{ github.repository }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Fetch trusted bot source tarball
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,8 +40,10 @@ jobs:
           python - <<'PY'
           import io, os, tarfile, urllib.request
           from pathlib import Path
+          repo = os.environ['GITHUB_REPOSITORY']
+          ref = os.environ['GITHUB_SHA']
           req = urllib.request.Request(
-              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/tarball/{os.environ['GITHUB_SHA']}",
+              f'https://api.github.com/repos/{repo}/tarball/{ref}',
               headers={'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}", 'Accept': 'application/vnd.github+json'},
           )
           target = Path(os.environ['RUNNER_TEMP']) / 'reviewer-bot-src'
@@ -57,26 +55,12 @@ jobs:
           roots = list(target.iterdir())
           print(f'BOT_SRC_ROOT={roots[0]}', file=open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8'))
           PY
-      - name: Select deferred payload
-        run: |
-          python - <<'PY'
-          import os
-          from pathlib import Path
-          files = sorted(Path(os.environ['RUNNER_TEMP']).joinpath('observer-artifact').rglob('*.json'))
-          if len(files) != 1:
-              raise SystemExit(f'Expected exactly one deferred payload, found {len(files)}')
-          print(f'DEFERRED_CONTEXT_PATH={files[0]}', file=open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8'))
-          PY
-      - name: Run trusted reconcile
+      - name: Run reviewer bot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT_NAME: workflow_run
-          EVENT_ACTION: completed
-          WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
-          WORKFLOW_RUN_TRIGGERING_NAME: ${{ github.event.workflow_run.name }}
-          WORKFLOW_RUN_TRIGGERING_ID: ${{ github.event.workflow_run.id }}
-          WORKFLOW_RUN_TRIGGERING_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-          WORKFLOW_RUN_TRIGGERING_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          MANUAL_ACTION: ${{ github.event.inputs.action }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -84,11 +68,11 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
-          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-reconcile.yml
+          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-sweeper-repair.yml
         run: uv run python "$BOT_SRC_ROOT/scripts/reviewer_bot.py"
       - name: Workflow summary
         run: |
           {
-            echo 'Deferred-gap recovery guidance:'
+            echo 'Deferred-gap operator guidance:'
             echo '- docs/reviewer-bot-review-freshness-operator-runbook.md'
           } >> "$GITHUB_STEP_SUMMARY"

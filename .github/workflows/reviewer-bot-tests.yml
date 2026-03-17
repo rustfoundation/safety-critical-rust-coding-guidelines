@@ -5,14 +5,14 @@ on:
     paths:
       - 'scripts/reviewer_bot.py'
       - 'scripts/*.py'
-      - '.github/workflows/reviewer-bot.yml'
+      - '.github/workflows/reviewer-bot-*.yml'
       - '.github/reviewer-bot-tests/**'
       - 'pyproject.toml'
   pull_request:
     paths:
       - 'scripts/reviewer_bot.py'
       - 'scripts/*.py'
-      - '.github/workflows/reviewer-bot.yml'
+      - '.github/workflows/reviewer-bot-*.yml'
       - '.github/reviewer-bot-tests/**'
       - 'pyproject.toml'
   workflow_dispatch:
