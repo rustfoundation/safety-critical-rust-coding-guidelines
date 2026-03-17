@@ -70,6 +70,7 @@ try:
     import scripts.reviewer_bot_lib.github_api as github_api_module
     import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
     import scripts.reviewer_bot_lib.lifecycle as lifecycle_module
+    import scripts.reviewer_bot_lib.reconcile as reconcile_module
     import scripts.reviewer_bot_lib.reviews as reviews_module
     import scripts.reviewer_bot_lib.state_store as state_store_module
     from scripts.reviewer_bot_lib import app as app_module
@@ -158,6 +159,7 @@ except ImportError:
     import reviewer_bot_lib.github_api as github_api_module
     import reviewer_bot_lib.lease_lock as lease_lock_module
     import reviewer_bot_lib.lifecycle as lifecycle_module
+    import reviewer_bot_lib.reconcile as reconcile_module
     import reviewer_bot_lib.reviews as reviews_module
     import reviewer_bot_lib.state_store as state_store_module
     from reviewer_bot_lib.config import (  # noqa: F401
@@ -849,12 +851,39 @@ def classify_comment_payload(comment_body: str) -> dict:
     return comment_routing_module.classify_comment_payload(_runtime_bot(), comment_body)
 
 
+def _digest_body(body: str) -> str:
+    return comment_routing_module._digest_body(body)
+
+
 def classify_issue_comment_actor() -> str:
     return comment_routing_module.classify_issue_comment_actor()
 
 
 def route_issue_comment_trust(issue_number: int) -> str:
     return comment_routing_module.route_issue_comment_trust(_runtime_bot(), issue_number)
+
+
+def _record_conversation_freshness(
+    state: dict,
+    issue_number: int,
+    comment_author: str,
+    comment_id: int,
+    created_at: str,
+) -> bool:
+    return comment_routing_module._record_conversation_freshness(
+        _runtime_bot(), state, issue_number, comment_author, comment_id, created_at
+    )
+
+
+def _handle_comment_command(
+    state: dict,
+    issue_number: int,
+    comment_author: str,
+    classified: dict,
+) -> bool:
+    return comment_routing_module._handle_command(
+        _runtime_bot(), state, issue_number, comment_author, classified
+    )
 
 
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
@@ -921,7 +950,7 @@ def reconcile_active_review_entry(
     require_pull_request_context: bool = True,
     completion_source: str = "rectify:reconcile-pr-review",
 ) -> tuple[str, bool, bool]:
-    return events_module.reconcile_active_review_entry(
+    return reconcile_module.reconcile_active_review_entry(
         _runtime_bot(),
         state,
         issue_number,
@@ -1114,12 +1143,16 @@ def handle_pull_request_target_synchronize(state: dict) -> bool:
     return lifecycle_module.handle_pull_request_target_synchronize(_runtime_bot(), state)
 
 
+def maybe_record_head_observation_repair(issue_number: int, review_data: dict) -> bool:
+    return lifecycle_module.maybe_record_head_observation_repair(_runtime_bot(), issue_number, review_data)
+
+
 def handle_pull_request_review_event(state: dict) -> bool:
     return events_module.handle_pull_request_review_event(_runtime_bot(), state)
 
 
 def handle_workflow_run_event(state: dict) -> bool:
-    return events_module.handle_workflow_run_event(_runtime_bot(), state)
+    return reconcile_module.handle_workflow_run_event(_runtime_bot(), state)
 
 
 def handle_closed_event(state: dict) -> bool:
