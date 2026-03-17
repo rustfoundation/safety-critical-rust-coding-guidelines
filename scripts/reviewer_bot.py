@@ -784,22 +784,6 @@ def list_open_items_with_status_labels() -> list[int]:
     return reviews_module.list_open_items_with_status_labels(_runtime_bot())
 
 
-def reconcile_active_review_entry(
-    state: dict,
-    issue_number: int,
-    *,
-    require_pull_request_context: bool = True,
-    completion_source: str = "rectify:reconcile-pr-review",
-) -> tuple[str, bool, bool]:
-    return reconcile_module.reconcile_active_review_entry(
-        _runtime_bot(),
-        state,
-        issue_number,
-        require_pull_request_context=require_pull_request_context,
-        completion_source=completion_source,
-    )
-
-
 def handle_rectify_command(state: dict, issue_number: int, comment_author: str) -> tuple[str, bool, bool]:
     """Handle /rectify for the current issue/PR only.
 
@@ -836,7 +820,11 @@ def handle_rectify_command(state: dict, issue_number: int, comment_author: str) 
             False,
         )
 
-    return reconcile_active_review_entry(state, issue_number)
+    return reconcile_module.reconcile_active_review_entry(
+        _runtime_bot(),
+        state,
+        issue_number,
+    )
 
 
 def check_overdue_reviews(state: dict) -> list[dict]:
