@@ -129,6 +129,22 @@ def extract_commit_sha(payload: Any) -> str | None:
     return sha if isinstance(sha, str) and sha else None
 
 
+def _snapshot_matches_expected_lock(current_lock: dict, expected_token: str) -> bool:
+    return (
+        isinstance(current_lock, dict)
+        and current_lock.get("lock_state") == "locked"
+        and current_lock.get("lock_token") == expected_token
+    )
+
+
+def _snapshot_is_stale_unlocked_predecessor(current_lock: dict) -> bool:
+    return (
+        isinstance(current_lock, dict)
+        and current_lock.get("lock_state") == "unlocked"
+        and current_lock.get("lock_token") is None
+    )
+
+
 def render_lock_commit_message(bot: LeaseLockContext, lock_meta: dict) -> str:
     lock_json = json.dumps(bot.normalize_lock_metadata(lock_meta), sort_keys=False)
     return f"{LOCK_COMMIT_MARKER}\n{lock_json}"
@@ -375,20 +391,36 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                 raise RuntimeError("Lock acquire commit response did not include commit SHA")
             update_response = bot.cas_update_lock_ref(new_commit_sha)
             if update_response.status_code == 200:
-                bot.ACTIVE_LEASE_CONTEXT = LeaseContext(
-                    lock_token=lock_token,
-                    lock_owner_run_id=lock_owner_run_id,
-                    lock_owner_workflow=lock_owner_workflow,
-                    lock_owner_job=lock_owner_job,
-                    state_issue_url=bot.get_state_issue_html_url(),
-                    lock_ref=bot.get_lock_ref_display(),
-                    lock_expires_at=desired_lock.get("lock_expires_at"),
+                snapshot_ref_sha, snapshot_tree_sha, snapshot_lock = bot.get_lock_ref_snapshot()
+                del snapshot_ref_sha, snapshot_tree_sha
+                if _snapshot_matches_expected_lock(snapshot_lock, lock_token):
+                    bot.ACTIVE_LEASE_CONTEXT = LeaseContext(
+                        lock_token=lock_token,
+                        lock_owner_run_id=lock_owner_run_id,
+                        lock_owner_workflow=lock_owner_workflow,
+                        lock_owner_job=lock_owner_job,
+                        state_issue_url=bot.get_state_issue_html_url(),
+                        lock_ref=bot.get_lock_ref_display(),
+                        lock_expires_at=desired_lock.get("lock_expires_at"),
+                    )
+                    print(
+                        "Acquired reviewer-bot lease lock "
+                        f"(run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, lock_ref={bot.get_lock_ref_display()})"
+                    )
+                    return bot.ACTIVE_LEASE_CONTEXT
+                if _snapshot_is_stale_unlocked_predecessor(snapshot_lock):
+                    print(
+                        "Lease lock acquire visibility lag detected; retrying confirmation "
+                        f"(attempt {attempt}, token_prefix={lock_token[:8]})"
+                    )
+                    delay = retry_base + random.uniform(0, retry_base)
+                    time.sleep(delay)
+                    continue
+                conflicting_token = snapshot_lock.get("lock_token") if isinstance(snapshot_lock, dict) else None
+                raise RuntimeError(
+                    "Lease lock acquire confirmed unexpected lock state after ref update "
+                    f"(expected prefix={lock_token[:8]}, got prefix={str(conflicting_token)[:8]})"
                 )
-                print(
-                    "Acquired reviewer-bot lease lock "
-                    f"(run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, lock_ref={bot.get_lock_ref_display()})"
-                )
-                return bot.ACTIVE_LEASE_CONTEXT
             if update_response.status_code in {409, 422}:
                 print(
                     "Lease lock acquire conflict "
@@ -438,6 +470,15 @@ def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
                 break
             current_token = current_lock.get("lock_token")
             if current_token != context.lock_token:
+                if _snapshot_is_stale_unlocked_predecessor(current_lock):
+                    print(
+                        "Lease lock release observed stale unlocked predecessor; retrying "
+                        f"(attempt {attempt}, token_prefix={context.lock_token[:8]})",
+                        file=bot.sys.stderr,
+                    )
+                    delay = retry_base + random.uniform(0, retry_base)
+                    time.sleep(delay)
+                    continue
                 print(
                     "WARNING: Lease lock token mismatch during release; "
                     f"expected prefix={context.lock_token[:8]}, got prefix={str(current_token)[:8]}",
