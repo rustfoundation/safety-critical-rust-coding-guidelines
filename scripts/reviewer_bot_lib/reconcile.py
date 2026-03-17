@@ -180,6 +180,33 @@ def _load_deferred_context() -> dict:
     return payload
 
 
+def _validate_observer_noop_payload(payload: dict) -> None:
+    required = {
+        "schema_version",
+        "kind",
+        "reason",
+        "source_workflow_name",
+        "source_workflow_file",
+        "source_run_id",
+        "source_run_attempt",
+        "source_event_name",
+        "source_event_action",
+        "source_event_key",
+        "pr_number",
+    }
+    missing = sorted(required - set(payload))
+    if missing:
+        raise RuntimeError("Observer no-op payload missing required fields: " + ", ".join(missing))
+    if payload.get("schema_version") != 1:
+        raise RuntimeError("Observer no-op payload schema_version is not accepted")
+    if payload.get("kind") != "observer_noop":
+        raise RuntimeError("Observer no-op payload kind mismatch")
+    if not isinstance(payload.get("reason"), str) or not payload.get("reason"):
+        raise RuntimeError("Observer no-op payload reason must be a non-empty string")
+    if not isinstance(payload.get("pr_number"), int):
+        raise RuntimeError("Observer no-op payload pr_number must be an integer")
+
+
 def _expected_observer_identity(payload: dict) -> tuple[str, str]:
     event_name = payload.get("source_event_name")
     event_action = payload.get("source_event_action")
@@ -291,6 +318,15 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
     event_action = payload.get("source_event_action")
     source_event_key = str(payload.get("source_event_key", ""))
     try:
+        if payload.get("kind") == "observer_noop":
+            _validate_observer_noop_payload(payload)
+            _validate_workflow_run_artifact_identity(payload)
+            print(
+                "Observer workflow produced explicit no-op payload for "
+                f"{source_event_key}: {payload.get('reason')}"
+            )
+            return False
+
         if event_name == "issue_comment":
             _validate_deferred_comment_artifact(payload)
             _validate_workflow_run_artifact_identity(payload)

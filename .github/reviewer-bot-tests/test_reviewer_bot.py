@@ -393,6 +393,37 @@ def test_deferred_comment_missing_live_object_preserves_source_time_freshness(tm
     assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:99"]["reason"] == "reconcile_failed_closed"
 
 
+def test_observer_noop_payload_is_safe_noop(tmp_path, monkeypatch):
+    state = make_state()
+    reviewer_bot.ensure_review_entry(state, 42, create=True)
+    payload_path = tmp_path / "observer-noop.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "kind": "observer_noop",
+                "reason": "ignored_non_human_automation",
+                "source_workflow_name": "Reviewer Bot PR Comment Observer",
+                "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+                "source_run_id": 777,
+                "source_run_attempt": 1,
+                "source_event_name": "issue_comment",
+                "source_event_action": "created",
+                "source_event_key": "issue_comment:111",
+                "pr_number": 42,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "777")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    assert reviewer_bot.handle_workflow_run_event(state) is False
+    assert state["active_reviews"]["42"]["deferred_gaps"] == {}
+
+
 def test_execute_pending_privileged_command_revalidates_live_state(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
