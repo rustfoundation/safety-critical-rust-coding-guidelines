@@ -325,7 +325,18 @@ def test_acquire_lock_retries_until_expected_token_visible(monkeypatch):
             ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
             ("stale-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
             ("stale-ref-2", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            ("new-ref", "tree", {"lock_state": "locked", "lock_token": "token-123"}),
+            (
+                "new-ref",
+                "tree",
+                {
+                    "lock_state": "locked",
+                    "lock_token": "token-123",
+                    "lock_owner_run_id": "local-run",
+                    "lock_owner_workflow": "reviewer-bot",
+                    "lock_owner_job": "reviewer-bot",
+                    "lock_expires_at": "2999-01-01T00:00:00+00:00",
+                },
+            ),
         ]
     )
 
@@ -360,6 +371,68 @@ def test_acquire_lock_fails_closed_on_conflicting_visible_token(monkeypatch):
     monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
 
     with pytest.raises(RuntimeError, match="unexpected lock state"):
+        reviewer_bot.acquire_state_issue_lease_lock()
+
+
+def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypatch):
+    snapshots = iter(
+        [
+            ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
+            ("stale-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
+            (
+                "new-ref",
+                "tree",
+                {
+                    "lock_state": "locked",
+                    "lock_token": "token-123",
+                    "lock_owner_run_id": "local-run",
+                    "lock_owner_workflow": "reviewer-bot",
+                    "lock_owner_job": "reviewer-bot",
+                    "lock_expires_at": "2999-01-01T00:00:00+00:00",
+                },
+            ),
+        ]
+    )
+
+    monkeypatch.setattr(reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
+    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
+    monkeypatch.setattr(reviewer_bot, "create_lock_commit", lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(201, {"sha": "commit-1"}, {}, "", True))
+    monkeypatch.setattr(reviewer_bot, "cas_update_lock_ref", lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True))
+    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
+    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+
+    context = reviewer_bot.acquire_state_issue_lease_lock()
+
+    assert context.lock_token == "token-123"
+    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is context
+
+
+def test_acquire_lock_fails_closed_when_own_token_has_mismatched_owner(monkeypatch):
+    snapshots = iter(
+        [
+            (
+                "new-ref",
+                "tree",
+                {
+                    "lock_state": "locked",
+                    "lock_token": "token-123",
+                    "lock_owner_run_id": "someone-else",
+                    "lock_owner_workflow": "reviewer-bot",
+                    "lock_owner_job": "reviewer-bot",
+                    "lock_expires_at": "2999-01-01T00:00:00+00:00",
+                },
+            )
+        ]
+    )
+
+    monkeypatch.setattr(reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
+    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
+    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
+    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+
+    with pytest.raises(RuntimeError, match="owner metadata drifted"):
         reviewer_bot.acquire_state_issue_lease_lock()
 
 

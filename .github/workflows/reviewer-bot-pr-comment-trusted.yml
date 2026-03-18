@@ -16,9 +16,6 @@ jobs:
       github.event.issue.pull_request != null &&
       github.event.comment.user.type == 'User' &&
       contains('OWNER,MEMBER,COLLABORATOR', github.event.comment.author_association)
-    concurrency:
-      group: reviewer-bot-state-314
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       # Temporary lock debt: contents:write is allowed only for the existing lock-ref API operations.
