@@ -367,6 +367,56 @@ def _update_deferred_gap(bot, review_data: dict, payload: dict, reason: str, dia
     review_data["deferred_gaps"][source_event_key] = existing
 
 
+def _validate_live_comment_replay_contract(bot, review_data: dict, payload: dict, live_body: str) -> dict | None:
+    source_comment_class = str(payload.get("comment_class", ""))
+    live_classified = classify_comment_payload(bot, live_body)
+    live_comment_class = str(live_classified.get("comment_class", ""))
+    source_has_non_command_text = bool(payload.get("has_non_command_text"))
+    live_has_non_command_text = bool(live_classified.get("has_non_command_text"))
+
+    if live_comment_class != source_comment_class:
+        _update_deferred_gap(
+            bot,
+            review_data,
+            payload,
+            "reconcile_failed_closed",
+            (
+                f"Deferred comment {payload['comment_id']} classification changed from "
+                f"{source_comment_class} to {live_comment_class}; replay suppressed. "
+                f"See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
+            ),
+        )
+        return None
+
+    if live_has_non_command_text != source_has_non_command_text:
+        _update_deferred_gap(
+            bot,
+            review_data,
+            payload,
+            "reconcile_failed_closed",
+            (
+                f"Deferred comment {payload['comment_id']} non-command text classification drifted; "
+                f"replay suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
+            ),
+        )
+        return None
+
+    if source_comment_class in {"command_only", "command_plus_text"} and int(live_classified.get("command_count", 0)) != 1:
+        _update_deferred_gap(
+            bot,
+            review_data,
+            payload,
+            "reconcile_failed_closed",
+            (
+                f"Deferred comment {payload['comment_id']} no longer resolves to exactly one command; "
+                f"replay suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
+            ),
+        )
+        return None
+
+    return live_classified
+
+
 def handle_workflow_run_event(bot, state: dict) -> bool:
     bot.assert_lock_held("handle_workflow_run_event")
     if str(state.get("freshness_runtime_epoch", "")).strip() != "freshness_v15":
@@ -427,10 +477,11 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
             changed = False
             if source_freshness_eligible:
                 changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at) or changed
+            live_classified = _validate_live_comment_replay_contract(bot, review_data, payload, live_body)
+            if live_classified is None:
+                return changed
             if classified in {"command_only", "command_plus_text"}:
-                live_classified = classify_comment_payload(bot, live_body)
-                if int(live_classified.get("command_count", 0)) == 1:
-                    changed = _handle_command(bot, state, pr_number, comment_author, live_classified) or changed
+                changed = _handle_command(bot, state, pr_number, comment_author, live_classified) or changed
             _mark_reconciled_source_event(review_data, source_event_key)
             _clear_source_event_key(review_data, source_event_key)
             return changed
