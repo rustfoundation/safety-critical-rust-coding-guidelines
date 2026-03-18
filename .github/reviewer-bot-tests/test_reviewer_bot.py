@@ -653,6 +653,21 @@ def test_workflow_summaries_and_runbook_references_exist():
     assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
 
 
+def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
+    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-trusted.yml").read_text(encoding="utf-8"))
+    job = data["jobs"]["reviewer-bot-pr-comment-trusted"]
+    steps = job["steps"]
+    assert steps[0]["name"] == "Decide whether same-repo trusted path applies"
+    assert steps[1]["if"] == "env.RUN_TRUSTED_PR_COMMENT == 'true'"
+    assert steps[2]["if"] == "env.RUN_TRUSTED_PR_COMMENT == 'true'"
+    assert steps[3]["if"] == "env.RUN_TRUSTED_PR_COMMENT == 'true'"
+    assert steps[4]["name"] == "Trusted path skipped"
+    assert steps[4]["if"] == "env.RUN_TRUSTED_PR_COMMENT != 'true'"
+    workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-trusted.yml").read_text(encoding="utf-8")
+    assert "https://api.github.com/repos/{repo}/pulls/{pr_number}" in workflow_text
+    assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
+
+
 def test_classify_event_intent_treats_supported_workflow_run_sources_as_mutating(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "issue_comment")
     assert reviewer_bot.classify_event_intent("workflow_run", "completed") == reviewer_bot.EVENT_INTENT_MUTATING
