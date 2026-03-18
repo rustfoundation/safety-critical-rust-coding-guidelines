@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -878,6 +879,39 @@ def test_execute_pending_privileged_command_fails_closed_without_live_fls_audit_
     pending = review["pending_privileged_commands"]["issue_comment:100"]
     assert pending["status"] == "failed_closed"
     assert pending["result"] == "live_revalidation_failed"
+
+
+def test_list_changed_files_ignores_untracked_bootstrap_noise(monkeypatch, tmp_path):
+    commands_seen = []
+
+    def fake_run_command(command, cwd, check=True):
+        commands_seen.append(command)
+        if command == ["git", "diff", "--name-only"]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        if command == ["git", "diff", "--cached", "--name-only"]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(reviewer_bot.automation_module, "run_command", fake_run_command)
+    assert reviewer_bot.automation_module.list_changed_files(tmp_path) == []
+    assert commands_seen == [["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]]
+
+
+def test_list_changed_files_reports_tracked_changes_only(monkeypatch, tmp_path):
+    def fake_run_command(command, cwd, check=True):
+        if command == ["git", "diff", "--name-only"]:
+            return subprocess.CompletedProcess(command, 0, stdout="README.md\nsrc/spec.lock\n", stderr="")
+        if command == ["git", "diff", "--cached", "--name-only"]:
+            return subprocess.CompletedProcess(command, 0, stdout="src/spec.lock\n", stderr="")
+        raise AssertionError(f"Unexpected command: {command}")
+
+    monkeypatch.setattr(reviewer_bot.automation_module, "run_command", fake_run_command)
+    assert reviewer_bot.automation_module.list_changed_files(tmp_path) == ["README.md", "src/spec.lock"]
+
+
+def test_privileged_commands_workflow_executes_source_entrypoint():
+    workflow_text = Path(".github/workflows/reviewer-bot-privileged-commands.yml").read_text(encoding="utf-8")
+    assert "run: uv run python scripts/reviewer_bot.py" in workflow_text
 
 
 def test_observer_run_reason_mapping_and_near_miss_signature():

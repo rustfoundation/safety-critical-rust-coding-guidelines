@@ -49,4 +49,4 @@ jobs:
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
           CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-privileged-commands.yml
-        run: uv run reviewer-bot
+        run: uv run python scripts/reviewer_bot.py
