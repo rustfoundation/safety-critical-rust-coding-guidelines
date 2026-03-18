@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 
 import yaml
@@ -59,16 +60,19 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 record["completed_at"] = _now_iso(bot)
                 record["result"] = "live_target_invalid"
                 return True
-            labels = {
-                label.get("name")
-                for label in issue_snapshot.get("labels", [])
-                if isinstance(label, dict) and isinstance(label.get("name"), str)
-            }
+            labels: set[str] = set()
+            for label in issue_snapshot.get("labels", []):
+                if not isinstance(label, dict):
+                    continue
+                name = label.get("name")
+                if isinstance(name, str):
+                    labels.add(name)
             if bot.FLS_AUDIT_LABEL not in labels or not bot.check_user_permission(actor, "triage"):
                 record["status"] = "failed_closed"
                 record["completed_at"] = _now_iso(bot)
                 record["result"] = "live_revalidation_failed"
                 return True
+            os.environ["ISSUE_LABELS"] = json.dumps(sorted(labels))
             message, success = bot.handle_accept_no_fls_changes_command(issue_number, actor)
             record["completed_at"] = _now_iso(bot)
             record["result_message"] = message
