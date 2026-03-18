@@ -151,6 +151,79 @@ def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypa
     assert pending["issue_comment:100"]["authorization"]["authorized"] is True
 
 
+def test_closed_non_pr_plain_text_comment_does_not_create_review_entry(monkeypatch):
+    state = make_state()
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_STATE", "closed")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation: close comment")
+    assert reviewer_bot.handle_comment_event(state) is False
+    assert state["active_reviews"] == {}
+
+
+def test_closed_non_pr_command_comment_does_not_create_pending_privileged_command(monkeypatch):
+    state = make_state()
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_STATE", "closed")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /accept-no-fls-changes")
+    called = {"post_comment": 0}
+    monkeypatch.setattr(reviewer_bot, "parse_issue_labels", lambda: [reviewer_bot.FLS_AUDIT_LABEL])
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
+    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda *args, **kwargs: called.__setitem__("post_comment", called["post_comment"] + 1) or True)
+    assert reviewer_bot.handle_comment_event(state) is False
+    assert state["active_reviews"] == {}
+    assert called["post_comment"] == 0
+
+
+def test_closed_non_pr_comment_removes_stale_review_entry(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_STATE", "closed")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation: close comment")
+    assert reviewer_bot.handle_comment_event(state) is False
+    assert "42" not in state["active_reviews"]
+
+
+def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_STATE", "open")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation: contributor plain text comment")
+    assert reviewer_bot.handle_comment_event(state) is True
+    accepted = state["active_reviews"]["42"]["contributor_comment"]["accepted"]
+    assert accepted["semantic_key"] == "issue_comment:100"
+
+
 def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
     state = make_state(epoch="legacy_v14")
     entry = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -982,6 +1055,11 @@ def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
     workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-trusted.yml").read_text(encoding="utf-8")
     assert "https://api.github.com/repos/{repo}/pulls/{pr_number}" in workflow_text
     assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
+
+
+def test_issue_comment_direct_workflow_exports_issue_state():
+    workflow_text = Path(".github/workflows/reviewer-bot-issue-comment-direct.yml").read_text(encoding="utf-8")
+    assert "ISSUE_STATE: ${{ github.event.issue.state }}" in workflow_text
 
 
 def test_mutating_reviewer_bot_workflows_do_not_share_global_github_concurrency():
