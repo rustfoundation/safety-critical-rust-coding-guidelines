@@ -1,0 +1,314 @@
+/* SPDX-License-Identifier: MIT OR Apache-2.0
+   SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors */
+
+/* Rust Playground Interactive Examples
+   
+   This stylesheet provides styling for interactive Rust code examples
+   with copy, run, and toggle-hidden-lines functionality.
+   
+   Note: This file is also embedded in exts/coding_guidelines/rust_examples.py
+   and generated at build time. Changes should be made in both places.
+*/
+
+/* Hide fallback literal block in HTML output */
+.rust-example-outer .rust-example-fallback {
+    display: none !important;
+}
+
+/* Container */
+.rust-example-container {
+    position: relative;
+    margin: 1em 0;
+    border-radius: 4px;
+    background-color: #2b2b2b;
+    overflow: hidden;
+}
+
+/* Badges row */
+.rust-example-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding: 0.5em 0.8em;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rust-example-badge {
+    display: inline-block;
+    padding: 0.2em 0.6em;
+    font-family: monospace;
+    font-size: 0.8em;
+    font-weight: bold;
+    border-radius: 3px;
+    text-transform: lowercase;
+}
+
+.rust-example-badge-ignore {
+    background-color: #6c757d;
+    color: white;
+}
+
+.rust-example-badge-ignore::before {
+    content: "⏭ ";
+}
+
+.rust-example-badge-compile-fail {
+    background-color: #dc3545;
+    color: white;
+}
+
+.rust-example-badge-compile-fail::before {
+    content: "✗ ";
+}
+
+.rust-example-badge-should-panic {
+    background-color: #fd7e14;
+    color: white;
+}
+
+.rust-example-badge-should-panic::before {
+    content: "💥 ";
+}
+
+.rust-example-badge-no-run {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.rust-example-badge-no-run::before {
+    content: "⚙ ";
+}
+
+.rust-example-badge-nightly {
+    background-color: #6f42c1;
+    color: white;
+}
+
+.rust-example-badge-nightly::before {
+    content: "🌙 ";
+}
+
+.rust-example-badge-version {
+    background-color: #ffc107;
+    color: #212529;
+    cursor: help;
+}
+
+/* Button toolbar */
+.rust-example-buttons {
+    position: absolute;
+    top: 0.5em;
+    right: 0.5em;
+    display: flex;
+    gap: 0.3em;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+
+.rust-example-container:hover .rust-example-buttons {
+    opacity: 1;
+}
+
+/* If badges are present, adjust button position */
+.rust-example-badges + .rust-example-buttons {
+    top: calc(0.5em + 2em + 0.5em);  /* Badge height + padding */
+}
+
+/* Individual buttons */
+.rust-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+    position: relative;
+}
+
+.rust-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.rust-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.rust-btn:disabled:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+}
+
+.rust-btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+}
+
+.rust-btn-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+/* Copy button tooltip */
+.rust-btn-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.3em 0.6em;
+    margin-bottom: 0.3em;
+    font-size: 0.75em;
+    white-space: nowrap;
+    background-color: #333;
+    color: #fff;
+    border-radius: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.rust-btn-tooltip.show {
+    opacity: 1;
+}
+
+/* Running state */
+.rust-btn-run.running {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* Hidden lines toggle active state */
+.rust-btn-toggle-hidden.active {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+/* Code wrapper */
+.rust-example-code-wrapper {
+    overflow-x: auto;
+}
+
+.rust-example-code {
+    margin: 0;
+    padding: 1em;
+    background-color: transparent;
+    overflow-x: auto;
+}
+
+.rust-example-code code {
+    font-family: 'Source Code Pro', Consolas, Monaco, 'Andale Mono', monospace;
+    font-size: 0.9em;
+    line-height: 1.5;
+    color: #f8f8f2;
+}
+
+/* Hidden lines styling when revealed */
+.rust-example-code .hidden-line {
+    opacity: 0.5;
+    background-color: rgba(128, 128, 128, 0.15);
+    display: block;
+    margin: 0 -1em;
+    padding: 0 1em;
+    font-style: italic;
+}
+
+/* Output area */
+.rust-example-output {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: #1e1e1e;
+}
+
+.rust-example-output-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5em 1em;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.rust-example-output-status {
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.rust-example-output-status.success {
+    color: #4caf50;
+}
+
+.rust-example-output-status.success::before {
+    content: "✓ ";
+}
+
+.rust-example-output-status.error {
+    color: #f44336;
+}
+
+.rust-example-output-status.error::before {
+    content: "✗ ";
+}
+
+.rust-example-output-status.expected {
+    color: #ff9800;
+}
+
+.rust-example-output-status.expected::before {
+    content: "✓ ";
+}
+
+.rust-example-output-close {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 0 0.3em;
+}
+
+.rust-example-output-close:hover {
+    color: #fff;
+}
+
+.rust-example-output-content {
+    margin: 0;
+    padding: 1em;
+    max-height: 300px;
+    overflow: auto;
+    font-family: 'Source Code Pro', Consolas, Monaco, monospace;
+    font-size: 0.85em;
+    color: #d4d4d4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Version warning note in output */
+.rust-example-version-note {
+    margin-top: 1em;
+    padding-top: 0.5em;
+    border-top: 1px dashed rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-style: italic;
+}
+
+/* Hide the JSON data script */
+.rust-example-data {
+    display: none;
+}
+
+/* Syntax highlighting (basic - Pygments/highlight.js will override) */
+.rust-example-code .keyword { color: #cc7832; }
+.rust-example-code .string { color: #6a8759; }
+.rust-example-code .comment { color: #808080; font-style: italic; }
+.rust-example-code .number { color: #6897bb; }

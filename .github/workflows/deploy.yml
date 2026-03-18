@@ -11,8 +11,16 @@ jobs:
 
   deploy:
     needs: build
+    # Always run so that 'deploy' explicitly fails when build fails,
+    # rather than being skipped. Skipped jobs don't block merge queue.
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Fail if build failed
+        if: needs.build.result != 'success'
+        run: |
+          echo "::error::build workflow failed with result: ${{ needs.build.result }}"
+          exit 1
       - name: Checkout code
         uses: actions/checkout@v3
 

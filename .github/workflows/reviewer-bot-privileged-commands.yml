@@ -1,0 +1,55 @@
+name: Reviewer Bot Privileged Commands
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_event_key:
+        description: Pending privileged command key from issue #314
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  STATE_ISSUE_NUMBER: '314'
+
+jobs:
+  privileged-command-executor:
+    concurrency:
+      group: reviewer-bot-state-314
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout trusted default-branch bot code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Document isolated privileged execution boundary
+        run: |
+          {
+            echo 'This workflow is the only place privileged reviewer-bot commands may execute.'
+            echo 'It must consume persisted trusted records from issue #314.'
+            echo 'Operator guidance: docs/reviewer-bot-review-freshness-operator-runbook.md'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Install uv
+        run: python -m pip install uv
+      - name: Execute persisted privileged command
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: workflow_dispatch
+          EVENT_ACTION: execute-pending-privileged-command
+          MANUAL_ACTION: execute-pending-privileged-command
+          PRIVILEGED_SOURCE_EVENT_KEY: ${{ github.event.inputs.source_event_key }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_JOB_NAME: ${{ github.job }}
+          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-privileged-commands.yml
+        run: uv run reviewer-bot

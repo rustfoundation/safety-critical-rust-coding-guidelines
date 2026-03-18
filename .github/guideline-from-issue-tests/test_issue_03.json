@@ -1,0 +1,124 @@
+{
+  "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/103",
+  "repository_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines",
+  "labels_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/103/labels{/name}",
+  "comments_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/103/comments",
+  "events_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/103/events",
+  "html_url": "https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/103",
+  "id": 3104390103,
+  "node_id": "I_kwDOOMMjbs65CTx103",
+  "number": 103,
+  "title": "[Coding Guideline]: Integer shift shall only be performed through checked APIs",
+  "user": {
+    "login": "rustfoundation",
+    "id": 14003018,
+    "node_id": "MDQ6VXNlcjE0MDAzMDE4",
+    "avatar_url": "https://avatars.githubusercontent.com/u/14003018?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/rustfoundation",
+    "html_url": "https://github.com/rustfoundation",
+    "followers_url": "https://api.github.com/users/rustfoundation/followers",
+    "following_url": "https://api.github.com/users/rustfoundation/following{/other_user}",
+    "gists_url": "https://api.github.com/users/rustfoundation/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/rustfoundation/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/rustfoundation/subscriptions",
+    "organizations_url": "https://api.github.com/users/rustfoundation/orgs",
+    "repos_url": "https://api.github.com/users/rustfoundation/repos",
+    "events_url": "https://api.github.com/users/rustfoundation/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/rustfoundation/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "labels": [
+    {
+      "id": 8703664686,
+      "node_id": "LA_kwDOOMMjbs8AAAACBsdiLg",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/category:%20mandatory",
+      "name": "category: mandatory",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703664688,
+      "node_id": "LA_kwDOOMMjbs8AAAACBsdiMA",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/status:%20draft",
+      "name": "status: draft",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703664689,
+      "node_id": "LA_kwDOOMMjbs8AAAACBsdiMQ",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/decidability:%20decidable",
+      "name": "decidability: decidable",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703686409,
+      "node_id": "LA_kwDOOMMjbs8AAAACBse3CQ",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/chapter:%20numerics",
+      "name": "chapter: numerics",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703686412,
+      "node_id": "LA_kwDOOMMjbs8AAAACBse3DA",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/scope:%20module",
+      "name": "scope: module",
+      "color": "ededed",
+      "default": false,
+      "description": null
+    },
+    {
+      "id": 8703732885,
+      "node_id": "LA_kwDOOMMjbs8AAAACBshslQ",
+      "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/labels/accepted",
+      "name": "accepted",
+      "color": "6AABE8",
+      "default": false,
+      "description": ""
+    }
+  ],
+  "state": "open",
+  "locked": false,
+  "assignee": null,
+  "assignees": [
+
+  ],
+  "milestone": null,
+  "comments": 0,
+  "created_at": "2025-05-30T22:24:07Z",
+  "updated_at": "2025-05-30T22:48:17Z",
+  "closed_at": null,
+  "author_association": "OWNER",
+  "active_lock_reason": null,
+  "sub_issues_summary": {
+    "total": 0,
+    "completed": 0,
+    "percent_completed": 0
+  },
+  "body": "### Chapter\n\nNumerics\n\n### Guideline Title\n\nInteger shift shall only be performed through `checked_` APIs\n\n### Category\n\nMandatory\n\n### Status\n\nDraft\n\n### Release Begin\n\n1.7.0\n\n### Release End\n\nlatest\n\n### FLS Paragraph ID\n\nfls_sru4wi5jomoe\n\n### Decidability\n\nDecidable\n\n### Scope\n\nModule\n\n### Tags\n\nnumerics, reduce-human-error, maintainability, portability, surprising-behavior\n\n### Amplification\n\nIn particular, the user should only perform left shifts via the [checked_shl](https://doc.rust-lang.org/core/index.html?search=%22checked_shl%22) function and right shifts via the [checked_shr](https://doc.rust-lang.org/core/index.html?search=%22checked_shr%22) function. Both of these functions exist in [core](https://doc.rust-lang.org/core/index.html).\n\nThis rule applies to the following primitive types:\n\n- `i8`\n- `i16`\n- `i32`\n- `i64`\n- `i128`\n- `u8`\n- `u16`\n- `u32`\n- `u64`\n- `u128`\n- `usize`\n- `isize`\n\n### Exception(s)\n\n_No response_\n\n### Rationale\n\nThis is directly inspired by [INT34-C. Do not shift an expression by a negative number of bits or by greater than or equal to the number of bits that exist in the operand](https://wiki.sei.cmu.edu/confluence/display/c/INT34-C.+Do+not+shift+an+expression+by+a+negative+number+of+bits+or+by+greater+than+or+equal+to+the+number+of+bits+that+exist+in+the+operand).\n\nIn Rust these out-of-range shifts don't give rise to Undefined Behavior; however, they are still problematic in Safety Critical contexts for two reasons.\n\n**Reason 1: inconsistent behavior**\n\nThe behavior of shift operations depends on the compilation mode. Say for example, that we have a number `x` of type `uN`, and we perform the operation\n\n`x << M`\n\nThen, it will behave like this:\n\n| **Compilation Mode** | `0 <= M < N` | `M < 0` | `N <= M` |\n|---|---|---|---|\n| Debug | Shifts normally | Panics | Panics |\n| Release | Shifts normally | Shifts by `M mod N` | Shifts by `M mod N` |\n\n..\n\n   Note: the behavior is exactly the same for the `>>` operator.\n\nPanicking in `Debug` is an issue by itself, however, a perhaps larger issue there is that its behavior is different from that of `Release`. Such inconsistencies aren't acceptable in Safety Critical scenarios.\n\nTherefore, a consistently-behaved operation should be required for performing shifts.\n\n## Reason 2: programmer intent\n\nThere is no scenario in which it makes sense to perform a shift of negative length, or of more than `N - 1` bits. The operation itself becomes meaningless.\n\nTherefore, an API that restricts the length of the shift to the range `[0, N - 1]` should be used instead of the `<<` and `>>` operators.\n\n## The Solution\n\nThe ideal solution for this exists in `core`: `checked_shl` and `checked_shr`.\n\n`<T>::checked_shl(M)` returns a value of type `Option<T>`, in the following way:\n\n- If `M < 0`, the output is `None`\n- If `0 <= M < N` for `T` of `N` bits, then the output is `Some(T)`\n- If `N <= M`, the output is `None`\n\nThis API has consistent behavior across `Debug` and `Release`, and makes the programmer intent explicit, which effectively solves this issue.\n\n### Non-Compliant Example 1 - Prose\n\nAs seen below in the `non_compliant_example()` function:\n\n- the use of `<<` will exhibit different behavior between debug and release builds,\n- and will panic if the shift amount is negative or greater than or equal to the number of bits.\n\n### Non-Compliant Example 1 - Code\n\n```rust\nfn non_compliant_example() {\n    let x: u32 = 1;\n    let shift_amount: u32 = 32; // This is >= the number of bits in u32\n\n    // This will panic in debug mode, or wrap in release mode\n    let result = x << shift_amount;\n    println!(\"Result: {}\", result);\n}\n```\n\n### Non-Compliant Example 2 - Prose (Optional)\n\n_No response_\n\n### Non-Compliant Example 2 - Code (Optional)\n\n_No response_\n\n### Non-Compliant Example 3 - Prose (Optional)\n\n_No response_\n\n### Non-Compliant Example 3 - Code (Optional)\n\n_No response_\n\n### Non-Compliant Example 4 - Prose (Optional)\n\n_No response_\n\n### Non-Compliant Example 4 - Code (Optional)\n\n_No response_\n\n### Compliant Example 1 - Prose\n\nAs seen below in the `compliant_example()` function:\n\n- the use of `checked_shl` will exhibit consistent behavior between debug and release builds,\n- and will return `None` if the shift amount is negative or greater than or equal to the number of bits.\n\n### Compliant Example 1 - Code\n\n```rust\nfn compliant_example() {\n    let x: u32 = 1;\n    let shift_amount: u32 = 32; // This is >= the number of bits in u32\n\n    // This will return None instead of panicking or wrapping\n    match x.checked_shl(shift_amount) {\n        Some(result) => println!(\"Result: {}\", result),\n        None => println!(\"Shift amount is out of range\"),\n    }\n}\n```\n\n### Compliant Example 2 - Prose (Optional)\n\n_No response_\n\n### Compliant Example 2 - Code (Optional)\n\n_No response_\n\n### Compliant Example 3 - Prose (Optional)\n\n_No response_\n\n### Compliant Example 3 - Code (Optional)\n\n_No response_\n\n### Compliant Example 4 - Prose (Optional)\n\n_No response_\n\n### Compliant Example 4 - Code (Optional)\n\n_No response_\n\n### Bibliography\n\n_No response_",
+  "closed_by": null,
+  "reactions": {
+    "url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/103/reactions",
+    "total_count": 0,
+    "+1": 0,
+    "-1": 0,
+    "laugh": 0,
+    "hooray": 0,
+    "confused": 0,
+    "heart": 0,
+    "rocket": 0,
+    "eyes": 0
+  },
+  "timeline_url": "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/103/timeline",
+  "performed_via_github_app": null,
+  "state_reason": null
+}

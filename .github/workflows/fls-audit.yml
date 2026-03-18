@@ -1,0 +1,42 @@
+name: FLS Audit
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: fls-audit
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  fls-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run FLS audit
+        run: uv run python scripts/fls_audit.py --no-delta
+
+      - name: Update audit issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          uv run python scripts/fls_audit_issue.py \
+            --report-json build/fls_audit/report.json \
+            --report-md build/fls_audit/report.md \
+            --label fls-audit \
+            --title-prefix "FLS audit:"

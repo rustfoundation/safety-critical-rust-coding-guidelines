@@ -1,0 +1,49 @@
+
+/* Bibliography table styling */
+.bibliography-table {
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+.bibliography-table td {
+    vertical-align: top;
+    padding: 0.5em;
+    border: none !important;
+}
+
+.bibliography-table td:first-child {
+    white-space: nowrap;
+    font-weight: bold;
+    width: auto;
+    min-width: 120px;
+}
+
+.bibliography-table td:last-child {
+    width: 100%;
+}
+
+/* Style for bibliography need container */
+.need[data-type="bibliography"] {
+    background-color: #f8f9fa;
+    border-left: 4px solid #A8D8EA;
+    padding: 1em;
+    margin: 1em 0;
+}
+
+.need[data-type="bibliography"] .needs_title {
+    font-size: 1.1em;
+    color: #2c5282;
+}
+
+/* Citation link styling within guidelines */
+.citation-ref {
+    font-family: monospace;
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.citation-ref:hover {
+    background-color: rgba(0, 120, 215, 0.1);
+}

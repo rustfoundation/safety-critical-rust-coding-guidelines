@@ -4,11 +4,15 @@
 from sphinx.domains import Domain
 
 from . import (
+    bibliography_validator,
+    citation_roles,
     common,
     fls_checks,
     fls_linking,
     guidelines_checks,
+    rust_examples,
     std_role,
+    text_checks,
     write_guidelines_ids,
 )
 from .common import bar_format, get_tqdm, logger, logging
@@ -19,6 +23,8 @@ class CodingGuidelinesDomain(Domain):
     label = "Rust Standard Library"
     roles = {
         "std": std_role.StdRefRole(),
+        "cite": citation_roles.CiteRole(),
+        "bibentry": citation_roles.BibEntryRole(),
     }
     directives = {}
     object_types = {}
@@ -73,6 +79,18 @@ def setup(app):
     if app.config.debug:
         logger.setLevel(logging.INFO)
         common.disable_tqdm = True
+
+    # Set up rust_examples extension
+    rust_examples.setup(app)
+    
+    # Set up bibliography validator extension
+    bibliography_validator.setup(app)
+    
+    # Set up citation roles for bibliography linking
+    citation_roles.setup(app)
+    
+    # Set up text content validation
+    text_checks.setup(app)
 
     app.connect("env-check-consistency", guidelines_checks.validate_required_fields)
     app.connect("env-check-consistency", fls_checks.check_fls)

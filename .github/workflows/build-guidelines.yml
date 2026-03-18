@@ -12,18 +12,28 @@ on:
       - "main"
   # workflow_call trigger to make this workflow reusable
   workflow_call:
-    # You can add inputs here if needed in the future
-    # inputs:
-    #   example_input:
-    #     required: false
-    #     type: string
-    #     default: 'default value'
+
 jobs:
+  # Check Rust examples compile before building docs
+  check_rust_examples:
+    uses: ./.github/workflows/check-rust-examples.yml
+
   build:
+    needs: check_rust_examples
+    # Always run so that 'build' (the required status check) explicitly fails
+    # when check_rust_examples fails, rather than being skipped.
+    # Skipped jobs don't block merge queue, but failed jobs do.
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Fail if example checks failed
+        if: needs.check_rust_examples.result != 'success'
+        run: |
+          echo "::error::check_rust_examples workflow failed with result: ${{ needs.check_rust_examples.result }}"
+          echo "One or more Rust example checks did not pass. See the check_rust_examples job for details."
+          exit 1
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v6
       - name: Build documentation
@@ -78,9 +88,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-      - name: Install typos
-        run: cargo install typos-cli
+        uses: actions/checkout@v4
       - name: Check for typos
-        run: typos
-  
+        uses: crate-ci/typos@v1.40.0

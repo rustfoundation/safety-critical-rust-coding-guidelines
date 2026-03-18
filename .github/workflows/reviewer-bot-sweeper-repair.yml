@@ -1,0 +1,78 @@
+name: Reviewer Bot Sweeper Repair
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Action to perform
+        required: true
+        default: check-overdue
+        type: choice
+        options: [sync-members, show-state, check-overdue, repair-review-status-labels]
+
+permissions:
+  contents: read
+
+env:
+  STATE_ISSUE_NUMBER: '314'
+
+jobs:
+  reviewer-bot-sweeper-repair:
+    concurrency:
+      group: reviewer-bot-state-314
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      # Temporary lock debt: contents:write is allowed only for the existing lock-ref API operations.
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Install uv
+        run: python -m pip install uv
+      - name: Fetch trusted bot source tarball
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import io, os, tarfile, urllib.request
+          from pathlib import Path
+          repo = os.environ['GITHUB_REPOSITORY']
+          ref = os.environ['GITHUB_SHA']
+          req = urllib.request.Request(
+              f'https://api.github.com/repos/{repo}/tarball/{ref}',
+              headers={'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}", 'Accept': 'application/vnd.github+json'},
+          )
+          target = Path(os.environ['RUNNER_TEMP']) / 'reviewer-bot-src'
+          target.mkdir(parents=True, exist_ok=True)
+          with urllib.request.urlopen(req) as response:
+              data = response.read()
+          with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as archive:
+              archive.extractall(target)
+          roots = list(target.iterdir())
+          print(f'BOT_SRC_ROOT={roots[0]}', file=open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8'))
+          PY
+      - name: Run reviewer bot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          MANUAL_ACTION: ${{ github.event.inputs.action }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_JOB_NAME: ${{ github.job }}
+          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-sweeper-repair.yml
+        run: uv run --project "$BOT_SRC_ROOT" reviewer-bot
+      - name: Workflow summary
+        run: |
+          {
+            echo 'Deferred-gap operator guidance:'
+            echo '- docs/reviewer-bot-review-freshness-operator-runbook.md'
+          } >> "$GITHUB_STEP_SUMMARY"

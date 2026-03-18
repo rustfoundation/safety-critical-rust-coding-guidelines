@@ -1,13 +1,6 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # SPDX-FileCopyrightText: The Coding Guidelines Subcommittee Contributors
 
-# -- Path setup --------------------------------------------------------------
-
-import os
-import sys
-
-sys.path.append(os.path.abspath("../exts"))
-
 # -- Project information -----------------------------------------------------
 
 project = "Safety-Critical Rust Coding Guidelines"
@@ -25,6 +18,12 @@ extensions = [
     "sphinx_needs",
     "coding_guidelines",
 ]
+
+# Show hidden lines in all examples (default: False)
+rust_examples_show_hidden = False
+
+# Path to shared prelude (default: None)
+rust_examples_prelude_file = "src/examples_prelude.rs"
 
 # Basic needs configuration
 needs_id_regex = "^[A-Za-z0-9_]+"
@@ -62,6 +61,13 @@ needs_types = [
         "color": "#729FCF",
         "style": "node",
     },
+    {
+        "directive": "bibliography",
+        "title": "Bibliography",
+        "prefix": "bib_",
+        "color": "#A8D8EA",
+        "style": "node",
+    },
 ]
 
 # Define custom sections for needs
@@ -72,6 +78,7 @@ needs_layouts = {
             "rationale",
             "non_compliant_example",
             "compliant_example",
+            "bibliography",
         ]
     }
 }
@@ -84,12 +91,13 @@ needs_render_contexts = {
             "rationale",
             "non_compliant_example",
             "non_compliant_example",
+            "bibliography",
         ],
     }
 }
 
 # Make sure these sections are included in the JSON
-needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example"]
+needs_extra_sections = ["rationale", "compliant_example", "non_compliant_example", "bibliography"]
 
 needs_statuses = [
     dict(name="draft", description="This guideline is in draft stage", color="#999999"),
@@ -109,6 +117,8 @@ needs_tags = [
     dict(name="numerics", description="Numerics-related guideline"),
     dict(name="undefined-behavior", description="Guideline related to Undefined Behavior"),
     dict(name="stack-overflow", description="Guideline related to Stack Overflow"),
+    dict(name="unions", description="Guideline related to union types and field access"),
+    dict(name="initialization", description="Guideline related to initialization requirements and uninitialized data"),
 
     dict(name="maintainability", description="How effectively and efficiently a product or system can be modified. This includes improvements, fault corrections, and adaptations to changes in the environment or requirements. It is considered a crucial software quality characteristic."),
     dict(name="portability", description="The degree to which a system, product, or component can be effectively and efficiently transferred from one hardware, software, or other operational or usage environment to another."),
@@ -201,9 +211,41 @@ required_guideline_fields = [
     "tags",
 ]  # Id is automatically generated
 
+# -- Bibliography validation configuration -----------------------------------
+
+# Enable URL validation (typically only in CI)
+bibliography_check_urls = False  # Set via --define or environment
+
+# Timeout for URL checks in seconds
+bibliography_url_timeout = 10
+
+# Whether broken URLs should fail the build (True) or just warn (False)
+bibliography_fail_on_broken = True
+
+# Whether duplicate URLs should fail the build
+bibliography_fail_on_duplicates = True
+
+# Whether to warn about bibliography entries not cited in text
+bibliography_check_unused = False
+
+# -- Text content validation configuration -----------------------------------
+
+# Enable inline URL detection in guideline text
+# When enabled, URLs in guideline content will be flagged as errors
+# Contributors should use :std: role or bibliography citations instead
+text_check_inline_urls = True
+
+# Whether inline URLs should fail the build (True) or just warn (False)
+text_check_fail_on_inline_urls = True
+
 # -- Options for HTML output -------------------------------------------------
 
 # Configure the theme
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
 templates_path = ['_templates']
+
+# Custom CSS files to include
+html_css_files = [
+    'custom.css',
+]

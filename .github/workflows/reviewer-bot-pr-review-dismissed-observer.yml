@@ -1,0 +1,51 @@
+name: Reviewer Bot PR Review Dismissed Observer
+
+on:
+  pull_request_review:
+    types: [dismissed]
+
+permissions:
+  contents: read
+
+jobs:
+  observer:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Build deferred review dismissal artifact
+        env:
+          PAYLOAD_PATH: ${{ runner.temp }}/deferred-review-dismissed.json
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_ID: ${{ github.event.review.id }}
+          COMMIT_ID: ${{ github.event.review.commit_id }}
+          REVIEW_AUTHOR: ${{ github.event.review.user.login }}
+          REVIEW_AUTHOR_ID: ${{ github.event.review.user.id }}
+        run: |
+          python - <<'PY'
+          import json, os
+          payload = {
+              'schema_version': 2,
+              'source_workflow_name': 'Reviewer Bot PR Review Dismissed Observer',
+              'source_workflow_file': '.github/workflows/reviewer-bot-pr-review-dismissed-observer.yml',
+              'source_run_id': int(os.environ['GITHUB_RUN_ID']),
+              'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+              'source_event_name': 'pull_request_review',
+              'source_event_action': 'dismissed',
+              'source_event_key': f"pull_request_review_dismissed:{os.environ['REVIEW_ID']}",
+              'pr_number': int(os.environ['PR_NUMBER']),
+              'review_id': int(os.environ['REVIEW_ID']),
+              'source_commit_id': os.environ['COMMIT_ID'],
+              'actor_login': os.environ['REVIEW_AUTHOR'],
+              'actor_id': int(os.environ['REVIEW_AUTHOR_ID']),
+              'source_artifact_name': f"reviewer-bot-review-dismissed-context-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}",
+          }
+          with open(os.environ['PAYLOAD_PATH'], 'w', encoding='utf-8') as handle:
+              json.dump(payload, handle)
+          PY
+      - name: Upload deferred review dismissal artifact
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: reviewer-bot-review-dismissed-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deferred-review-dismissed.json
+          retention-days: 7
