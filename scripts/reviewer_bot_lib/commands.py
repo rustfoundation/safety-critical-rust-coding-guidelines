@@ -251,16 +251,14 @@ def summarize_output(result: subprocess.CompletedProcess, limit: int = 20) -> st
 
 
 def list_changed_files(repo_root: Path) -> list[str]:
-    result = run_command(["git", "status", "--porcelain"], cwd=repo_root)
-    files = []
-    for line in result.stdout.splitlines():
-        if not line:
-            continue
-        path = line[3:]
-        if " -> " in path:
-            path = path.split(" -> ")[-1]
-        files.append(path)
-    return files
+    files: list[str] = []
+    for command in (["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]):
+        result = run_command(command, cwd=repo_root)
+        for line in result.stdout.splitlines():
+            path = line.strip()
+            if path:
+                files.append(path)
+    return sorted(set(files))
 
 
 def get_default_branch(bot) -> str:
