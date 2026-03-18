@@ -320,6 +320,11 @@ def test_main_mutating_event_does_not_sync_or_save_when_state_unavailable(monkey
 
 
 def test_acquire_lock_retries_until_expected_token_visible(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot.lease_lock_module,
+        "get_lock_owner_context",
+        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
+    )
     snapshots = iter(
         [
             ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
@@ -375,6 +380,11 @@ def test_acquire_lock_fails_closed_on_conflicting_visible_token(monkeypatch):
 
 
 def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot.lease_lock_module,
+        "get_lock_owner_context",
+        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
+    )
     snapshots = iter(
         [
             ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
@@ -409,6 +419,11 @@ def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypa
 
 
 def test_acquire_lock_fails_closed_when_own_token_has_mismatched_owner(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot.lease_lock_module,
+        "get_lock_owner_context",
+        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
+    )
     snapshots = iter(
         [
             (
