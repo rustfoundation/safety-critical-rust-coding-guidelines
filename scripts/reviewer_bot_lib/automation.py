@@ -92,7 +92,7 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
         return "❌ Working tree is not clean; refusing to update spec.lock.", False
 
     audit_result = bot.run_command(
-        ["uv", "run", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
+        ["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
         cwd=repo_root,
         check=False,
     )
@@ -108,7 +108,7 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
         return f"❌ Audit command failed.{detail_text}", False
 
     update_result = bot.run_command(
-        ["uv", "run", "python", "./make.py", "--update-spec-lock-file"],
+        ["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"],
         cwd=repo_root,
         check=False,
     )

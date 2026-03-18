@@ -933,6 +933,57 @@ def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp
     assert observed["cwd"] == tmp_path
 
 
+def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_path):
+    monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_LABELS", json.dumps([reviewer_bot.FLS_AUDIT_LABEL]))
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
+    list_calls = {"count": 0}
+
+    def fake_list_changed_files(repo_root):
+        list_calls["count"] += 1
+        assert repo_root == tmp_path
+        return []
+
+    commands = []
+
+    def fake_run_command(command, cwd, check=False):
+        commands.append((command, cwd, check))
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(reviewer_bot, "list_changed_files", fake_list_changed_files)
+    monkeypatch.setattr(reviewer_bot, "run_command", fake_run_command)
+    message, success = reviewer_bot.handle_accept_no_fls_changes_command(42, "alice")
+    assert (message, success) == ("✅ `src/spec.lock` is already up to date; no PR needed.", True)
+    assert list_calls["count"] == 2
+    assert commands == [
+        (["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"], tmp_path, False),
+        (["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"], tmp_path, False),
+    ]
+
+
+def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, tmp_path):
+    monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_LABELS", json.dumps([reviewer_bot.FLS_AUDIT_LABEL]))
+    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
+    monkeypatch.setattr(reviewer_bot, "list_changed_files", lambda repo_root: [])
+
+    def fake_run_command(command, cwd, check=False):
+        return subprocess.CompletedProcess(
+            command,
+            1,
+            stdout="",
+            stderr="error: lockfile at uv.lock needs to be updated, but --locked was provided",
+        )
+
+    monkeypatch.setattr(reviewer_bot, "run_command", fake_run_command)
+    message, success = reviewer_bot.handle_accept_no_fls_changes_command(42, "alice")
+    assert success is False
+    assert "Audit command failed." in message
+    assert "--locked was provided" in message
+
+
 def test_observer_run_reason_mapping_and_near_miss_signature():
     signature = {"status": "waiting", "conclusion": None, "name": "approval_pending"}
     assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"
