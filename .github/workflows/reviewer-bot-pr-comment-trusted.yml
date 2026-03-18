@@ -27,9 +27,49 @@ jobs:
       pull-requests: write
       actions: read
     steps:
+      - name: Decide whether same-repo trusted path applies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          pr_number = os.environ['PR_NUMBER']
+          repo = os.environ['GITHUB_REPOSITORY']
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/pulls/{pr_number}",
+              headers={
+                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+              },
+          )
+          with urllib.request.urlopen(req) as response:
+              pull_request = json.load(response)
+
+          head_repo = pull_request.get('head', {}).get('repo') or {}
+          head_full_name = str(head_repo.get('full_name') or '').strip()
+          pr_author = str(pull_request.get('user', {}).get('login') or '').strip()
+          is_same_repo = head_full_name == repo
+          is_dependabot_restricted = pr_author == 'dependabot[bot]'
+          run_trusted_path = is_same_repo and not is_dependabot_restricted
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as handle:
+              print(f"RUN_TRUSTED_PR_COMMENT={str(run_trusted_path).lower()}", file=handle)
+          if run_trusted_path:
+              print(f"Trusted same-repo PR comment path enabled for PR #{pr_number}.")
+          else:
+              reason = 'cross-repo' if not is_same_repo else 'restricted-author'
+              print(
+                  f"Skipping trusted same-repo PR comment path for PR #{pr_number}: {reason}."
+              )
+          PY
       - name: Install uv
+        if: env.RUN_TRUSTED_PR_COMMENT == 'true'
         run: python -m pip install uv
       - name: Fetch trusted bot source tarball
+        if: env.RUN_TRUSTED_PR_COMMENT == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -50,6 +90,7 @@ jobs:
           print(f'BOT_SRC_ROOT={roots[0]}', file=open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8'))
           PY
       - name: Run reviewer bot
+        if: env.RUN_TRUSTED_PR_COMMENT == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVENT_NAME: issue_comment
@@ -76,3 +117,7 @@ jobs:
           CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-pr-comment-trusted.yml
           REVIEWER_BOT_TRUST_CLASS: pr_trusted_direct
         run: uv run --project "$BOT_SRC_ROOT" reviewer-bot
+      - name: Trusted path skipped
+        if: env.RUN_TRUSTED_PR_COMMENT != 'true'
+        run: |
+          echo 'Trusted same-repo PR comment workflow skipped after PR metadata preflight.'
