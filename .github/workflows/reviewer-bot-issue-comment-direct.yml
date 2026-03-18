@@ -13,9 +13,6 @@ env:
 jobs:
   reviewer-bot-issue-comment-direct:
     if: ${{ github.event.issue.pull_request == null }}
-    concurrency:
-      group: reviewer-bot-state-314
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       # Temporary lock debt: contents:write is allowed only for the existing lock-ref API operations.

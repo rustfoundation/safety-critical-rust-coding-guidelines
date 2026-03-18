@@ -137,6 +137,39 @@ def _snapshot_matches_expected_lock(current_lock: dict, expected_token: str) -> 
     )
 
 
+def _snapshot_matches_expected_owner(current_lock: dict, run_id: str, workflow: str, job: str) -> bool:
+    return (
+        isinstance(current_lock, dict)
+        and str(current_lock.get("lock_owner_run_id") or "") == run_id
+        and str(current_lock.get("lock_owner_workflow") or "") == workflow
+        and str(current_lock.get("lock_owner_job") or "") == job
+    )
+
+
+def _activate_lease_context(
+    bot: LeaseLockContext,
+    lock_token: str,
+    lock_owner_run_id: str,
+    lock_owner_workflow: str,
+    lock_owner_job: str,
+    lock_expires_at: str | None,
+) -> LeaseContext:
+    bot.ACTIVE_LEASE_CONTEXT = LeaseContext(
+        lock_token=lock_token,
+        lock_owner_run_id=lock_owner_run_id,
+        lock_owner_workflow=lock_owner_workflow,
+        lock_owner_job=lock_owner_job,
+        state_issue_url=bot.get_state_issue_html_url(),
+        lock_ref=bot.get_lock_ref_display(),
+        lock_expires_at=lock_expires_at,
+    )
+    print(
+        "Acquired reviewer-bot lease lock "
+        f"(run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, lock_ref={bot.get_lock_ref_display()})"
+    )
+    return bot.ACTIVE_LEASE_CONTEXT
+
+
 def _snapshot_is_stale_unlocked_predecessor(current_lock: dict) -> bool:
     return (
         isinstance(current_lock, dict)
@@ -363,6 +396,22 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
         ref_head_sha, tree_sha, current_lock = bot.get_lock_ref_snapshot()
         now = datetime.now(timezone.utc)
         lock_valid = bot.lock_is_currently_valid(current_lock, now)
+        if lock_valid and _snapshot_matches_expected_lock(current_lock, lock_token):
+            if not _snapshot_matches_expected_owner(
+                current_lock, lock_owner_run_id, lock_owner_workflow, lock_owner_job
+            ):
+                raise RuntimeError(
+                    "Lease lock token matches current run but owner metadata drifted; failing closed "
+                    f"(token_prefix={lock_token[:8]})"
+                )
+            return _activate_lease_context(
+                bot,
+                lock_token,
+                lock_owner_run_id,
+                lock_owner_workflow,
+                lock_owner_job,
+                current_lock.get("lock_expires_at") if isinstance(current_lock, dict) else None,
+            )
         if not lock_valid:
             desired_lock = bot.build_lock_metadata(
                 lock_token, lock_owner_run_id, lock_owner_workflow, lock_owner_job
@@ -394,20 +443,21 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                 snapshot_ref_sha, snapshot_tree_sha, snapshot_lock = bot.get_lock_ref_snapshot()
                 del snapshot_ref_sha, snapshot_tree_sha
                 if _snapshot_matches_expected_lock(snapshot_lock, lock_token):
-                    bot.ACTIVE_LEASE_CONTEXT = LeaseContext(
-                        lock_token=lock_token,
-                        lock_owner_run_id=lock_owner_run_id,
-                        lock_owner_workflow=lock_owner_workflow,
-                        lock_owner_job=lock_owner_job,
-                        state_issue_url=bot.get_state_issue_html_url(),
-                        lock_ref=bot.get_lock_ref_display(),
-                        lock_expires_at=desired_lock.get("lock_expires_at"),
+                    if not _snapshot_matches_expected_owner(
+                        snapshot_lock, lock_owner_run_id, lock_owner_workflow, lock_owner_job
+                    ):
+                        raise RuntimeError(
+                            "Lease lock acquire confirmed expected token with mismatched owner metadata "
+                            f"(token_prefix={lock_token[:8]})"
+                        )
+                    return _activate_lease_context(
+                        bot,
+                        lock_token,
+                        lock_owner_run_id,
+                        lock_owner_workflow,
+                        lock_owner_job,
+                        desired_lock.get("lock_expires_at"),
                     )
-                    print(
-                        "Acquired reviewer-bot lease lock "
-                        f"(run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, lock_ref={bot.get_lock_ref_display()})"
-                    )
-                    return bot.ACTIVE_LEASE_CONTEXT
                 if _snapshot_is_stale_unlocked_predecessor(snapshot_lock):
                     print(
                         "Lease lock acquire visibility lag detected; retrying confirmation "

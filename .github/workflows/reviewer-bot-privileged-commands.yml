@@ -16,9 +16,6 @@ env:
 
 jobs:
   privileged-command-executor:
-    concurrency:
-      group: reviewer-bot-state-314
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     permissions:
       contents: write

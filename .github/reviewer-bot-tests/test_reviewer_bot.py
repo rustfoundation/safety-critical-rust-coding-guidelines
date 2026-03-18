@@ -815,6 +815,22 @@ def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
     assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
 
 
+def test_mutating_reviewer_bot_workflows_do_not_share_global_github_concurrency():
+    workflow_paths = [
+        ".github/workflows/reviewer-bot-issues.yml",
+        ".github/workflows/reviewer-bot-issue-comment-direct.yml",
+        ".github/workflows/reviewer-bot-sweeper-repair.yml",
+        ".github/workflows/reviewer-bot-pr-metadata.yml",
+        ".github/workflows/reviewer-bot-pr-comment-trusted.yml",
+        ".github/workflows/reviewer-bot-reconcile.yml",
+        ".github/workflows/reviewer-bot-privileged-commands.yml",
+    ]
+    for workflow_path in workflow_paths:
+        data = yaml.safe_load(Path(workflow_path).read_text(encoding="utf-8"))
+        for job in data.get("jobs", {}).values():
+            assert "concurrency" not in job
+
+
 def test_classify_event_intent_treats_supported_workflow_run_sources_as_mutating(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "issue_comment")
     assert reviewer_bot.classify_event_intent("workflow_run", "completed") == reviewer_bot.EVENT_INTENT_MUTATING
