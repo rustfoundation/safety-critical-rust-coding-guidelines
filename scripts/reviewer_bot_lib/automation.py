@@ -32,6 +32,13 @@ def list_changed_files(repo_root: Path) -> list[str]:
     return sorted(set(files))
 
 
+def get_target_repo_root() -> Path:
+    configured = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
+    if configured:
+        return Path(configured)
+    return Path(__file__).resolve().parents[2]
+
+
 def get_default_branch(bot) -> str:
     repo_info = bot.github_api("GET", "")
     if isinstance(repo_info, dict):
@@ -80,7 +87,7 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
     if not bot.check_user_permission(comment_author, "triage"):
         return "❌ You must have triage permissions to run this command.", False
 
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = get_target_repo_root()
     if bot.list_changed_files(repo_root):
         return "❌ Working tree is not clean; refusing to update spec.lock.", False
 
