@@ -188,6 +188,64 @@ def _load_deferred_context() -> dict:
     return payload
 
 
+def _set_env_if_present(name: str, value) -> None:
+    if value is None:
+        return
+    os.environ[name] = str(value)
+
+
+def _hydrate_reconcile_pr_context(bot, pr_number: int) -> dict:
+    pull_request = bot.github_api("GET", f"pulls/{pr_number}")
+    if not isinstance(pull_request, dict):
+        raise RuntimeError(f"Failed to fetch live PR #{pr_number} for reconcile context")
+    author = pull_request.get("user")
+    if not isinstance(author, dict):
+        raise RuntimeError(f"Live PR #{pr_number} is missing author metadata")
+    author_login = author.get("login")
+    if not isinstance(author_login, str) or not author_login.strip():
+        raise RuntimeError(f"Live PR #{pr_number} is missing a valid author login")
+    labels = pull_request.get("labels")
+    if labels is None:
+        labels = []
+    if not isinstance(labels, list):
+        raise RuntimeError(f"Live PR #{pr_number} labels are malformed")
+    label_names: list[str] = []
+    for label in labels:
+        if not isinstance(label, dict):
+            raise RuntimeError(f"Live PR #{pr_number} contains malformed label metadata")
+        name = label.get("name")
+        if not isinstance(name, str):
+            raise RuntimeError(f"Live PR #{pr_number} contains a label without a valid name")
+        label_names.append(name)
+    os.environ["IS_PULL_REQUEST"] = "true"
+    os.environ["ISSUE_AUTHOR"] = author_login
+    os.environ["ISSUE_LABELS"] = json.dumps(label_names)
+    return pull_request
+
+
+def _hydrate_reconcile_comment_context(live_comment: dict, payload: dict) -> None:
+    user = live_comment.get("user")
+    if not isinstance(user, dict):
+        raise RuntimeError("Live deferred comment user metadata is unavailable")
+    comment_author = user.get("login") or payload.get("actor_login") or ""
+    if not isinstance(comment_author, str) or not comment_author.strip():
+        raise RuntimeError("Live deferred comment author login is unavailable")
+    comment_user_type = user.get("type")
+    if not isinstance(comment_user_type, str) or not comment_user_type.strip():
+        raise RuntimeError("Live deferred comment user type is unavailable")
+    author_association = live_comment.get("author_association")
+    if not isinstance(author_association, str) or not author_association.strip():
+        raise RuntimeError("Live deferred comment author association is unavailable")
+    _set_env_if_present("COMMENT_AUTHOR", comment_author)
+    _set_env_if_present("COMMENT_ID", payload.get("comment_id"))
+    _set_env_if_present("COMMENT_CREATED_AT", payload.get("source_created_at"))
+    _set_env_if_present("COMMENT_USER_TYPE", comment_user_type)
+    _set_env_if_present("COMMENT_AUTHOR_ASSOCIATION", author_association)
+    _set_env_if_present("COMMENT_SENDER_TYPE", comment_user_type)
+    os.environ["COMMENT_INSTALLATION_ID"] = ""
+    os.environ["COMMENT_PERFORMED_VIA_GITHUB_APP"] = "true" if live_comment.get("performed_via_github_app") else "false"
+
+
 def _validate_observer_noop_payload(payload: dict) -> None:
     required = {
         "schema_version",
@@ -338,6 +396,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
         if event_name == "issue_comment":
             _validate_deferred_comment_artifact(payload)
             _validate_workflow_run_artifact_identity(payload)
+            _hydrate_reconcile_pr_context(bot, pr_number)
             if source_event_key != f"issue_comment:{payload['comment_id']}":
                 raise RuntimeError("Deferred comment artifact source_event_key mismatch")
             comment_author = str(payload.get("actor_login", ""))
@@ -355,6 +414,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                     changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
                 _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {payload['comment_id']} is no longer visible; source-time freshness only may be preserved. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
                 return changed
+            _hydrate_reconcile_comment_context(live_comment, payload)
             live_body = live_comment.get("body")
             if not isinstance(live_body, str):
                 raise RuntimeError("Live deferred comment body is unavailable")
