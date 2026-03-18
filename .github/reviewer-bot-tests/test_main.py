@@ -211,6 +211,30 @@ def test_main_reloads_state_before_syncing_status_labels(monkeypatch):
     ]
 
 
+def test_issue_close_then_close_comment_does_not_leave_active_review(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_TITLE", "Validation issue")
+    monkeypatch.setenv("ISSUE_BODY", "body")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("ISSUE_STATE", "closed")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation close-path comment")
+
+    assert reviewer_bot.handle_closed_event(state) is True
+    assert "42" not in state["active_reviews"]
+    assert reviewer_bot.handle_comment_event(state) is False
+    assert "42" not in state["active_reviews"]
+
+
 def test_main_fails_when_save_state_fails(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")

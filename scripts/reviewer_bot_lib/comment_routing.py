@@ -24,6 +24,10 @@ def _is_pr_event() -> bool:
     return os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
 
 
+def _issue_state() -> str:
+    return os.environ.get("ISSUE_STATE", "").strip().lower()
+
+
 def _require_v18_for_pr(state: dict, context: str) -> bool:
     if not _is_pr_event():
         return True
@@ -320,6 +324,10 @@ def handle_comment_event(bot, state: dict) -> bool:
     if route == "safe_noop":
         return False
     if route == "issue_direct":
+        if _issue_state() == "closed":
+            state.get("active_reviews", {}).pop(str(issue_number), None)
+            print(f"Ignoring direct comment on closed issue #{issue_number}")
+            return False
         return _process_comment_event(bot, state, issue_number)
     if route == "pr_trusted_direct":
         if not _require_v18_for_pr(state, "pr_trusted_direct_comment"):

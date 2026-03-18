@@ -51,6 +51,7 @@ jobs:
           EVENT_NAME: issue_comment
           EVENT_ACTION: created
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_STATE: ${{ github.event.issue.state }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
           ISSUE_HTML_URL: ${{ github.event.issue.html_url }}
