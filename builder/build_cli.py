@@ -288,7 +288,8 @@ def main(root):
     builder = "linkcheck" if args.check_links else "xml" if args.xml else "html"
 
     if args.update_spec_lock_file:
-        update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
+        success = update_spec_lockfile(SPEC_CHECKSUM_URL, root / "src" / SPEC_LOCKFILE)
+        raise SystemExit(0 if success else 1)
 
     build_docs(
         root,
