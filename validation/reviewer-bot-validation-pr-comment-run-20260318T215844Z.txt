@@ -1,0 +1,3 @@
+Disposable validation artifact for reviewer-bot post-merge plan.
+Scenario: Same-repo PR trusted-direct comment path.
+Run: run-20260318T215844Z
