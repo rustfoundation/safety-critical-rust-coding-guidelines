@@ -475,7 +475,10 @@ def _discover_visible_review_events(bot, issue_number: int, review_data: dict) -
     for review in reviews:
         review_id = review.get("id") if isinstance(review, dict) else None
         submitted_at = review.get("submitted_at") if isinstance(review, dict) else None
+        state = str(review.get("state", "")).strip().upper() if isinstance(review, dict) else ""
         if not isinstance(review_id, int) or not isinstance(submitted_at, str):
+            continue
+        if state == "DISMISSED":
             continue
         submitted_dt = parse_timestamp(submitted_at)
         if submitted_dt is None or submitted_dt < floor:
@@ -488,6 +491,40 @@ def _discover_visible_review_events(bot, issue_number: int, review_data: dict) -
                 "source_created_at": submitted_at,
                 "object_id": str(review_id),
                 "surface": "reviews_submitted",
+            }
+        )
+    return discovered, True
+
+
+def _discover_visible_review_dismissal_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
+    watermark = _load_surface_watermark(review_data, "reviews_dismissed")
+    watermark["last_scan_started_at"] = _now_iso()
+    reviews = bot.get_pull_request_reviews(issue_number)
+    if reviews is None:
+        return None, False
+    floor = _surface_scan_floor(bot, watermark)
+    discovered: list[dict] = []
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        review_id = review.get("id")
+        state = str(review.get("state", "")).strip().upper()
+        dismissed_at = review.get("dismissed_at") or review.get("updated_at") or review.get("submitted_at")
+        if state != "DISMISSED":
+            continue
+        if not isinstance(review_id, int) or not isinstance(dismissed_at, str):
+            continue
+        dismissed_dt = parse_timestamp(dismissed_at)
+        if dismissed_dt is None or dismissed_dt < floor:
+            continue
+        discovered.append(
+            {
+                "source_event_key": f"pull_request_review_dismissed:{review_id}",
+                "source_event_name": "pull_request_review",
+                "source_event_action": "dismissed",
+                "source_created_at": dismissed_at,
+                "object_id": str(review_id),
+                "surface": "reviews_dismissed",
             }
         )
     return discovered, True
@@ -713,6 +750,73 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 _update_observer_watermark(bot, review_data, "reviews_submitted", last_review["source_created_at"], last_review["object_id"])
             else:
                 watermark = _load_surface_watermark(review_data, "reviews_submitted")
+                watermark["last_scan_started_at"] = watermark.get("last_scan_started_at") or _now_iso()
+                watermark["last_scan_completed_at"] = _now_iso()
+                watermark["bootstrap_completed_at"] = watermark.get("bootstrap_completed_at") or _now_iso()
+        discovered_dismissals, dismissals_complete = _discover_visible_review_dismissal_events(bot, issue_number, review_data)
+        if dismissals_complete and isinstance(discovered_dismissals, list):
+            for discovered in discovered_dismissals:
+                source_event_key = discovered["source_event_key"]
+                dismissed_at = discovered["source_created_at"]
+                if _should_skip_discovered_key(bot, review_data, source_event_key, ("review_dismissal",)):
+                    continue
+                existing_gap = review_data.get("deferred_gaps", {}).get(source_event_key, {})
+                workflow_file = ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml"
+                workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "pull_request_review")
+                run_correlation = correlate_candidate_observer_runs(
+                    source_event_key,
+                    source_event_kind="pull_request_review:dismissed",
+                    source_event_created_at=dismissed_at,
+                    pr_number=issue_number,
+                    workflow_file=workflow_file,
+                    workflow_runs=workflow_runs,
+                )
+                run_correlation["later_recheck_complete"] = bool(existing_gap.get("full_scan_complete"))
+                artifact_correlation = None
+                run_detail = None
+                if run_correlation.get("status") == "candidate_runs_found":
+                    artifact_correlation = inspect_run_artifact_payloads(
+                        bot,
+                        run_correlation.get("candidate_runs", []),
+                        source_event_key,
+                        pr_number=issue_number,
+                        source_event_kind="pull_request_review:dismissed",
+                    )
+                    exact_run_id = artifact_correlation.get("correlated_run") if isinstance(artifact_correlation, dict) else None
+                    if isinstance(exact_run_id, int):
+                        run_correlation["correlated_run"] = exact_run_id
+                        run_correlation["correlated_run_found"] = True
+                        run_detail = _fetch_run_detail(bot, exact_run_id)
+                reason, diagnostic_reason = evaluate_deferred_gap_state(
+                    {
+                        **existing_gap,
+                        "source_event_created_at": dismissed_at,
+                    },
+                    run_correlation,
+                    run_detail,
+                    artifact_correlation,
+                )
+                _record_gap_diagnostics(
+                    bot,
+                    review_data,
+                    source_event_key,
+                    source_event_name="pull_request_review",
+                    source_event_action="dismissed",
+                    issue_number=issue_number,
+                    source_created_at=dismissed_at,
+                    workflow_file=workflow_file,
+                    run_correlation=run_correlation,
+                    run_detail=run_detail,
+                    artifact_correlation=artifact_correlation,
+                    reason=reason,
+                    diagnostic_reason=diagnostic_reason,
+                )
+                changed = True
+            if discovered_dismissals:
+                last_dismissal = discovered_dismissals[-1]
+                _update_observer_watermark(bot, review_data, "reviews_dismissed", last_dismissal["source_created_at"], last_dismissal["object_id"])
+            else:
+                watermark = _load_surface_watermark(review_data, "reviews_dismissed")
                 watermark["last_scan_started_at"] = watermark.get("last_scan_started_at") or _now_iso()
                 watermark["last_scan_completed_at"] = _now_iso()
                 watermark["bootstrap_completed_at"] = watermark.get("bootstrap_completed_at") or _now_iso()
