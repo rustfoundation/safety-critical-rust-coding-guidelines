@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from builder import build_cli
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing, sweeper
 
@@ -982,6 +983,28 @@ def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, t
     assert success is False
     assert "Audit command failed." in message
     assert "--locked was provided" in message
+
+
+def test_update_spec_lock_file_mode_exits_before_build_docs(monkeypatch, tmp_path):
+    monkeypatch.setattr(build_cli.argparse.ArgumentParser, "parse_args", lambda self: type("Args", (), {
+        "clear": False,
+        "offline": False,
+        "ignore_spec_lock_diff": False,
+        "update_spec_lock_file": True,
+        "validate_urls": False,
+        "serve": False,
+        "check_links": False,
+        "xml": False,
+        "verbose": False,
+        "debug": False,
+    })())
+    called = {"update": 0, "build": 0}
+    monkeypatch.setattr(build_cli, "update_spec_lockfile", lambda url, path: called.__setitem__("update", called["update"] + 1) or True)
+    monkeypatch.setattr(build_cli, "build_docs", lambda *args, **kwargs: called.__setitem__("build", called["build"] + 1))
+    with pytest.raises(SystemExit) as exc_info:
+        build_cli.main(tmp_path)
+    assert exc_info.value.code == 0
+    assert called == {"update": 1, "build": 0}
 
 
 def test_observer_run_reason_mapping_and_near_miss_signature():
