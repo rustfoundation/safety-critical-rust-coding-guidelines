@@ -346,14 +346,14 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
     repo_root = get_target_repo_root()
     if bot.list_changed_files(repo_root):
         return "❌ Working tree is not clean; refusing to update spec.lock.", False
-    audit_result = bot.run_command(["uv", "run", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"], cwd=repo_root, check=False)
+    audit_result = bot.run_command(["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"], cwd=repo_root, check=False)
     if audit_result.returncode == 2:
         return ("❌ The audit reports affected guidelines. Please review and open a PR with the necessary guideline updates instead."), False
     if audit_result.returncode != 0:
         details = bot.summarize_output(audit_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
         return (f"❌ Audit command failed.{detail_text}"), False
-    update_result = bot.run_command(["uv", "run", "python", "./make.py", "--update-spec-lock-file"], cwd=repo_root, check=False)
+    update_result = bot.run_command(["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"], cwd=repo_root, check=False)
     if update_result.returncode != 0:
         details = bot.summarize_output(update_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
