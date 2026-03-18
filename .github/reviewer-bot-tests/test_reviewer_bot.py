@@ -855,7 +855,7 @@ def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention()
     assert sweeper.classify_artifact_gap_reason(missing) == "artifact_missing"
 
 
-def test_sweeper_creates_keyed_deferred_gaps_only_for_visible_comments_and_submitted_reviews(monkeypatch):
+def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_dismissals(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -871,13 +871,42 @@ def test_sweeper_creates_keyed_deferred_gaps_only_for_visible_comments_and_submi
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
-        lambda issue_number: [{"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"}],
+        lambda issue_number: [
+            {"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"},
+            {"id": 303, "submitted_at": "2026-03-17T09:00:00Z", "updated_at": "2026-03-17T12:00:00Z", "state": "DISMISSED"},
+        ],
     )
     assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
     gaps = state["active_reviews"]["42"]["deferred_gaps"]
     assert "issue_comment:101" in gaps
     assert "pull_request_review:202" in gaps
-    assert not any(key.startswith("pull_request_review_dismissed:") for key in gaps)
+    assert "pull_request_review_dismissed:303" in gaps
+    assert gaps["pull_request_review_dismissed:303"]["source_workflow_file"] == ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml"
+
+
+def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["reconciled_source_events"] = ["pull_request_review_dismissed:303"]
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
+            "issues/42/comments?per_page=100&page=1": [],
+        }.get(endpoint),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {"id": 303, "submitted_at": "2026-03-17T09:00:00Z", "updated_at": "2026-03-17T12:00:00Z", "state": "DISMISSED"},
+        ],
+    )
+    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is False
+    assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
 def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch):
