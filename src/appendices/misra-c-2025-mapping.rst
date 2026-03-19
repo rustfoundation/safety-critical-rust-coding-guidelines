@@ -6,7 +6,7 @@ first table covers guidelines that are applicable to Rust in general, while the 
 guidelines that are applicable in the presence of unsafe code. The third table lists guidelines that are not applicable
 to Rust.
 
-The origin of this assessment can be found as Addendum 6 of the MISRA C 2025 standard [#f1]_.
+The origin of this assessment can be found at `MISRA C:2025 Addendum 6`_.
 
 
 Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code present)
@@ -578,391 +578,294 @@ Table 3 – Guideline rules that are not applicable to Rust
 
    * - Guideline
      - Rationale
-     - Safety critical Rust rule
      - Comment
    * - **Directives**
      -
      -
-     -
    * - D.4.6
      - DC
-     -
      - all primitive types already fulfil this
    * - D.4.8
      - DC
      -
-     -
    * - D.4.10
      - UB, DC
-     -
      -
    * - **Rules**
      -
      -
-     -
    * - R.1.4
      - UB, DC
-     -
      - this is specific to C versioning
    * - R.2.4
      - DC
-     -
      - no separate tag name space in Rust
    * - R.3.2
      - DC
      -
-     -
    * - R.4.1
      - DC, IDB
-     -
      -
    * - R.4.2
      - DC
      -
-     -
    * - R.5.4
      - UB, IDB, DC
      -
-     -
    * - R.5.7
      - UB, DC
-     -
      - no separate tag name space in Rust
    * - R.6.1
      - UB, IDB
-     -
      - only provided as a library feature
    * - R.6.2
      - DC
      -
-     -
    * - R.6.3
      - IDB
-     -
      -
    * - R.7.3
      - DC
      -
-     -
    * - R.7.4
      - UB
-     -
      -
    * - R.7.5
      - UB
      -
-     -
    * - R.7.6
      - DC
-     -
      -
    * - R.8.1
      - DC
      -
-     -
    * - R.8.2
      - UB, DC
-     -
      -
    * - R.8.4
      - UB
      -
-     -
    * - R.8.8
      - DC
-     -
      -
    * - R.8.10
      - UB, DC
      -
-     -
    * - R.8.11
      - DC
-     -
      -
    * - R.8.12
      - DC
      -
-     -
    * - R.8.14
      - UB
      -
-     -
    * - R.8.16
      - DC
-     -
      - cannot be explicitly specified. Only ZSTs have this alignment
    * - R.8.18
      - UB, DC
      -
-     -
    * - R.8.19
      - UB, DC
-     -
      -
    * - R.9.2
      - UB, CQ, DC
      -
-     -
    * - R.9.3
      - UB
-     -
      -
    * - R.9.5
      - IDB, DC
      -
-     -
    * - R.9.6
      - DC
-     -
      -
    * - R.10.1
      - UB, IDB, DC
      -
-     -
    * - R.10.2
      - DC
-     -
      -
    * - R.10.3
      - UB, IDB
      -
-     -
    * - R.10.4
      - IDB
-     -
      -
    * - R.10.6
      - DC
      -
-     -
    * - R.10.7
      - DC
      -
-     -
    * - R.11.9
      - DC
-     -
      - Rust does not have a null pointer constant (specific concept to C)
    * - R.11.10
      - UB
      -
-     -
    * - R.12.3
      - DC
-     -
      -
    * - R.12.5
      - DC
      -
-     -
    * - R.12.6
      - UB
      -
-     -
    * - R.13.2
      - UB
-     -
      - order of evaluation is strict in Rust
    * - R.13.3
      - UB, DC
      -
-     -
    * - R.13.4
      - UB, DC
-     -
      - result has unit type and order of evaluation is strict in Rust
    * - R.13.6
      - UB, DC
-     -
      - this is not an expression operator in Rust
    * - R.14.2
      - DC
      -
-     -
    * - R.15.1
      - DC
-     -
      -
    * - R.15.2
      - DC
      -
-     -
    * - R.15.3
      - DC
-     -
      -
    * - R.15.6
      - DC
      -
-     -
    * - R.16.1
      - DC
-     -
      -
    * - R.16.2
      - DC
      -
-     -
    * - R.16.3
      - DC
      -
-     -
    * - R.16.4
      - DC
-     -
      - a corresponding match expression must be complete
    * - R.16.5
      - DC
-     -
      - irrefutable pattern causes a subsequent refutable one to be unreachable
    * - R.16.6
      - DC
      -
-     -
    * - R.16.7
      - DC
-     -
      -
    * - R.17.1
      - UB
      -
-     -
    * - R.17.3
      - UB
      -
-     -
    * - R.17.4
      - UB
-     -
      - the return keyword is not needed to return a value in Rust, only to exit
    * - R.17.5
      - UB, DC
      -
-     -
    * - R.17.10
      - DC
-     -
      -
    * - R.17.12
      - DC
      -
-     -
    * - R.17.13
      - UB
-     -
      -
    * - R.18.7
      - UB, DC
      -
-     -
    * - R.18.8
      - UB, DC
-     -
      -
    * - R.18.9
      - UB
      -
-     -
    * - R.18.10
      - UB
      -
-     -
    * - R.20.1
      - UB
-     -
      - rules specific to the C preprocessor do not apply to Rust
    * - R.20.2
      - UB
      -
-     -
    * - R.20.3
      - UB
-     -
      -
    * - R.20.5
      - DC
      -
-     -
    * - R.20.6
      - UB
-     -
      -
    * - R.20.8
      - DC
      -
-     -
    * - R.20.9
      - DC
-     -
      -
    * - R.20.10
      - UB
      -
-     -
    * - R.20.11
      - UB
-     -
      -
    * - R.20.12
      - DC
      -
-     -
    * - R.20.13
      - DC
-     -
      -
    * - R.20.14
      - DC
      -
-     -
    * - R.20.15
      - UB
      -
-     -
    * - R.21.11
      - UB
-     -
      - no external interface
    * - R.21.22
      - UB
-     -
      - no external interface
    * - R.21.23
      - DC
-     -
      - no external interface
    * - R.23.1
      - DC
      -
-     -
    * - R.23.2
      - DC
-     -
      -
    * - R.23.3
      - DC
      -
-     -
    * - R.23.4
      - DC
-     -
      -
    * - R.23.5
      - DC
      -
-     -
    * - R.23.6
      - DC
-     -
      -
    * - R.23.7
      - DC
      -
-     -
    * - R.23.8
      - DC
-     -
      -
 
 
@@ -995,6 +898,5 @@ Footnotes
 
 .. rubric:: Footnotes
 
-.. [#f1] MISRA C:2025 Addendum 6, "Applicability of MISRA C:2025 to the Rust Programming Language", available at
-         https://misra.org.uk/app/uploads/2025/03/MISRA-C-2025-ADD6.pdf
+.. _MISRA C\:2025 Addendum 6: https://misra.org.uk/app/uploads/2025/03/MISRA-C-2025-ADD6.pdf
 
