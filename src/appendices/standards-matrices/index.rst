@@ -5,3 +5,8 @@
 
 Standards Matrices
 ==================
+
+.. toctree::
+   :maxdepth: 1
+
+   misra-c-2025-mapping
