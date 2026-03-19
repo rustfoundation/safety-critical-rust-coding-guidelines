@@ -26,7 +26,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      -
    * - D.1.1
      - IDB
-     -
+     - 
      -
    * - D.1.2
      - IDB
@@ -138,7 +138,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      - no character limit, but one can be applied; has name spaces
    * - R.5.3
      - DC
-     -
+     - :need:`gui_SJMrWDYZ0dN4`
      - this also applies to macro names
    * - R.5.6
      - DC
@@ -186,7 +186,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      -
    * - R.11.4
      - UB, IDB
-     -
+     - :need:`gui_PM8Vpf7lZ51U`
      -
    * - R.11.11
      - DC
@@ -226,7 +226,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      -
    * - R.17.2
      - UB, DC
-     -
+     - :need:`gui_ot2Zt3dd6of1`
      -
    * - R.17.7
      - DC
@@ -250,7 +250,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      -
    * - R.19.2
      - UB, DC
-     -
+     - :need:`gui_0cuTYG8RVYjg`
      -
    * - R.19.3
      - UB
@@ -349,11 +349,11 @@ In addition to the rules from Table 1, these are the additional guidelines that 
      -
    * - R.10.5
      - DC
-     -
+     - :need:`gui_ADHABsmK9FXz`
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.10.8
      - DC
-     -
+     - :need:`gui_HDnAZ7EZ4z6G`
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.11.1
      - UB, IDB
@@ -369,7 +369,7 @@ In addition to the rules from Table 1, these are the additional guidelines that 
      -
    * - R.11.6
      - UB, IDB
-     -
+     - :need:`gui_PM8Vpf7lZ51U`
      -
    * - R.11.8
      - UB
@@ -377,7 +377,7 @@ In addition to the rules from Table 1, these are the additional guidelines that 
      -
    * - R.12.2
      - UB, DC
-     -
+     - :need:`gui_LvmzGKdsAgI5`, :need:`gui_RHvQj8BHlz9b`
      -
    * - R.12.4
      - DC
