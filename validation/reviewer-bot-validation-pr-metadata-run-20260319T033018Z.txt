@@ -1,0 +1,3 @@
+Disposable validation artifact for reviewer-bot post-merge plan.
+Scenario: PR metadata lifecycle path.
+Run: run-20260319T033018Z
