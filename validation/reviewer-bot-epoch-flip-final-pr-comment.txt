@@ -1,0 +1,2 @@
+Disposable validation artifact for reviewer-bot epoch-flip final smoke check.
+Scenario: same-repo trusted-direct PR command after observer suppression.
