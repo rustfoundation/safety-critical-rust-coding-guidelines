@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .config import AssignmentAttempt
 from .guidance import get_issue_guidance, get_pr_guidance
 
 
@@ -80,6 +81,35 @@ def parse_command(bot, comment_body: str) -> tuple[str, list[str]] | None:
     return command, args
 
 
+def _apply_assignment_side_effects(
+    bot,
+    state: dict,
+    issue_number: int,
+    reviewer: str,
+    assignment_method: str,
+    issue_author: str,
+) -> tuple[AssignmentAttempt, str | None]:
+    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    assignment_attempt = bot.request_reviewer_assignment(issue_number, reviewer)
+    bot.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
+    bot.record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
+    failure_comment = bot.get_assignment_failure_comment(reviewer, assignment_attempt)
+    if failure_comment:
+        bot.post_comment(issue_number, failure_comment)
+    if assignment_attempt.success:
+        if is_pr:
+            bot.post_comment(issue_number, get_pr_guidance(reviewer, issue_author))
+        else:
+            labels = set(parse_issue_labels())
+            guidance = (
+                bot.get_fls_audit_guidance(reviewer, issue_author)
+                if bot.FLS_AUDIT_LABEL in labels
+                else get_issue_guidance(reviewer, issue_author)
+            )
+            bot.post_comment(issue_number, guidance)
+    return assignment_attempt, failure_comment
+
+
 def handle_pass_command(bot, state: dict, issue_number: int, comment_author: str, reason: str | None) -> tuple[str, bool]:
     issue_data = bot.ensure_review_entry(state, issue_number, create=True)
     if issue_data is None:
@@ -104,13 +134,16 @@ def handle_pass_command(bot, state: dict, issue_number: int, comment_author: str
         return ("❌ No other reviewers available. Everyone in the queue has either passed on this issue or is the author."), False
     bot.reposition_member_as_next(state, passed_reviewer)
     bot.unassign_reviewer(issue_number, passed_reviewer)
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = bot.request_reviewer_assignment(issue_number, next_reviewer)
-    bot.set_current_reviewer(state, issue_number, next_reviewer)
-    bot.record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
+    assignment_attempt, failure_comment = _apply_assignment_side_effects(
+        bot,
+        state,
+        issue_number,
+        next_reviewer,
+        "round-robin",
+        issue_author,
+    )
     assignment_line = f"@{next_reviewer} is now assigned as the reviewer."
     if not assignment_attempt.success:
-        failure_comment = bot.get_assignment_failure_comment(next_reviewer, assignment_attempt)
         if failure_comment:
             assignment_line = failure_comment
         else:
@@ -171,14 +204,17 @@ def handle_pass_until_command(bot, state: dict, issue_number: int, comment_autho
         skip_set = {issue_author} if issue_author else set()
         next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
         if next_reviewer:
-            is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-            assignment_attempt = bot.request_reviewer_assignment(issue_number, next_reviewer)
-            bot.set_current_reviewer(state, issue_number, next_reviewer)
-            bot.record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
+            assignment_attempt, failure_comment = _apply_assignment_side_effects(
+                bot,
+                state,
+                issue_number,
+                next_reviewer,
+                "round-robin",
+                issue_author,
+            )
             if assignment_attempt.success:
                 reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
             else:
-                failure_comment = bot.get_assignment_failure_comment(next_reviewer, assignment_attempt)
                 if failure_comment:
                     reassigned_msg = f"\n\n{failure_comment}"
                 else:
@@ -441,14 +477,18 @@ def handle_claim_command(bot, state: dict, issue_number: int, comment_author: st
     current_assignees = bot.get_issue_assignees(issue_number)
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = bot.request_reviewer_assignment(issue_number, comment_author)
-    bot.set_current_reviewer(state, issue_number, comment_author, assignment_method="claim")
-    bot.record_assignment(state, comment_author, issue_number, "pr" if is_pr else "issue")
+    issue_author = os.environ.get("ISSUE_AUTHOR", "")
+    assignment_attempt, failure_comment = _apply_assignment_side_effects(
+        bot,
+        state,
+        issue_number,
+        comment_author,
+        "claim",
+        issue_author,
+    )
     prev_text = f" (previously: @{', @'.join(current_assignees)})" if current_assignees else ""
     response = f"✅ @{comment_author} has claimed this review{prev_text}."
     if not assignment_attempt.success:
-        failure_comment = bot.get_assignment_failure_comment(comment_author, assignment_attempt)
         if failure_comment:
             response = f"{response}\n\n{failure_comment}"
     return response, True
@@ -518,15 +558,19 @@ def handle_assign_command(bot, state: dict, issue_number: int, username: str) ->
     current_assignees = bot.get_issue_assignees(issue_number)
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = bot.request_reviewer_assignment(issue_number, username)
-    bot.set_current_reviewer(state, issue_number, username, assignment_method="manual")
-    bot.record_assignment(state, username, issue_number, "pr" if is_pr else "issue")
+    issue_author = os.environ.get("ISSUE_AUTHOR", "")
+    assignment_attempt, failure_comment = _apply_assignment_side_effects(
+        bot,
+        state,
+        issue_number,
+        username,
+        "manual",
+        issue_author,
+    )
     prev_text = f" (previously: @{', @'.join(current_assignees)})" if current_assignees else ""
     if assignment_attempt.success:
         return f"✅ @{username} has been assigned as reviewer{prev_text}.", True
     response = f"✅ @{username} remains designated as reviewer in bot state{prev_text}. GitHub reviewer assignment could not be completed."
-    failure_comment = bot.get_assignment_failure_comment(username, assignment_attempt)
     if failure_comment:
         response = f"{response}\n\n{failure_comment}"
     return response, True
@@ -541,21 +585,15 @@ def handle_assign_from_queue_command(bot, state: dict, issue_number: int) -> tup
     next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
     if not next_reviewer:
         return (f"❌ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue."), False
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
-    assignment_attempt = bot.request_reviewer_assignment(issue_number, next_reviewer)
-    bot.set_current_reviewer(state, issue_number, next_reviewer)
-    bot.record_assignment(state, next_reviewer, issue_number, "pr" if is_pr else "issue")
+    assignment_attempt, _failure_comment = _apply_assignment_side_effects(
+        bot,
+        state,
+        issue_number,
+        next_reviewer,
+        "round-robin",
+        issue_author,
+    )
     prev_text = f" (previously: @{', @'.join(current_assignees)})" if current_assignees else ""
-    failure_comment = bot.get_assignment_failure_comment(next_reviewer, assignment_attempt)
-    if failure_comment:
-        bot.post_comment(issue_number, failure_comment)
-    if is_pr:
-        if assignment_attempt.success:
-            guidance = get_pr_guidance(next_reviewer, issue_author)
-            bot.post_comment(issue_number, guidance)
-    else:
-        guidance = get_issue_guidance(next_reviewer, issue_author)
-        bot.post_comment(issue_number, guidance)
     if assignment_attempt.success:
         return f"✅ @{next_reviewer} (next in queue) has been assigned as reviewer{prev_text}.", True
     return (f"✅ @{next_reviewer} remains designated as reviewer in bot state{prev_text}. GitHub reviewer assignment could not be completed."), True

@@ -947,6 +947,73 @@ def test_execute_pending_privileged_command_fails_closed_without_live_fls_audit_
     assert pending["result"] == "live_revalidation_failed"
 
 
+def test_assign_command_posts_pr_guidance_on_success(monkeypatch):
+    state = make_state()
+    state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("ISSUE_AUTHOR", "PLeVasseur")
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: [])
+    monkeypatch.setattr(reviewer_bot, "request_reviewer_assignment", lambda issue_number, username: reviewer_bot.AssignmentAttempt(success=True, status_code=201))
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    response, success = reviewer_bot.handle_assign_command(state, 42, "@felix91gr")
+    assert success is True
+    assert response == "✅ @felix91gr has been assigned as reviewer."
+    assert posted == [reviewer_bot.get_pr_guidance("felix91gr", "PLeVasseur")]
+
+
+def test_claim_command_posts_pr_guidance_on_success(monkeypatch):
+    state = make_state()
+    state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("ISSUE_AUTHOR", "PLeVasseur")
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: [])
+    monkeypatch.setattr(reviewer_bot, "request_reviewer_assignment", lambda issue_number, username: reviewer_bot.AssignmentAttempt(success=True, status_code=201))
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    response, success = reviewer_bot.handle_claim_command(state, 42, "felix91gr")
+    assert success is True
+    assert response == "✅ @felix91gr has claimed this review."
+    assert posted == [reviewer_bot.get_pr_guidance("felix91gr", "PLeVasseur")]
+
+
+def test_pass_command_posts_pr_guidance_for_new_reviewer(monkeypatch):
+    state = make_state()
+    state["queue"] = [
+        {"github": "alice", "name": "Alice"},
+        {"github": "felix91gr", "name": "Félix Fischer"},
+    ]
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("ISSUE_AUTHOR", "PLeVasseur")
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: ["alice"])
+    monkeypatch.setattr(reviewer_bot, "request_reviewer_assignment", lambda issue_number, username: reviewer_bot.AssignmentAttempt(success=True, status_code=201))
+    monkeypatch.setattr(reviewer_bot, "unassign_reviewer", lambda issue_number, username: True)
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    response, success = reviewer_bot.handle_pass_command(state, 42, "alice", None)
+    assert success is True
+    assert "@felix91gr is now assigned as the reviewer." in response
+    assert posted == [reviewer_bot.get_pr_guidance("felix91gr", "PLeVasseur")]
+
+
+def test_assign_from_queue_posts_guidance_only_once(monkeypatch):
+    state = make_state()
+    state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("ISSUE_AUTHOR", "PLeVasseur")
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: [])
+    monkeypatch.setattr(reviewer_bot, "request_reviewer_assignment", lambda issue_number, username: reviewer_bot.AssignmentAttempt(success=True, status_code=201))
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    response, success = reviewer_bot.handle_assign_from_queue_command(state, 42)
+    assert success is True
+    assert response == "✅ @felix91gr (next in queue) has been assigned as reviewer."
+    assert posted == [reviewer_bot.get_pr_guidance("felix91gr", "PLeVasseur")]
+
+
 def test_list_changed_files_ignores_untracked_bootstrap_noise(monkeypatch, tmp_path):
     commands_seen = []
 
