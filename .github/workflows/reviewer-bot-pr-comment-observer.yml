@@ -14,7 +14,49 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Decide whether deferred observer path applies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_USER_TYPE: ${{ github.event.comment.user.type }}
+          COMMENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          pr_number = os.environ['PR_NUMBER']
+          repo = os.environ['GITHUB_REPOSITORY']
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{repo}/pulls/{pr_number}",
+              headers={
+                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  'Accept': 'application/vnd.github+json',
+              },
+          )
+          with urllib.request.urlopen(req) as response:
+              pull_request = json.load(response)
+
+          head_repo = pull_request.get('head', {}).get('repo') or {}
+          head_full_name = str(head_repo.get('full_name') or '').strip()
+          pr_author = str(pull_request.get('user', {}).get('login') or '').strip()
+          same_repo = head_full_name == repo
+          restricted_deferred = pr_author == 'dependabot[bot]'
+          trusted_human = (
+              os.environ.get('COMMENT_USER_TYPE', '').strip() == 'User'
+              and os.environ.get('COMMENT_AUTHOR_ASSOCIATION', '').strip() in {'OWNER', 'MEMBER', 'COLLABORATOR'}
+          )
+          run_observer = not (same_repo and trusted_human and not restricted_deferred)
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as handle:
+              print(f"RUN_PR_COMMENT_OBSERVER={str(run_observer).lower()}", file=handle)
+          if run_observer:
+              print(f"Deferred PR comment observer remains enabled for PR #{pr_number}.")
+          else:
+              print(f"Skipping deferred PR comment observer for trusted-direct same-repo PR comment on PR #{pr_number}.")
+          PY
       - name: Build deferred comment artifact
+        if: env.RUN_PR_COMMENT_OBSERVER == 'true'
         env:
           PAYLOAD_PATH: ${{ runner.temp }}/deferred-comment.json
           COMMENT_BODY: ${{ github.event.comment.body }}
@@ -95,9 +137,14 @@ jobs:
               json.dump(payload, handle)
           PY
       - name: Upload deferred comment artifact
+        if: env.RUN_PR_COMMENT_OBSERVER == 'true'
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: reviewer-bot-comment-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/deferred-comment.json
           retention-days: 7
           if-no-files-found: ignore
+      - name: Deferred observer skipped
+        if: env.RUN_PR_COMMENT_OBSERVER != 'true'
+        run: |
+          echo 'Deferred PR comment observer skipped for trusted-direct same-repo human comment.'

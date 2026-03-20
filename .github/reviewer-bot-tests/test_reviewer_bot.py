@@ -1320,6 +1320,20 @@ def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
     assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
 
 
+def test_pr_comment_observer_skips_trusted_direct_same_repo_comments():
+    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8"))
+    job = data["jobs"]["observer"]
+    steps = job["steps"]
+    assert steps[0]["name"] == "Decide whether deferred observer path applies"
+    assert steps[1]["if"] == "env.RUN_PR_COMMENT_OBSERVER == 'true'"
+    assert steps[2]["if"] == "env.RUN_PR_COMMENT_OBSERVER == 'true'"
+    assert steps[3]["name"] == "Deferred observer skipped"
+    assert steps[3]["if"] == "env.RUN_PR_COMMENT_OBSERVER != 'true'"
+    workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
+    assert "RUN_PR_COMMENT_OBSERVER" in workflow_text
+    assert "Skipping deferred PR comment observer for trusted-direct same-repo PR comment" in workflow_text
+
+
 def test_issue_comment_direct_workflow_exports_issue_state():
     workflow_text = Path(".github/workflows/reviewer-bot-issue-comment-direct.yml").read_text(encoding="utf-8")
     assert "ISSUE_STATE: ${{ github.event.issue.state }}" in workflow_text
