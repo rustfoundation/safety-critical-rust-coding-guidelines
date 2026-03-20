@@ -1320,6 +1320,48 @@ def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
     assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
 
 
+def test_pr_comment_observer_routes_through_reviewer_bot_payload_builder():
+    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8"))
+    job = data["jobs"]["observer"]
+    steps = job["steps"]
+    assert steps[0]["name"] == "Install uv"
+    assert steps[1]["name"] == "Fetch trusted bot source tarball"
+    assert steps[2]["name"] == "Build deferred comment artifact"
+    assert steps[3]["name"] == "Upload deferred comment artifact"
+    workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
+    assert "build_pr_comment_observer_payload" in workflow_text
+    assert 'uv run --project "$BOT_SRC_ROOT" python - <<\'PY\'' in workflow_text
+
+
+def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "PLeVasseur")
+    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "COLLABORATOR")
+    monkeypatch.setenv("COMMENT_SENDER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_INSTALLATION_ID", "")
+    monkeypatch.setenv("COMMENT_PERFORMED_VIA_GITHUB_APP", "false")
+    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /r? @felix91gr")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_AUTHOR_ID", "123")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-20T20:48:25Z")
+    monkeypatch.setenv("GITHUB_RUN_ID", "999")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+            "user": {"login": "PLeVasseur"},
+        },
+    )
+    payload = reviewer_bot.build_pr_comment_observer_payload(42)
+    assert payload["kind"] == "observer_noop"
+    assert payload["reason"] == "trusted_direct_same_repo_human_comment"
+    assert payload["source_event_key"] == "issue_comment:100"
+
+
 def test_issue_comment_direct_workflow_exports_issue_state():
     workflow_text = Path(".github/workflows/reviewer-bot-issue-comment-direct.yml").read_text(encoding="utf-8")
     assert "ISSUE_STATE: ${{ github.event.issue.state }}" in workflow_text
