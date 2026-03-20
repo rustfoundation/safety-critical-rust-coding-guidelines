@@ -548,8 +548,8 @@ def handle_pass_until_command(state: dict, issue_number: int, comment_author: st
     return commands_module.handle_pass_until_command(_runtime_bot(), state, issue_number, comment_author, return_date, reason)
 
 
-def handle_label_command(issue_number: int, label_string: str) -> tuple[str, bool]:
-    return commands_module.handle_label_command(_runtime_bot(), issue_number, label_string)
+def handle_label_command(state: dict, issue_number: int, label_string: str) -> tuple[str, bool, bool]:
+    return commands_module.handle_label_command(_runtime_bot(), state, issue_number, label_string)
 
 
 def parse_issue_labels() -> list[str]:

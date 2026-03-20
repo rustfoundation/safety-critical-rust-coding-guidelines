@@ -257,7 +257,7 @@ def _handle_command(bot, state: dict, issue_number: int, comment_author: str, cl
         else:
             response = f"❌ Missing date. Usage: `{bot.BOT_MENTION} /away YYYY-MM-DD [reason]`"
     elif command == "label":
-        response, success = bot.handle_label_command(issue_number, " ".join(args))
+        response, success, state_changed = bot.handle_label_command(state, issue_number, " ".join(args))
     elif command == "sync-members":
         response, success = bot.handle_sync_members_command(state)
         state_changed = success

@@ -192,14 +192,15 @@ def handle_pass_until_command(bot, state: dict, issue_number: int, comment_autho
     return (f"✅ @{comment_author} is now away until {return_date}{reason_text}.\n\nYou'll be automatically added back to the queue on that date.{reassigned_msg}"), True
 
 
-def handle_label_command(bot, issue_number: int, label_string: str) -> tuple[str, bool]:
+def handle_label_command(bot, state: dict, issue_number: int, label_string: str) -> tuple[str, bool, bool]:
     pattern = r'(?:(?<=^)|(?<=\s))([+-])(.+?)(?=\s[+-]|\s*$)'
     matches = re.findall(pattern, label_string)
     if not matches:
-        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
+        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False, False
     existing_labels = bot.get_repo_labels()
     results = []
     all_success = True
+    state_changed = False
     for action, label in matches:
         label = label.strip()
         if not label:
@@ -210,6 +211,14 @@ def handle_label_command(bot, issue_number: int, label_string: str) -> tuple[str
                 all_success = False
             elif bot.add_label(issue_number, label):
                 results.append(f"✅ Added label `{label}`")
+                if label == "sign-off: create pr" and os.environ.get("IS_PULL_REQUEST", "false").lower() != "true":
+                    review_data = bot.ensure_review_entry(state, issue_number)
+                    reviewer = review_data.get("current_reviewer") if review_data else None
+                    completion_changed = bot.mark_review_complete(
+                        state, issue_number, reviewer, "issue_label: sign-off: create pr"
+                    )
+                    status_changed = bot.sync_status_labels_for_items(state, [issue_number])
+                    state_changed = completion_changed or status_changed or state_changed
             else:
                 results.append(f"❌ Failed to add label `{label}`")
                 all_success = False
@@ -220,8 +229,8 @@ def handle_label_command(bot, issue_number: int, label_string: str) -> tuple[str
                 results.append(f"❌ Failed to remove label `{label}`")
                 all_success = False
     if not results:
-        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False
-    return "\n".join(results), all_success
+        return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False, False
+    return "\n".join(results), all_success, state_changed
 
 
 def parse_issue_labels() -> list[str]:
