@@ -1,0 +1,2 @@
+Disposable validation artifact for reviewer-bot post-fix PR comment retest.
+Scenario: same-repo trusted-direct PR command after guidance consistency fix.
