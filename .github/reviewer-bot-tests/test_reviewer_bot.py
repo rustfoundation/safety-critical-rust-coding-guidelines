@@ -226,6 +226,71 @@ def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
     assert accepted["semantic_key"] == "issue_comment:100"
 
 
+def test_label_signoff_create_pr_marks_issue_review_complete_and_syncs_status(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /label +sign-off: create pr")
+    monkeypatch.setattr(reviewer_bot, "get_repo_labels", lambda: ["sign-off: create pr"])
+    monkeypatch.setattr(reviewer_bot, "add_label", lambda issue_number, label: True)
+    synced = []
+    monkeypatch.setattr(
+        reviewer_bot,
+        "sync_status_labels_for_items",
+        lambda state_obj, issue_numbers: synced.append(list(issue_numbers)) or True,
+    )
+    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append((issue_number, body)) or True)
+    assert reviewer_bot.handle_comment_event(state) is True
+    assert review["review_completion_source"] == "issue_label: sign-off: create pr"
+    assert review["current_cycle_completion"]["completed"] is True
+    assert synced == [[42]]
+    assert posted == [(42, "✅ Added label `sign-off: create pr`")]
+
+
+def test_label_signoff_create_pr_on_pr_does_not_mark_issue_complete(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
+    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /label +sign-off: create pr")
+    monkeypatch.setenv("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+            "user": {"login": "dana"},
+        },
+    )
+    monkeypatch.setattr(reviewer_bot, "get_repo_labels", lambda: ["sign-off: create pr"])
+    monkeypatch.setattr(reviewer_bot, "add_label", lambda issue_number, label: True)
+    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda *args, **kwargs: pytest.fail("status sync should not run for PR sign-off label command"))
+    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda *args, **kwargs: True)
+    assert reviewer_bot.handle_comment_event(state) is False
+    assert review["review_completion_source"] is None
+
+
 def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
     state = make_state(epoch="legacy_v14")
     entry = reviewer_bot.ensure_review_entry(state, 42, create=True)
