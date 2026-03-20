@@ -14,50 +14,32 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Decide whether deferred observer path applies
+      - name: Install uv
+        run: python -m pip install uv
+      - name: Fetch trusted bot source tarball
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.issue.number }}
-          COMMENT_USER_TYPE: ${{ github.event.comment.user.type }}
-          COMMENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
         run: |
           python - <<'PY'
-          import json
-          import os
-          import urllib.request
+          import io, os, tarfile, urllib.request
+          from pathlib import Path
 
-          pr_number = os.environ['PR_NUMBER']
-          repo = os.environ['GITHUB_REPOSITORY']
           req = urllib.request.Request(
-              f"https://api.github.com/repos/{repo}/pulls/{pr_number}",
-              headers={
-                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
-                  'Accept': 'application/vnd.github+json',
-              },
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/tarball/{os.environ['GITHUB_SHA']}",
+              headers={'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}", 'Accept': 'application/vnd.github+json'},
           )
+          target = Path(os.environ['RUNNER_TEMP']) / 'reviewer-bot-src'
+          target.mkdir(parents=True, exist_ok=True)
           with urllib.request.urlopen(req) as response:
-              pull_request = json.load(response)
-
-          head_repo = pull_request.get('head', {}).get('repo') or {}
-          head_full_name = str(head_repo.get('full_name') or '').strip()
-          pr_author = str(pull_request.get('user', {}).get('login') or '').strip()
-          same_repo = head_full_name == repo
-          restricted_deferred = pr_author == 'dependabot[bot]'
-          trusted_human = (
-              os.environ.get('COMMENT_USER_TYPE', '').strip() == 'User'
-              and os.environ.get('COMMENT_AUTHOR_ASSOCIATION', '').strip() in {'OWNER', 'MEMBER', 'COLLABORATOR'}
-          )
-          run_observer = not (same_repo and trusted_human and not restricted_deferred)
-          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as handle:
-              print(f"RUN_PR_COMMENT_OBSERVER={str(run_observer).lower()}", file=handle)
-          if run_observer:
-              print(f"Deferred PR comment observer remains enabled for PR #{pr_number}.")
-          else:
-              print(f"Skipping deferred PR comment observer for trusted-direct same-repo PR comment on PR #{pr_number}.")
+              data = response.read()
+          with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as archive:
+              archive.extractall(target)
+          roots = list(target.iterdir())
+          print(f'BOT_SRC_ROOT={roots[0]}', file=open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8'))
           PY
       - name: Build deferred comment artifact
-        if: env.RUN_PR_COMMENT_OBSERVER == 'true'
         env:
+          BOT_SRC_ROOT: ${{ env.BOT_SRC_ROOT }}
           PAYLOAD_PATH: ${{ runner.temp }}/deferred-comment.json
           COMMENT_BODY: ${{ github.event.comment.body }}
           PR_NUMBER: ${{ github.event.issue.number }}
@@ -71,80 +53,19 @@ jobs:
           COMMENT_INSTALLATION_ID: ${{ github.event.installation.id }}
           COMMENT_PERFORMED_VIA_GITHUB_APP: ${{ github.event.comment.performed_via_github_app != null }}
         run: |
-          python - <<'PY'
-          import hashlib, json, os, re
-          body = os.environ['COMMENT_BODY'].replace('\r\n', '\n')
-          normalized = '\n'.join(line.rstrip() for line in body.split('\n')).strip()
-          comment_user_type = os.environ.get('COMMENT_USER_TYPE', '').strip()
-          comment_author = os.environ.get('COMMENT_AUTHOR', '').strip()
-          sender_type = os.environ.get('COMMENT_SENDER_TYPE', '').strip()
-          installation_id = os.environ.get('COMMENT_INSTALLATION_ID', '').strip()
-          via_github_app = os.environ.get('COMMENT_PERFORMED_VIA_GITHUB_APP', '').strip().lower()
-          noop_reason = None
-          if comment_user_type == 'Bot' or comment_author.endswith('[bot]') or comment_author == 'guidelines-bot':
-              noop_reason = 'ignored_non_human_automation'
-          elif installation_id or via_github_app == 'true' or (sender_type and sender_type not in {'User', 'Bot'}):
-              noop_reason = 'ignored_non_human_automation'
-          if noop_reason is not None:
-              payload = {
-                  'schema_version': 1,
-                  'kind': 'observer_noop',
-                  'reason': noop_reason,
-                  'source_workflow_name': 'Reviewer Bot PR Comment Observer',
-                  'source_workflow_file': '.github/workflows/reviewer-bot-pr-comment-observer.yml',
-                  'source_run_id': int(os.environ['GITHUB_RUN_ID']),
-                  'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
-                  'source_event_name': 'issue_comment',
-                  'source_event_action': 'created',
-                  'source_event_key': f"issue_comment:{os.environ['COMMENT_ID']}",
-                  'pr_number': int(os.environ['PR_NUMBER']),
-              }
-          else:
-              command_pattern = re.compile(r'^@guidelines\-bot\s+/[A-Za-z0-9?_\-]+(?:\s+.*)?$')
-              lines = [line for line in normalized.splitlines() if line.strip()]
-              command_lines = [line for line in lines if command_pattern.match(line.strip())]
-              non_command_lines = [line for line in lines if not command_pattern.match(line.strip())]
-              if not normalized:
-                  comment_class = 'empty_or_whitespace'
-              elif command_lines and not non_command_lines:
-                  comment_class = 'command_only'
-              elif command_lines and non_command_lines:
-                  comment_class = 'command_plus_text'
-              else:
-                  comment_class = 'plain_text'
-              digest = hashlib.sha256(normalized.encode('utf-8')).hexdigest()
-              payload = {
-                  'schema_version': 2,
-                  'source_workflow_name': 'Reviewer Bot PR Comment Observer',
-                  'source_workflow_file': '.github/workflows/reviewer-bot-pr-comment-observer.yml',
-                  'source_run_id': int(os.environ['GITHUB_RUN_ID']),
-                  'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
-                  'source_event_name': 'issue_comment',
-                  'source_event_action': 'created',
-                  'source_event_key': f"issue_comment:{os.environ['COMMENT_ID']}",
-                  'pr_number': int(os.environ['PR_NUMBER']),
-                  'comment_id': int(os.environ['COMMENT_ID']),
-                  'comment_class': comment_class,
-                  'has_non_command_text': bool(non_command_lines),
-                  'source_body_digest': digest,
-                  'source_created_at': os.environ['COMMENT_CREATED_AT'],
-                  'actor_login': os.environ['COMMENT_AUTHOR'],
-                  'actor_id': int(os.environ['COMMENT_AUTHOR_ID']),
-                  'actor_class': 'repo_user_principal' if comment_user_type == 'User' else 'unknown_actor',
-                  'source_artifact_name': f"reviewer-bot-comment-context-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}",
-              }
+          uv run --project "$BOT_SRC_ROOT" python - <<'PY'
+          import json
+          import os
+          import scripts.reviewer_bot as reviewer_bot
+
+          payload = reviewer_bot.build_pr_comment_observer_payload(int(os.environ['PR_NUMBER']))
           with open(os.environ['PAYLOAD_PATH'], 'w', encoding='utf-8') as handle:
               json.dump(payload, handle)
           PY
       - name: Upload deferred comment artifact
-        if: env.RUN_PR_COMMENT_OBSERVER == 'true'
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: reviewer-bot-comment-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: ${{ runner.temp }}/deferred-comment.json
           retention-days: 7
           if-no-files-found: ignore
-      - name: Deferred observer skipped
-        if: env.RUN_PR_COMMENT_OBSERVER != 'true'
-        run: |
-          echo 'Deferred PR comment observer skipped for trusted-direct same-repo human comment.'

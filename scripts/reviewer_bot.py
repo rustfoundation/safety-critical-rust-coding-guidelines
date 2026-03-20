@@ -789,6 +789,10 @@ def handle_comment_event(state: dict) -> bool:
     return comment_routing_module.handle_comment_event(_runtime_bot(), state)
 
 
+def build_pr_comment_observer_payload(issue_number: int) -> dict:
+    return comment_routing_module.build_pr_comment_observer_payload(_runtime_bot(), issue_number)
+
+
 def handle_manual_dispatch(state: dict) -> bool:
     return maintenance_module.handle_manual_dispatch(_runtime_bot(), state)
 

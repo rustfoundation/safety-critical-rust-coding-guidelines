@@ -121,7 +121,7 @@ def _fetch_pr_metadata(bot, issue_number: int) -> dict:
     return pull_request
 
 
-def route_issue_comment_trust(bot, issue_number: int) -> str:
+def classify_pr_comment_processing_target(bot, issue_number: int) -> str:
     actor_class = classify_issue_comment_actor()
     if actor_class in {"bot_account", "github_app_or_other_automation"} or _is_self_comment(bot, os.environ.get("COMMENT_AUTHOR", "")):
         return "safe_noop"
@@ -136,21 +136,80 @@ def route_issue_comment_trust(bot, issue_number: int) -> str:
     pr_author = pull_request.get("user", {}).get("login")
     is_dependabot_restricted = pr_author == "dependabot[bot]"
     author_association = os.environ.get("COMMENT_AUTHOR_ASSOCIATION", "").strip()
-    workflow_file = os.environ.get("CURRENT_WORKFLOW_FILE", "").strip()
-    workflow_ref = os.environ.get("GITHUB_REF", "").strip()
-    direct_match = (
-        not is_cross_repo
-        and not is_dependabot_restricted
-        and actor_class == "repo_user_principal"
-        and author_association in bot.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST
-        and workflow_file == ".github/workflows/reviewer-bot-pr-comment-trusted.yml"
-        and workflow_ref == "refs/heads/main"
-    )
+    trusted_principal = actor_class == "repo_user_principal" and author_association in bot.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST
     if is_cross_repo or is_dependabot_restricted:
         return "pr_deferred_reconcile"
-    if direct_match:
+    if trusted_principal:
         return "pr_trusted_direct"
     raise RuntimeError("Ambiguous same-repo PR comment trust posture; failing closed")
+
+
+def route_issue_comment_trust(bot, issue_number: int) -> str:
+    target = classify_pr_comment_processing_target(bot, issue_number)
+    if target != "pr_trusted_direct":
+        return target
+    workflow_file = os.environ.get("CURRENT_WORKFLOW_FILE", "").strip()
+    workflow_ref = os.environ.get("GITHUB_REF", "").strip()
+    if workflow_file == ".github/workflows/reviewer-bot-pr-comment-trusted.yml" and workflow_ref == "refs/heads/main":
+        return "pr_trusted_direct"
+    raise RuntimeError("Ambiguous same-repo PR comment trust posture; failing closed")
+
+
+def build_pr_comment_observer_payload(bot, issue_number: int) -> dict:
+    actor_class = classify_issue_comment_actor()
+    comment_id = int(os.environ["COMMENT_ID"])
+    base_payload = {
+        "source_workflow_name": "Reviewer Bot PR Comment Observer",
+        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+        "source_run_id": int(os.environ["GITHUB_RUN_ID"]),
+        "source_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+        "source_event_name": "issue_comment",
+        "source_event_action": "created",
+        "source_event_key": f"issue_comment:{comment_id}",
+        "pr_number": issue_number,
+    }
+    if actor_class in {"bot_account", "github_app_or_other_automation"} or _is_self_comment(bot, os.environ.get("COMMENT_AUTHOR", "")):
+        return {
+            "schema_version": 1,
+            "kind": "observer_noop",
+            "reason": "ignored_non_human_automation",
+            **base_payload,
+        }
+    processing_target = classify_pr_comment_processing_target(bot, issue_number)
+    if processing_target == "pr_trusted_direct":
+        return {
+            "schema_version": 1,
+            "kind": "observer_noop",
+            "reason": "trusted_direct_same_repo_human_comment",
+            **base_payload,
+        }
+    body = os.environ["COMMENT_BODY"]
+    normalized = _normalize_comment_body(body)
+    command_pattern = re.compile(r"^@guidelines\-bot\s+/[A-Za-z0-9?_\-]+(?:\s+.*)?$")
+    lines = [line for line in normalized.splitlines() if line.strip()]
+    command_lines = [line for line in lines if command_pattern.match(line.strip())]
+    non_command_lines = [line for line in lines if not command_pattern.match(line.strip())]
+    if not normalized:
+        comment_class = "empty_or_whitespace"
+    elif command_lines and not non_command_lines:
+        comment_class = "command_only"
+    elif command_lines and non_command_lines:
+        comment_class = "command_plus_text"
+    else:
+        comment_class = "plain_text"
+    return {
+        "schema_version": 2,
+        **base_payload,
+        "comment_id": comment_id,
+        "comment_class": comment_class,
+        "has_non_command_text": bool(non_command_lines),
+        "source_body_digest": _digest_body(body),
+        "source_created_at": os.environ["COMMENT_CREATED_AT"],
+        "actor_login": os.environ["COMMENT_AUTHOR"],
+        "actor_id": int(os.environ["COMMENT_AUTHOR_ID"]),
+        "actor_class": "repo_user_principal" if actor_class == "repo_user_principal" else "unknown_actor",
+        "source_artifact_name": f"reviewer-bot-comment-context-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}",
+    }
 
 
 def _record_conversation_freshness(bot, state: dict, issue_number: int, comment_author: str, comment_id: int, created_at: str) -> bool:
