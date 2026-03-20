@@ -1,0 +1,3 @@
+Disposable validation artifact for reviewer-bot post-merge plan.
+Scenario: Deferred PR review dismissed path.
+Run: run-20260320T202238Z
