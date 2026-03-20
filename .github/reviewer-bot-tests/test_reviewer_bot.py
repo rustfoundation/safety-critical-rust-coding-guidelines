@@ -1334,7 +1334,6 @@ def test_pr_comment_observer_routes_through_reviewer_bot_payload_builder():
 
 
 def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):
-    monkeypatch.setenv("IS_PULL_REQUEST", "true")
     monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
     monkeypatch.setenv("COMMENT_USER_TYPE", "User")
     monkeypatch.setenv("COMMENT_AUTHOR", "PLeVasseur")
