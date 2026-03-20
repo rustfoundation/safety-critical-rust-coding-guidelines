@@ -17,7 +17,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
    :widths: auto
 
    * - Guideline
-     - Rationale
+     - Category
      - Safety critical Rust rule
      - Comment
    * - **Directives**
@@ -25,67 +25,67 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      -
      -
    * - D.1.1
-     - IDB
+     - Required
      - 
      -
    * - D.1.2
-     - IDB
+     - Advisory
      -
      - intended to apply to experimental and unstable features, forcing full documentation
    * - D.2.1
-     - UB, CQ, DC
+     - Required
      -
      -
    * - D.3.1
-     - CQ
+     - Required
      -
      -
    * - D.4.1
-     - UB, CQ
+     - Required
      -
      - often in the form of panics
    * - D.4.4
-     - DC
+     - Advisory
      -
      - conditional compilation is provided by the cfg attribute
    * - D.4.5
-     - DC
+     - Advisory
      -
      - "ambiguity" is determined by the project
    * - D.4.7
-     - DC
+     - Required
      -
      - prefer Option, Result, etc. over in-band error values
    * - D.4.9
-     - DC, CQ
+     - Advisory
      -
      -
    * - D.4.11
-     - UB, IDB
+     - Required
      -
      -
    * - D.4.12
-     - UB, CQ
+     - Required
      -
      -
    * - D.4.13
-     - UB, DC
+     - Advisory
      -
      - many Rust APIs use the type system to enforce ordering
    * - D.4.14
-     - UB, CQ
+     - Required
      -
      -
    * - D.4.15
-     - UB, IDB, DC
+     - Required
      -
      - Rust implements IEEE-754
    * - D.5.2
-     - UB
+     - Required
      -
      -
    * - D.5.3
-     - UB, DC
+     - Required
      -
      -
    * - **Rules**
@@ -93,183 +93,183 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      -
      -
    * - R.1.3
-     - UB, IDB
+     - Required
      -
      -
    * - R.1.5
-     - UB, IDB, DC
+     - Required
      -
      - this applies to deprecated APIs
    * - R.2.1
-     - DC
+     - Required
      -
      -
    * - R.2.2
-     - DC
+     - Required
      -
      -
    * - R.2.3
-     - DC
+     - Advisory
      -
      -
    * - R.2.5
-     - DC
+     - Advisory
      -
      -
    * - R.2.6
-     - DC
+     - Advisory
      -
      -
    * - R.2.7
-     - DC
+     - Advisory
      -
      -
    * - R.2.8
-     - DC
+     - Advisory
      -
      -
    * - R.3.1
-     - DC
+     - Required
      -
      - nested comments are fully supported
    * - R.5.2
-     - UB, IDB, CQ
+     - Required
      -
      - no character limit, but one can be applied; has name spaces
    * - R.5.3
-     - DC
+     - Required
      - :need:`gui_SJMrWDYZ0dN4`
      - this also applies to macro names
    * - R.5.6
-     - DC
+     - Required
      -
      - the proper module system makes surprise name conflicts much less likely
    * - R.5.8
-     - DC
+     - Required
      -
      - the proper module system makes surprise name conflicts much less likely
    * - R.5.9
-     - DC
+     - Advisory
      -
      -
    * - R.7.1
-     - DC
+     - Required
      -
      - Rust octals have a distinct prefix from decimals
    * - R.7.2
-     - DC
+     - Required
      -
      - this is an error by default but can be enabled. Note that suffixes also make the size explicit
    * - R.8.7
-     - DC
+     - Advisory
      -
      - items should not be declared pub if referenced in only one module
    * - R.8.9
-     - DC
+     - Advisory
      -
      -
    * - R.8.13
-     - DC
+     - Advisory
      -
      - ``mut`` should be avoided unless necessary
    * - R.9.1
-     - UB
+     - Mandatory
      -
      - enforced by rustc but can be bypassed by unsafe
    * - R.9.4
-     - DC
+     - Required
      -
      - enforced by rustc
    * - R.11.3
-     - UB
+     - Required
      -
      -
    * - R.11.4
-     - UB, IDB
+     - Advisory
      - :need:`gui_PM8Vpf7lZ51U`
      -
    * - R.11.11
-     - DC
+     - Advisory
      -
      - enforced by rustc
    * - R.12.1
-     - DC
+     - Advisory
      -
      -
    * - R.13.1
-     - UB
+     - Required
      -
      - order of evaluation is strict in Rust
    * - R.13.5
-     - DC
+     - Required
      -
      -
    * - R.14.3
-     - DC
+     - Required
      -
      -
    * - R.14.4
-     - DC
+     - Required
      -
      - enforced by rustc
    * - R.15.4
-     - DC
+     - Advisory
      -
      -
    * - R.15.5
-     - DC
+     - Advisory
      -
      -
    * - R.15.7
-     - DC
+     - Required
      -
      -
    * - R.17.2
-     - UB, DC
+     - Required
      - :need:`gui_ot2Zt3dd6of1`
      -
    * - R.17.7
-     - DC
+     - Required
      -
      - ``must_use`` can help indicate where this is important, but does not affect applicability
    * - R.17.8
-     - DC
+     - Advisory
      -
      - this cannot be done accidentally without declaring parameters ``mut``
    * - R.17.11
-     - DC
+     - Advisory
      -
      - a non-returning function can be declared to return a value type
    * - R.18.3
-     - UB
+     - Required
      -
      -
    * - R.18.5
-     - DC
+     - Advisory
      -
      -
    * - R.19.2
-     - UB, DC
+     - Advisory
      - :need:`gui_0cuTYG8RVYjg`
      -
    * - R.19.3
-     - UB
+     - Required
      -
      -
    * - R.21.25
-     - UB
+     - Required
      -
      -
    * - R.22.13
-     - UB, DC
+     - Required
      -
      -
    * - R.22.18
-     - UB
+     - Required
      -
      -
    * - R.22.19
-     - UB
+     - Required
      -
      -
 
@@ -284,7 +284,7 @@ In addition to the rules from Table 1, these are the additional guidelines that 
    :widths: auto
 
    * - Guideline
-     - Rationale
+     - Category
      - Safety critical Rust rule
      - Comment
    * - **Directives**
@@ -292,15 +292,15 @@ In addition to the rules from Table 1, these are the additional guidelines that 
      -
      -
    * - D.4.2
-     - IDB, CQ
+     - Advisory
      -
      -
    * - D.4.3
-     - DC, CQ
+     - Required
      -
      -
    * - D.5.1
-     - UB
+     - Required
      -
      - not all safe Rust types are race-free
    * - **Rules**
@@ -308,263 +308,263 @@ In addition to the rules from Table 1, these are the additional guidelines that 
      -
      -
    * - R.1.1
-     - UB, IDB
+     - Required
      -
      -
    * - R.5.1
-     - UB, IDB, DC
+     - Required
      -
      - no character limit, except in extern "C", but one can be set by project
    * - R.5.5
-     - UB, IDB, DC
+     - Required
      -
      - macros and functions use different syntax
    * - R.5.10
-     - UB, DC
+     - Required
      -
      - only possible in some cases. Previously Rule 21.2
    * - R.8.3
-     - UB, DC
+     - Required
      -
      - an extern declaration shall have a type compatible with the C declaration
    * - R.8.5
-     - DC
+     - Required
      -
      - may affect extern "C" declarations
    * - R.8.6
-     - UB
+     - Required
      -
      - may affect extern "C" declarations
    * - R.8.15
-     - UB
+     - Required
      -
      - may affect extern "C" declarations
    * - R.8.17
-     - DC
+     - Advisory
      -
      - alignment applies to types, not objects
    * - R.9.7
-     - UB
+     - Mandatory
      -
      -
    * - R.10.5
-     - DC
+     - Advisory
      - :need:`gui_ADHABsmK9FXz`
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.10.8
-     - DC
+     - Required
      - :need:`gui_HDnAZ7EZ4z6G`
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.11.1
-     - UB, IDB
+     - Required
      -
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.11.2
-     - UB
+     - Required
      -
      -
    * - R.11.5
-     - UB
+     - Advisory
      -
      -
    * - R.11.6
-     - UB, IDB
+     - Required
      - :need:`gui_PM8Vpf7lZ51U`
      -
    * - R.11.8
-     - UB
+     - Required
      -
      -
    * - R.12.2
-     - UB, DC
+     - Required
      - :need:`gui_LvmzGKdsAgI5`, :need:`gui_RHvQj8BHlz9b`
      -
    * - R.12.4
-     - DC
+     - Advisory
      -
      - this is either well-defined or will not occur
    * - R.14.1
-     - DC
+     - Required
      -
      - applies to while loops only
    * - R.17.9
-     - UB
+     - Mandatory
      -
      - this is expressed with the ``!`` (Never) type, and enforced by rustc
    * - R.18.1
-     - UB
+     - Required
      -
      - by unsafe API
    * - R.18.2
-     - UB
+     - Required
      -
      - by unsafe API
    * - R.18.4
-     - DC
+     - Advisory
      -
      - applies to use of the unsafe API
    * - R.18.6
-     - UB
+     - Required
      -
      -
    * - R.19.1
-     - UB
+     - Mandatory
      -
      -
    * - R.20.4
-     - UB
+     - Required
      -
      - possible with raw identifiers but the compiler prevents visual conflicts
    * - R.20.7
-     - DC
+     - Required
      -
      - possible to express with procedural macros only, not ``macro_rules``
    * - R.21.3
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.4
-     - UB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.5
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.6
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.7
-     - UB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.8
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.9
-     - UB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.10
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.12
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.13
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.21.14
-     - DC
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.15
-     - DC
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.16
-     - UB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.17
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.21.18
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.21.19
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.21.20
-     - IDB, DC
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.21.21
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.24
-     - CQ
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.21.26
-     - UB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.1
-     - UB, CQ
+     - Required
      -
      - applies to resources acquired through FFI only
    * - R.22.2
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.22.3
-     - UB, IDB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.4
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.22.5
-     - IDB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.22.6
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.22.7
-     - DC
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.8
-     - DC
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.9
-     - DC
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.10
-     - DC
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.11
-     - UB
+     - Required
      -
      -
    * - R.22.12
-     - UB
+     - Mandatory
      -
      - only accessible through unsafe extern "C"
    * - R.22.14
-     - UB
+     - Mandatory
      -
      - applies to creating synchronization objects before threads that use them
    * - R.22.15
-     - UB
+     - Required
      -
      - applies to releasing synchronization objects after threads that use them
    * - R.22.16
-     - UB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.17
-     - UB
+     - Required
      -
      - only accessible through unsafe extern "C"
    * - R.22.20
-     - UB
+     - Mandatory
      -
      -
 
@@ -577,324 +577,322 @@ Table 3 – Guideline rules that are not applicable to Rust
    :widths: auto
 
    * - Guideline
-     - Rationale
+     - Category
      - Comment
    * - **Directives**
      -
      -
    * - D.4.6
-     - DC
+     - Advisory
      - all primitive types already fulfil this
    * - D.4.8
-     - DC
+     - Advisory
      -
    * - D.4.10
-     - UB, DC
+     - Required
      -
    * - **Rules**
      -
      -
    * - R.1.4
-     - UB, DC
+     - Required
      - this is specific to C versioning
    * - R.2.4
-     - DC
+     - Advisory
      - no separate tag name space in Rust
    * - R.3.2
-     - DC
+     - Required
      -
    * - R.4.1
-     - DC, IDB
+     - Required
      -
    * - R.4.2
-     - DC
+     - Advisory
      -
    * - R.5.4
-     - UB, IDB, DC
+     - Required
      -
    * - R.5.7
-     - UB, DC
+     - Required
      - no separate tag name space in Rust
    * - R.6.1
-     - UB, IDB
+     - Required
      - only provided as a library feature
    * - R.6.2
-     - DC
+     - Required
      -
    * - R.6.3
-     - IDB
+     - Required
      -
    * - R.7.3
-     - DC
+     - Required
      -
    * - R.7.4
-     - UB
+     - Required
      -
    * - R.7.5
-     - UB
+     - Mandatory
      -
    * - R.7.6
-     - DC
+     - Required
      -
    * - R.8.1
-     - DC
+     - Required
      -
    * - R.8.2
-     - UB, DC
+     - Required
      -
    * - R.8.4
-     - UB
+     - Required
      -
    * - R.8.8
-     - DC
+     - Required
      -
    * - R.8.10
-     - UB, DC
+     - Required
      -
    * - R.8.11
-     - DC
+     - Advisory
      -
    * - R.8.12
-     - DC
+     - Required
      -
    * - R.8.14
-     - UB
+     - Required
      -
    * - R.8.16
-     - DC
+     - Advisory
      - cannot be explicitly specified. Only ZSTs have this alignment
    * - R.8.18
-     - UB, DC
+     - Required
      -
    * - R.8.19
-     - UB, DC
+     - Advisory
      -
    * - R.9.2
-     - UB, CQ, DC
+     - Required
      -
    * - R.9.3
-     - UB
+     - Required
      -
    * - R.9.5
-     - IDB, DC
+     - Required
      -
    * - R.9.6
-     - DC
+     - Required
      -
    * - R.10.1
-     - UB, IDB, DC
+     - Required
      -
    * - R.10.2
-     - DC
+     - Required
      -
    * - R.10.3
-     - UB, IDB
+     - Required
      -
    * - R.10.4
-     - IDB
+     - Required
      -
    * - R.10.6
-     - DC
+     - Required
      -
    * - R.10.7
-     - DC
+     - Required
      -
    * - R.11.9
-     - DC
+     - Required
      - Rust does not have a null pointer constant (specific concept to C)
    * - R.11.10
-     - UB
+     - Required
      -
    * - R.12.3
-     - DC
+     - Advisory
      -
    * - R.12.5
-     - DC
+     - Mandatory
      -
    * - R.12.6
-     - UB
+     - Required
      -
    * - R.13.2
-     - UB
+     - Required
      - order of evaluation is strict in Rust
    * - R.13.3
-     - UB, DC
+     - Advisory
      -
    * - R.13.4
-     - UB, DC
+     - Advisory
      - result has unit type and order of evaluation is strict in Rust
    * - R.13.6
-     - UB, DC
+     - Required
      - this is not an expression operator in Rust
    * - R.14.2
-     - DC
+     - Required
      -
    * - R.15.1
-     - DC
+     - Advisory
      -
    * - R.15.2
-     - DC
+     - Required
      -
    * - R.15.3
-     - DC
+     - Required
      -
    * - R.15.6
-     - DC
+     - Required
      -
    * - R.16.1
-     - DC
+     - Required
      -
    * - R.16.2
-     - DC
+     - Required
      -
    * - R.16.3
-     - DC
+     - Required
      -
    * - R.16.4
-     - DC
+     - Required
      - a corresponding match expression must be complete
    * - R.16.5
-     - DC
+     - Required
      - irrefutable pattern causes a subsequent refutable one to be unreachable
    * - R.16.6
-     - DC
+     - Required
      -
    * - R.16.7
-     - DC
+     - Required
      -
    * - R.17.1
-     - UB
+     - Required
      -
    * - R.17.3
-     - UB
+     - Mandatory
      -
    * - R.17.4
-     - UB
+     - Mandatory
      - the return keyword is not needed to return a value in Rust, only to exit
    * - R.17.5
-     - UB, DC
+     - Required
      -
    * - R.17.10
-     - DC
+     - Required
      -
    * - R.17.12
-     - DC
+     - Advisory
      -
    * - R.17.13
-     - UB
+     - Required
      -
    * - R.18.7
-     - UB, DC
+     - Required
      -
    * - R.18.8
-     - UB, DC
+     - Required
      -
    * - R.18.9
-     - UB
+     - Required
      -
    * - R.18.10
-     - UB
+     - Mandatory
      -
    * - R.20.1
-     - UB
+     - Advisory
      - rules specific to the C preprocessor do not apply to Rust
    * - R.20.2
-     - UB
+     - Required
      -
    * - R.20.3
-     - UB
+     - Required
      -
    * - R.20.5
-     - DC
+     - Advisory
      -
    * - R.20.6
-     - UB
+     - Required
      -
    * - R.20.8
-     - DC
+     - Required
      -
    * - R.20.9
-     - DC
+     - Required
      -
    * - R.20.10
-     - UB
+     - Advisory
      -
    * - R.20.11
-     - UB
+     - Required
      -
    * - R.20.12
-     - DC
+     - Required
      -
    * - R.20.13
-     - DC
+     - Required
      -
    * - R.20.14
-     - DC
+     - Required
      -
    * - R.20.15
-     - UB
+     - Required
      -
    * - R.21.11
-     - UB
+     - Advisory
      - no external interface
    * - R.21.22
-     - UB
+     - Mandatory
      - no external interface
    * - R.21.23
-     - DC
+     - Required
      - no external interface
    * - R.23.1
-     - DC
+     - Advisory
      -
    * - R.23.2
-     - DC
+     - Required
      -
    * - R.23.3
-     - DC
+     - Advisory
      -
    * - R.23.4
-     - DC
+     - Required
      -
    * - R.23.5
-     - DC
+     - Advisory
      -
    * - R.23.6
-     - DC
+     - Required
      -
    * - R.23.7
-     - DC
+     - Advisory
      -
    * - R.23.8
-     - DC
+     - Required
      -
 
 
 Glossary
-========
+--------
 
-Rationale
----------
+Category
+........
 
-The rationale for each MISRA C guideline is classified with one, or more, of the following:
+Each MISRA C guideline is assigned a category, as follows:
 
 .. list-table::
    :header-rows: 1
    :widths: auto
 
-   * - Status
+   * - Category
      - Interpretation
-   * - UB
-     - The MISRA C guideline applies to C Undefined or Unspecified Behaviour
-   * - IDB
-     - The MISRA C guideline applies to C Implementation-defined Behaviour
-   * - CQ
-     - The MISRA C guideline applies to Code Quality considerations
-   * - DC
-     - The MISRA C guideline applies to Developer Confusion, where there is common misunderstanding of a C feature
+   * - Mandatory
+     - Code shall always comply with this guideline. Formal deviation is not permitted
+   * - Required
+     - Code shall comply with this guideline, with a formal deviation required where this is not the case
+   * - Advisory
+     - These are recommendations which should be followed as far as is reasonably practical. Formal deviation is not necessary for advisory guidelines but, if the formal deviation process is not followed, alternative arrangements should be made for documenting non-compliances
 
 
 Footnotes
----------
+.........
 
 .. rubric:: Footnotes
 
