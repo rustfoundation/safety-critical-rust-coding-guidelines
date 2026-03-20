@@ -125,8 +125,6 @@ def classify_pr_comment_processing_target(bot, issue_number: int) -> str:
     actor_class = classify_issue_comment_actor()
     if actor_class in {"bot_account", "github_app_or_other_automation"} or _is_self_comment(bot, os.environ.get("COMMENT_AUTHOR", "")):
         return "safe_noop"
-    if not _is_pr_event():
-        return "issue_direct"
     pull_request = _fetch_pr_metadata(bot, issue_number)
     head_repo = pull_request.get("head", {}).get("repo", {})
     head_full_name = head_repo.get("full_name") if isinstance(head_repo, dict) else None
@@ -145,6 +143,8 @@ def classify_pr_comment_processing_target(bot, issue_number: int) -> str:
 
 
 def route_issue_comment_trust(bot, issue_number: int) -> str:
+    if not _is_pr_event():
+        return "issue_direct"
     target = classify_pr_comment_processing_target(bot, issue_number)
     if target != "pr_trusted_direct":
         return target
