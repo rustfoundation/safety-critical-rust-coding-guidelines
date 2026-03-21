@@ -79,6 +79,7 @@ needs_layouts = {
             "non_compliant_example",
             "compliant_example",
             "bibliography",
+            "misra",
         ]
     }
 }
@@ -92,6 +93,7 @@ needs_render_contexts = {
             "non_compliant_example",
             "non_compliant_example",
             "bibliography",
+            "misra",
         ],
     }
 }
@@ -198,6 +200,7 @@ needs_extra_options = [
     "decidability",
     "scope",
     "release",
+    "misra",
 ]
 
 
