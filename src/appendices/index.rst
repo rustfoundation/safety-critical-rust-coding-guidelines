@@ -7,7 +7,7 @@ Appendices
 ==========
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    licenses
-   standards-matrices
+   standards-matrices/index
