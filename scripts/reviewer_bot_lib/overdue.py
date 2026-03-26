@@ -22,9 +22,23 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
         if not current_reviewer:
             continue
 
-        last_activity = review_data.get("last_reviewer_activity")
-        if not last_activity:
-            last_activity = review_data.get("assigned_at")
+        issue_number = int(issue_key)
+        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+        if isinstance(issue_snapshot, dict) and isinstance(issue_snapshot.get("pull_request"), dict):
+            response_state = bot.reviews_module.compute_reviewer_response_state(
+                bot,
+                issue_number,
+                review_data,
+                issue_snapshot=issue_snapshot,
+            )
+            if response_state.get("state") != "awaiting_reviewer_response":
+                continue
+            last_activity = response_state.get("anchor_timestamp")
+        else:
+            last_activity = review_data.get("last_reviewer_activity")
+            if not last_activity:
+                last_activity = review_data.get("assigned_at")
+
         if not last_activity:
             continue
 
@@ -52,7 +66,7 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
                 if days_since_warning >= bot.TRANSITION_PERIOD_DAYS:
                     overdue.append(
                         {
-                            "issue_number": int(issue_key),
+                            "issue_number": issue_number,
                             "reviewer": current_reviewer,
                             "days_overdue": days_since_activity,
                             "days_since_warning": days_since_warning,
@@ -65,7 +79,7 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
         else:
             overdue.append(
                 {
-                    "issue_number": int(issue_key),
+                    "issue_number": issue_number,
                     "reviewer": current_reviewer,
                     "days_overdue": days_since_activity - bot.REVIEW_DEADLINE_DAYS,
                     "days_since_warning": 0,

@@ -624,6 +624,163 @@ def _compare_cross_channel_conversation(contributor: dict | None, reviewer: dict
     return -1
 
 
+def _initial_reviewer_anchor(review_data: dict) -> str | None:
+    for field in ("active_cycle_started_at", "cycle_started_at", "assigned_at"):
+        value = review_data.get(field)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _contributor_revision_handoff_record(review_data: dict, current_head: str | None, reviewer_review: dict | None) -> dict | None:
+    contributor_revision = review_data.get("contributor_revision", {}).get("accepted")
+    if not isinstance(contributor_revision, dict):
+        return None
+    revision_head = contributor_revision.get("reviewed_head_sha")
+    if not isinstance(revision_head, str) or not isinstance(current_head, str):
+        return None
+    if revision_head != current_head:
+        return None
+    reviewer_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    if isinstance(reviewer_head, str) and reviewer_head == current_head:
+        return None
+    return contributor_revision
+
+
+def compute_reviewer_response_state(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    issue_snapshot: dict | None = None,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict[str, object]:
+    if issue_snapshot is None:
+        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+    if not isinstance(issue_snapshot, dict):
+        return {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
+    is_pr = isinstance(issue_snapshot.get("pull_request"), dict)
+    current_reviewer = review_data.get("current_reviewer")
+    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
+        return {"state": "untracked", "reason": "no_current_reviewer"}
+
+    reviewer_comment = review_data.get("reviewer_comment", {}).get("accepted")
+    reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
+    contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
+
+    if not reviewer_comment and not reviewer_review and is_pr:
+        live_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
+        if live_review is not None:
+            reviewer_review = build_reviewer_review_record_from_live_review(live_review, actor=current_reviewer)
+
+    if not reviewer_comment and not reviewer_review:
+        return {
+            "state": "awaiting_reviewer_response",
+            "reason": "no_reviewer_activity",
+            "anchor_timestamp": _initial_reviewer_anchor(review_data),
+            "reviewer_comment": reviewer_comment,
+            "reviewer_review": reviewer_review,
+            "contributor_comment": contributor_comment,
+            "contributor_handoff": None,
+        }
+
+    latest_reviewer_response = reviewer_comment
+    if _compare_records(reviewer_review, latest_reviewer_response) > 0:
+        latest_reviewer_response = reviewer_review
+
+    if not is_pr:
+        completion = review_data.get("current_cycle_completion")
+        if not isinstance(completion, dict) or not completion.get("completed"):
+            if review_data.get("review_completed_at"):
+                return {"state": "done", "reason": None}
+            return {
+                "state": "awaiting_contributor_response",
+                "reason": "completion_missing",
+                "anchor_timestamp": latest_reviewer_response.get("timestamp") if isinstance(latest_reviewer_response, dict) else None,
+            }
+        return {"state": "done", "reason": None}
+
+    if pull_request is None:
+        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
+    if not isinstance(pull_request, dict):
+        return {"state": "projection_failed", "reason": "pull_request_unavailable"}
+    head = pull_request.get("head")
+    current_head = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(current_head, str) or not current_head.strip():
+        return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
+    review_data["active_head_sha"] = current_head
+
+    contributor_handoff = contributor_comment
+    contributor_revision = _contributor_revision_handoff_record(review_data, current_head, reviewer_review if isinstance(reviewer_review, dict) else None)
+    if _compare_records(contributor_revision, contributor_handoff) > 0:
+        contributor_handoff = contributor_revision
+
+    latest_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    if not isinstance(latest_review_head, str) or latest_review_head != current_head:
+        return {
+            "state": "awaiting_reviewer_response",
+            "reason": "review_head_stale",
+            "anchor_timestamp": contributor_handoff.get("timestamp") if isinstance(contributor_handoff, dict) else _initial_reviewer_anchor(review_data),
+            "current_head_sha": current_head,
+            "reviewer_comment": reviewer_comment,
+            "reviewer_review": reviewer_review,
+            "contributor_comment": contributor_comment,
+            "contributor_handoff": contributor_handoff,
+        }
+
+    if _compare_cross_channel_conversation(contributor_handoff, latest_reviewer_response) > 0:
+        reason = "contributor_comment_newer"
+        if isinstance(contributor_handoff, dict) and str(contributor_handoff.get("semantic_key", "")).startswith("pull_request_"):
+            reason = "contributor_revision_newer"
+        return {
+            "state": "awaiting_reviewer_response",
+            "reason": reason,
+            "anchor_timestamp": contributor_handoff.get("timestamp") if isinstance(contributor_handoff, dict) else None,
+            "current_head_sha": current_head,
+            "reviewer_comment": reviewer_comment,
+            "reviewer_review": reviewer_review,
+            "contributor_comment": contributor_comment,
+            "contributor_handoff": contributor_handoff,
+        }
+
+    completion, write_approval = rebuild_pr_approval_state(bot, issue_number, review_data, pull_request=pull_request, reviews=reviews)
+    if completion is None or write_approval is None:
+        return {"state": "projection_failed", "reason": "live_review_state_unknown"}
+    if not completion.get("completed"):
+        return {
+            "state": "awaiting_contributor_response",
+            "reason": "completion_missing",
+            "anchor_timestamp": latest_reviewer_response.get("timestamp") if isinstance(latest_reviewer_response, dict) else None,
+            "current_head_sha": current_head,
+            "reviewer_comment": reviewer_comment,
+            "reviewer_review": reviewer_review,
+            "contributor_comment": contributor_comment,
+            "contributor_handoff": contributor_handoff,
+        }
+    if not write_approval.get("has_write_approval"):
+        return {
+            "state": "awaiting_write_approval",
+            "reason": "write_approval_missing",
+            "anchor_timestamp": latest_reviewer_response.get("timestamp") if isinstance(latest_reviewer_response, dict) else None,
+            "current_head_sha": current_head,
+            "reviewer_comment": reviewer_comment,
+            "reviewer_review": reviewer_review,
+            "contributor_comment": contributor_comment,
+            "contributor_handoff": contributor_handoff,
+        }
+    return {
+        "state": "done",
+        "reason": "write_approval_present",
+        "anchor_timestamp": latest_reviewer_response.get("timestamp") if isinstance(latest_reviewer_response, dict) else None,
+        "current_head_sha": current_head,
+        "reviewer_comment": reviewer_comment,
+        "reviewer_review": reviewer_review,
+        "contributor_comment": contributor_comment,
+        "contributor_handoff": contributor_handoff,
+    }
+
+
 def project_status_labels_for_item(
     bot,
     issue_number: int,
@@ -635,7 +792,6 @@ def project_status_labels_for_item(
         issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
     if not isinstance(issue_snapshot, dict):
         return None, {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
-    is_pr = isinstance(issue_snapshot.get("pull_request"), dict)
     if str(issue_snapshot.get("state", "")).lower() == "closed":
         return set(), {"state": "closed", "reason": None}
 
@@ -646,55 +802,18 @@ def project_status_labels_for_item(
     if not isinstance(current_reviewer, str) or not current_reviewer.strip():
         return set(), {"state": "untracked", "reason": "no_current_reviewer"}
 
-    reviewer_comment = review_data.get("reviewer_comment", {}).get("accepted")
-    reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
-    contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
-
-    if not reviewer_comment and not reviewer_review and is_pr:
-        live_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data)
-        if live_review is not None:
-            reviewer_review = build_reviewer_review_record_from_live_review(live_review, actor=current_reviewer)
-
-    if not reviewer_comment and not reviewer_review:
-        return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": "awaiting_reviewer_response", "reason": "no_reviewer_activity"})
-
-    if is_pr:
-        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
-        if not isinstance(pull_request, dict):
-            return None, {"state": "projection_failed", "reason": "pull_request_unavailable"}
-        head = pull_request.get("head")
-        current_head = head.get("sha") if isinstance(head, dict) else None
-        if not isinstance(current_head, str) or not current_head.strip():
-            return None, {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
-        review_data["active_head_sha"] = current_head
-        latest_review_head = None
-        if isinstance(reviewer_review, dict):
-            latest_review_head = reviewer_review.get("reviewed_head_sha")
-        if not isinstance(latest_review_head, str) or latest_review_head != current_head:
-            return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": "awaiting_reviewer_response", "reason": "review_head_stale"})
-
-    latest_reviewer_response = reviewer_comment
-    if _compare_records(reviewer_review, latest_reviewer_response) > 0:
-        latest_reviewer_response = reviewer_review
-    if _compare_cross_channel_conversation(contributor_comment, latest_reviewer_response) > 0:
-        return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": "awaiting_reviewer_response", "reason": "contributor_comment_newer"})
-
-    if is_pr:
-        completion, write_approval = rebuild_pr_approval_state(bot, issue_number, review_data)
-        if completion is None or write_approval is None:
-            return None, {"state": "projection_failed", "reason": "live_review_state_unknown"}
-        if not completion.get("completed"):
-            return ({STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}, {"state": "awaiting_contributor_response", "reason": "completion_missing"})
-        if not write_approval.get("has_write_approval"):
-            return ({STATUS_AWAITING_WRITE_APPROVAL_LABEL}, {"state": "awaiting_write_approval", "reason": "write_approval_missing"})
-        return set(), {"state": "done", "reason": "write_approval_present"}
-
-    completion = review_data.get("current_cycle_completion")
-    if not isinstance(completion, dict) or not completion.get("completed"):
-        if review_data.get("review_completed_at"):
-            return set(), {"state": "done", "reason": None}
-        return ({STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}, {"state": "awaiting_contributor_response", "reason": "completion_missing"})
-    return set(), {"state": "done", "reason": None}
+    response_state = compute_reviewer_response_state(bot, issue_number, review_data, issue_snapshot=issue_snapshot)
+    state_name = response_state.get("state")
+    reason = response_state.get("reason")
+    if state_name == "projection_failed":
+        return None, {"state": str(state_name), "reason": str(reason)}
+    if state_name == "awaiting_reviewer_response":
+        return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": str(state_name), "reason": str(reason)})
+    if state_name == "awaiting_contributor_response":
+        return ({STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}, {"state": str(state_name), "reason": str(reason)})
+    if state_name == "awaiting_write_approval":
+        return ({STATUS_AWAITING_WRITE_APPROVAL_LABEL}, {"state": str(state_name), "reason": str(reason)})
+    return set(), {"state": str(state_name), "reason": None if reason is None else str(reason)}
 
 
 def sync_status_labels(bot, issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
