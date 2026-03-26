@@ -60,11 +60,16 @@ def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action
             return bot.EVENT_INTENT_NON_MUTATING_DEFER
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
+    if event_name == "pull_request_review_comment":
+        if event_action == "created":
+            return bot.EVENT_INTENT_NON_MUTATING_DEFER
+        return bot.EVENT_INTENT_NON_MUTATING_READONLY
+
     if event_name == "workflow_run":
         if event_action != "completed":
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
         workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
-        if workflow_run_event in {"pull_request_review", "issue_comment"}:
+        if workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
             return bot.EVENT_INTENT_MUTATING
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
@@ -168,7 +173,7 @@ def main(bot: ReviewerBotContext):
 
         elif event_name == "workflow_run":
             if event_action == "completed":
-                if os.environ.get("WORKFLOW_RUN_EVENT", "").strip() in {"pull_request_review", "issue_comment"}:
+                if os.environ.get("WORKFLOW_RUN_EVENT", "").strip() in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
                     state_changed = bot.handle_workflow_run_event(state)
                 else:
                     print(

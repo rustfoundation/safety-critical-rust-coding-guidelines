@@ -90,6 +90,77 @@ def get_latest_valid_current_reviewer_review_for_cycle(
     return latest_review
 
 
+def get_valid_current_reviewer_reviews_for_cycle(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    reviews: list[dict] | None = None,
+) -> list[dict]:
+    current_reviewer = review_data.get("current_reviewer")
+    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
+        return []
+    boundary = get_current_cycle_boundary(bot, review_data)
+    if boundary is None:
+        return []
+    if reviews is None:
+        reviews = bot.get_pull_request_reviews(issue_number)
+    if reviews is None:
+        return []
+    valid_reviews: list[dict] = []
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or author.lower() != current_reviewer.lower():
+            continue
+        state = str(review.get("state", "")).upper()
+        if state not in {"APPROVED", "COMMENTED", "CHANGES_REQUESTED"}:
+            continue
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None or submitted_at < boundary:
+            continue
+        commit_id = review.get("commit_id")
+        if not isinstance(commit_id, str) or not commit_id.strip():
+            continue
+        valid_reviews.append(review)
+    return valid_reviews
+
+
+def _review_sort_key(review: dict) -> tuple[datetime, str]:
+    return (
+        parse_github_timestamp(review.get("submitted_at")) or datetime.min.replace(tzinfo=timezone.utc),
+        str(review.get("id", "")),
+    )
+
+
+def _review_matches_head(review: dict, current_head: str | None) -> bool:
+    commit_id = review.get("commit_id") if isinstance(review, dict) else None
+    return isinstance(commit_id, str) and isinstance(current_head, str) and commit_id.strip() == current_head.strip()
+
+
+def get_preferred_current_reviewer_review_for_cycle(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict | None:
+    valid_reviews = get_valid_current_reviewer_reviews_for_cycle(bot, issue_number, review_data, reviews=reviews)
+    if not valid_reviews:
+        return None
+    if len(valid_reviews) == 1:
+        return valid_reviews[0]
+    if pull_request is None:
+        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
+    head = pull_request.get("head") if isinstance(pull_request, dict) else None
+    current_head = head.get("sha") if isinstance(head, dict) else None
+    current_head_reviews = [review for review in valid_reviews if _review_matches_head(review, current_head)]
+    candidates = current_head_reviews or valid_reviews
+    return max(candidates, key=_review_sort_key, default=None)
+
+
 def build_reviewer_review_record_from_live_review(review: dict, *, actor: str | None = None) -> dict | None:
     if not isinstance(review, dict):
         return None
@@ -127,17 +198,49 @@ def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, 
     )
 
 
-def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
-    reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
-    if isinstance(reviewer_review, dict):
-        return False
-    live_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
-    if live_review is None:
-        return False
-    submitted_at = live_review.get("submitted_at")
-    changed = accept_reviewer_review_from_live_review(review_data, live_review, actor=review_data.get("current_reviewer"))
+def refresh_reviewer_review_from_live_preferred_review(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+    actor: str | None = None,
+) -> tuple[bool, dict | None]:
+    preferred_review = get_preferred_current_reviewer_review_for_cycle(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if preferred_review is None:
+        return False, None
+    record = build_reviewer_review_record_from_live_review(preferred_review, actor=actor or review_data.get("current_reviewer"))
+    if record is None:
+        return False, None
+    channel = _ensure_channel_map(review_data, "reviewer_review")
+    changed = False
+    if record["semantic_key"] not in channel["seen_keys"]:
+        channel["seen_keys"].append(record["semantic_key"])
+        changed = True
+    if channel.get("accepted") != record:
+        channel["accepted"] = record
+        changed = True
+    submitted_at = preferred_review.get("submitted_at")
     if isinstance(submitted_at, str):
         record_reviewer_activity(review_data, submitted_at)
+    return changed, preferred_review
+
+
+def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
+    changed, _ = refresh_reviewer_review_from_live_preferred_review(
+        bot,
+        issue_number,
+        review_data,
+        reviews=reviews,
+        actor=review_data.get("current_reviewer"),
+    )
     return changed
 
 
@@ -669,27 +772,20 @@ def compute_reviewer_response_state(
     reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
     contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
 
-    if not reviewer_comment and not reviewer_review and is_pr:
-        live_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
-        if live_review is not None:
-            reviewer_review = build_reviewer_review_record_from_live_review(live_review, actor=current_reviewer)
-
-    if not reviewer_comment and not reviewer_review:
-        return {
-            "state": "awaiting_reviewer_response",
-            "reason": "no_reviewer_activity",
-            "anchor_timestamp": _initial_reviewer_anchor(review_data),
-            "reviewer_comment": reviewer_comment,
-            "reviewer_review": reviewer_review,
-            "contributor_comment": contributor_comment,
-            "contributor_handoff": None,
-        }
-
-    latest_reviewer_response = reviewer_comment
-    if _compare_records(reviewer_review, latest_reviewer_response) > 0:
-        latest_reviewer_response = reviewer_review
-
     if not is_pr:
+        if not reviewer_comment and not reviewer_review:
+            return {
+                "state": "awaiting_reviewer_response",
+                "reason": "no_reviewer_activity",
+                "anchor_timestamp": _initial_reviewer_anchor(review_data),
+                "reviewer_comment": reviewer_comment,
+                "reviewer_review": reviewer_review,
+                "contributor_comment": contributor_comment,
+                "contributor_handoff": None,
+            }
+        latest_reviewer_response = reviewer_comment
+        if _compare_records(reviewer_review, latest_reviewer_response) > 0:
+            latest_reviewer_response = reviewer_review
         completion = review_data.get("current_cycle_completion")
         if not isinstance(completion, dict) or not completion.get("completed"):
             if review_data.get("review_completed_at"):
@@ -701,6 +797,27 @@ def compute_reviewer_response_state(
             }
         return {"state": "done", "reason": None}
 
+    if not reviewer_comment and not reviewer_review:
+        preferred_live_review = get_preferred_current_reviewer_review_for_cycle(
+            bot,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
+        if preferred_live_review is not None:
+            reviewer_review = build_reviewer_review_record_from_live_review(preferred_live_review, actor=current_reviewer)
+        else:
+            return {
+                "state": "awaiting_reviewer_response",
+                "reason": "no_reviewer_activity",
+                "anchor_timestamp": _initial_reviewer_anchor(review_data),
+                "reviewer_comment": reviewer_comment,
+                "reviewer_review": reviewer_review,
+                "contributor_comment": contributor_comment,
+                "contributor_handoff": None,
+            }
+
     if pull_request is None:
         pull_request = bot.github_api("GET", f"pulls/{issue_number}")
     if not isinstance(pull_request, dict):
@@ -710,6 +827,20 @@ def compute_reviewer_response_state(
     if not isinstance(current_head, str) or not current_head.strip():
         return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
     review_data["active_head_sha"] = current_head
+
+    preferred_live_review = get_preferred_current_reviewer_review_for_cycle(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if preferred_live_review is not None:
+        reviewer_review = build_reviewer_review_record_from_live_review(preferred_live_review, actor=current_reviewer)
+
+    latest_reviewer_response = reviewer_comment
+    if _compare_records(reviewer_review, latest_reviewer_response) > 0:
+        latest_reviewer_response = reviewer_review
 
     contributor_handoff = contributor_comment
     contributor_revision = _contributor_revision_handoff_record(review_data, current_head, reviewer_review if isinstance(reviewer_review, dict) else None)

@@ -6,6 +6,7 @@ on:
       - Reviewer Bot PR Comment Observer
       - Reviewer Bot PR Review Submitted Observer
       - Reviewer Bot PR Review Dismissed Observer
+      - Reviewer Bot PR Review Comment Observer
     types: [completed]
 
 permissions:

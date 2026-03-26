@@ -78,6 +78,11 @@ def test_classify_event_intent_same_repo_dismissed_review_is_non_mutating_defer(
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
 
 
+def test_classify_event_intent_review_comment_is_non_mutating_defer(monkeypatch):
+    intent = reviewer_bot.classify_event_intent("pull_request_review_comment", "created")
+    assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
+
+
 def test_classify_event_intent_workflow_run_dismissed_review_is_mutating(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
     monkeypatch.setenv("WORKFLOW_RUN_EVENT_ACTION", "dismissed")
@@ -130,6 +135,37 @@ def test_main_workflow_run_reconcile_acquires_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
     monkeypatch.setenv("EVENT_ACTION", "completed")
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
+
+    acquire_called = {"value": False}
+
+    def fake_acquire():
+        acquire_called["value"] = True
+        return reviewer_bot.LeaseContext(
+            lock_token="token",
+            lock_owner_run_id="run",
+            lock_owner_workflow="workflow",
+            lock_owner_job="job",
+            state_issue_url="https://example.com/issues/314",
+            lock_ref="refs/heads/reviewer-bot-state-lock",
+            lock_expires_at="2999-01-01T00:00:00+00:00",
+        )
+
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", fake_acquire)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda state: (state, []))
+    monkeypatch.setattr(reviewer_bot, "handle_workflow_run_event", lambda state: False)
+
+    reviewer_bot.main()
+
+    assert acquire_called["value"] is True
+
+
+def test_main_workflow_run_review_comment_reconcile_acquires_lock(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "workflow_run")
+    monkeypatch.setenv("EVENT_ACTION", "completed")
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review_comment")
 
     acquire_called = {"value": False}
 
