@@ -48,6 +48,99 @@ def get_latest_review_by_reviewer(bot, reviews: list[dict], reviewer: str) -> di
     return latest_review
 
 
+def get_latest_valid_current_reviewer_review_for_cycle(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    reviews: list[dict] | None = None,
+) -> dict | None:
+    current_reviewer = review_data.get("current_reviewer")
+    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
+        return None
+    boundary = get_current_cycle_boundary(bot, review_data)
+    if boundary is None:
+        return None
+    if reviews is None:
+        reviews = bot.get_pull_request_reviews(issue_number)
+    if reviews is None:
+        return None
+    latest_review = None
+    latest_key = (datetime.min.replace(tzinfo=timezone.utc), "")
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or author.lower() != current_reviewer.lower():
+            continue
+        state = str(review.get("state", "")).upper()
+        if state not in {"APPROVED", "COMMENTED", "CHANGES_REQUESTED"}:
+            continue
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None or submitted_at < boundary:
+            continue
+        commit_id = review.get("commit_id")
+        if not isinstance(commit_id, str) or not commit_id.strip():
+            continue
+        review_id = str(review.get("id", ""))
+        review_key = (submitted_at, review_id)
+        if review_key >= latest_key:
+            latest_key = review_key
+            latest_review = review
+    return latest_review
+
+
+def build_reviewer_review_record_from_live_review(review: dict, *, actor: str | None = None) -> dict | None:
+    if not isinstance(review, dict):
+        return None
+    review_id = review.get("id")
+    submitted_at = review.get("submitted_at")
+    commit_id = review.get("commit_id")
+    author = actor if isinstance(actor, str) and actor.strip() else review.get("user", {}).get("login")
+    if not isinstance(review_id, int) or not isinstance(submitted_at, str) or not isinstance(commit_id, str):
+        return None
+    if not isinstance(author, str) or not author.strip():
+        return None
+    return {
+        "semantic_key": f"pull_request_review:{review_id}",
+        "timestamp": submitted_at,
+        "actor": author,
+        "reviewed_head_sha": commit_id,
+        "source_precedence": 1,
+        "payload": {},
+    }
+
+
+def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
+    record = build_reviewer_review_record_from_live_review(review, actor=actor)
+    if record is None:
+        return False
+    return accept_channel_event(
+        review_data,
+        "reviewer_review",
+        semantic_key=record["semantic_key"],
+        timestamp=record["timestamp"],
+        actor=record["actor"],
+        reviewed_head_sha=record["reviewed_head_sha"],
+        source_precedence=record["source_precedence"],
+        payload=record["payload"],
+    )
+
+
+def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
+    reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
+    if isinstance(reviewer_review, dict):
+        return False
+    live_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
+    if live_review is None:
+        return False
+    submitted_at = live_review.get("submitted_at")
+    changed = accept_reviewer_review_from_live_review(review_data, live_review, actor=review_data.get("current_reviewer"))
+    if isinstance(submitted_at, str):
+        record_reviewer_activity(review_data, submitted_at)
+    return changed
+
+
 def find_triage_approval_after(bot, reviews: list[dict], since: datetime | None) -> tuple[str, datetime] | None:
     permission_cache: dict[str, bool] = {}
     approvals: list[tuple[datetime, str, str]] = []
@@ -180,7 +273,10 @@ def clear_transition_timers(review_data: dict) -> None:
 
 
 def record_reviewer_activity(review_data: dict, timestamp: str) -> None:
-    review_data["last_reviewer_activity"] = timestamp
+    current = parse_github_timestamp(review_data.get("last_reviewer_activity"))
+    candidate = parse_github_timestamp(timestamp)
+    if current is None or candidate is None or candidate >= current:
+        review_data["last_reviewer_activity"] = timestamp
     clear_transition_timers(review_data)
 
 
@@ -554,6 +650,11 @@ def project_status_labels_for_item(
     reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
     contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
 
+    if not reviewer_comment and not reviewer_review and is_pr:
+        live_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data)
+        if live_review is not None:
+            reviewer_review = build_reviewer_review_record_from_live_review(live_review, actor=current_reviewer)
+
     if not reviewer_comment and not reviewer_review:
         return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": "awaiting_reviewer_response", "reason": "no_reviewer_activity"})
 
@@ -572,7 +673,10 @@ def project_status_labels_for_item(
         if not isinstance(latest_review_head, str) or latest_review_head != current_head:
             return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": "awaiting_reviewer_response", "reason": "review_head_stale"})
 
-    if _compare_cross_channel_conversation(contributor_comment, reviewer_comment) > 0:
+    latest_reviewer_response = reviewer_comment
+    if _compare_records(reviewer_review, latest_reviewer_response) > 0:
+        latest_reviewer_response = reviewer_review
+    if _compare_cross_channel_conversation(contributor_comment, latest_reviewer_response) > 0:
         return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": "awaiting_reviewer_response", "reason": "contributor_comment_newer"})
 
     if is_pr:

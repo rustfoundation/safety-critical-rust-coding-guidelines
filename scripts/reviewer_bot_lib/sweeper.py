@@ -519,15 +519,7 @@ def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source
     if repair is None:
         return False
     author, submitted_at, commit_id = repair
-    changed = bot.reviews_module.accept_channel_event(
-        review_data,
-        "reviewer_review",
-        semantic_key=source_event_key,
-        timestamp=submitted_at,
-        actor=author,
-        reviewed_head_sha=commit_id,
-        source_precedence=1,
-    )
+    changed = bot.reviews_module.accept_reviewer_review_from_live_review(review_data, review, actor=author)
     bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
     completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
     _mark_reconciled_source_event(review_data, source_event_key)
