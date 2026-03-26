@@ -882,6 +882,26 @@ def list_open_items_with_status_labels(bot) -> list[int]:
     return sorted(numbers)
 
 
+def list_open_tracked_review_items(state: dict) -> list[int]:
+    numbers: set[int] = set()
+    active_reviews = state.get("active_reviews")
+    if not isinstance(active_reviews, dict):
+        return []
+    for issue_key, review_data in active_reviews.items():
+        if not isinstance(review_data, dict):
+            continue
+        current_reviewer = review_data.get("current_reviewer")
+        if not isinstance(current_reviewer, str) or not current_reviewer.strip():
+            continue
+        try:
+            issue_number = int(issue_key)
+        except (TypeError, ValueError):
+            continue
+        if issue_number > 0:
+            numbers.add(issue_number)
+    return sorted(numbers)
+
+
 def handle_pr_approved_review(bot, state: dict, issue_number: int, review_author: str, completion_source: str) -> bool:
     review_data = ensure_review_entry(state, issue_number)
     if review_data is None:
