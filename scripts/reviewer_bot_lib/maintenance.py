@@ -100,8 +100,10 @@ def handle_scheduled_check(bot, state: dict) -> bool:
                 continue
             if bot.reviews_module.repair_missing_reviewer_review_state(bot, issue_number, review_data):
                 changed = True
+                bot.collect_touched_item(issue_number)
             if maybe_record_head_observation_repair(bot, issue_number, review_data):
                 changed = True
+                bot.collect_touched_item(issue_number)
     overdue_reviews = check_overdue_reviews(bot, state)
     if not overdue_reviews:
         return changed

@@ -319,7 +319,7 @@ def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
     assert reviewer_bot.handle_comment_event(state) is False
 
 
-def test_check_overdue_reviews_skips_transition_after_transition_notice_sent():
+def test_check_overdue_reviews_skips_transition_after_transition_notice_sent(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -328,6 +328,12 @@ def test_check_overdue_reviews_skips_transition_after_transition_notice_sent():
     review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
     review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
     review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
     assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
 
 
@@ -447,6 +453,167 @@ def test_scheduled_check_repairs_missing_reviewer_review_state(monkeypatch):
     assert accepted is not None
     assert accepted["semantic_key"] == "pull_request_review:10"
     assert review["last_reviewer_activity"] == "2026-03-17T10:01:00Z"
+
+
+def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["active_cycle_started_at"] = "2026-03-01T00:00:00Z"
+    review["reviewer_review"]["accepted"] = {
+        "semantic_key": "pull_request_review:10",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "actor": "alice",
+        "reviewed_head_sha": "head-1",
+        "source_precedence": 1,
+        "payload": {},
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
+    monkeypatch.setattr(
+        reviewer_bot.reviews_module,
+        "rebuild_pr_approval_state",
+        lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}),
+    )
+    assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
+
+
+def test_check_overdue_reviews_uses_contributor_comment_timestamp_when_turn_returns_to_reviewer(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["active_cycle_started_at"] = "2026-03-01T00:00:00Z"
+    review["reviewer_review"]["accepted"] = {
+        "semantic_key": "pull_request_review:10",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "actor": "alice",
+        "reviewed_head_sha": "head-1",
+        "source_precedence": 1,
+        "payload": {},
+    }
+    review["contributor_comment"]["accepted"] = {
+        "semantic_key": "issue_comment:20",
+        "timestamp": "2026-03-12T00:00:00Z",
+        "actor": "bob",
+        "reviewed_head_sha": None,
+        "source_precedence": 0,
+        "payload": {},
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
+    monkeypatch.setattr(
+        reviewer_bot.reviews_module,
+        "rebuild_pr_approval_state",
+        lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}),
+    )
+    overdue = reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state)
+    assert overdue[0]["issue_number"] == 42
+    assert overdue[0]["needs_warning"] is True
+    assert overdue[0]["days_overdue"] == 0
+
+
+def test_check_overdue_reviews_uses_contributor_revision_timestamp_when_head_changes_after_review(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["active_cycle_started_at"] = "2026-03-01T00:00:00Z"
+    review["reviewer_review"]["accepted"] = {
+        "semantic_key": "pull_request_review:10",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "actor": "alice",
+        "reviewed_head_sha": "head-1",
+        "source_precedence": 1,
+        "payload": {},
+    }
+    review["contributor_revision"]["accepted"] = {
+        "semantic_key": "pull_request_sync:42:head-2",
+        "timestamp": "2026-03-12T00:00:00Z",
+        "actor": None,
+        "reviewed_head_sha": "head-2",
+        "source_precedence": 1,
+        "payload": {},
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-2"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
+    overdue = reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state)
+    assert overdue[0]["issue_number"] == 42
+    assert overdue[0]["needs_warning"] is True
+    assert overdue[0]["days_overdue"] == 0
+
+
+def test_check_overdue_reviews_ignores_same_head_contributor_revision_after_valid_reviewer_review(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["active_cycle_started_at"] = "2026-03-01T00:00:00Z"
+    review["reviewer_review"]["accepted"] = {
+        "semantic_key": "pull_request_review:10",
+        "timestamp": "2026-03-02T00:00:00Z",
+        "actor": "alice",
+        "reviewed_head_sha": "head-1",
+        "source_precedence": 1,
+        "payload": {},
+    }
+    review["contributor_revision"]["accepted"] = {
+        "semantic_key": "pull_request_head_observed:42:head-1",
+        "timestamp": "2026-03-12T00:00:00Z",
+        "actor": None,
+        "reviewed_head_sha": "head-1",
+        "source_precedence": 1,
+        "payload": {},
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
+    monkeypatch.setattr(
+        reviewer_bot.reviews_module,
+        "rebuild_pr_approval_state",
+        lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}),
+    )
+    assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
 
 
 def test_issue_edit_by_author_records_contributor_freshness(monkeypatch):
