@@ -39,6 +39,10 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             continue
 
         transition_warning_sent = review_data.get("transition_warning_sent")
+        transition_notice_sent_at = review_data.get("transition_notice_sent_at")
+
+        if transition_notice_sent_at:
+            continue
 
         if transition_warning_sent:
             try:
@@ -71,6 +75,59 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             )
 
     return overdue
+
+
+def find_existing_transition_notice(bot, issue_number: int, transition_warning_sent: str | None) -> str | None:
+    if not isinstance(transition_warning_sent, str) or not transition_warning_sent:
+        return None
+    try:
+        warning_dt = bot.datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+    response = bot.github_api("GET", f"issues/{issue_number}/comments?per_page=100")
+    if not isinstance(response, list):
+        return None
+    first_match = None
+    for comment in response:
+        if not isinstance(comment, dict):
+            continue
+        user = comment.get("user")
+        login = user.get("login") if isinstance(user, dict) else None
+        created_at = comment.get("created_at")
+        body = comment.get("body")
+        if not isinstance(login, str) or not isinstance(created_at, str) or not isinstance(body, str):
+            continue
+        if login != "github-actions[bot]":
+            continue
+        first_line = body.splitlines()[0].strip() if body.splitlines() else ""
+        if first_line != "🔔 **Transition Period Ended**":
+            continue
+        try:
+            created_dt = bot.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        if created_dt < warning_dt:
+            continue
+        if first_match is None or created_dt < first_match[0]:
+            first_match = (created_dt, created_at)
+    return first_match[1] if first_match else None
+
+
+def backfill_transition_notice_if_present(bot, state: dict, issue_number: int) -> bool:
+    issue_key = str(issue_number)
+    active_reviews = state.get("active_reviews")
+    if not isinstance(active_reviews, dict):
+        return False
+    review_data = active_reviews.get(issue_key)
+    if not isinstance(review_data, dict):
+        return False
+    if review_data.get("transition_notice_sent_at"):
+        return False
+    existing_notice = find_existing_transition_notice(bot, issue_number, review_data.get("transition_warning_sent"))
+    if not existing_notice:
+        return False
+    review_data["transition_notice_sent_at"] = existing_notice
+    return True
 
 
 def handle_overdue_review_warning(bot, state: dict, issue_number: int, reviewer: str) -> bool:

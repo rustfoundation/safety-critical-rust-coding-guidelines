@@ -67,6 +67,7 @@ def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dic
                 reviewed_head_sha=commit_id,
                 source_precedence=1,
             )
+            bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
     return bool(completion.get("completed"))
 
 
@@ -108,6 +109,8 @@ def reconcile_active_review_entry(
                 reviewed_head_sha=commit_id,
                 source_precedence=1,
             ) or state_changed
+            bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
+            state_changed = True
             messages.append(f"latest review by @{assigned_reviewer} is `{latest_state}`")
     if _record_review_rebuild(bot, state, issue_number, review_data):
         state_changed = True
@@ -520,6 +523,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                     reviewed_head_sha=live_commit_id,
                     source_precedence=1,
                 )
+                bot.reviews_module.record_reviewer_activity(review_data, live_submitted_at)
             _record_review_rebuild(bot, state, pr_number, review_data)
             _mark_reconciled_source_event(review_data, source_event_key)
             _clear_source_event_key(review_data, source_event_key)

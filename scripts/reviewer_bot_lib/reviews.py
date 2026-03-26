@@ -117,6 +117,7 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
         "active_head_sha": None,
         "last_reviewer_activity": None,
         "transition_warning_sent": None,
+        "transition_notice_sent_at": None,
         "assignment_method": None,
         "review_completed_at": None,
         "review_completed_by": None,
@@ -173,6 +174,20 @@ def _reset_cycle_state(review_data: dict) -> None:
         review_data["pending_privileged_commands"] = {}
 
 
+def clear_transition_timers(review_data: dict) -> None:
+    review_data["transition_warning_sent"] = None
+    review_data["transition_notice_sent_at"] = None
+
+
+def record_reviewer_activity(review_data: dict, timestamp: str) -> None:
+    review_data["last_reviewer_activity"] = timestamp
+    clear_transition_timers(review_data)
+
+
+def record_transition_notice_sent(review_data: dict, timestamp: str) -> None:
+    review_data["transition_notice_sent_at"] = timestamp
+
+
 def set_current_reviewer(
     state: dict,
     issue_number: int,
@@ -187,8 +202,7 @@ def set_current_reviewer(
     review_data["cycle_started_at"] = now
     review_data["active_cycle_started_at"] = now
     review_data["assigned_at"] = now
-    review_data["last_reviewer_activity"] = now
-    review_data["transition_warning_sent"] = None
+    record_reviewer_activity(review_data, now)
     review_data["assignment_method"] = assignment_method
     review_data["review_completed_at"] = None
     review_data["review_completed_by"] = None
@@ -270,8 +284,7 @@ def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> b
     current_reviewer = review_data.get("current_reviewer")
     if not isinstance(current_reviewer, str) or current_reviewer.lower() != reviewer.lower():
         return False
-    review_data["last_reviewer_activity"] = _now_iso()
-    review_data["transition_warning_sent"] = None
+    record_reviewer_activity(review_data, _now_iso())
     return True
 
 
@@ -283,8 +296,7 @@ def mark_review_complete(state: dict, issue_number: int, reviewer: str | None, s
     review_data["review_completed_at"] = now
     review_data["review_completed_by"] = reviewer or None
     review_data["review_completion_source"] = source
-    review_data["last_reviewer_activity"] = now
-    review_data["transition_warning_sent"] = None
+    record_reviewer_activity(review_data, now)
     review_data["current_cycle_completion"] = {
         "completed": True,
         "completed_at": now,

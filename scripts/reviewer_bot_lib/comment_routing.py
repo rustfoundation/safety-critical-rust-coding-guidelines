@@ -235,8 +235,7 @@ def _record_conversation_freshness(bot, state: dict, issue_number: int, comment_
             timestamp=created_at,
             actor=comment_author,
         )
-        review_data["last_reviewer_activity"] = created_at
-        review_data["transition_warning_sent"] = None
+        bot.reviews_module.record_reviewer_activity(review_data, created_at)
         return changed
     return False
 

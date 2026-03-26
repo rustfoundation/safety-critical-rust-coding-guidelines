@@ -31,17 +31,26 @@ def _semantic_digest(value: str) -> str:
 
 
 def handle_transition_notice(bot, state: dict, issue_number: int, reviewer: str) -> bool:
-    del state
+    review_data = bot.ensure_review_entry(state, issue_number, create=True)
+    if review_data is None:
+        return False
+    if review_data.get("transition_notice_sent_at"):
+        return False
     notice_message = f"""🔔 **Transition Period Ended**
 
 @{reviewer}, the {bot.TRANSITION_PERIOD_DAYS}-day transition period has passed without activity on this review.
 
 Per our [contribution guidelines](CONTRIBUTING.md#review-deadlines), this may result in a transition from Producer to Observer status.
 
-**The review will now be reassigned to the next person in the queue.**
+You may still continue this review, or use `{bot.BOT_MENTION} /pass`, `{bot.BOT_MENTION} /release`, or `{bot.BOT_MENTION} /away` if you need to step back.
 
 _If you believe this is in error or have extenuating circumstances, please reach out to the subcommittee._"""
-    bot.post_comment(issue_number, notice_message)
+    if not bot.post_comment(issue_number, notice_message):
+        return False
+    bot.reviews_module.record_transition_notice_sent(
+        review_data,
+        bot.datetime.now(bot.timezone.utc).isoformat(),
+    )
     return True
 
 
