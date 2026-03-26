@@ -20,6 +20,17 @@ def _now_iso(bot) -> str:
     return bot.datetime.now(bot.timezone.utc).isoformat()
 
 
+def status_projection_repair_needed(bot, state: dict) -> bool:
+    current_epoch = state.get("status_projection_epoch")
+    return current_epoch != bot.STATUS_PROJECTION_EPOCH
+
+
+def collect_status_projection_repair_items(bot, state: dict) -> list[int]:
+    numbers = set(bot.list_open_items_with_status_labels())
+    numbers.update(bot.reviews_module.list_open_tracked_review_items(state))
+    return sorted(number for number in numbers if isinstance(number, int) and number > 0)
+
+
 def handle_manual_dispatch(bot, state: dict) -> bool:
     action = os.environ.get("MANUAL_ACTION", "")
     if action == "show-state":

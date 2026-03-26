@@ -324,6 +324,7 @@ def load_state(bot: StateStoreContext, *, fail_on_unavailable: bool = False) -> 
     default_state = {
         "schema_version": STATE_SCHEMA_VERSION,
         "freshness_runtime_epoch": FRESHNESS_RUNTIME_EPOCH_LEGACY,
+        "status_projection_epoch": None,
         "last_updated": None,
         "current_index": 0,
         "queue": [],
@@ -347,6 +348,8 @@ def load_state(bot: StateStoreContext, *, fail_on_unavailable: bool = False) -> 
         state["schema_version"] = STATE_SCHEMA_VERSION
     if not isinstance(state.get("freshness_runtime_epoch"), str) or not state.get("freshness_runtime_epoch"):
         state["freshness_runtime_epoch"] = FRESHNESS_RUNTIME_EPOCH_LEGACY
+    if not isinstance(state.get("status_projection_epoch"), str) or not state.get("status_projection_epoch"):
+        state["status_projection_epoch"] = None
     if state.get("last_updated") is None:
         state["last_updated"] = None
     if not isinstance(state.get("current_index"), int):

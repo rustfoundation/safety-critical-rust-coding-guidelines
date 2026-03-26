@@ -4,6 +4,10 @@ import os
 import sys
 
 from .context import ReviewerBotContext
+from .maintenance import (
+    collect_status_projection_repair_items,
+    status_projection_repair_needed,
+)
 
 
 def _revalidate_epoch(bot: ReviewerBotContext, expected_epoch: str | None, phase: str) -> None:
@@ -106,6 +110,7 @@ def main(bot: ReviewerBotContext):
     touched_items: list[int] = []
     projection_failure: RuntimeError | None = None
     loaded_epoch: str | None = None
+    projection_epoch_repair = False
 
     try:
         if lock_required:
@@ -172,6 +177,14 @@ def main(bot: ReviewerBotContext):
                     )
 
         touched_items = bot.drain_touched_items()
+        if event_name in {"schedule", "workflow_dispatch"} and status_projection_repair_needed(bot, state):
+            touched_items = sorted(
+                {
+                    *touched_items,
+                    *collect_status_projection_repair_items(bot, state),
+                }
+            )
+            projection_epoch_repair = True
 
         if state_changed or sync_changes or restored:
             if not lock_acquired:
@@ -230,6 +243,14 @@ def main(bot: ReviewerBotContext):
                     if not bot.save_state(state):
                         raise RuntimeError(
                             "Projection failed and repair-needed metadata could not be persisted."
+                        )
+            else:
+                if projection_epoch_repair:
+                    state["status_projection_epoch"] = bot.STATUS_PROJECTION_EPOCH
+                    _revalidate_epoch(bot, loaded_epoch, "status-projection epoch save")
+                    if not bot.save_state(state):
+                        raise RuntimeError(
+                            "Status projection epoch repair succeeded but could not be persisted."
                         )
 
         with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as output_file:

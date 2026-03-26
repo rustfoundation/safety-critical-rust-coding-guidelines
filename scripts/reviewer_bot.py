@@ -128,6 +128,7 @@ from scripts.reviewer_bot_lib.config import (  # noqa: F401  # noqa: F401
     STATUS_AWAITING_WRITE_APPROVAL_LABEL,
     STATUS_LABEL_CONFIG,
     STATUS_LABELS,
+    STATUS_PROJECTION_EPOCH,
     TRANSITION_PERIOD_DAYS,
     AssignmentAttempt,
     GitHubApiResult,
