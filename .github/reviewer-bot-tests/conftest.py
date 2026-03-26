@@ -9,6 +9,7 @@ def clear_env():
         "COMMENT_BODY",
         "COMMENT_AUTHOR",
         "COMMENT_ID",
+        "COMMENT_SOURCE_EVENT_KEY",
         "ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE",
         "EVENT_ACTION",
         "EVENT_NAME",

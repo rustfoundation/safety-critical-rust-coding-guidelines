@@ -12,9 +12,8 @@ from .comment_routing import (
     classify_comment_payload,
 )
 from .reviews import (
-    accept_reviewer_review_from_live_review,
     find_triage_approval_after,
-    get_latest_valid_current_reviewer_review_for_cycle,
+    refresh_reviewer_review_from_live_preferred_review,
 )
 
 
@@ -54,14 +53,17 @@ def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dic
     reviews = bot.get_pull_request_reviews(issue_number)
     if reviews is None:
         raise RuntimeError(f"Failed to fetch live reviews for PR #{issue_number}")
+    refresh_reviewer_review_from_live_preferred_review(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+        actor=review_data.get("current_reviewer"),
+    )
     completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data, pull_request=pull_request, reviews=reviews)
     if completion is None:
         raise RuntimeError(f"Unable to rebuild approval state for PR #{issue_number}")
-    latest = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
-    if latest is not None:
-        submitted_at = latest.get("submitted_at")
-        if accept_reviewer_review_from_live_review(review_data, latest, actor=review_data.get("current_reviewer")) and isinstance(submitted_at, str):
-            bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
     return bool(completion.get("completed"))
 
 
@@ -87,14 +89,18 @@ def reconcile_active_review_entry(
     reviews = bot.get_pull_request_reviews(issue_number)
     if reviews is None:
         return f"❌ Failed to fetch reviews for PR #{issue_number}; cannot run `/rectify`.", False, False
-    latest_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
     messages: list[str] = []
+    refreshed, latest_review = refresh_reviewer_review_from_live_preferred_review(
+        bot,
+        issue_number,
+        review_data,
+        reviews=reviews,
+        actor=assigned_reviewer,
+    )
     if latest_review is not None:
         latest_state = str(latest_review.get("state", "")).upper()
-        submitted_at = latest_review.get("submitted_at")
-        if accept_reviewer_review_from_live_review(review_data, latest_review, actor=assigned_reviewer) and isinstance(submitted_at, str):
+        if refreshed:
             state_changed = True
-            bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
             messages.append(f"latest review by @{assigned_reviewer} is `{latest_state}`")
     if _record_review_rebuild(bot, state, issue_number, review_data):
         state_changed = True
@@ -164,6 +170,36 @@ def _validate_deferred_review_artifact(payload: dict) -> None:
         raise RuntimeError("Deferred review artifact review_id and pr_number must be integers")
 
 
+def _validate_deferred_review_comment_artifact(payload: dict) -> None:
+    required = {
+        "schema_version",
+        "source_workflow_name",
+        "source_workflow_file",
+        "source_run_id",
+        "source_run_attempt",
+        "source_event_name",
+        "source_event_action",
+        "source_event_key",
+        "pr_number",
+        "comment_id",
+        "comment_class",
+        "has_non_command_text",
+        "source_body_digest",
+        "source_created_at",
+    }
+    missing = sorted(required - set(payload))
+    if missing:
+        raise RuntimeError("Deferred review-comment artifact missing required fields: " + ", ".join(missing))
+    if payload.get("schema_version") != 2:
+        raise RuntimeError("Deferred review-comment artifact schema_version is not accepted by V18 reconcile")
+    if not isinstance(payload.get("comment_id"), int) or not isinstance(payload.get("pr_number"), int):
+        raise RuntimeError("Deferred review-comment artifact comment_id and pr_number must be integers")
+    if not isinstance(payload.get("comment_class"), str) or not isinstance(payload.get("has_non_command_text"), bool):
+        raise RuntimeError("Deferred review-comment artifact parse fields are malformed")
+    if not isinstance(payload.get("source_body_digest"), str) or not isinstance(payload.get("source_created_at"), str):
+        raise RuntimeError("Deferred review-comment artifact source digest or timestamp is malformed")
+
+
 def _load_deferred_context() -> dict:
     path = os.environ.get("DEFERRED_CONTEXT_PATH", "").strip()
     if not path:
@@ -225,6 +261,7 @@ def _hydrate_reconcile_comment_context(live_comment: dict, payload: dict) -> Non
         raise RuntimeError("Live deferred comment author association is unavailable")
     _set_env_if_present("COMMENT_AUTHOR", comment_author)
     _set_env_if_present("COMMENT_ID", payload.get("comment_id"))
+    _set_env_if_present("COMMENT_SOURCE_EVENT_KEY", payload.get("source_event_key"))
     _set_env_if_present("COMMENT_CREATED_AT", payload.get("source_created_at"))
     _set_env_if_present("COMMENT_USER_TYPE", comment_user_type)
     _set_env_if_present("COMMENT_AUTHOR_ASSOCIATION", author_association)
@@ -278,6 +315,11 @@ def _expected_observer_identity(payload: dict) -> tuple[str, str]:
             "Reviewer Bot PR Review Dismissed Observer",
             ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
         )
+    if event_name == "pull_request_review_comment" and event_action == "created":
+        return (
+            "Reviewer Bot PR Review Comment Observer",
+            ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
+        )
     raise RuntimeError("Unsupported deferred workflow identity")
 
 
@@ -311,6 +353,8 @@ def _artifact_expected_name(payload: dict) -> str:
         return f"reviewer-bot-review-submitted-context-{run_id}-attempt-{run_attempt}"
     if event_name == "pull_request_review" and event_action == "dismissed":
         return f"reviewer-bot-review-dismissed-context-{run_id}-attempt-{run_attempt}"
+    if event_name == "pull_request_review_comment" and event_action == "created":
+        return f"reviewer-bot-review-comment-context-{run_id}-attempt-{run_attempt}"
     raise RuntimeError("Unsupported deferred artifact naming")
 
 
@@ -323,7 +367,61 @@ def _artifact_expected_payload_name(payload: dict) -> str:
         return "deferred-review-submitted.json"
     if event_name == "pull_request_review" and event_action == "dismissed":
         return "deferred-review-dismissed.json"
+    if event_name == "pull_request_review_comment" and event_action == "created":
+        return "deferred-review-comment.json"
     raise RuntimeError("Unsupported deferred payload path")
+
+
+def _reconcile_deferred_comment(
+    bot,
+    state: dict,
+    pr_number: int,
+    review_data: dict,
+    payload: dict,
+    *,
+    expected_event_name: str,
+    live_comment_endpoint: str,
+) -> bool:
+    comment_id_value = payload.get("comment_id")
+    if not isinstance(comment_id_value, int):
+        raise RuntimeError("Deferred comment artifact comment_id must be an integer")
+    comment_id = comment_id_value
+    if str(payload.get("source_event_key", "")) != f"{expected_event_name}:{comment_id}":
+        raise RuntimeError("Deferred comment artifact source_event_key mismatch")
+    _set_env_if_present("COMMENT_SOURCE_EVENT_KEY", payload.get("source_event_key"))
+    _hydrate_reconcile_pr_context(bot, pr_number)
+    comment_author = str(payload.get("actor_login", ""))
+    comment_created_at = str(payload.get("source_created_at"))
+    classified = payload.get("comment_class")
+    source_freshness_eligible = classified in {"plain_text", "command_plus_text"} and bool(payload.get("has_non_command_text"))
+    live_comment = bot.github_api("GET", live_comment_endpoint)
+    if not isinstance(live_comment, dict):
+        changed = False
+        if source_freshness_eligible:
+            changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
+        _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {comment_id} is no longer visible; source-time freshness only may be preserved. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
+        return changed
+    _hydrate_reconcile_comment_context(live_comment, payload)
+    live_body = live_comment.get("body")
+    if not isinstance(live_body, str):
+        raise RuntimeError("Live deferred comment body is unavailable")
+    if _digest_body(live_body) != payload.get("source_body_digest"):
+        changed = False
+        if source_freshness_eligible:
+            changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
+        _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {comment_id} body digest changed; command execution suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
+        return changed
+    changed = False
+    if source_freshness_eligible:
+        changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at) or changed
+    live_classified = _validate_live_comment_replay_contract(bot, review_data, payload, live_body)
+    if live_classified is None:
+        return changed
+    if classified in {"command_only", "command_plus_text"}:
+        changed = _handle_command(bot, state, pr_number, comment_author, live_classified) or changed
+    _mark_reconciled_source_event(review_data, str(payload.get("source_event_key", "")))
+    _clear_source_event_key(review_data, str(payload.get("source_event_key", "")))
+    return changed
 
 
 def _update_deferred_gap(bot, review_data: dict, payload: dict, reason: str, diagnostic_summary: str) -> None:
@@ -433,45 +531,28 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
         if event_name == "issue_comment":
             _validate_deferred_comment_artifact(payload)
             _validate_workflow_run_artifact_identity(payload)
-            _hydrate_reconcile_pr_context(bot, pr_number)
-            if source_event_key != f"issue_comment:{payload['comment_id']}":
-                raise RuntimeError("Deferred comment artifact source_event_key mismatch")
-            comment_author = str(payload.get("actor_login", ""))
-            comment_created_at = str(payload.get("source_created_at"))
-            comment_id_value = payload.get("comment_id")
-            if not isinstance(comment_id_value, int):
-                raise RuntimeError("Deferred comment artifact comment_id must be an integer")
-            comment_id = comment_id_value
-            classified = payload.get("comment_class")
-            source_freshness_eligible = classified in {"plain_text", "command_plus_text"} and bool(payload.get("has_non_command_text"))
-            live_comment = bot.github_api("GET", f"issues/comments/{payload['comment_id']}")
-            if not isinstance(live_comment, dict):
-                changed = False
-                if source_freshness_eligible:
-                    changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
-                _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {payload['comment_id']} is no longer visible; source-time freshness only may be preserved. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
-                return changed
-            _hydrate_reconcile_comment_context(live_comment, payload)
-            live_body = live_comment.get("body")
-            if not isinstance(live_body, str):
-                raise RuntimeError("Live deferred comment body is unavailable")
-            if _digest_body(live_body) != payload.get("source_body_digest"):
-                changed = False
-                if source_freshness_eligible:
-                    changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
-                _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {payload['comment_id']} body digest changed; command execution suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
-                return changed
-            changed = False
-            if source_freshness_eligible:
-                changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at) or changed
-            live_classified = _validate_live_comment_replay_contract(bot, review_data, payload, live_body)
-            if live_classified is None:
-                return changed
-            if classified in {"command_only", "command_plus_text"}:
-                changed = _handle_command(bot, state, pr_number, comment_author, live_classified) or changed
-            _mark_reconciled_source_event(review_data, source_event_key)
-            _clear_source_event_key(review_data, source_event_key)
-            return changed
+            return _reconcile_deferred_comment(
+                bot,
+                state,
+                pr_number,
+                review_data,
+                payload,
+                expected_event_name="issue_comment",
+                live_comment_endpoint=f"issues/comments/{payload['comment_id']}",
+            )
+
+        if event_name == "pull_request_review_comment" and event_action == "created":
+            _validate_deferred_review_comment_artifact(payload)
+            _validate_workflow_run_artifact_identity(payload)
+            return _reconcile_deferred_comment(
+                bot,
+                state,
+                pr_number,
+                review_data,
+                payload,
+                expected_event_name="pull_request_review_comment",
+                live_comment_endpoint=f"pulls/comments/{payload['comment_id']}",
+            )
 
         if event_name == "pull_request_review" and event_action == "submitted":
             _validate_deferred_review_artifact(payload)

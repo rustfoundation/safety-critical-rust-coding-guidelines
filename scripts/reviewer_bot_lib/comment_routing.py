@@ -217,7 +217,7 @@ def _record_conversation_freshness(bot, state: dict, issue_number: int, comment_
     if review_data is None:
         return False
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
-    semantic_key = f"issue_comment:{comment_id}"
+    semantic_key = os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip() or f"issue_comment:{comment_id}"
     if issue_author and issue_author.lower() == comment_author.lower():
         return bot.reviews_module.accept_channel_event(
             review_data,
@@ -282,7 +282,7 @@ def _handle_command(bot, state: dict, issue_number: int, comment_author: str, cl
     review_data = bot.ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
-    source_event_key = f"issue_comment:{os.environ.get('COMMENT_ID', '')}"
+    source_event_key = os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip() or f"issue_comment:{os.environ.get('COMMENT_ID', '')}"
     if command == "accept-no-fls-changes":
         is_valid, metadata = _validate_accept_no_fls_changes_handoff(bot, issue_number, comment_author)
         if not is_valid:

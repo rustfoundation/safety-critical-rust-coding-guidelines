@@ -108,7 +108,22 @@ def correlate_candidate_observer_runs(
             "later_recheck_complete": False,
             "correlated_run": None,
         }
-    expected_event = "issue_comment" if source_event_kind == "issue_comment:created" else "pull_request_review"
+    expected_event_map = {
+        "issue_comment:created": "issue_comment",
+        "pull_request_review:submitted": "pull_request_review",
+        "pull_request_review:dismissed": "pull_request_review",
+        "pull_request_review_comment:created": "pull_request_review_comment",
+    }
+    expected_event = expected_event_map.get(source_event_kind)
+    if expected_event is None:
+        return {
+            "status": "observer_state_unknown",
+            "reason": "unsupported_source_event_kind",
+            "candidate_run_ids": [],
+            "full_scan_complete": False,
+            "later_recheck_complete": False,
+            "correlated_run": None,
+        }
     window_start = created_at - timedelta(minutes=2)
     window_end = created_at + timedelta(minutes=30)
     candidates: list[dict] = []
@@ -520,6 +535,12 @@ def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source
         return False
     author, submitted_at, commit_id = repair
     changed = bot.reviews_module.accept_reviewer_review_from_live_review(review_data, review, actor=author)
+    changed = bot.reviews_module.refresh_reviewer_review_from_live_preferred_review(
+        bot,
+        issue_number,
+        review_data,
+        actor=author,
+    )[0] or changed
     bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
     completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
     _mark_reconciled_source_event(review_data, source_event_key)
@@ -587,6 +608,40 @@ def _discover_visible_review_events(bot, issue_number: int, review_data: dict) -
                 "object_id": str(review_id),
                 "surface": "reviews_submitted",
                 "review": review,
+            }
+        )
+    return discovered, True
+
+
+def _discover_visible_review_comment_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
+    watermark = _load_surface_watermark(review_data, "review_comments")
+    watermark["last_scan_started_at"] = _now_iso()
+    comments = bot.github_api("GET", f"pulls/{issue_number}/comments?per_page=100")
+    if comments is None:
+        return None, False
+    if not isinstance(comments, list):
+        return None, False
+    floor = _surface_scan_floor(bot, watermark)
+    discovered: list[dict] = []
+    for comment in comments:
+        if not isinstance(comment, dict) or _is_automation_comment(comment):
+            continue
+        comment_id = comment.get("id")
+        created_at = comment.get("created_at")
+        if not isinstance(comment_id, int) or not isinstance(created_at, str):
+            continue
+        created_dt = parse_timestamp(created_at)
+        if created_dt is None or created_dt < floor:
+            continue
+        discovered.append(
+            {
+                "source_event_key": f"pull_request_review_comment:{comment_id}",
+                "source_event_name": "pull_request_review_comment",
+                "source_event_action": "created",
+                "source_created_at": created_at,
+                "object_id": str(comment_id),
+                "surface": "review_comments",
+                "comment": comment,
             }
         )
     return discovered, True
@@ -860,6 +915,73 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 _update_observer_watermark(bot, review_data, "reviews_submitted", last_review["source_created_at"], last_review["object_id"])
             else:
                 watermark = _load_surface_watermark(review_data, "reviews_submitted")
+                watermark["last_scan_started_at"] = watermark.get("last_scan_started_at") or _now_iso()
+                watermark["last_scan_completed_at"] = _now_iso()
+                watermark["bootstrap_completed_at"] = watermark.get("bootstrap_completed_at") or _now_iso()
+        discovered_review_comments, review_comments_complete = _discover_visible_review_comment_events(bot, issue_number, review_data)
+        if review_comments_complete and isinstance(discovered_review_comments, list):
+            for discovered in discovered_review_comments:
+                source_event_key = discovered["source_event_key"]
+                created_at = discovered["source_created_at"]
+                if _should_skip_discovered_key(bot, review_data, source_event_key, ("reviewer_comment", "contributor_comment")):
+                    continue
+                existing_gap = review_data.get("deferred_gaps", {}).get(source_event_key, {})
+                workflow_file = ".github/workflows/reviewer-bot-pr-review-comment-observer.yml"
+                workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "pull_request_review_comment")
+                run_correlation = correlate_candidate_observer_runs(
+                    source_event_key,
+                    source_event_kind="pull_request_review_comment:created",
+                    source_event_created_at=created_at,
+                    pr_number=issue_number,
+                    workflow_file=workflow_file,
+                    workflow_runs=workflow_runs,
+                )
+                run_correlation["later_recheck_complete"] = bool(existing_gap.get("full_scan_complete"))
+                artifact_correlation = None
+                run_detail = None
+                if run_correlation.get("status") == "candidate_runs_found":
+                    artifact_correlation = inspect_run_artifact_payloads(
+                        bot,
+                        run_correlation.get("candidate_runs", []),
+                        source_event_key,
+                        pr_number=issue_number,
+                        source_event_kind="pull_request_review_comment:created",
+                    )
+                    exact_run_id = artifact_correlation.get("correlated_run") if isinstance(artifact_correlation, dict) else None
+                    if isinstance(exact_run_id, int):
+                        run_correlation["correlated_run"] = exact_run_id
+                        run_correlation["correlated_run_found"] = True
+                    run_detail = _maybe_fetch_single_candidate_run_detail(bot, run_correlation, artifact_correlation)
+                reason, diagnostic_reason = evaluate_deferred_gap_state(
+                    {
+                        **existing_gap,
+                        "source_event_created_at": created_at,
+                    },
+                    run_correlation,
+                    run_detail,
+                    artifact_correlation,
+                )
+                _record_gap_diagnostics(
+                    bot,
+                    review_data,
+                    source_event_key,
+                    source_event_name="pull_request_review_comment",
+                    source_event_action="created",
+                    issue_number=issue_number,
+                    source_created_at=created_at,
+                    workflow_file=workflow_file,
+                    run_correlation=run_correlation,
+                    run_detail=run_detail,
+                    artifact_correlation=artifact_correlation,
+                    reason=reason,
+                    diagnostic_reason=diagnostic_reason,
+                )
+                changed = True
+            if discovered_review_comments:
+                last_comment = discovered_review_comments[-1]
+                _update_observer_watermark(bot, review_data, "review_comments", last_comment["source_created_at"], last_comment["object_id"])
+            else:
+                watermark = _load_surface_watermark(review_data, "review_comments")
                 watermark["last_scan_started_at"] = watermark.get("last_scan_started_at") or _now_iso()
                 watermark["last_scan_completed_at"] = _now_iso()
                 watermark["bootstrap_completed_at"] = watermark.get("bootstrap_completed_at") or _now_iso()
