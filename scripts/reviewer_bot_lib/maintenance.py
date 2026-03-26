@@ -98,6 +98,8 @@ def handle_scheduled_check(bot, state: dict) -> bool:
             issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
             if not isinstance(issue_snapshot, dict) or not isinstance(issue_snapshot.get("pull_request"), dict):
                 continue
+            if bot.reviews_module.repair_missing_reviewer_review_state(bot, issue_number, review_data):
+                changed = True
             if maybe_record_head_observation_repair(bot, issue_number, review_data):
                 changed = True
     overdue_reviews = check_overdue_reviews(bot, state)

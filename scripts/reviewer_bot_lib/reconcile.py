@@ -11,7 +11,11 @@ from .comment_routing import (
     _record_conversation_freshness,
     classify_comment_payload,
 )
-from .reviews import find_triage_approval_after, get_latest_review_by_reviewer
+from .reviews import (
+    accept_reviewer_review_from_live_review,
+    find_triage_approval_after,
+    get_latest_valid_current_reviewer_review_for_cycle,
+)
 
 
 def _now_iso(bot) -> str:
@@ -53,20 +57,10 @@ def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dic
     completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data, pull_request=pull_request, reviews=reviews)
     if completion is None:
         raise RuntimeError(f"Unable to rebuild approval state for PR #{issue_number}")
-    latest = get_latest_review_by_reviewer(bot, reviews, str(review_data.get("current_reviewer", "")))
+    latest = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
     if latest is not None:
-        commit_id = latest.get("commit_id")
         submitted_at = latest.get("submitted_at")
-        if isinstance(commit_id, str) and isinstance(submitted_at, str):
-            bot.reviews_module.accept_channel_event(
-                review_data,
-                "reviewer_review",
-                semantic_key=f"pull_request_review:{latest.get('id')}",
-                timestamp=submitted_at,
-                actor=review_data.get("current_reviewer"),
-                reviewed_head_sha=commit_id,
-                source_precedence=1,
-            )
+        if accept_reviewer_review_from_live_review(review_data, latest, actor=review_data.get("current_reviewer")) and isinstance(submitted_at, str):
             bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
     return bool(completion.get("completed"))
 
@@ -93,24 +87,14 @@ def reconcile_active_review_entry(
     reviews = bot.get_pull_request_reviews(issue_number)
     if reviews is None:
         return f"❌ Failed to fetch reviews for PR #{issue_number}; cannot run `/rectify`.", False, False
-    latest_review = get_latest_review_by_reviewer(bot, reviews, assigned_reviewer)
+    latest_review = get_latest_valid_current_reviewer_review_for_cycle(bot, issue_number, review_data, reviews=reviews)
     messages: list[str] = []
     if latest_review is not None:
         latest_state = str(latest_review.get("state", "")).upper()
-        commit_id = latest_review.get("commit_id")
         submitted_at = latest_review.get("submitted_at")
-        if latest_state in {"APPROVED", "COMMENTED", "CHANGES_REQUESTED"} and isinstance(commit_id, str) and isinstance(submitted_at, str):
-            state_changed = bot.reviews_module.accept_channel_event(
-                review_data,
-                "reviewer_review",
-                semantic_key=f"pull_request_review:{latest_review.get('id')}",
-                timestamp=submitted_at,
-                actor=assigned_reviewer,
-                reviewed_head_sha=commit_id,
-                source_precedence=1,
-            ) or state_changed
-            bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
+        if accept_reviewer_review_from_live_review(review_data, latest_review, actor=assigned_reviewer) and isinstance(submitted_at, str):
             state_changed = True
+            bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
             messages.append(f"latest review by @{assigned_reviewer} is `{latest_state}`")
     if _record_review_rebuild(bot, state, issue_number, review_data):
         state_changed = True

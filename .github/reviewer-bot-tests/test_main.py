@@ -292,6 +292,7 @@ def test_main_schedule_backfills_existing_transition_notice_without_duplicate_co
     monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
     monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, current: False)
     monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: False)
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
     monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []})
     monkeypatch.setattr(reviewer_bot, "save_state", lambda current: True)
     monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current, issue_numbers: True)

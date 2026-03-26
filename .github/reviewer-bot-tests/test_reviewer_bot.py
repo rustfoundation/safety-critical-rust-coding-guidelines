@@ -396,6 +396,7 @@ def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypat
     review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
     monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, state: False)
     monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: False)
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
     monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"pull_request": {}})
     posted = []
     monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
@@ -416,6 +417,36 @@ def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypat
     assert reviewer_bot.handle_scheduled_check(state) is True
     assert review["transition_notice_sent_at"] == "2026-03-25T15:22:42Z"
     assert posted == []
+
+
+def test_scheduled_check_repairs_missing_reviewer_review_state(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, state: False)
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: False)
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "check_overdue_reviews", lambda bot, state: [])
+    monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"pull_request": {}})
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 10,
+                "state": "COMMENTED",
+                "submitted_at": "2026-03-17T10:01:00Z",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    assert reviewer_bot.handle_scheduled_check(state) is True
+    accepted = review["reviewer_review"]["accepted"]
+    assert accepted is not None
+    assert accepted["semantic_key"] == "pull_request_review:10"
+    assert review["last_reviewer_activity"] == "2026-03-17T10:01:00Z"
 
 
 def test_issue_edit_by_author_records_contributor_freshness(monkeypatch):
@@ -472,6 +503,127 @@ def test_project_status_labels_uses_commit_id_and_comment_freshness(monkeypatch)
     desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
     assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}
     assert metadata["reason"] == "review_head_stale"
+
+
+def test_project_status_labels_uses_live_current_reviewer_review_when_channel_state_missing(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 10,
+                "state": "COMMENTED",
+                "submitted_at": "2026-03-17T10:01:00Z",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}
+    assert metadata["reason"] == "completion_missing"
+
+
+def test_project_status_labels_uses_live_review_fallback_for_stale_head(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-2"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 10,
+                "state": "COMMENTED",
+                "submitted_at": "2026-03-17T10:01:00Z",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}
+    assert metadata["reason"] == "review_head_stale"
+
+
+def test_project_status_labels_prefers_newer_contributor_comment_over_live_review_fallback(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "contributor_comment",
+        semantic_key="issue_comment:20",
+        timestamp="2026-03-17T10:05:00Z",
+        actor="bob",
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 10,
+                "state": "COMMENTED",
+                "submitted_at": "2026-03-17T10:01:00Z",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}
+    assert metadata["reason"] == "contributor_comment_newer"
+
+
+def test_record_reviewer_activity_does_not_regress_timestamp_on_legacy_backfill():
+    review = reviewer_bot.ensure_review_entry(make_state(), 42, create=True)
+    assert review is not None
+    review["last_reviewer_activity"] = "2026-03-20T10:00:00Z"
+    review["transition_warning_sent"] = "2026-03-21T10:00:00Z"
+    review["transition_notice_sent_at"] = "2026-03-22T10:00:00Z"
+    reviewer_bot.reviews_module.record_reviewer_activity(review, "2026-03-18T10:00:00Z")
+    assert review["last_reviewer_activity"] == "2026-03-20T10:00:00Z"
+    assert review["transition_warning_sent"] is None
+    assert review["transition_notice_sent_at"] is None
 
 
 def test_project_status_labels_emits_awaiting_write_approval_only_after_completion(monkeypatch):
