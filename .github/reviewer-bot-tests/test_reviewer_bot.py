@@ -319,6 +319,105 @@ def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
     assert reviewer_bot.handle_comment_event(state) is False
 
 
+def test_check_overdue_reviews_skips_transition_after_transition_notice_sent():
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
+    review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
+    review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
+    assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
+
+
+def test_handle_transition_notice_records_transition_notice_sent_at_once(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append((issue_number, body)) or True)
+    assert reviewer_bot.handle_transition_notice(state, 42, "alice") is True
+    assert review["transition_notice_sent_at"] is not None
+    assert reviewer_bot.handle_transition_notice(state, 42, "alice") is False
+    assert len(posted) == 1
+
+
+def test_handle_transition_notice_message_does_not_claim_reassignment(monkeypatch):
+    state = make_state()
+    reviewer_bot.ensure_review_entry(state, 42, create=True)
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    assert reviewer_bot.handle_transition_notice(state, 42, "alice") is True
+    assert "reassigned to the next person in the queue" not in posted[0]
+    assert "/pass" in posted[0]
+
+
+def test_reviewer_comment_clears_warning_and_transition_notice_markers(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
+    review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
+    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "hello")
+    monkeypatch.setenv("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+            "user": {"login": "dana"},
+        },
+    )
+    assert reviewer_bot.handle_comment_event(state) is True
+    assert review["transition_warning_sent"] is None
+    assert review["transition_notice_sent_at"] is None
+
+
+def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
+    review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, state: False)
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: False)
+    monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"pull_request": {}})
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+
+    def fake_api(method, endpoint, data=None):
+        if endpoint == "issues/42/comments?per_page=100":
+            return [
+                {
+                    "id": 99,
+                    "created_at": "2026-03-25T15:22:42Z",
+                    "body": "🔔 **Transition Period Ended**\n\nExisting notice",
+                    "user": {"login": "github-actions[bot]"},
+                }
+            ]
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(reviewer_bot, "github_api", fake_api)
+    assert reviewer_bot.handle_scheduled_check(state) is True
+    assert review["transition_notice_sent_at"] == "2026-03-25T15:22:42Z"
+    assert posted == []
+
+
 def test_issue_edit_by_author_records_contributor_freshness(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -493,6 +592,73 @@ def test_handle_workflow_run_event_rebuilds_completion_from_live_review_commit_i
     )
     assert reviewer_bot.handle_workflow_run_event(state) is True
     assert state["active_reviews"]["42"]["current_cycle_completion"]["completed"] is False
+
+
+def test_workflow_run_review_submission_clears_warning_and_transition_notice_markers(tmp_path, monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
+    review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
+    payload_path = tmp_path / "deferred-review.json"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "source_workflow_name": "Reviewer Bot PR Review Submitted Observer",
+                "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+                "source_run_id": 500,
+                "source_run_attempt": 2,
+                "source_event_name": "pull_request_review",
+                "source_event_action": "submitted",
+                "source_event_key": "pull_request_review:11",
+                "pr_number": 42,
+                "review_id": 11,
+                "source_submitted_at": "2026-03-17T10:00:00Z",
+                "source_review_state": "COMMENTED",
+                "source_commit_id": "head-1",
+                "actor_login": "alice",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Review Submitted Observer")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "500")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "2")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "pulls/42": {"head": {"sha": "head-2"}, "user": {"login": "dana"}, "labels": []},
+            "pulls/42/reviews/11": {
+                "id": 11,
+                "submitted_at": "2026-03-17T10:00:00Z",
+                "state": "COMMENTED",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            },
+        }.get(endpoint),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 11,
+                "submitted_at": "2026-03-17T10:00:00Z",
+                "state": "COMMENTED",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    assert reviewer_bot.handle_workflow_run_event(state) is True
+    assert review["transition_warning_sent"] is None
+    assert review["transition_notice_sent_at"] is None
 
 
 def test_deferred_comment_missing_live_object_preserves_source_time_freshness(tmp_path, monkeypatch):
@@ -1258,6 +1424,31 @@ def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention()
     assert sweeper.classify_artifact_gap_reason(missing) == "artifact_missing"
 
 
+def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: [
+            {
+                "id": 100,
+                "created_at": "2026-03-25T10:00:00Z",
+                "user": {"login": "github-actions[bot]", "type": "Bot"},
+            },
+            {
+                "id": 101,
+                "created_at": "2026-03-25T11:00:00Z",
+                "user": {"login": "alice", "type": "User"},
+            },
+        ],
+    )
+    discovered, complete = sweeper._discover_visible_comment_events(reviewer_bot, 42, review)
+    assert complete is True
+    assert [item["source_event_key"] for item in discovered] == ["issue_comment:101"]
+
+
 def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_dismissals(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -1268,15 +1459,15 @@ def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_di
         "github_api",
         lambda method, endpoint, data=None: {
             "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
-            "issues/42/comments?per_page=100&page=1": [{"id": 101, "created_at": "2026-03-17T10:00:00Z"}],
+            "issues/42/comments?per_page=100&page=1": [{"id": 101, "created_at": "2026-03-25T10:00:00Z"}],
         }.get(endpoint),
     )
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
         lambda issue_number: [
-            {"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"},
-            {"id": 303, "submitted_at": "2026-03-17T09:00:00Z", "updated_at": "2026-03-17T12:00:00Z", "state": "DISMISSED"},
+                {"id": 202, "submitted_at": "2026-03-25T11:00:00Z", "state": "APPROVED"},
+                {"id": 303, "submitted_at": "2026-03-25T09:00:00Z", "updated_at": "2026-03-25T12:00:00Z", "state": "DISMISSED"},
         ],
     )
     assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
@@ -1331,6 +1522,53 @@ def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
+def test_sweeper_fetches_single_candidate_run_detail_without_exact_artifact_match(monkeypatch):
+    run_correlation = {
+        "candidate_run_ids": [123],
+        "correlated_run": None,
+        "correlated_run_found": False,
+    }
+    monkeypatch.setattr(sweeper, "_fetch_run_detail", lambda bot, run_id: {"id": run_id, "status": "completed", "conclusion": "action_required"})
+    detail = sweeper._maybe_fetch_single_candidate_run_detail(reviewer_bot, run_correlation, {"status": "no_exact_artifact_match"})
+    assert detail == {"id": 123, "status": "completed", "conclusion": "action_required"}
+    assert run_correlation["correlated_run"] == 123
+
+
+def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_without_artifact(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
+    review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
+    review["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"state": "open", "head": {"sha": "head-1"}} if endpoint == "pulls/42" else {"workflow_runs": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 202,
+                "submitted_at": "2026-03-25T11:00:00Z",
+                "state": "COMMENTED",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
+    assert review["last_reviewer_activity"] == "2026-03-25T11:00:00Z"
+    assert review["transition_warning_sent"] is None
+    assert review["transition_notice_sent_at"] is None
+    assert "pull_request_review:202" not in review["deferred_gaps"]
+    assert "pull_request_review:202" in review["reconciled_source_events"]
+
+
 def test_workflow_policy_split_and_lock_only_boundaries():
     workflows_dir = Path(".github/workflows")
     required = {
@@ -1365,6 +1603,13 @@ def test_workflow_policy_split_and_lock_only_boundaries():
                     assert "@" in value and len(value.split("@", 1)[1]) == 40
 
 
+def test_pr_comment_observer_workflow_builds_payload_inline_without_bot_src_root():
+    workflow = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
+    assert "BOT_SRC_ROOT" not in workflow
+    assert "build_pr_comment_observer_payload" not in workflow
+    assert "Fetch trusted bot source tarball" not in workflow
+
+
 def test_workflow_summaries_and_runbook_references_exist():
     runbook = Path("docs/reviewer-bot-review-freshness-operator-runbook.md")
     assert runbook.exists()
@@ -1387,17 +1632,15 @@ def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
     assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
 
 
-def test_pr_comment_observer_routes_through_reviewer_bot_payload_builder():
+def test_pr_comment_observer_workflow_uses_inline_payload_builder():
     data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8"))
     job = data["jobs"]["observer"]
     steps = job["steps"]
-    assert steps[0]["name"] == "Install uv"
-    assert steps[1]["name"] == "Fetch trusted bot source tarball"
-    assert steps[2]["name"] == "Build deferred comment artifact"
-    assert steps[3]["name"] == "Upload deferred comment artifact"
+    assert steps[0]["name"] == "Build deferred comment artifact"
+    assert steps[1]["name"] == "Upload deferred comment artifact"
     workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
-    assert "build_pr_comment_observer_payload" in workflow_text
-    assert 'uv run --project "$BOT_SRC_ROOT" python - <<\'PY\'' in workflow_text
+    assert "build_pr_comment_observer_payload" not in workflow_text
+    assert 'uv run --project "$BOT_SRC_ROOT"' not in workflow_text
 
 
 def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):

@@ -274,6 +274,41 @@ def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
     assert excinfo.value.code == 1
 
 
+def test_main_schedule_backfills_existing_transition_notice_without_duplicate_comment(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "schedule")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
+    review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
+
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, current: False)
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: False)
+    monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []})
+    monkeypatch.setattr(reviewer_bot, "save_state", lambda current: True)
+    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current, issue_numbers: True)
+    posted = []
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+
+    def fake_api(method, endpoint, data=None):
+        if endpoint == "issues/42/comments?per_page=100":
+            return [{"id": 99, "created_at": "2026-03-25T15:22:42Z", "body": "🔔 **Transition Period Ended**\n\nExisting notice", "user": {"login": "github-actions[bot]"}}]
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(reviewer_bot, "github_api", fake_api)
+    reviewer_bot.main()
+    assert review["transition_notice_sent_at"] == "2026-03-25T15:22:42Z"
+    assert posted == []
+
+
 def test_main_mutating_event_fails_closed_when_state_unavailable(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")

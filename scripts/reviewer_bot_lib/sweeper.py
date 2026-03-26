@@ -13,6 +13,8 @@ from urllib.parse import quote
 from .reconcile import (
     _artifact_expected_name,
     _artifact_expected_payload_name,
+    _clear_source_event_key,
+    _mark_reconciled_source_event,
     _update_deferred_gap,
     _was_reconciled_source_event,
 )
@@ -435,6 +437,104 @@ def _list_issue_comments_paginated(bot, issue_number: int) -> tuple[list[dict] |
         page += 1
 
 
+def _is_automation_comment(comment: dict) -> bool:
+    user = comment.get("user") if isinstance(comment, dict) else None
+    login = user.get("login") if isinstance(user, dict) else None
+    user_type = user.get("type") if isinstance(user, dict) else None
+    if isinstance(login, str):
+        lowered = login.lower()
+        if lowered == "github-actions[bot]" or lowered == "guidelines-bot" or lowered.endswith("[bot]"):
+            return True
+    if isinstance(user_type, str) and user_type.lower() == "bot":
+        return True
+    if comment.get("performed_via_github_app"):
+        return True
+    return False
+
+
+def _fetch_live_issue_comment(bot, comment_id: str) -> dict | None:
+    if not comment_id.isdigit():
+        return None
+    response = bot.github_api("GET", f"issues/comments/{comment_id}")
+    return response if isinstance(response, dict) else None
+
+
+def _purge_bot_authored_comment_gap(bot, review_data: dict, source_event_key: str) -> bool:
+    if not source_event_key.startswith("issue_comment:"):
+        return False
+    comment_id = source_event_key.split(":", 1)[1]
+    live_comment = _fetch_live_issue_comment(bot, comment_id)
+    if not isinstance(live_comment, dict) or not _is_automation_comment(live_comment):
+        return False
+    deferred_gaps = review_data.get("deferred_gaps")
+    if not isinstance(deferred_gaps, dict) or source_event_key not in deferred_gaps:
+        return False
+    deferred_gaps.pop(source_event_key, None)
+    return True
+
+
+def _maybe_fetch_single_candidate_run_detail(bot, run_correlation: dict, artifact_correlation: dict | None) -> dict | None:
+    correlated_run = run_correlation.get("correlated_run")
+    if isinstance(correlated_run, int):
+        return _fetch_run_detail(bot, correlated_run)
+    candidate_run_ids = run_correlation.get("candidate_run_ids")
+    if not isinstance(candidate_run_ids, list):
+        return None
+    candidate_ints = [run_id for run_id in candidate_run_ids if isinstance(run_id, int)]
+    if len(candidate_ints) != 1:
+        return None
+    if isinstance(artifact_correlation, dict) and artifact_correlation.get("status") == "observer_state_unknown":
+        return None
+    run_id = candidate_ints[0]
+    run_correlation["correlated_run"] = run_id
+    run_correlation["correlated_run_found"] = True
+    return _fetch_run_detail(bot, run_id)
+
+
+def _can_repair_visible_review(bot, review_data: dict, review: dict, source_event_key: str) -> tuple[str, str, str] | None:
+    current_reviewer = review_data.get("current_reviewer")
+    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
+        return None
+    author = review.get("user", {}).get("login") if isinstance(review, dict) else None
+    commit_id = review.get("commit_id") if isinstance(review, dict) else None
+    submitted_at = review.get("submitted_at") if isinstance(review, dict) else None
+    review_id = review.get("id") if isinstance(review, dict) else None
+    if not isinstance(author, str) or author.lower() != current_reviewer.lower():
+        return None
+    if not isinstance(commit_id, str) or not commit_id.strip():
+        return None
+    if not isinstance(submitted_at, str):
+        return None
+    boundary = bot.reviews_module.get_current_cycle_boundary(bot, review_data)
+    submitted_dt = parse_timestamp(submitted_at)
+    if boundary is None or submitted_dt is None or submitted_dt < boundary:
+        return None
+    if source_event_key != f"pull_request_review:{review_id}":
+        return None
+    return author, submitted_at, commit_id
+
+
+def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source_event_key: str, review: dict) -> bool:
+    repair = _can_repair_visible_review(bot, review_data, review, source_event_key)
+    if repair is None:
+        return False
+    author, submitted_at, commit_id = repair
+    changed = bot.reviews_module.accept_channel_event(
+        review_data,
+        "reviewer_review",
+        semantic_key=source_event_key,
+        timestamp=submitted_at,
+        actor=author,
+        reviewed_head_sha=commit_id,
+        source_precedence=1,
+    )
+    bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
+    completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
+    _mark_reconciled_source_event(review_data, source_event_key)
+    _clear_source_event_key(review_data, source_event_key)
+    return changed or completion is not None
+
+
 def _discover_visible_comment_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
     watermark = _load_surface_watermark(review_data, "comments")
     watermark["last_scan_started_at"] = _now_iso()
@@ -444,6 +544,8 @@ def _discover_visible_comment_events(bot, issue_number: int, review_data: dict) 
     floor = _surface_scan_floor(bot, watermark)
     discovered: list[dict] = []
     for comment in comments:
+        if _is_automation_comment(comment):
+            continue
         comment_id = comment.get("id")
         created_at = comment.get("created_at")
         if not isinstance(comment_id, int) or not isinstance(created_at, str):
@@ -459,6 +561,7 @@ def _discover_visible_comment_events(bot, issue_number: int, review_data: dict) 
                 "source_created_at": created_at,
                 "object_id": str(comment_id),
                 "surface": "comments",
+                "comment": comment,
             }
         )
     return discovered, complete
@@ -491,6 +594,7 @@ def _discover_visible_review_events(bot, issue_number: int, review_data: dict) -
                 "source_created_at": submitted_at,
                 "object_id": str(review_id),
                 "surface": "reviews_submitted",
+                "review": review,
             }
         )
     return discovered, True
@@ -619,6 +723,11 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
         pull_request = bot.github_api("GET", f"pulls/{issue_number}")
         if not isinstance(pull_request, dict) or str(pull_request.get("state", "")).lower() != "open":
             continue
+        deferred_gaps = review_data.get("deferred_gaps")
+        if isinstance(deferred_gaps, dict):
+            for source_event_key in list(deferred_gaps):
+                if _purge_bot_authored_comment_gap(bot, review_data, source_event_key):
+                    changed = True
         discovered_comments, comments_complete = _discover_visible_comment_events(bot, issue_number, review_data)
         if comments_complete and isinstance(discovered_comments, list):
             for discovered in discovered_comments:
@@ -652,7 +761,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                     if isinstance(exact_run_id, int):
                         run_correlation["correlated_run"] = exact_run_id
                         run_correlation["correlated_run_found"] = True
-                        run_detail = _fetch_run_detail(bot, exact_run_id)
+                    run_detail = _maybe_fetch_single_candidate_run_detail(bot, run_correlation, artifact_correlation)
                 reason, diagnostic_reason = evaluate_deferred_gap_state(
                     {
                         **existing_gap,
@@ -719,7 +828,16 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                     if isinstance(exact_run_id, int):
                         run_correlation["correlated_run"] = exact_run_id
                         run_correlation["correlated_run_found"] = True
-                        run_detail = _fetch_run_detail(bot, exact_run_id)
+                    run_detail = _maybe_fetch_single_candidate_run_detail(bot, run_correlation, artifact_correlation)
+                review_payload = discovered.get("review") if isinstance(discovered.get("review"), dict) else None
+                artifact_status = artifact_correlation.get("status") if isinstance(artifact_correlation, dict) else None
+                if (
+                    review_payload is not None
+                    and artifact_status != "exact_artifact_match"
+                    and _repair_visible_review_gap(bot, review_data, issue_number, source_event_key, review_payload)
+                ):
+                    changed = True
+                    continue
                 reason, diagnostic_reason = evaluate_deferred_gap_state(
                     {
                         **existing_gap,
