@@ -8,7 +8,11 @@ import os
 import yaml
 
 from .lifecycle import maybe_record_head_observation_repair
-from .overdue import check_overdue_reviews, handle_overdue_review_warning
+from .overdue import (
+    backfill_transition_notice_if_present,
+    check_overdue_reviews,
+    handle_overdue_review_warning,
+)
 from .sweeper import sweep_deferred_gaps
 
 
@@ -106,6 +110,8 @@ def handle_scheduled_check(bot, state: dict) -> bool:
             if handle_overdue_review_warning(bot, state, issue_number, reviewer):
                 changed = True
         elif review["needs_transition"]:
-            bot.handle_transition_notice(state, issue_number, reviewer)
-            changed = True
+            if backfill_transition_notice_if_present(bot, state, issue_number):
+                changed = True
+            elif bot.handle_transition_notice(state, issue_number, reviewer):
+                changed = True
     return changed
