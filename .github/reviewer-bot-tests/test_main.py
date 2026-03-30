@@ -62,10 +62,75 @@ def test_main_show_state_uses_direct_yaml_import(monkeypatch, capsys):
     assert "freshness_runtime_epoch" in output
 
 
+def _valid_reviewer_board_metadata():
+    return {
+        "data": {
+            "organization": {
+                "projectV2": {
+                    "id": "PVT_kwDOB",
+                    "title": "Reviewer Board",
+                    "fields": {
+                        "nodes": [
+                            {
+                                "__typename": "ProjectV2SingleSelectField",
+                                "id": "field-review-state",
+                                "name": "Review State",
+                                "options": [
+                                    {"id": "opt-ar", "name": "Awaiting Reviewer"},
+                                    {"id": "opt-ac", "name": "Awaiting Contributor"},
+                                    {"id": "opt-aw", "name": "Awaiting Write Approval"},
+                                    {"id": "opt-done", "name": "Done"},
+                                    {"id": "opt-unassigned", "name": "Unassigned"},
+                                ],
+                            },
+                            {
+                                "__typename": "ProjectV2Field",
+                                "dataType": "TEXT",
+                                "id": "field-reviewer",
+                                "name": "Reviewer",
+                            },
+                            {
+                                "__typename": "ProjectV2Field",
+                                "dataType": "DATE",
+                                "id": "field-assigned-at",
+                                "name": "Assigned At",
+                            },
+                            {
+                                "__typename": "ProjectV2Field",
+                                "dataType": "DATE",
+                                "id": "field-waiting-since",
+                                "name": "Waiting Since",
+                            },
+                            {
+                                "__typename": "ProjectV2SingleSelectField",
+                                "id": "field-needs-attention",
+                                "name": "Needs Attention",
+                                "options": [
+                                    {"id": "opt-no", "name": "No"},
+                                    {"id": "opt-warning", "name": "Warning Sent"},
+                                    {"id": "opt-notice", "name": "Transition Notice Sent"},
+                                    {"id": "opt-triage", "name": "Triage Approval Required"},
+                                    {"id": "opt-repair", "name": "Projection Repair Required"},
+                                ],
+                            },
+                        ]
+                    },
+                }
+            }
+        }
+    }
+
+
 def test_classify_event_intent_cross_repo_review_is_non_mutating_defer(monkeypatch):
     monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "true")
     intent = reviewer_bot.classify_event_intent("pull_request_review", "submitted")
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
+
+
+def test_classify_event_intent_preview_reviewer_board_is_non_mutating(monkeypatch):
+    monkeypatch.setenv("MANUAL_ACTION", "preview-reviewer-board")
+    intent = reviewer_bot.classify_event_intent("workflow_dispatch", "")
+    assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_READONLY
 
 
 def test_classify_event_intent_same_repo_review_is_non_mutating_defer(monkeypatch):
@@ -246,6 +311,170 @@ def test_main_reloads_state_before_syncing_status_labels(monkeypatch):
         "load:4",
         "sync",
     ]
+
+
+def test_main_preview_reviewer_board_disabled_is_clean_noop(monkeypatch, capsys):
+    monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    monkeypatch.setenv("MANUAL_ACTION", "preview-reviewer-board")
+    monkeypatch.setenv("REVIEWER_BOARD_ENABLED", "false")
+
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
+    monkeypatch.setattr(
+        reviewer_bot,
+        "acquire_state_issue_lease_lock",
+        lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "process_pass_until_expirations",
+        lambda state: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "sync_members_with_queue",
+        lambda state: (_ for _ in ()).throw(AssertionError("preview should skip member sync")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "save_state",
+        lambda state: (_ for _ in ()).throw(AssertionError("preview should not save state")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "sync_status_labels_for_items",
+        lambda state, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")),
+    )
+
+    reviewer_bot.main()
+
+    output = capsys.readouterr().out
+    assert "Reviewer board preview skipped: reviewer board is disabled." in output
+
+
+def test_main_preview_reviewer_board_missing_token_fails_clearly(monkeypatch, capsys):
+    monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    monkeypatch.setenv("MANUAL_ACTION", "preview-reviewer-board")
+    monkeypatch.setenv("REVIEWER_BOARD_ENABLED", "true")
+    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
+    monkeypatch.setattr(
+        reviewer_bot,
+        "acquire_state_issue_lease_lock",
+        lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "process_pass_until_expirations",
+        lambda state: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "sync_members_with_queue",
+        lambda state: (_ for _ in ()).throw(AssertionError("preview should skip member sync")),
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        reviewer_bot.main()
+
+    assert excinfo.value.code == 1
+    assert "REVIEWER_BOARD_TOKEN not set" in capsys.readouterr().err
+
+
+def test_main_preview_reviewer_board_invalid_manifest_fails_clearly(monkeypatch, capsys):
+    monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    monkeypatch.setenv("MANUAL_ACTION", "preview-reviewer-board")
+    monkeypatch.setenv("REVIEWER_BOARD_ENABLED", "true")
+    monkeypatch.setenv("REVIEWER_BOARD_TOKEN", "board-token")
+    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
+    monkeypatch.setattr(
+        reviewer_bot,
+        "acquire_state_issue_lease_lock",
+        lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_graphql",
+        lambda query, variables=None, *, token=None: {
+            "data": {
+                "organization": {
+                    "projectV2": {
+                        "id": "PVT_kwDOB",
+                        "title": "Reviewer Board",
+                        "fields": {"nodes": []},
+                    }
+                }
+            }
+        },
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        reviewer_bot.main()
+
+    assert excinfo.value.code == 1
+    assert "Missing reviewer board field: Review State" in capsys.readouterr().err
+
+
+def test_main_preview_reviewer_board_is_read_only(monkeypatch, capsys):
+    monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    monkeypatch.setenv("MANUAL_ACTION", "preview-reviewer-board")
+    monkeypatch.setenv("REVIEWER_BOARD_ENABLED", "true")
+    monkeypatch.setenv("REVIEWER_BOARD_TOKEN", "board-token")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+
+    state = make_state()
+    state["status_projection_epoch"] = "status_projection_v1"
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-20T12:34:56Z"
+    review["active_cycle_started_at"] = "2026-03-20T12:34:56Z"
+
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
+    monkeypatch.setattr(
+        reviewer_bot,
+        "acquire_state_issue_lease_lock",
+        lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "process_pass_until_expirations",
+        lambda current: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "sync_members_with_queue",
+        lambda current: (_ for _ in ()).throw(AssertionError("preview should skip member sync")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "save_state",
+        lambda current: (_ for _ in ()).throw(AssertionError("preview should not save state")),
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "sync_status_labels_for_items",
+        lambda current, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")),
+    )
+    monkeypatch.setattr(reviewer_bot, "github_graphql", lambda query, variables=None, *, token=None: _valid_reviewer_board_metadata())
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+    )
+
+    reviewer_bot.main()
+
+    output = capsys.readouterr().out
+    assert "classification: open_tracked_assigned" in output
+    assert "ensure_membership: true" in output
 
 
 def test_issue_close_then_close_comment_does_not_leave_active_review(monkeypatch):

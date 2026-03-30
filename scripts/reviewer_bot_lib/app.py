@@ -75,7 +75,7 @@ def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action
 
     if event_name == "workflow_dispatch":
         action = os.environ.get("MANUAL_ACTION", "").strip()
-        if action == "show-state":
+        if action in {"show-state", "preview-reviewer-board"}:
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
         return bot.EVENT_INTENT_MUTATING
 
@@ -182,7 +182,7 @@ def main(bot: ReviewerBotContext):
                     )
 
         touched_items = bot.drain_touched_items()
-        if event_name in {"schedule", "workflow_dispatch"} and status_projection_repair_needed(bot, state):
+        if lock_required and event_name in {"schedule", "workflow_dispatch"} and status_projection_repair_needed(bot, state):
             touched_items = sorted(
                 {
                     *touched_items,

@@ -13,6 +13,11 @@ from .overdue import (
     check_overdue_reviews,
     handle_overdue_review_warning,
 )
+from .project_board import (
+    format_preview_for_output,
+    preview_board_projection_for_item,
+    reviewer_board_preflight,
+)
 from .sweeper import sweep_deferred_gaps
 
 
@@ -35,6 +40,44 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
     action = os.environ.get("MANUAL_ACTION", "")
     if action == "show-state":
         print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
+        return False
+    if action == "preview-reviewer-board":
+        preflight = reviewer_board_preflight(bot)
+        if not preflight.enabled:
+            print("Reviewer board preview skipped: reviewer board is disabled.")
+            return False
+        if not preflight.valid:
+            raise RuntimeError(
+                "Reviewer board preview preflight failed: " + "; ".join(preflight.errors)
+            )
+
+        issue_number_raw = os.environ.get("ISSUE_NUMBER", "").strip()
+        issue_numbers: list[int] = []
+        if issue_number_raw:
+            issue_numbers = [int(issue_number_raw)]
+        else:
+            active_reviews = state.get("active_reviews")
+            if isinstance(active_reviews, dict):
+                candidates: set[int] = set()
+                for issue_key, review_data in active_reviews.items():
+                    if not isinstance(review_data, dict):
+                        continue
+                    try:
+                        issue_number = int(issue_key)
+                    except (TypeError, ValueError):
+                        continue
+                    if issue_number > 0:
+                        candidates.add(issue_number)
+                issue_numbers = sorted(candidates)
+
+        previews = [preview_board_projection_for_item(bot, state, issue_number) for issue_number in issue_numbers]
+        print(
+            yaml.safe_dump(
+                format_preview_for_output(preflight, previews),
+                default_flow_style=False,
+                sort_keys=False,
+            ).rstrip()
+        )
         return False
     bot.assert_lock_held("handle_manual_dispatch")
     if action == "sync-members":
