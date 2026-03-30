@@ -10,7 +10,11 @@ on:
         required: true
         default: check-overdue
         type: choice
-        options: [sync-members, show-state, check-overdue, repair-review-status-labels]
+        options: [sync-members, show-state, check-overdue, repair-review-status-labels, preview-reviewer-board]
+      issue_number:
+        description: Optional issue or PR number for targeted reviewer-board preview
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -58,6 +62,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EVENT_ACTION: ${{ github.event.action }}
           MANUAL_ACTION: ${{ github.event.inputs.action }}
+          ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -66,6 +71,8 @@ jobs:
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
           CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-sweeper-repair.yml
+          REVIEWER_BOARD_ENABLED: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'preview-reviewer-board' && 'true' || 'false' }}
+          REVIEWER_BOARD_TOKEN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'preview-reviewer-board' && secrets.REVIEWER_BOARD_TOKEN || '' }}
         run: uv run --project "$BOT_SRC_ROOT" reviewer-bot
       - name: Workflow summary
         run: |
