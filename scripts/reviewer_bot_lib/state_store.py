@@ -279,6 +279,7 @@ def get_state_issue_snapshot(bot: StateStoreContext) -> StateIssueSnapshot | Non
     response = bot.github_api_request(
         "GET",
         f"issues/{state_issue_number}",
+        retry_policy="idempotent_read",
         suppress_error_log=True,
     )
     if response.status_code != 200:
@@ -307,10 +308,12 @@ def get_state_issue_snapshot(bot: StateStoreContext) -> StateIssueSnapshot | Non
 
 def conditional_patch_state_issue(bot: StateStoreContext, body: str, etag: str | None = None):
     state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
+    extra_headers = {"If-Match": etag} if isinstance(etag, str) and etag else None
     return bot.github_api_request(
         "PATCH",
         f"issues/{state_issue_number}",
         {"body": body},
+        extra_headers=extra_headers,
         suppress_error_log=True,
     )
 

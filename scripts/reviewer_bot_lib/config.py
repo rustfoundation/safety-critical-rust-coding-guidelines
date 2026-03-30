@@ -197,11 +197,14 @@ def get_commands_help() -> str:
 
 @dataclass
 class GitHubApiResult:
-    status_code: int
+    status_code: int | None
     payload: Any
     headers: dict[str, str]
     text: str
     ok: bool
+    failure_kind: str | None = None
+    retry_attempts: int = 0
+    transport_error: str | None = None
 
 
 @dataclass

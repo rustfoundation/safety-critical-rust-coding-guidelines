@@ -213,6 +213,8 @@ def github_api_request(
     data: dict | None = None,
     extra_headers: dict[str, str] | None = None,
     *,
+    retry_policy: str = "none",
+    timeout_seconds: float | None = None,
     suppress_error_log: bool = False,
 ) -> GitHubApiResult:
     return github_api_module.github_api_request(
@@ -221,6 +223,8 @@ def github_api_request(
         endpoint,
         data,
         extra_headers,
+        retry_policy=retry_policy,
+        timeout_seconds=timeout_seconds,
         suppress_error_log=suppress_error_log,
     )
 
@@ -234,6 +238,8 @@ def github_graphql_request(
     variables: dict | None = None,
     *,
     token: str | None = None,
+    retry_policy: str = "none",
+    timeout_seconds: float | None = None,
     suppress_error_log: bool = False,
 ) -> GitHubApiResult:
     return github_api_module.github_graphql_request(
@@ -241,6 +247,8 @@ def github_graphql_request(
         query,
         variables,
         token=token,
+        retry_policy=retry_policy,
+        timeout_seconds=timeout_seconds,
         suppress_error_log=suppress_error_log,
     )
 
@@ -346,7 +354,7 @@ def get_assignment_failure_comment(reviewer: str, attempt: AssignmentAttempt) ->
     return github_api_module.get_assignment_failure_comment(_runtime_bot(), reviewer, attempt)
 
 
-def get_issue_assignees(issue_number: int) -> list[str]:
+def get_issue_assignees(issue_number: int) -> list[str] | None:
     return github_api_module.get_issue_assignees(_runtime_bot(), issue_number)
 
 
@@ -366,7 +374,11 @@ def unassign_reviewer(issue_number: int, username: str) -> bool:
     return github_api_module.unassign_reviewer(_runtime_bot(), issue_number, username)
 
 
-def check_user_permission(username: str, required_permission: str = "triage") -> bool:
+def get_user_permission_status(username: str, required_permission: str = "triage") -> str:
+    return github_api_module.get_user_permission_status(_runtime_bot(), username, required_permission)
+
+
+def check_user_permission(username: str, required_permission: str = "triage") -> bool | None:
     return github_api_module.check_user_permission(_runtime_bot(), username, required_permission)
 
 
@@ -627,6 +639,10 @@ def get_default_branch() -> str:
 
 def find_open_pr_for_branch(branch: str) -> dict | None:
     return automation_module.find_open_pr_for_branch(_runtime_bot(), branch)
+
+
+def find_open_pr_for_branch_status(branch: str) -> tuple[str, dict | None]:
+    return automation_module.find_open_pr_for_branch_status(_runtime_bot(), branch)
 
 
 def resolve_workflow_run_pr_number() -> int:

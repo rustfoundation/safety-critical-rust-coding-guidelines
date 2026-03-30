@@ -21,6 +21,30 @@ def _now_iso(bot) -> str:
     return bot.datetime.now(bot.timezone.utc).isoformat()
 
 
+class ReconcileReadError(RuntimeError):
+    def __init__(self, message: str, *, failure_kind: str | None = None):
+        super().__init__(message)
+        self.failure_kind = failure_kind
+
+
+def _read_reconcile_object(bot, endpoint: str, *, label: str) -> dict:
+    try:
+        response = bot.github_api_request("GET", endpoint, retry_policy="idempotent_read")
+    except SystemExit:
+        payload = bot.github_api("GET", endpoint)
+        if not isinstance(payload, dict):
+            raise ReconcileReadError(f"{label} unavailable", failure_kind="unavailable")
+        return payload
+    if not response.ok:
+        failure_kind = response.failure_kind
+        if failure_kind == "not_found":
+            raise ReconcileReadError(f"{label} not found", failure_kind=failure_kind)
+        raise ReconcileReadError(f"{label} unavailable", failure_kind=failure_kind)
+    if not isinstance(response.payload, dict):
+        raise ReconcileReadError(f"{label} payload invalid", failure_kind="invalid_payload")
+    return response.payload
+
+
 def _ensure_source_event_key(review_data: dict, source_event_key: str, payload: dict | None = None) -> None:
     review_data.setdefault("deferred_gaps", {})
     if payload is None:
@@ -47,12 +71,10 @@ def _was_reconciled_source_event(review_data: dict, source_event_key: str) -> bo
 
 
 def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dict) -> bool:
-    pull_request = bot.github_api("GET", f"pulls/{issue_number}")
-    if not isinstance(pull_request, dict):
-        raise RuntimeError(f"Failed to fetch pull request #{issue_number}")
+    pull_request = _read_reconcile_object(bot, f"pulls/{issue_number}", label=f"pull request #{issue_number}")
     reviews = bot.get_pull_request_reviews(issue_number)
     if reviews is None:
-        raise RuntimeError(f"Failed to fetch live reviews for PR #{issue_number}")
+        raise ReconcileReadError(f"live reviews for PR #{issue_number} unavailable", failure_kind="unavailable")
     refresh_reviewer_review_from_live_preferred_review(
         bot,
         issue_number,
@@ -61,9 +83,19 @@ def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dic
         reviews=reviews,
         actor=review_data.get("current_reviewer"),
     )
-    completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data, pull_request=pull_request, reviews=reviews)
-    if completion is None:
-        raise RuntimeError(f"Unable to rebuild approval state for PR #{issue_number}")
+    approval_result = bot.reviews_module.rebuild_pr_approval_state_result(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if not approval_result.get("ok"):
+        raise ReconcileReadError(
+            f"Unable to rebuild approval state for PR #{issue_number}: {approval_result.get('reason')}",
+            failure_kind=str(approval_result.get("failure_kind") or "unavailable"),
+        )
+    completion = approval_result["completion"]
     return bool(completion.get("completed"))
 
 
@@ -218,9 +250,7 @@ def _set_env_if_present(name: str, value) -> None:
 
 
 def _hydrate_reconcile_pr_context(bot, pr_number: int) -> dict:
-    pull_request = bot.github_api("GET", f"pulls/{pr_number}")
-    if not isinstance(pull_request, dict):
-        raise RuntimeError(f"Failed to fetch live PR #{pr_number} for reconcile context")
+    pull_request = _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number} for reconcile context")
     author = pull_request.get("user")
     if not isinstance(author, dict):
         raise RuntimeError(f"Live PR #{pr_number} is missing author metadata")
@@ -394,12 +424,30 @@ def _reconcile_deferred_comment(
     comment_created_at = str(payload.get("source_created_at"))
     classified = payload.get("comment_class")
     source_freshness_eligible = classified in {"plain_text", "command_plus_text"} and bool(payload.get("has_non_command_text"))
-    live_comment = bot.github_api("GET", live_comment_endpoint)
-    if not isinstance(live_comment, dict):
+    try:
+        live_comment = _read_reconcile_object(bot, live_comment_endpoint, label=f"deferred comment {comment_id}")
+    except ReconcileReadError as exc:
         changed = False
         if source_freshness_eligible:
             changed = _record_conversation_freshness(bot, state, pr_number, comment_author, comment_id, comment_created_at)
-        _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {comment_id} is no longer visible; source-time freshness only may be preserved. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
+        if exc.failure_kind == "not_found":
+            summary = (
+                f"Deferred comment {comment_id} is no longer visible; source-time freshness only may be preserved. "
+                f"See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
+            )
+        else:
+            summary = (
+                f"Deferred comment {comment_id} could not be validated from live GitHub data "
+                f"({exc.failure_kind or 'unavailable'}); replay suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
+            )
+        _update_deferred_gap(
+            bot,
+            review_data,
+            payload,
+            "reconcile_failed_closed",
+            summary,
+            failure_kind=exc.failure_kind,
+        )
         return changed
     _hydrate_reconcile_comment_context(live_comment, payload)
     live_body = live_comment.get("body")
@@ -424,7 +472,15 @@ def _reconcile_deferred_comment(
     return changed
 
 
-def _update_deferred_gap(bot, review_data: dict, payload: dict, reason: str, diagnostic_summary: str) -> None:
+def _update_deferred_gap(
+    bot,
+    review_data: dict,
+    payload: dict,
+    reason: str,
+    diagnostic_summary: str,
+    *,
+    failure_kind: str | None = None,
+) -> None:
     source_event_key = str(payload.get("source_event_key", ""))
     if not source_event_key:
         return
@@ -447,6 +503,7 @@ def _update_deferred_gap(bot, review_data: dict, payload: dict, reason: str, dia
             "last_checked_at": _now_iso(bot),
             "operator_action_required": True,
             "diagnostic_summary": diagnostic_summary,
+            "failure_kind": failure_kind,
         }
     )
     review_data["deferred_gaps"][source_event_key] = existing
@@ -563,10 +620,14 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
             review_id = review_id_value
             if source_event_key != f"pull_request_review:{review_id}":
                 raise RuntimeError("Deferred review-submitted artifact source_event_key mismatch")
-            live_review = bot.github_api("GET", f"pulls/{pr_number}/reviews/{review_id}")
-            live_pr = bot.github_api("GET", f"pulls/{pr_number}")
-            if not isinstance(live_pr, dict):
-                raise RuntimeError(f"Failed to fetch live PR #{pr_number}")
+            try:
+                live_review = _read_reconcile_object(bot, f"pulls/{pr_number}/reviews/{review_id}", label=f"live review #{review_id}")
+            except ReconcileReadError as exc:
+                if exc.failure_kind == "not_found":
+                    live_review = None
+                else:
+                    raise
+            _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number}")
             live_commit_id = None
             live_submitted_at = payload.get("source_submitted_at")
             live_state = payload.get("source_review_state")
@@ -577,7 +638,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
             else:
                 live_commit_id = payload.get("source_commit_id")
             actor = str(payload.get("actor_login", ""))
-            changed = bot.maybe_record_head_observation_repair(pr_number, review_data)
+            state_changed = bot.maybe_record_head_observation_repair(pr_number, review_data).changed
             if isinstance(review_data.get("current_reviewer"), str) and review_data.get("current_reviewer", "").lower() == actor.lower() and isinstance(live_commit_id, str) and isinstance(live_submitted_at, str):
                 bot.reviews_module.accept_channel_event(
                     review_data,
@@ -589,10 +650,12 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                     source_precedence=1,
                 )
                 bot.reviews_module.record_reviewer_activity(review_data, live_submitted_at)
-            _record_review_rebuild(bot, state, pr_number, review_data)
+                state_changed = True
+            if _record_review_rebuild(bot, state, pr_number, review_data):
+                state_changed = True
             _mark_reconciled_source_event(review_data, source_event_key)
             _clear_source_event_key(review_data, source_event_key)
-            return changed or True
+            return state_changed
 
         if event_name == "pull_request_review" and event_action == "dismissed":
             _validate_deferred_review_artifact(payload)
@@ -609,12 +672,21 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 timestamp=_now_iso(bot),
                 dismissal_only=True,
             )
-            bot.maybe_record_head_observation_repair(pr_number, review_data)
-            _record_review_rebuild(bot, state, pr_number, review_data)
+            state_changed = bot.maybe_record_head_observation_repair(pr_number, review_data).changed
+            if _record_review_rebuild(bot, state, pr_number, review_data):
+                state_changed = True
             _mark_reconciled_source_event(review_data, source_event_key)
             _clear_source_event_key(review_data, source_event_key)
             return True
     except RuntimeError as exc:
-        _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"{exc} See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
+        failure_kind = exc.failure_kind if isinstance(exc, ReconcileReadError) else None
+        _update_deferred_gap(
+            bot,
+            review_data,
+            payload,
+            "reconcile_failed_closed",
+            f"{exc} See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.",
+            failure_kind=failure_kind,
+        )
         raise
     raise RuntimeError("Unsupported deferred workflow_run payload")

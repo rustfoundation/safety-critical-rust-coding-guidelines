@@ -46,23 +46,41 @@ def get_default_branch(bot) -> str:
     return "main"
 
 
-def find_open_pr_for_branch(bot, branch: str) -> dict | None:
+def find_open_pr_for_branch_status(bot, branch: str) -> tuple[str, dict | None]:
     owner = os.environ.get("REPO_OWNER", "").strip()
     branch = branch.strip()
     if not owner or not branch:
-        return None
-    response = bot.github_api("GET", f"pulls?state=open&head={owner}:{branch}")
-    if isinstance(response, list) and response:
-        first = response[0]
+        return "not_found", None
+    response = bot.github_api_request(
+        "GET",
+        f"pulls?state=open&head={owner}:{branch}",
+        retry_policy="idempotent_read",
+    )
+    if not response.ok:
+        return "unavailable", None
+    payload = response.payload
+    if not isinstance(payload, list):
+        return "unavailable", None
+    if payload:
+        first = payload[0]
         if isinstance(first, dict):
-            return first
-    return None
+            return "found", first
+    return "not_found", None
+
+
+def find_open_pr_for_branch(bot, branch: str) -> dict | None:
+    status, pr = find_open_pr_for_branch_status(bot, branch)
+    if status != "found":
+        return None
+    return pr
 
 
 def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict | None:
-    existing = bot.find_open_pr_for_branch(branch)
-    if existing:
+    lookup_status, existing = bot.find_open_pr_for_branch_status(branch)
+    if lookup_status == "found":
         return existing
+    if lookup_status == "unavailable":
+        raise RuntimeError(f"Unable to determine whether branch '{branch}' already has an open PR")
     title = "chore: update spec.lock (no guideline impact)"
     body = (
         "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n"
@@ -84,7 +102,10 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
     labels = bot.parse_issue_labels()
     if bot.FLS_AUDIT_LABEL not in labels:
         return "❌ This command is only available on issues labeled `fls-audit`.", False
-    if not bot.check_user_permission(comment_author, "triage"):
+    permission_status = bot.get_user_permission_status(comment_author, "triage")
+    if permission_status == "unavailable":
+        return "❌ Unable to verify triage permissions right now; refusing to run this command.", False
+    if permission_status != "granted":
         return "❌ You must have triage permissions to run this command.", False
 
     repo_root = get_target_repo_root()

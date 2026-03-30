@@ -12,6 +12,20 @@ from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing, sweeper
 
 
+class FakeGitHubResponse:
+    def __init__(self, status_code, payload=None, text="", headers=None):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = text
+        self.headers = headers or {}
+        self.content = b"" if payload is None and not text else b"x"
+
+    def json(self):
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
 def make_state(epoch: str = "freshness_v15"):
     return {
         "schema_version": reviewer_bot.STATE_SCHEMA_VERSION,
@@ -136,6 +150,133 @@ def test_load_state_sets_schema_and_epoch_defaults(monkeypatch):
     assert state["freshness_runtime_epoch"] == reviewer_bot.FRESHNESS_RUNTIME_EPOCH_LEGACY
 
 
+def test_get_state_issue_snapshot_uses_retry_aware_read(monkeypatch):
+    observed = {}
+    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 1)
+
+    def fake_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        observed["retry_policy"] = kwargs.get("retry_policy")
+        return reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"body": "state: ok", "html_url": "https://example.com/state/1"},
+            headers={"etag": '"abc"'},
+            text="ok",
+            ok=True,
+            failure_kind=None,
+            retry_attempts=1,
+            transport_error=None,
+        )
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
+
+    snapshot = reviewer_bot.get_state_issue_snapshot()
+
+    assert snapshot is not None
+    assert snapshot.etag == '"abc"'
+    assert observed["retry_policy"] == "idempotent_read"
+
+
+def test_conditional_patch_state_issue_sends_if_match_header(monkeypatch):
+    observed = {}
+    monkeypatch.setattr(reviewer_bot, "STATE_ISSUE_NUMBER", 1)
+
+    def fake_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        observed["extra_headers"] = extra_headers
+        return reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"body": data["body"]},
+            headers={},
+            text="ok",
+            ok=True,
+            failure_kind=None,
+            retry_attempts=0,
+            transport_error=None,
+        )
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
+
+    reviewer_bot.conditional_patch_state_issue("updated", '"etag-1"')
+
+    assert observed["extra_headers"] == {"If-Match": '"etag-1"'}
+
+
+def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
+    observed = []
+
+    def fake_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        observed.append((endpoint, kwargs.get("retry_policy")))
+        if endpoint == "git/ref/heads/reviewer-bot-state-lock" and len(observed) == 1:
+            return reviewer_bot.GitHubApiResult(
+                status_code=404,
+                payload={"message": "missing"},
+                headers={},
+                text="missing",
+                ok=False,
+                failure_kind="not_found",
+                retry_attempts=0,
+                transport_error=None,
+            )
+        if endpoint == "git/ref/heads/reviewer-bot-state-lock":
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload={"object": {"sha": "base-sha"}},
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        if endpoint == "git/ref/heads/main":
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload={"object": {"sha": "base-sha"}},
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=1,
+                transport_error=None,
+            )
+        if endpoint == "git/refs":
+            return reviewer_bot.GitHubApiResult(
+                status_code=201,
+                payload={"ref": "refs/heads/reviewer-bot-state-lock"},
+                headers={},
+                text="created",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
+    monkeypatch.setattr(reviewer_bot, "LOCK_REF_NAME", "heads/reviewer-bot-state-lock")
+    monkeypatch.setattr(reviewer_bot, "LOCK_REF_BOOTSTRAP_BRANCH", "main")
+
+    assert reviewer_bot.ensure_lock_ref_exists() == "base-sha"
+    assert observed[0] == ("git/ref/heads/reviewer-bot-state-lock", "idempotent_read")
+    assert observed[1] == ("git/ref/heads/main", "idempotent_read")
+
+
+def test_renew_state_issue_lease_lock_fails_on_token_mismatch(monkeypatch):
+    context = reviewer_bot.LeaseContext(
+        lock_token="expected-token",
+        lock_owner_run_id="run-1",
+        lock_owner_workflow="wf",
+        lock_owner_job="job",
+        state_issue_url="https://example.com/state/1",
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_lock_ref_snapshot",
+        lambda: ("ref-sha", "tree-sha", {"lock_token": "different-token", "lock_state": "locked"}),
+    )
+
+    assert reviewer_bot.renew_state_issue_lease_lock(context) is False
+
+
 def test_reviewer_board_preflight_validates_manifest(monkeypatch):
     monkeypatch.setenv("REVIEWER_BOARD_ENABLED", "true")
     monkeypatch.setenv("REVIEWER_BOARD_TOKEN", "board-token")
@@ -146,6 +287,107 @@ def test_reviewer_board_preflight_validates_manifest(monkeypatch):
     assert preflight.enabled is True
     assert preflight.valid is True
     assert preflight.project_id == "PVT_kwDOB"
+
+
+def test_github_api_request_retries_idempotent_get_on_502(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setenv("REPO_OWNER", "rustfoundation")
+    monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
+    responses = iter(
+        [
+            FakeGitHubResponse(502, {"message": "bad gateway"}, "bad gateway"),
+            FakeGitHubResponse(200, {"ok": True}, "ok"),
+        ]
+    )
+    monkeypatch.setattr(reviewer_bot.github_api_module.requests, "request", lambda *args, **kwargs: next(responses))
+    monkeypatch.setattr(reviewer_bot.github_api_module.time, "sleep", lambda *_args, **_kwargs: None)
+
+    result = reviewer_bot.github_api_request("GET", "issues/42", retry_policy="idempotent_read")
+
+    assert result.ok is True
+    assert result.payload == {"ok": True}
+    assert result.retry_attempts == 1
+    assert result.failure_kind is None
+
+
+def test_github_api_request_retries_transport_exception_for_idempotent_get(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setenv("REPO_OWNER", "rustfoundation")
+    monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
+    calls = {"count": 0}
+
+    def fake_request(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise reviewer_bot.github_api_module.requests.RequestException("timeout")
+        return FakeGitHubResponse(200, {"ok": True}, "ok")
+
+    monkeypatch.setattr(reviewer_bot.github_api_module.requests, "request", fake_request)
+    monkeypatch.setattr(reviewer_bot.github_api_module.time, "sleep", lambda *_args, **_kwargs: None)
+
+    result = reviewer_bot.github_api_request("GET", "issues/42", retry_policy="idempotent_read")
+
+    assert result.ok is True
+    assert result.payload == {"ok": True}
+    assert result.retry_attempts == 1
+
+
+def test_github_api_request_classifies_not_found_without_retry(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setenv("REPO_OWNER", "rustfoundation")
+    monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
+    calls = {"count": 0}
+
+    def fake_request(*args, **kwargs):
+        calls["count"] += 1
+        return FakeGitHubResponse(404, {"message": "missing"}, "missing")
+
+    monkeypatch.setattr(reviewer_bot.github_api_module.requests, "request", fake_request)
+
+    result = reviewer_bot.github_api_request("GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
+
+    assert result.ok is False
+    assert result.failure_kind == "not_found"
+    assert result.retry_attempts == 0
+    assert calls["count"] == 1
+
+
+def test_github_api_request_classifies_forbidden_without_retry(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setenv("REPO_OWNER", "rustfoundation")
+    monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
+    calls = {"count": 0}
+
+    def fake_request(*args, **kwargs):
+        calls["count"] += 1
+        return FakeGitHubResponse(403, {"message": "forbidden"}, "forbidden")
+
+    monkeypatch.setattr(reviewer_bot.github_api_module.requests, "request", fake_request)
+
+    result = reviewer_bot.github_api_request("GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
+
+    assert result.ok is False
+    assert result.failure_kind == "forbidden"
+    assert result.retry_attempts == 0
+    assert calls["count"] == 1
+
+
+def test_github_graphql_request_retries_idempotent_query_on_502(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    responses = iter(
+        [
+            FakeGitHubResponse(502, {"message": "bad gateway"}, "bad gateway"),
+            FakeGitHubResponse(200, {"data": {"viewer": {"login": "bot"}}}, "ok"),
+        ]
+    )
+    monkeypatch.setattr(reviewer_bot.github_api_module.requests, "post", lambda *args, **kwargs: next(responses))
+    monkeypatch.setattr(reviewer_bot.github_api_module.time, "sleep", lambda *_args, **_kwargs: None)
+
+    result = reviewer_bot.github_graphql_request("query { viewer { login } }", retry_policy="idempotent_read")
+
+    assert result.ok is True
+    assert result.payload == {"data": {"viewer": {"login": "bot"}}}
+    assert result.retry_attempts == 1
 
 
 @pytest.mark.parametrize(
@@ -479,7 +721,14 @@ def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypat
     review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
     review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
     monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, state: False)
-    monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: False)
+    monkeypatch.setattr(
+        reviewer_bot.maintenance_module,
+        "maybe_record_head_observation_repair",
+        lambda bot, issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+            changed=False,
+            outcome="unchanged",
+        ),
+    )
     monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
     monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"pull_request": {}})
     posted = []
@@ -510,7 +759,14 @@ def test_scheduled_check_repairs_missing_reviewer_review_state(monkeypatch):
     review["current_reviewer"] = "alice"
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
     monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, state: False)
-    monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: False)
+    monkeypatch.setattr(
+        reviewer_bot.maintenance_module,
+        "maybe_record_head_observation_repair",
+        lambda bot, issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+            changed=False,
+            outcome="unchanged",
+        ),
+    )
     monkeypatch.setattr(reviewer_bot.maintenance_module, "check_overdue_reviews", lambda bot, state: [])
     monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"pull_request": {}})
     monkeypatch.setattr(
@@ -531,6 +787,122 @@ def test_scheduled_check_repairs_missing_reviewer_review_state(monkeypatch):
     assert accepted is not None
     assert accepted["semantic_key"] == "pull_request_review:10"
     assert review["last_reviewer_activity"] == "2026-03-17T10:01:00Z"
+
+
+def test_maybe_record_head_observation_repair_skips_unavailable_without_mutation(monkeypatch):
+    review_data = {
+        "active_head_sha": "head-1",
+        "contributor_revision": {"accepted": None},
+    }
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload={"message": "bad gateway"},
+            headers={},
+            text="bad gateway",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    result = reviewer_bot.maybe_record_head_observation_repair(42, review_data)
+
+    assert result == reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+        changed=False,
+        outcome="skipped_unavailable",
+        failure_kind="server_error",
+        reason="pull_request_unavailable",
+    )
+    assert review_data["active_head_sha"] == "head-1"
+
+
+def test_maybe_record_head_observation_repair_records_changed_head_once(monkeypatch):
+    review_data = {
+        "active_head_sha": "head-1",
+        "contributor_revision": {"accepted": None},
+        "current_cycle_completion": {"completed": True},
+        "current_cycle_write_approval": {"has_write_approval": True},
+        "review_completed_at": "2026-03-10T00:00:00Z",
+        "review_completed_by": "alice",
+        "review_completion_source": "live_review_rebuild",
+    }
+    accepted = []
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"state": "open", "head": {"sha": "head-2"}},
+            headers={},
+            text="ok",
+            ok=True,
+            failure_kind=None,
+            retry_attempts=0,
+            transport_error=None,
+        ),
+    )
+    monkeypatch.setattr(
+        reviewer_bot.reviews_module,
+        "accept_channel_event",
+        lambda review_data, channel, **kwargs: accepted.append((channel, kwargs)) or True,
+    )
+
+    result = reviewer_bot.maybe_record_head_observation_repair(42, review_data)
+
+    assert result.outcome == "changed"
+    assert result.changed is True
+    assert review_data["active_head_sha"] == "head-2"
+    assert accepted[0][0] == "contributor_revision"
+    assert accepted[0][1]["semantic_key"] == "pull_request_head_observed:42:head-2"
+    assert review_data["current_cycle_completion"] == {}
+    assert review_data["current_cycle_write_approval"] == {}
+    assert review_data["review_completed_at"] is None
+
+
+def test_scheduled_check_records_live_read_failure_and_continues(monkeypatch):
+    state = make_state()
+    review_42 = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review_43 = reviewer_bot.ensure_review_entry(state, 43, create=True)
+    assert review_42 is not None
+    assert review_43 is not None
+    review_42["current_reviewer"] = "alice"
+    review_43["current_reviewer"] = "bob"
+    overdue_called = []
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, state: False)
+    monkeypatch.setattr(reviewer_bot, "collect_touched_item", lambda issue_number: None)
+    monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"pull_request": {}})
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "check_overdue_reviews", lambda bot, state: overdue_called.append(True) or [])
+    monkeypatch.setattr(reviewer_bot.reviews_module, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data: False)
+
+    def fake_head_repair(bot, issue_number, review_data):
+        if issue_number == 42:
+            return reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+                changed=False,
+                outcome="skipped_unavailable",
+                failure_kind="server_error",
+                reason="pull_request_unavailable",
+            )
+        review_data["repair_needed"] = {
+            "kind": "live_read_failure",
+            "phase": "head_observation_repair",
+            "reason": "stale",
+            "failure_kind": "server_error",
+            "recorded_at": "2026-03-01T00:00:00Z",
+        }
+        return reviewer_bot.lifecycle_module.HeadObservationRepairResult(changed=False, outcome="unchanged")
+
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "maybe_record_head_observation_repair", fake_head_repair)
+
+    assert reviewer_bot.handle_scheduled_check(state) is True
+    assert overdue_called == [True]
+    assert review_42["repair_needed"]["kind"] == "live_read_failure"
+    assert review_42["repair_needed"]["phase"] == "head_observation_repair"
+    assert review_42["repair_needed"]["failure_kind"] == "server_error"
+    assert review_43["repair_needed"] is None
 
 
 def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkeypatch):
@@ -565,6 +937,97 @@ def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkey
         lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}),
     )
     assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
+
+
+def test_check_overdue_reviews_skips_item_when_snapshot_unavailable(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-01T00:00:00Z"
+    review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
+    monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: None)
+
+    assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
+
+
+def test_handle_overdue_review_warning_only_records_successful_comment(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: False)
+
+    assert reviewer_bot.maintenance_module.handle_overdue_review_warning(reviewer_bot, state, 42, "alice") is False
+    assert review["transition_warning_sent"] is None
+
+
+def test_remove_label_reports_failure(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=500,
+            payload={"message": "boom"},
+            headers={},
+            text="boom",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=0,
+            transport_error=None,
+        ),
+    )
+
+    assert reviewer_bot.remove_label(42, "status: awaiting reviewer response") is False
+
+
+def test_get_user_permission_status_distinguishes_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload={"message": "bad gateway"},
+            headers={},
+            text="bad gateway",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    assert reviewer_bot.get_user_permission_status("alice", "triage") == "unavailable"
+    assert reviewer_bot.check_user_permission("alice", "triage") is None
+
+
+def test_get_issue_assignees_returns_none_when_fetch_unavailable(monkeypatch):
+    monkeypatch.setenv("IS_PULL_REQUEST", "true")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload={"message": "bad gateway"},
+            headers={},
+            text="bad gateway",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    assert reviewer_bot.get_issue_assignees(42) is None
+
+
+def test_handle_issue_or_pr_opened_fails_closed_when_assignees_unavailable(monkeypatch):
+    state = make_state()
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_LABELS", json.dumps(["coding guideline"]))
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+
+    with pytest.raises(RuntimeError, match="Unable to determine assignees"):
+        reviewer_bot.handle_issue_or_pr_opened(state)
 
 
 def test_check_overdue_reviews_uses_contributor_comment_timestamp_when_turn_returns_to_reviewer(monkeypatch):
@@ -1123,32 +1586,162 @@ def test_project_status_labels_emits_awaiting_write_approval_only_after_completi
         lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
     )
 
-    def fake_api(method, endpoint, data=None):
+    def fake_github_api_request(method, endpoint, data=None, extra_headers=None, **kwargs):
         if endpoint == "pulls/42":
-            return {"head": {"sha": "head-1"}}
-        return None
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload={"state": "open", "head": {"sha": "head-1"}},
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        if endpoint.startswith("pulls/42/reviews"):
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload=[
+                    {
+                        "id": 10,
+                        "state": "APPROVED",
+                        "submitted_at": "2026-03-17T10:01:00Z",
+                        "commit_id": "head-1",
+                        "user": {"login": "bob"},
+                    }
+                ],
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        raise AssertionError(endpoint)
 
-    monkeypatch.setattr(reviewer_bot, "github_api", fake_api)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "id": 10,
-                "state": "APPROVED",
-                "submitted_at": "2026-03-17T10:01:00Z",
-                "commit_id": "head-1",
-                "user": {"login": "bob"},
-            }
-        ],
-    )
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": False)
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_github_api_request)
+    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "denied")
     desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
     assert desired_labels == {reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL}
     assert metadata["state"] == "awaiting_write_approval"
     review["mandatory_approver_required"] = True
     desired_labels_again, _ = reviewer_bot.project_status_labels_for_item(42, state)
     assert desired_labels_again == {reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL}
+
+
+def test_compute_reviewer_response_state_reports_pull_request_unavailable(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload={"message": "bad gateway"},
+            headers={},
+            text="bad gateway",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    response_state = reviewer_bot.compute_reviewer_response_state(42, review)
+
+    assert response_state["state"] == "projection_failed"
+    assert response_state["reason"] == "reviews_unavailable"
+
+
+def test_compute_reviewer_response_state_reports_permission_unavailable(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-17T10:01:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+
+    def fake_github_api_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        if endpoint == "pulls/42":
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload={"state": "open", "head": {"sha": "head-1"}},
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        if endpoint.startswith("pulls/42/reviews"):
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload=[
+                    {
+                        "id": 10,
+                        "state": "APPROVED",
+                        "submitted_at": "2026-03-17T10:01:00Z",
+                        "commit_id": "head-1",
+                        "user": {"login": "alice"},
+                    }
+                ],
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_github_api_request)
+    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "unavailable")
+
+    response_state = reviewer_bot.compute_reviewer_response_state(42, review)
+
+    assert response_state["state"] == "projection_failed"
+    assert response_state["reason"] == "permission_unavailable"
+
+
+def test_list_open_items_with_status_labels_fails_closed_on_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload={"message": "bad gateway"},
+            headers={},
+            text="bad gateway",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="server_error"):
+        reviewer_bot.list_open_items_with_status_labels()
 
 
 def test_handle_workflow_run_event_rebuilds_completion_from_live_review_commit_id(tmp_path, monkeypatch):
@@ -1875,6 +2468,74 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
     assert "issue_comment:201" not in state["active_reviews"]["42"]["reconciled_source_events"]
 
 
+def test_deferred_comment_reconcile_records_failure_kind_when_live_comment_unavailable(tmp_path, monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    payload_path = tmp_path / "deferred-comment-unavailable.json"
+    live_body = "reviewer-bot validation: contributor plain text comment"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "source_workflow_name": "Reviewer Bot PR Comment Observer",
+                "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+                "source_run_id": 603,
+                "source_run_attempt": 1,
+                "source_event_name": "issue_comment",
+                "source_event_action": "created",
+                "source_event_key": "issue_comment:205",
+                "pr_number": 42,
+                "comment_id": 205,
+                "comment_class": "plain_text",
+                "has_non_command_text": True,
+                "source_body_digest": comment_routing._digest_body(live_body),
+                "source_created_at": "2026-03-17T10:00:00Z",
+                "actor_login": "dana",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "603")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+
+    def fake_github_api_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        if endpoint == "pulls/42":
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload={"user": {"login": "dana"}, "labels": []},
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        if endpoint == "issues/comments/205":
+            return reviewer_bot.GitHubApiResult(
+                status_code=502,
+                payload={"message": "bad gateway"},
+                headers={},
+                text="bad gateway",
+                ok=False,
+                failure_kind="server_error",
+                retry_attempts=1,
+                transport_error=None,
+            )
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_github_api_request)
+
+    assert reviewer_bot.handle_workflow_run_event(state) is True
+    gap = state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:205"]
+    assert gap["reason"] == "reconcile_failed_closed"
+    assert gap["failure_kind"] == "server_error"
+
+
 def test_deferred_comment_reconcile_fails_closed_when_comment_classification_drifts(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -2066,6 +2727,51 @@ def test_execute_pending_privileged_command_fails_closed_without_live_fls_audit_
     pending = review["pending_privileged_commands"]["issue_comment:100"]
     assert pending["status"] == "failed_closed"
     assert pending["result"] == "live_revalidation_failed"
+
+
+def test_create_pull_request_fails_closed_when_open_pr_lookup_unavailable(monkeypatch):
+    called = {"post": 0}
+    monkeypatch.setattr(reviewer_bot, "find_open_pr_for_branch_status", lambda branch: ("unavailable", None))
+    monkeypatch.setattr(reviewer_bot, "github_api", lambda method, endpoint, data=None: called.__setitem__("post", called["post"] + 1) or None)
+
+    with pytest.raises(RuntimeError, match="Unable to determine whether branch 'feature-branch' already has an open PR"):
+        reviewer_bot.create_pull_request("feature-branch", "main", 42)
+
+    assert called["post"] == 0
+
+
+def test_resolve_workflow_run_pr_number_fails_closed_when_pr_unavailable(monkeypatch):
+    monkeypatch.setenv("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "42")
+    monkeypatch.setenv("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "head-1")
+    monkeypatch.setenv("WORKFLOW_RUN_HEAD_SHA", "head-1")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload={"message": "bad gateway"},
+            headers={},
+            text="bad gateway",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to fetch pull request #42 during workflow_run reconcile"):
+        reviewer_bot.resolve_workflow_run_pr_number()
+
+
+def test_assign_command_fails_closed_when_assignees_unavailable(monkeypatch):
+    state = make_state()
+    state["queue"] = [{"github": "felix91gr", "name": "F\u00e9lix Fischer"}]
+    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+
+    response, success = reviewer_bot.handle_assign_command(state, 42, "@felix91gr")
+
+    assert success is False
+    assert "Unable to determine current assignees/reviewers" in response
 
 
 def test_assign_command_posts_pr_guidance_on_success(monkeypatch):
@@ -2320,6 +3026,36 @@ def test_stage_b_artifact_correlation_rejects_ambiguous_exact_matches():
     )
     assert result["status"] == "observer_state_unknown"
     assert result["reason"] == "ambiguous_exact_artifact_matches"
+
+
+def test_list_run_artifacts_consumes_retry_aware_success(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"artifacts": [{"id": 1, "name": "artifact"}]},
+            headers={},
+            text="ok",
+            ok=True,
+            failure_kind=None,
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    assert sweeper._list_run_artifacts(reviewer_bot, 10) == [{"id": 1, "name": "artifact"}]
+
+
+def test_evaluate_gap_state_treats_artifact_download_unavailable_as_unknown():
+    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
+        {"source_event_created_at": "2026-03-17T00:00:00Z"},
+        {"status": "candidate_runs_found", "correlated_run": 10},
+        {"status": "completed", "conclusion": "success"},
+        {"status": "no_exact_artifact_match", "artifact_scan_outcomes": {10: "download_unavailable"}},
+    )
+    assert reason == "observer_state_unknown"
+    assert diagnostic == "artifact_download_unavailable"
 
 
 def test_evaluate_gap_state_only_emits_missing_after_negative_inference_contract():

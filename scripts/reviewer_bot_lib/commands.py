@@ -7,6 +7,9 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .automation import (
+    find_open_pr_for_branch_status as automation_find_open_pr_for_branch_status,
+)
 from .config import AssignmentAttempt
 from .guidance import get_issue_guidance, get_pr_guidance
 
@@ -110,13 +113,22 @@ def _apply_assignment_side_effects(
     return assignment_attempt, failure_comment
 
 
+def _current_assignees_or_error(bot, issue_number: int) -> tuple[list[str] | None, str | None]:
+    current_assignees = bot.get_issue_assignees(issue_number)
+    if current_assignees is None:
+        return None, "❌ Unable to determine current assignees/reviewers from GitHub; refusing to continue."
+    return current_assignees, None
+
+
 def handle_pass_command(bot, state: dict, issue_number: int, comment_author: str, reason: str | None) -> tuple[str, bool]:
     issue_data = bot.ensure_review_entry(state, issue_number, create=True)
     if issue_data is None:
         return "❌ Unable to load review state.", False
     passed_reviewer = issue_data.get("current_reviewer")
     if not passed_reviewer:
-        current_assignees = bot.get_issue_assignees(issue_number)
+        current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
+        if assignee_error:
+            return assignee_error, False
         passed_reviewer = current_assignees[0] if current_assignees else None
     if not passed_reviewer:
         return "❌ No reviewer is currently assigned to pass.", False
@@ -195,7 +207,9 @@ def handle_pass_until_command(bot, state: dict, issue_number: int, comment_autho
         issue_data = state["active_reviews"][issue_key]
         if isinstance(issue_data, dict):
             tracked_reviewer = issue_data.get("current_reviewer")
-    current_assignees = bot.get_issue_assignees(issue_number)
+    current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
+    if assignee_error:
+        return assignee_error, False
     is_current_reviewer = ((tracked_reviewer and tracked_reviewer.lower() == comment_author.lower()) or comment_author.lower() in [a.lower() for a in current_assignees])
     reassigned_msg = ""
     if is_current_reviewer:
@@ -321,16 +335,10 @@ def get_default_branch(bot) -> str:
 
 
 def find_open_pr_for_branch(bot, branch: str) -> dict | None:
-    owner = os.environ.get("REPO_OWNER", "").strip()
-    branch = branch.strip()
-    if not owner or not branch:
+    status, pr = automation_find_open_pr_for_branch_status(bot, branch)
+    if status != "found":
         return None
-    response = bot.github_api("GET", f"pulls?state=open&head={owner}:{branch}")
-    if isinstance(response, list) and response:
-        first = response[0]
-        if isinstance(first, dict):
-            return first
-    return None
+    return pr
 
 
 def resolve_workflow_run_pr_number(bot) -> int:
@@ -351,9 +359,10 @@ def resolve_workflow_run_pr_number(bot) -> int:
         raise RuntimeError("Missing WORKFLOW_RUN_HEAD_SHA for workflow_run reconcile")
     if reconcile_head_sha != workflow_run_head_sha:
         raise RuntimeError("Workflow_run reconcile context SHA mismatch between artifact and workflow payload")
-    pull_request = bot.github_api("GET", f"pulls/{pr_number}")
-    if not isinstance(pull_request, dict):
+    response = bot.github_api_request("GET", f"pulls/{pr_number}", retry_policy="idempotent_read")
+    if not response.ok or not isinstance(response.payload, dict):
         raise RuntimeError(f"Failed to fetch pull request #{pr_number} during workflow_run reconcile")
+    pull_request = response.payload
     head = pull_request.get("head")
     pull_request_head_sha = ""
     if isinstance(head, dict):
@@ -369,9 +378,11 @@ def resolve_workflow_run_pr_number(bot) -> int:
 
 
 def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict | None:
-    existing = bot.find_open_pr_for_branch(branch)
-    if existing:
+    lookup_status, existing = automation_find_open_pr_for_branch_status(bot, branch)
+    if lookup_status == "found":
         return existing
+    if lookup_status == "unavailable":
+        raise RuntimeError(f"Unable to determine whether branch '{branch}' already has an open PR")
     title = "chore: update spec.lock (no guideline impact)"
     body = "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n" f"Closes #{issue_number}"
     response = bot.github_api("POST", "pulls", {"title": title, "head": branch, "base": base, "body": body})
@@ -386,7 +397,10 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
     labels = bot.parse_issue_labels()
     if bot.FLS_AUDIT_LABEL not in labels:
         return "❌ This command is only available on issues labeled `fls-audit`.", False
-    if not bot.check_user_permission(comment_author, "triage"):
+    permission_status = bot.get_user_permission_status(comment_author, "triage")
+    if permission_status == "unavailable":
+        return "❌ Unable to verify triage permissions right now; refusing to run this command.", False
+    if permission_status != "granted":
         return "❌ You must have triage permissions to run this command.", False
     repo_root = get_target_repo_root()
     if bot.list_changed_files(repo_root):
@@ -474,7 +488,9 @@ def handle_claim_command(bot, state: dict, issue_number: int, comment_author: st
         return (f"❌ @{comment_author} is not in the reviewer queue. Only Producers can claim reviews."), False
     if is_away:
         return (f"❌ @{comment_author} is currently marked as away. Please use `{bot.BOT_MENTION} /away YYYY-MM-DD` to update your return date first, or wait until your scheduled return."), False
-    current_assignees = bot.get_issue_assignees(issue_number)
+    current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
+    if assignee_error:
+        return assignee_error, False
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
@@ -503,7 +519,10 @@ def handle_release_command(bot, state: dict, issue_number: int, comment_author: 
         target_username = args[0].lstrip("@")
         reason = " ".join(args[1:]) if len(args) > 1 else None
         releasing_other = target_username.lower() != comment_author.lower()
-        if releasing_other and not bot.check_user_permission(comment_author, "triage"):
+        permission_status = bot.get_user_permission_status(comment_author, "triage")
+        if permission_status == "unavailable":
+            return "❌ Unable to verify triage permissions right now; refusing to continue.", False
+        if releasing_other and permission_status != "granted":
             return (f"❌ @{comment_author} does not have permission to release other reviewers. Triage access or higher is required."), False
     else:
         target_username = comment_author
@@ -516,7 +535,9 @@ def handle_release_command(bot, state: dict, issue_number: int, comment_author: 
         if isinstance(issue_data, dict):
             tracked_reviewer = issue_data.get("current_reviewer")
             assignment_method = issue_data.get("assignment_method")
-    current_assignees = bot.get_issue_assignees(issue_number)
+    current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
+    if assignee_error:
+        return assignee_error, False
     is_tracked = tracked_reviewer and tracked_reviewer.lower() == target_username.lower()
     is_assigned = target_username.lower() in [assignee.lower() for assignee in current_assignees]
     if not is_tracked and not is_assigned:
@@ -555,7 +576,9 @@ def handle_assign_command(bot, state: dict, issue_number: int, username: str) ->
             if entry["github"].lower() == username.lower():
                 return_date = entry.get("return_date", "unknown")
                 return (f"⚠️ @{username} is currently marked as away until {return_date}. Consider assigning someone else or waiting."), False
-    current_assignees = bot.get_issue_assignees(issue_number)
+    current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
+    if assignee_error:
+        return assignee_error, False
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
     issue_author = os.environ.get("ISSUE_AUTHOR", "")
@@ -577,7 +600,9 @@ def handle_assign_command(bot, state: dict, issue_number: int, username: str) ->
 
 
 def handle_assign_from_queue_command(bot, state: dict, issue_number: int) -> tuple[str, bool]:
-    current_assignees = bot.get_issue_assignees(issue_number)
+    current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
+    if assignee_error:
+        return assignee_error, False
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
     issue_author = os.environ.get("ISSUE_AUTHOR", "")

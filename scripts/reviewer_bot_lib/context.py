@@ -28,6 +28,8 @@ class GitHubTransportContext(Protocol):
         data: dict | None = None,
         extra_headers: dict[str, str] | None = None,
         *,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def github_api(self, method: str, endpoint: str, data: dict | None = None) -> Any | None: ...
@@ -37,6 +39,8 @@ class GitHubTransportContext(Protocol):
         variables: dict | None = None,
         *,
         token: str | None = None,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def github_graphql(
@@ -47,6 +51,7 @@ class GitHubTransportContext(Protocol):
         token: str | None = None,
     ) -> Any | None: ...
     def request_reviewer_assignment(self, issue_number: int, username: str) -> AssignmentAttempt: ...
+    def get_user_permission_status(self, username: str, required_permission: str = "triage") -> str: ...
     def remove_assignee(self, issue_number: int, username: str) -> bool: ...
     def remove_pr_reviewer(self, issue_number: int, username: str) -> bool: ...
 
@@ -71,6 +76,8 @@ class StateStoreContext(Protocol):
         data: dict | None = None,
         extra_headers: dict[str, str] | None = None,
         *,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def get_state_issue(self) -> dict | None: ...
@@ -119,6 +126,8 @@ class LeaseLockContext(Protocol):
         data: dict | None = None,
         extra_headers: dict[str, str] | None = None,
         *,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def get_lock_ref_display(self) -> str: ...
