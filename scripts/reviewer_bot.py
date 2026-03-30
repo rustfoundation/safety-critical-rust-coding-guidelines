@@ -73,6 +73,7 @@ import scripts.reviewer_bot_lib.github_api as github_api_module
 import scripts.reviewer_bot_lib.lease_lock as lease_lock_module
 import scripts.reviewer_bot_lib.lifecycle as lifecycle_module
 import scripts.reviewer_bot_lib.maintenance as maintenance_module
+import scripts.reviewer_bot_lib.project_board as project_board_module
 import scripts.reviewer_bot_lib.reconcile as reconcile_module
 import scripts.reviewer_bot_lib.reviews as reviews_module
 import scripts.reviewer_bot_lib.state_store as state_store_module
@@ -115,6 +116,26 @@ from scripts.reviewer_bot_lib.config import (  # noqa: F401  # noqa: F401
     REVIEW_DEADLINE_DAYS,
     REVIEW_FRESHNESS_RUNBOOK_PATH,
     REVIEW_LABELS,
+    REVIEWER_BOARD_ENABLED_ENV,
+    REVIEWER_BOARD_FIELD_ASSIGNED_AT,
+    REVIEWER_BOARD_FIELD_NEEDS_ATTENTION,
+    REVIEWER_BOARD_FIELD_REVIEW_STATE,
+    REVIEWER_BOARD_FIELD_REVIEWER,
+    REVIEWER_BOARD_FIELD_WAITING_SINCE,
+    REVIEWER_BOARD_OPTION_ATTENTION_NO,
+    REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED,
+    REVIEWER_BOARD_OPTION_ATTENTION_TRANSITION_NOTICE_SENT,
+    REVIEWER_BOARD_OPTION_ATTENTION_TRIAGE_APPROVAL_REQUIRED,
+    REVIEWER_BOARD_OPTION_ATTENTION_WARNING_SENT,
+    REVIEWER_BOARD_OPTION_AWAITING_CONTRIBUTOR,
+    REVIEWER_BOARD_OPTION_AWAITING_REVIEWER,
+    REVIEWER_BOARD_OPTION_AWAITING_WRITE_APPROVAL,
+    REVIEWER_BOARD_OPTION_DONE,
+    REVIEWER_BOARD_OPTION_UNASSIGNED,
+    REVIEWER_BOARD_ORG,
+    REVIEWER_BOARD_PROJECT_MANIFEST,
+    REVIEWER_BOARD_PROJECT_NUMBER,
+    REVIEWER_BOARD_TOKEN_ENV,
     REVIEWER_REQUEST_422_TEMPLATE,
     STATE_BLOCK_END_MARKER,
     STATE_BLOCK_START_MARKER,
@@ -180,6 +201,12 @@ def get_github_token() -> str:
     return github_api_module.get_github_token()
 
 
+def get_github_graphql_token(*, prefer_board_token: bool = False) -> str:
+    return github_api_module.get_github_graphql_token(
+        _runtime_bot(), prefer_board_token=prefer_board_token
+    )
+
+
 def github_api_request(
     method: str,
     endpoint: str,
@@ -200,6 +227,31 @@ def github_api_request(
 
 def github_api(method: str, endpoint: str, data: dict | None = None) -> Any | None:
     return github_api_module.github_api(_runtime_bot(), method, endpoint, data)
+
+
+def github_graphql_request(
+    query: str,
+    variables: dict | None = None,
+    *,
+    token: str | None = None,
+    suppress_error_log: bool = False,
+) -> GitHubApiResult:
+    return github_api_module.github_graphql_request(
+        _runtime_bot(),
+        query,
+        variables,
+        token=token,
+        suppress_error_log=suppress_error_log,
+    )
+
+
+def github_graphql(
+    query: str,
+    variables: dict | None = None,
+    *,
+    token: str | None = None,
+) -> Any | None:
+    return github_api_module.github_graphql(_runtime_bot(), query, variables, token=token)
 
 
 def post_comment(issue_number: int, body: str) -> bool:
@@ -684,6 +736,24 @@ def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
     return reviews_module.get_pull_request_reviews(_runtime_bot(), issue_number)
 
 
+def compute_reviewer_response_state(
+    issue_number: int,
+    review_data: dict,
+    *,
+    issue_snapshot: dict | None = None,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict[str, object]:
+    return reviews_module.compute_reviewer_response_state(
+        _runtime_bot(),
+        issue_number,
+        review_data,
+        issue_snapshot=issue_snapshot,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+
+
 def project_status_labels_for_item(
     issue_number: int,
     state: dict,
@@ -800,6 +870,14 @@ def handle_manual_dispatch(state: dict) -> bool:
 
 def handle_scheduled_check(state: dict) -> bool:
     return maintenance_module.handle_scheduled_check(_runtime_bot(), state)
+
+
+def reviewer_board_preflight():
+    return project_board_module.reviewer_board_preflight(_runtime_bot())
+
+
+def preview_board_projection_for_item(state: dict, issue_number: int):
+    return project_board_module.preview_board_projection_for_item(_runtime_bot(), state, issue_number)
 
 
 # ==============================================================================

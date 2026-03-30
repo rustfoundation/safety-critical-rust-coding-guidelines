@@ -1,5 +1,6 @@
 """GitHub transport and issue/PR mutation helpers."""
 
+import json
 import os
 import random
 import sys
@@ -8,7 +9,12 @@ from urllib.parse import quote
 
 import requests
 
-from .config import LOCK_API_RETRY_LIMIT, LOCK_RETRY_BASE_SECONDS, STATUS_LABEL_CONFIG
+from .config import (
+    LOCK_API_RETRY_LIMIT,
+    LOCK_RETRY_BASE_SECONDS,
+    REVIEWER_BOARD_TOKEN_ENV,
+    STATUS_LABEL_CONFIG,
+)
 from .context import GitHubTransportContext
 
 
@@ -18,6 +24,15 @@ def get_github_token() -> str:
         print("ERROR: GITHUB_TOKEN not set", file=sys.stderr)
         raise SystemExit(1)
     return token
+
+
+def get_github_graphql_token(bot: GitHubTransportContext, *, prefer_board_token: bool = False) -> str:
+    if prefer_board_token:
+        token = os.environ.get(REVIEWER_BOARD_TOKEN_ENV)
+        if not token:
+            raise RuntimeError(f"{REVIEWER_BOARD_TOKEN_ENV} not set")
+        return token
+    return bot.get_github_token()
 
 
 def github_api_request(
@@ -66,6 +81,66 @@ def github_api_request(
 
 def github_api(bot: GitHubTransportContext, method: str, endpoint: str, data: dict | None = None):
     response = bot.github_api_request(method, endpoint, data)
+    if not response.ok:
+        return None
+    if response.payload is None:
+        return {}
+    return response.payload
+
+
+def github_graphql_request(
+    bot: GitHubTransportContext,
+    query: str,
+    variables: dict | None = None,
+    *,
+    token: str | None = None,
+    suppress_error_log: bool = False,
+):
+    graphql_token = token or bot.get_github_graphql_token()
+    headers = {
+        "Authorization": f"Bearer {graphql_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    response = requests.post(
+        "https://api.github.com/graphql",
+        headers=headers,
+        json={"query": query, "variables": variables or {}},
+    )
+
+    payload = None
+    if response.content:
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+
+    graphql_errors = payload.get("errors") if isinstance(payload, dict) else None
+    ok = response.status_code < 400 and not graphql_errors
+    if not ok and not suppress_error_log:
+        details = response.text
+        if graphql_errors:
+            details = json.dumps(graphql_errors, sort_keys=True)
+        print(f"GitHub GraphQL error: {response.status_code} - {details}", file=sys.stderr)
+
+    normalized_headers = {key.lower(): value for key, value in response.headers.items()}
+    return bot.GitHubApiResult(
+        status_code=response.status_code,
+        payload=payload,
+        headers=normalized_headers,
+        text=response.text,
+        ok=ok,
+    )
+
+
+def github_graphql(
+    bot: GitHubTransportContext,
+    query: str,
+    variables: dict | None = None,
+    *,
+    token: str | None = None,
+):
+    response = bot.github_graphql_request(query, variables, token=token)
     if not response.ok:
         return None
     if response.payload is None:

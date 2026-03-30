@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,69 @@ def make_state(epoch: str = "freshness_v15"):
         "recent_assignments": [],
         "active_reviews": {},
     }
+
+
+def valid_reviewer_board_metadata():
+    return {
+        "data": {
+            "organization": {
+                "projectV2": {
+                    "id": "PVT_kwDOB",
+                    "title": "Reviewer Board",
+                    "fields": {
+                        "nodes": [
+                            {
+                                "__typename": "ProjectV2SingleSelectField",
+                                "id": "field-review-state",
+                                "name": "Review State",
+                                "options": [
+                                    {"id": "opt-ar", "name": "Awaiting Reviewer"},
+                                    {"id": "opt-ac", "name": "Awaiting Contributor"},
+                                    {"id": "opt-aw", "name": "Awaiting Write Approval"},
+                                    {"id": "opt-done", "name": "Done"},
+                                    {"id": "opt-unassigned", "name": "Unassigned"},
+                                ],
+                            },
+                            {
+                                "__typename": "ProjectV2Field",
+                                "dataType": "TEXT",
+                                "id": "field-reviewer",
+                                "name": "Reviewer",
+                            },
+                            {
+                                "__typename": "ProjectV2Field",
+                                "dataType": "DATE",
+                                "id": "field-assigned-at",
+                                "name": "Assigned At",
+                            },
+                            {
+                                "__typename": "ProjectV2Field",
+                                "dataType": "DATE",
+                                "id": "field-waiting-since",
+                                "name": "Waiting Since",
+                            },
+                            {
+                                "__typename": "ProjectV2SingleSelectField",
+                                "id": "field-needs-attention",
+                                "name": "Needs Attention",
+                                "options": [
+                                    {"id": "opt-no", "name": "No"},
+                                    {"id": "opt-warning", "name": "Warning Sent"},
+                                    {"id": "opt-notice", "name": "Transition Notice Sent"},
+                                    {"id": "opt-triage", "name": "Triage Approval Required"},
+                                    {"id": "opt-repair", "name": "Projection Repair Required"},
+                                ],
+                            },
+                        ]
+                    },
+                }
+            }
+        }
+    }
+
+
+def iso_z(dt):
+    return dt.isoformat().replace("+00:00", "Z")
 
 
 @pytest.fixture(autouse=True)
@@ -62,6 +126,7 @@ def clean_env(monkeypatch):
     for key in keys:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", object())
+    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
 
 
 def test_load_state_sets_schema_and_epoch_defaults(monkeypatch):
@@ -69,6 +134,18 @@ def test_load_state_sets_schema_and_epoch_defaults(monkeypatch):
     state = reviewer_bot.load_state()
     assert state["schema_version"] == reviewer_bot.STATE_SCHEMA_VERSION
     assert state["freshness_runtime_epoch"] == reviewer_bot.FRESHNESS_RUNTIME_EPOCH_LEGACY
+
+
+def test_reviewer_board_preflight_validates_manifest(monkeypatch):
+    monkeypatch.setenv("REVIEWER_BOARD_ENABLED", "true")
+    monkeypatch.setenv("REVIEWER_BOARD_TOKEN", "board-token")
+    monkeypatch.setattr(reviewer_bot, "github_graphql", lambda query, variables=None, *, token=None: valid_reviewer_board_metadata())
+
+    preflight = reviewer_bot.reviewer_board_preflight()
+
+    assert preflight.enabled is True
+    assert preflight.valid is True
+    assert preflight.project_id == "PVT_kwDOB"
 
 
 @pytest.mark.parametrize(
@@ -491,15 +568,21 @@ def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkey
 
 
 def test_check_overdue_reviews_uses_contributor_comment_timestamp_when_turn_returns_to_reviewer(monkeypatch):
+    now = reviewer_bot.datetime.now(reviewer_bot.timezone.utc)
+    assigned_at = iso_z(now - timedelta(days=reviewer_bot.REVIEW_DEADLINE_DAYS + 20))
+    reviewer_review_at = iso_z(now - timedelta(days=reviewer_bot.REVIEW_DEADLINE_DAYS + 19))
+    contributor_comment_at = iso_z(
+        now - timedelta(days=reviewer_bot.REVIEW_DEADLINE_DAYS, minutes=1)
+    )
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    review["assigned_at"] = "2026-03-01T00:00:00Z"
-    review["active_cycle_started_at"] = "2026-03-01T00:00:00Z"
+    review["assigned_at"] = assigned_at
+    review["active_cycle_started_at"] = assigned_at
     review["reviewer_review"]["accepted"] = {
         "semantic_key": "pull_request_review:10",
-        "timestamp": "2026-03-02T00:00:00Z",
+        "timestamp": reviewer_review_at,
         "actor": "alice",
         "reviewed_head_sha": "head-1",
         "source_precedence": 1,
@@ -507,7 +590,7 @@ def test_check_overdue_reviews_uses_contributor_comment_timestamp_when_turn_retu
     }
     review["contributor_comment"]["accepted"] = {
         "semantic_key": "issue_comment:20",
-        "timestamp": "2026-03-12T00:00:00Z",
+        "timestamp": contributor_comment_at,
         "actor": "bob",
         "reviewed_head_sha": None,
         "source_precedence": 0,
@@ -536,15 +619,21 @@ def test_check_overdue_reviews_uses_contributor_comment_timestamp_when_turn_retu
 
 
 def test_check_overdue_reviews_uses_contributor_revision_timestamp_when_head_changes_after_review(monkeypatch):
+    now = reviewer_bot.datetime.now(reviewer_bot.timezone.utc)
+    assigned_at = iso_z(now - timedelta(days=reviewer_bot.REVIEW_DEADLINE_DAYS + 20))
+    reviewer_review_at = iso_z(now - timedelta(days=reviewer_bot.REVIEW_DEADLINE_DAYS + 19))
+    contributor_revision_at = iso_z(
+        now - timedelta(days=reviewer_bot.REVIEW_DEADLINE_DAYS, minutes=1)
+    )
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    review["assigned_at"] = "2026-03-01T00:00:00Z"
-    review["active_cycle_started_at"] = "2026-03-01T00:00:00Z"
+    review["assigned_at"] = assigned_at
+    review["active_cycle_started_at"] = assigned_at
     review["reviewer_review"]["accepted"] = {
         "semantic_key": "pull_request_review:10",
-        "timestamp": "2026-03-02T00:00:00Z",
+        "timestamp": reviewer_review_at,
         "actor": "alice",
         "reviewed_head_sha": "head-1",
         "source_precedence": 1,
@@ -552,7 +641,7 @@ def test_check_overdue_reviews_uses_contributor_revision_timestamp_when_head_cha
     }
     review["contributor_revision"]["accepted"] = {
         "semantic_key": "pull_request_sync:42:head-2",
-        "timestamp": "2026-03-12T00:00:00Z",
+        "timestamp": contributor_revision_at,
         "actor": None,
         "reviewed_head_sha": "head-2",
         "source_precedence": 1,
@@ -705,6 +794,129 @@ def test_project_status_labels_uses_live_current_reviewer_review_when_channel_st
     desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
     assert desired_labels == {reviewer_bot.STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}
     assert metadata["reason"] == "completion_missing"
+
+
+def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-20T12:34:56Z"
+    review["active_cycle_started_at"] = "2026-03-20T12:34:56Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+    )
+
+    preview = reviewer_bot.preview_board_projection_for_item(state, 42)
+
+    assert preview.classification == "open_tracked_assigned"
+    assert preview.eligible is True
+    assert preview.desired is not None
+    assert preview.desired.review_state == "Awaiting Reviewer"
+    assert preview.desired.reviewer == "alice"
+
+
+def test_preview_board_projection_tracked_unassigned_maps_to_unassigned(monkeypatch):
+    state = make_state()
+    reviewer_bot.ensure_review_entry(state, 42, create=True)
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+    )
+
+    preview = reviewer_bot.preview_board_projection_for_item(state, 42)
+
+    assert preview.classification == "open_tracked_unassigned"
+    assert preview.desired is not None
+    assert preview.desired.review_state == "Unassigned"
+    assert preview.desired.reviewer is None
+    assert preview.desired.waiting_since is None
+    assert preview.desired.needs_attention == "No"
+
+
+def test_preview_board_projection_closed_item_maps_to_archive_intent(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "closed", "pull_request": None, "labels": []},
+    )
+
+    preview = reviewer_bot.preview_board_projection_for_item(state, 42)
+
+    assert preview.classification == "closed"
+    assert preview.eligible is False
+    assert preview.desired is not None
+    assert preview.desired.archive is True
+    assert preview.desired.ensure_membership is False
+
+
+def test_preview_board_projection_open_untracked_maps_to_archive_intent(monkeypatch):
+    state = make_state()
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+    )
+
+    preview = reviewer_bot.preview_board_projection_for_item(state, 42)
+
+    assert preview.classification == "open_untracked"
+    assert preview.eligible is False
+    assert preview.desired is not None
+    assert preview.desired.archive is True
+
+
+def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["assigned_at"] = "2026-03-20T12:34:56Z"
+    review["active_cycle_started_at"] = "2026-03-20T12:34:56Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_comment",
+        semantic_key="issue_comment:1",
+        timestamp="2026-03-21T08:00:00Z",
+        actor="alice",
+    )
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-21T08:00:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(
+        reviewer_bot.reviews_module,
+        "rebuild_pr_approval_state",
+        lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}),
+    )
+
+    preview = reviewer_bot.preview_board_projection_for_item(state, 42)
+
+    assert preview.desired is not None
+    assert preview.desired.assigned_at == "2026-03-20"
+    assert preview.desired.waiting_since == "2026-03-21"
 
 
 def test_project_status_labels_uses_live_review_fallback_for_stale_head(monkeypatch):
