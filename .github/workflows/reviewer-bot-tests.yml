@@ -43,6 +43,9 @@ jobs:
           --cov-report=term-missing
           --cov-report=json:coverage-reviewer-bot.json
 
+      - name: Run migrated reviewer bot tests with importlib collection
+        run: uv run pytest tests --import-mode=importlib
+
       - name: Enforce reviewer bot statement and branch floors
         run: |
           uv run python - <<'PY'
