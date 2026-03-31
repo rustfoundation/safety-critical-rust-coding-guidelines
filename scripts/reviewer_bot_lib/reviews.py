@@ -10,10 +10,12 @@ from .config import (
     MANDATORY_TRIAGE_APPROVER_LABEL,
     MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
     MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
-    STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
-    STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
-    STATUS_AWAITING_WRITE_APPROVAL_LABEL,
     STATUS_LABELS,
+)
+from .reviews_projection import (
+    compute_pr_approval_state_from_reviews,
+    desired_labels_from_response_state,
+    filter_current_head_reviews_for_cycle,
 )
 
 
@@ -341,72 +343,36 @@ def compute_pr_approval_state_result(
         return reviews_result
     reviews = reviews_result["reviews"]
 
-    survivors: dict[str, dict] = {}
+    normalized_reviews = []
     for review in reviews:
         if not isinstance(review, dict):
+            normalized_reviews.append(review)
             continue
-        state = str(review.get("state", "")).upper()
-        if state == "DISMISSED":
-            continue
-        submitted_at = parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None or submitted_at < boundary:
-            continue
-        commit_id = review.get("commit_id")
-        if not isinstance(commit_id, str) or not commit_id.strip():
-            continue
-        if commit_id.strip() != current_head:
-            continue
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author.strip():
-            continue
-        review_id = str(review.get("id", ""))
-        key = author.lower()
-        candidate_key = (submitted_at, review_id)
-        current = survivors.get(key)
-        if current is None:
-            survivors[key] = review
-            continue
-        current_key = (
-            parse_github_timestamp(current.get("submitted_at"))
-            or datetime.min.replace(tzinfo=timezone.utc),
-            str(current.get("id", "")),
-        )
-        if candidate_key >= current_key:
-            survivors[key] = review
+        normalized = dict(review)
+        normalized["submitted_at"] = parse_github_timestamp(review.get("submitted_at"))
+        normalized_reviews.append(normalized)
 
-    approvals = [review for review in survivors.values() if str(review.get("state", "")).upper() == "APPROVED"]
-    completion = {
-        "completed": bool(approvals),
-        "current_head_sha": current_head,
-        "qualifying_review_ids": [review.get("id") for review in approvals],
-    }
-
+    survivors = filter_current_head_reviews_for_cycle(
+        normalized_reviews,
+        boundary=boundary,
+        current_head=current_head,
+    )
     permission_cache: dict[str, str] = {}
-    has_write_approval = False
-    write_approvers: list[str] = []
-    for review in approvals:
+    for review in survivors.values():
         author = review.get("user", {}).get("login")
         if not isinstance(author, str) or not author.strip():
             continue
         cache_key = author.lower()
         if cache_key not in permission_cache:
             permission_cache[cache_key] = _permission_status(bot, author, "push")
-        if permission_cache[cache_key] == "unavailable":
-            return _projection_failure("permission_unavailable")
-        if permission_cache[cache_key] == "granted":
-            has_write_approval = True
-            write_approvers.append(author)
-    write_approval = {
-        "has_write_approval": has_write_approval,
-        "write_approvers": write_approvers,
-        "current_head_sha": current_head,
-    }
-    return {
-        "ok": True,
-        "completion": completion,
-        "write_approval": write_approval,
-        "current_head_sha": current_head,
-    }
+    result = compute_pr_approval_state_from_reviews(
+        survivors,
+        current_head=current_head,
+        permission_statuses=permission_cache,
+    )
+    if not result.get("ok"):
+        return _projection_failure(str(result.get("reason")))
+    return result
 
 
 def apply_pr_approval_state(
@@ -1116,15 +1082,7 @@ def project_status_labels_for_item(
     response_state = compute_reviewer_response_state(bot, issue_number, review_data, issue_snapshot=issue_snapshot)
     state_name = response_state.get("state")
     reason = response_state.get("reason")
-    if state_name == "projection_failed":
-        return None, {"state": str(state_name), "reason": str(reason)}
-    if state_name == "awaiting_reviewer_response":
-        return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": str(state_name), "reason": str(reason)})
-    if state_name == "awaiting_contributor_response":
-        return ({STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}, {"state": str(state_name), "reason": str(reason)})
-    if state_name == "awaiting_write_approval":
-        return ({STATUS_AWAITING_WRITE_APPROVAL_LABEL}, {"state": str(state_name), "reason": str(reason)})
-    return set(), {"state": str(state_name), "reason": None if reason is None else str(reason)}
+    return desired_labels_from_response_state(str(state_name), None if reason is None else str(reason))
 
 
 def sync_status_labels(bot, issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
