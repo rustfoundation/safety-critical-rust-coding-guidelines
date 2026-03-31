@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
       - '.github/workflows/reviewer-bot-*.yml'
       - '.github/reviewer-bot-tests/**'
@@ -11,6 +12,7 @@ on:
   pull_request:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
       - '.github/workflows/reviewer-bot-*.yml'
       - '.github/reviewer-bot-tests/**'
