@@ -583,9 +583,9 @@ def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source
     )[0] or changed
     bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
     completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
-    _mark_reconciled_source_event(review_data, source_event_key)
-    _clear_source_event_key(review_data, source_event_key)
-    return changed or completion is not None
+    reconciled_changed = _mark_reconciled_source_event(review_data, source_event_key)
+    gap_cleared_changed = _clear_source_event_key(review_data, source_event_key)
+    return changed or completion is not None or reconciled_changed or gap_cleared_changed
 
 
 def _discover_visible_comment_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:

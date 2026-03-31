@@ -160,13 +160,14 @@ def github_api_request(
             )
 
         payload = None
+        invalid_payload = False
         if response.content:
             try:
                 payload = response.json()
             except ValueError:
-                payload = None
+                invalid_payload = True
 
-        ok = response.status_code < 400
+        ok = response.status_code < 400 and not invalid_payload
         normalized_headers = {key.lower(): value for key, value in response.headers.items()}
         if ok:
             return _build_result(
@@ -180,7 +181,7 @@ def github_api_request(
                 retry_attempts=retry_attempts,
             )
 
-        failure_kind = _classify_failure(response.status_code)
+        failure_kind = _classify_failure(response.status_code, invalid_payload=invalid_payload)
         if retry_policy == RETRY_POLICY_IDEMPOTENT_READ and _should_retry_status(response.status_code) and attempt < max_attempts:
             retry_attempts += 1
             time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))

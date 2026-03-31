@@ -37,6 +37,16 @@ def _clear_maintenance_repair_marker(review_data: dict, phase: str) -> bool:
     return True
 
 
+def _repair_marker_matches(existing: dict | None, candidate: dict) -> bool:
+    if not isinstance(existing, dict):
+        return False
+    return {
+        key: value for key, value in existing.items() if key != "recorded_at"
+    } == {
+        key: value for key, value in candidate.items() if key != "recorded_at"
+    }
+
+
 def _record_maintenance_repair_marker(
     bot,
     review_data: dict,
@@ -52,7 +62,8 @@ def _record_maintenance_repair_marker(
         "failure_kind": failure_kind,
         "recorded_at": _now_iso(bot),
     }
-    if review_data.get("repair_needed") == marker:
+    existing_marker = review_data.get("repair_needed")
+    if _repair_marker_matches(existing_marker, marker):
         return False
     review_data["repair_needed"] = marker
     return True
@@ -158,7 +169,18 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 name = label.get("name")
                 if isinstance(name, str):
                     labels.add(name)
-            if bot.FLS_AUDIT_LABEL not in labels or not bot.check_user_permission(actor, "triage"):
+            permission_status = bot.get_user_permission_status(actor, "triage")
+            if bot.FLS_AUDIT_LABEL not in labels:
+                record["status"] = "failed_closed"
+                record["completed_at"] = _now_iso(bot)
+                record["result"] = "live_revalidation_failed"
+                return True
+            if permission_status == "unavailable":
+                record["status"] = "failed_closed"
+                record["completed_at"] = _now_iso(bot)
+                record["result"] = "live_permission_unavailable"
+                return True
+            if permission_status != "granted":
                 record["status"] = "failed_closed"
                 record["completed_at"] = _now_iso(bot)
                 record["result"] = "live_revalidation_failed"

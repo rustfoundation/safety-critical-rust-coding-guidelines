@@ -267,8 +267,7 @@ def handle_label_command(bot, state: dict, issue_number: int, label_string: str)
                     completion_changed = bot.mark_review_complete(
                         state, issue_number, reviewer, "issue_label: sign-off: create pr"
                     )
-                    status_changed = bot.sync_status_labels_for_items(state, [issue_number])
-                    state_changed = completion_changed or status_changed or state_changed
+                    state_changed = completion_changed or state_changed
             else:
                 results.append(f"❌ Failed to add label `{label}`")
                 all_success = False

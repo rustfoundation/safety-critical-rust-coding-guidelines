@@ -224,8 +224,6 @@ def get_preferred_current_reviewer_review_for_cycle(
         return None
     if len(valid_reviews) == 1:
         return valid_reviews[0]
-    if pull_request is None:
-        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
     head = pull_request.get("head") if isinstance(pull_request, dict) else None
     current_head = head.get("sha") if isinstance(head, dict) else None
     current_head_reviews = [review for review in valid_reviews if _review_matches_head(review, current_head)]
@@ -279,6 +277,11 @@ def refresh_reviewer_review_from_live_preferred_review(
     reviews: list[dict] | None = None,
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
+    if pull_request is None:
+        pull_request_result = _pull_request_read_result(bot, issue_number)
+        if not pull_request_result.get("ok"):
+            return False, None
+        pull_request = pull_request_result["pull_request"]
     preferred_review = get_preferred_current_reviewer_review_for_cycle(
         bot,
         issue_number,
@@ -301,8 +304,129 @@ def refresh_reviewer_review_from_live_preferred_review(
         changed = True
     submitted_at = preferred_review.get("submitted_at")
     if isinstance(submitted_at, str):
+        previous_activity = review_data.get("last_reviewer_activity")
+        previous_warning = review_data.get("transition_warning_sent")
+        previous_notice = review_data.get("transition_notice_sent_at")
         record_reviewer_activity(review_data, submitted_at)
+        activity_changed = (
+            previous_activity != review_data.get("last_reviewer_activity")
+            or previous_warning != review_data.get("transition_warning_sent")
+            or previous_notice != review_data.get("transition_notice_sent_at")
+        )
+        changed = changed or activity_changed
     return changed, preferred_review
+
+
+def compute_pr_approval_state_result(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict[str, object]:
+    boundary = get_current_cycle_boundary(bot, review_data)
+    if boundary is None:
+        return _projection_failure("pull_request_unavailable")
+    pull_request_result = _pull_request_read_result(bot, issue_number, pull_request)
+    if not pull_request_result.get("ok"):
+        return pull_request_result
+    pull_request = pull_request_result["pull_request"]
+    head = pull_request.get("head")
+    current_head = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(current_head, str) or not current_head.strip():
+        return _projection_failure("pull_request_head_unavailable", "invalid_payload")
+    reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
+    if not reviews_result.get("ok"):
+        return reviews_result
+    reviews = reviews_result["reviews"]
+
+    survivors: dict[str, dict] = {}
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        state = str(review.get("state", "")).upper()
+        if state == "DISMISSED":
+            continue
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None or submitted_at < boundary:
+            continue
+        commit_id = review.get("commit_id")
+        if not isinstance(commit_id, str) or not commit_id.strip():
+            continue
+        if commit_id.strip() != current_head:
+            continue
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or not author.strip():
+            continue
+        review_id = str(review.get("id", ""))
+        key = author.lower()
+        candidate_key = (submitted_at, review_id)
+        current = survivors.get(key)
+        if current is None:
+            survivors[key] = review
+            continue
+        current_key = (
+            parse_github_timestamp(current.get("submitted_at"))
+            or datetime.min.replace(tzinfo=timezone.utc),
+            str(current.get("id", "")),
+        )
+        if candidate_key >= current_key:
+            survivors[key] = review
+
+    approvals = [review for review in survivors.values() if str(review.get("state", "")).upper() == "APPROVED"]
+    completion = {
+        "completed": bool(approvals),
+        "current_head_sha": current_head,
+        "qualifying_review_ids": [review.get("id") for review in approvals],
+    }
+
+    permission_cache: dict[str, str] = {}
+    has_write_approval = False
+    write_approvers: list[str] = []
+    for review in approvals:
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or not author.strip():
+            continue
+        cache_key = author.lower()
+        if cache_key not in permission_cache:
+            permission_cache[cache_key] = _permission_status(bot, author, "push")
+        if permission_cache[cache_key] == "unavailable":
+            return _projection_failure("permission_unavailable")
+        if permission_cache[cache_key] == "granted":
+            has_write_approval = True
+            write_approvers.append(author)
+    write_approval = {
+        "has_write_approval": has_write_approval,
+        "write_approvers": write_approvers,
+        "current_head_sha": current_head,
+    }
+    return {
+        "ok": True,
+        "completion": completion,
+        "write_approval": write_approval,
+        "current_head_sha": current_head,
+    }
+
+
+def apply_pr_approval_state(
+    review_data: dict,
+    *,
+    completion: dict,
+    write_approval: dict,
+    current_head_sha: str,
+) -> None:
+    review_data["active_head_sha"] = current_head_sha
+    review_data["current_cycle_completion"] = completion
+    review_data["current_cycle_write_approval"] = write_approval
+    if completion.get("completed"):
+        review_data["review_completed_at"] = _now_iso()
+        review_data["review_completed_by"] = None
+        review_data["review_completion_source"] = "live_review_rebuild"
+    else:
+        review_data["review_completed_at"] = None
+        review_data["review_completed_by"] = None
+        review_data["review_completion_source"] = None
 
 
 def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
@@ -690,94 +814,26 @@ def rebuild_pr_approval_state_result(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> dict[str, object]:
-    boundary = get_current_cycle_boundary(bot, review_data)
-    if boundary is None:
-        return _projection_failure("pull_request_unavailable")
-    pull_request_result = _pull_request_read_result(bot, issue_number, pull_request)
-    if not pull_request_result.get("ok"):
-        return pull_request_result
-    pull_request = pull_request_result["pull_request"]
-    head = pull_request.get("head")
-    current_head = head.get("sha") if isinstance(head, dict) else None
-    if not isinstance(current_head, str) or not current_head.strip():
-        return _projection_failure("pull_request_head_unavailable", "invalid_payload")
-    reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
-    if not reviews_result.get("ok"):
-        return reviews_result
-    reviews = reviews_result["reviews"]
-
-    survivors: dict[str, dict] = {}
-    for review in reviews:
-        if not isinstance(review, dict):
-            continue
-        state = str(review.get("state", "")).upper()
-        if state == "DISMISSED":
-            continue
-        submitted_at = parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None or submitted_at < boundary:
-            continue
-        commit_id = review.get("commit_id")
-        if not isinstance(commit_id, str) or not commit_id.strip():
-            continue
-        if commit_id.strip() != current_head:
-            continue
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author.strip():
-            continue
-        review_id = str(review.get("id", ""))
-        key = author.lower()
-        candidate_key = (submitted_at, review_id)
-        current = survivors.get(key)
-        if current is None:
-            survivors[key] = review
-            continue
-        current_key = (
-            parse_github_timestamp(current.get("submitted_at")) or datetime.min.replace(tzinfo=timezone.utc),
-            str(current.get("id", "")),
-        )
-        if candidate_key >= current_key:
-            survivors[key] = review
-
-    approvals = [review for review in survivors.values() if str(review.get("state", "")).upper() == "APPROVED"]
-    completion = {
-        "completed": bool(approvals),
-        "current_head_sha": current_head,
-        "qualifying_review_ids": [review.get("id") for review in approvals],
+    result = compute_pr_approval_state_result(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if not result.get("ok"):
+        return result
+    apply_pr_approval_state(
+        review_data,
+        completion=result["completion"],
+        write_approval=result["write_approval"],
+        current_head_sha=str(result["current_head_sha"]),
+    )
+    return {
+        "ok": True,
+        "completion": result["completion"],
+        "write_approval": result["write_approval"],
     }
-
-    permission_cache: dict[str, str] = {}
-    has_write_approval = False
-    write_approvers: list[str] = []
-    for review in approvals:
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author.strip():
-            continue
-        cache_key = author.lower()
-        if cache_key not in permission_cache:
-            permission_cache[cache_key] = _permission_status(bot, author, "push")
-        if permission_cache[cache_key] == "unavailable":
-            return _projection_failure("permission_unavailable")
-        if permission_cache[cache_key] == "granted":
-            has_write_approval = True
-            write_approvers.append(author)
-    write_approval = {
-        "has_write_approval": has_write_approval,
-        "write_approvers": write_approvers,
-        "current_head_sha": current_head,
-    }
-
-    review_data["active_head_sha"] = current_head
-    review_data["current_cycle_completion"] = completion
-    review_data["current_cycle_write_approval"] = write_approval
-    if completion["completed"]:
-        review_data["review_completed_at"] = _now_iso()
-        review_data["review_completed_by"] = None
-        review_data["review_completion_source"] = "live_review_rebuild"
-    else:
-        review_data["review_completed_at"] = None
-        review_data["review_completed_by"] = None
-        review_data["review_completion_source"] = None
-    return {"ok": True, "completion": completion, "write_approval": write_approval}
 
 
 def pr_has_current_write_approval(
@@ -886,6 +942,15 @@ def compute_reviewer_response_state(
             }
         return {"state": "done", "reason": None}
 
+    pull_request_result = _pull_request_read_result(bot, issue_number, pull_request)
+    if not pull_request_result.get("ok"):
+        return {"state": "projection_failed", "reason": str(pull_request_result.get("reason"))}
+    pull_request = pull_request_result["pull_request"]
+    head = pull_request.get("head")
+    current_head = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(current_head, str) or not current_head.strip():
+        return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
+
     if not reviewer_comment and not reviewer_review:
         reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
         if not reviews_result.get("ok"):
@@ -911,18 +976,17 @@ def compute_reviewer_response_state(
                 "contributor_handoff": None,
             }
 
-    pull_request_result = _pull_request_read_result(bot, issue_number, pull_request)
-    if not pull_request_result.get("ok"):
-        return {"state": "projection_failed", "reason": str(pull_request_result.get("reason"))}
-    pull_request = pull_request_result["pull_request"]
-    head = pull_request.get("head")
-    current_head = head.get("sha") if isinstance(head, dict) else None
-    if not isinstance(current_head, str) or not current_head.strip():
-        return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
-    review_data["active_head_sha"] = current_head
+    stored_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    refresh_live_review = reviews is not None or reviewer_review is None
+    if not refresh_live_review:
+        refresh_live_review = not isinstance(stored_review_head, str) or stored_review_head != current_head
 
     preferred_live_review = None
-    if reviewer_review is None or reviews is not None:
+    if refresh_live_review:
+        reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
+        if not reviews_result.get("ok"):
+            return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
+        reviews = reviews_result["reviews"]
         preferred_live_review = get_preferred_current_reviewer_review_for_cycle(
             bot,
             issue_number,
@@ -932,6 +996,8 @@ def compute_reviewer_response_state(
         )
     if preferred_live_review is not None:
         reviewer_review = build_reviewer_review_record_from_live_review(preferred_live_review, actor=current_reviewer)
+    elif refresh_live_review:
+        reviewer_review = None
 
     latest_reviewer_response = reviewer_comment
     if _compare_records(reviewer_review, latest_reviewer_response) > 0:
@@ -942,19 +1008,6 @@ def compute_reviewer_response_state(
     if _compare_records(contributor_revision, contributor_handoff) > 0:
         contributor_handoff = contributor_revision
 
-    latest_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
-    if not isinstance(latest_review_head, str) or latest_review_head != current_head:
-        return {
-            "state": "awaiting_reviewer_response",
-            "reason": "review_head_stale",
-            "anchor_timestamp": contributor_handoff.get("timestamp") if isinstance(contributor_handoff, dict) else _initial_reviewer_anchor(review_data),
-            "current_head_sha": current_head,
-            "reviewer_comment": reviewer_comment,
-            "reviewer_review": reviewer_review,
-            "contributor_comment": contributor_comment,
-            "contributor_handoff": contributor_handoff,
-        }
-
     if _compare_cross_channel_conversation(contributor_handoff, latest_reviewer_response) > 0:
         reason = "contributor_comment_newer"
         if isinstance(contributor_handoff, dict) and str(contributor_handoff.get("semantic_key", "")).startswith("pull_request_"):
@@ -963,6 +1016,19 @@ def compute_reviewer_response_state(
             "state": "awaiting_reviewer_response",
             "reason": reason,
             "anchor_timestamp": contributor_handoff.get("timestamp") if isinstance(contributor_handoff, dict) else None,
+            "current_head_sha": current_head,
+            "reviewer_comment": reviewer_comment,
+            "reviewer_review": reviewer_review,
+            "contributor_comment": contributor_comment,
+            "contributor_handoff": contributor_handoff,
+        }
+
+    latest_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    if not isinstance(latest_review_head, str) or latest_review_head != current_head:
+        return {
+            "state": "awaiting_reviewer_response",
+            "reason": "review_head_stale",
+            "anchor_timestamp": contributor_handoff.get("timestamp") if isinstance(contributor_handoff, dict) else _initial_reviewer_anchor(review_data),
             "current_head_sha": current_head,
             "reviewer_comment": reviewer_comment,
             "reviewer_review": reviewer_review,
@@ -981,7 +1047,7 @@ def compute_reviewer_response_state(
         if completion is None or write_approval is None:
             return {"state": "projection_failed", "reason": "live_review_state_unknown"}
     else:
-        approval_result = rebuild_pr_approval_state_result(
+        approval_result = compute_pr_approval_state_result(
             bot,
             issue_number,
             review_data,

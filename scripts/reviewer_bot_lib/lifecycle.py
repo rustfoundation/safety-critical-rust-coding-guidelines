@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -191,6 +192,12 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     if not head_sha:
         raise RuntimeError("Missing PR_HEAD_SHA for synchronize event")
     bot.collect_touched_item(issue_number)
+    previous_head_sha = review_data.get("active_head_sha")
+    previous_completion = deepcopy(review_data.get("current_cycle_completion"))
+    previous_write_approval = deepcopy(review_data.get("current_cycle_write_approval"))
+    previous_review_completed_at = review_data.get("review_completed_at")
+    previous_review_completed_by = review_data.get("review_completed_by")
+    previous_review_completion_source = review_data.get("review_completion_source")
     review_data["active_head_sha"] = head_sha
     timestamp = os.environ.get("EVENT_CREATED_AT", "") or _now_iso()
     changed = bot.reviews_module.accept_channel_event(
@@ -202,7 +209,14 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
         source_precedence=1,
     )
     bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
-    return changed
+    approval_changed = (
+        previous_completion != review_data.get("current_cycle_completion")
+        or previous_write_approval != review_data.get("current_cycle_write_approval")
+        or previous_review_completed_at != review_data.get("review_completed_at")
+        or previous_review_completed_by != review_data.get("review_completed_by")
+        or previous_review_completion_source != review_data.get("review_completion_source")
+    )
+    return changed or previous_head_sha != review_data.get("active_head_sha") or approval_changed
 
 
 def maybe_record_head_observation_repair(bot, issue_number: int, review_data: dict) -> HeadObservationRepairResult:

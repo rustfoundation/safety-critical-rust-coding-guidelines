@@ -810,11 +810,18 @@ def handle_rectify_command(state: dict, issue_number: int, comment_author: str) 
         and current_reviewer.lower() == comment_author.lower()
     )
 
-    has_triage = False
+    triage_status = "denied"
     if not is_current_reviewer:
-        has_triage = check_user_permission(comment_author, "triage")
+        triage_status = get_user_permission_status(comment_author, "triage")
 
-    if not is_current_reviewer and not has_triage:
+    if not is_current_reviewer and triage_status == "unavailable":
+        return (
+            "❌ Unable to verify triage permissions right now; refusing to continue.",
+            False,
+            False,
+        )
+
+    if not is_current_reviewer and triage_status != "granted":
         if current_reviewer:
             return (
                 f"❌ Only the assigned reviewer (@{current_reviewer}) or a maintainer with triage+ "
@@ -856,7 +863,9 @@ def handle_pull_request_target_synchronize(state: dict) -> bool:
     return lifecycle_module.handle_pull_request_target_synchronize(_runtime_bot(), state)
 
 
-def maybe_record_head_observation_repair(issue_number: int, review_data: dict) -> bool:
+def maybe_record_head_observation_repair(
+    issue_number: int, review_data: dict
+) -> lifecycle_module.HeadObservationRepairResult:
     return lifecycle_module.maybe_record_head_observation_repair(_runtime_bot(), issue_number, review_data)
 
 

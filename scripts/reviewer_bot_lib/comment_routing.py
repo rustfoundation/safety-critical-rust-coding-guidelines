@@ -235,8 +235,16 @@ def _record_conversation_freshness(bot, state: dict, issue_number: int, comment_
             timestamp=created_at,
             actor=comment_author,
         )
+        previous_activity = review_data.get("last_reviewer_activity")
+        previous_warning = review_data.get("transition_warning_sent")
+        previous_notice = review_data.get("transition_notice_sent_at")
         bot.reviews_module.record_reviewer_activity(review_data, created_at)
-        return changed
+        activity_changed = (
+            previous_activity != review_data.get("last_reviewer_activity")
+            or previous_warning != review_data.get("transition_warning_sent")
+            or previous_notice != review_data.get("transition_notice_sent_at")
+        )
+        return changed or activity_changed
     return False
 
 
@@ -260,7 +268,10 @@ def _validate_accept_no_fls_changes_handoff(bot, issue_number: int, comment_auth
     labels = bot.parse_issue_labels()
     if bot.FLS_AUDIT_LABEL not in labels:
         return False, {"reason": "missing_fls_audit_label"}
-    if not bot.check_user_permission(comment_author, "triage"):
+    permission_status = bot.get_user_permission_status(comment_author, "triage")
+    if permission_status == "unavailable":
+        return False, {"reason": "authorization_unavailable"}
+    if permission_status != "granted":
         return False, {"reason": "authorization_failed"}
     return True, {
         "command_name": "accept-no-fls-changes",
@@ -383,9 +394,9 @@ def handle_comment_event(bot, state: dict) -> bool:
         return False
     if route == "issue_direct":
         if _issue_state() == "closed":
-            state.get("active_reviews", {}).pop(str(issue_number), None)
+            removed = state.get("active_reviews", {}).pop(str(issue_number), None)
             print(f"Ignoring direct comment on closed issue #{issue_number}")
-            return False
+            return removed is not None
         return _process_comment_event(bot, state, issue_number)
     if route == "pr_trusted_direct":
         if not _require_v18_for_pr(state, "pr_trusted_direct_comment"):

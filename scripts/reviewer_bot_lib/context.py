@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
 from .config import AssignmentAttempt, GitHubApiResult, LeaseContext, StateIssueSnapshot
+from .lifecycle import HeadObservationRepairResult
 
 
 @runtime_checkable
@@ -178,6 +179,9 @@ class ReviewerBotContext(GitHubTransportContext, StateStoreContext, LeaseLockCon
     def handle_manual_dispatch(self, state: dict) -> bool: ...
     def handle_scheduled_check(self, state: dict) -> bool: ...
     def handle_workflow_run_event(self, state: dict) -> bool: ...
+    def maybe_record_head_observation_repair(
+        self, issue_number: int, review_data: dict
+    ) -> HeadObservationRepairResult: ...
     def sync_status_labels_for_items(self, state: dict, issue_numbers: Iterable[int]) -> bool: ...
     def compute_reviewer_response_state(
         self,

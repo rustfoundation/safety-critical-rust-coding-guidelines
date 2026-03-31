@@ -30,11 +30,19 @@ def _mark_projection_repair_needed(bot: ReviewerBotContext, state: dict, issue_n
         review_data = active_reviews.get(str(issue_number))
         if not isinstance(review_data, dict):
             continue
-        review_data["repair_needed"] = {
+        marker = {
             "kind": "projection_failure",
             "reason": reason,
             "recorded_at": bot.datetime.now(bot.timezone.utc).isoformat(),
         }
+        existing = review_data.get("repair_needed")
+        if isinstance(existing, dict) and {
+            key: value for key, value in existing.items() if key != "recorded_at"
+        } == {
+            key: value for key, value in marker.items() if key != "recorded_at"
+        }:
+            continue
+        review_data["repair_needed"] = marker
         changed = True
     return changed
 
