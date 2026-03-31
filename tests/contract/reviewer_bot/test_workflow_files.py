@@ -75,3 +75,45 @@ def test_mutating_reviewer_bot_workflows_do_not_share_global_github_concurrency(
         data = yaml.safe_load(Path(workflow_path).read_text(encoding="utf-8"))
         for job in data.get("jobs", {}).values():
             assert "concurrency" not in job
+
+
+def test_workflow_policy_split_and_lock_only_boundaries():
+    workflows_dir = Path(".github/workflows")
+    required = {
+        "reviewer-bot-issues.yml",
+        "reviewer-bot-issue-comment-direct.yml",
+        "reviewer-bot-sweeper-repair.yml",
+        "reviewer-bot-pr-metadata.yml",
+        "reviewer-bot-pr-comment-trusted.yml",
+        "reviewer-bot-pr-comment-observer.yml",
+        "reviewer-bot-pr-review-submitted-observer.yml",
+        "reviewer-bot-pr-review-dismissed-observer.yml",
+        "reviewer-bot-pr-review-comment-observer.yml",
+        "reviewer-bot-reconcile.yml",
+        "reviewer-bot-privileged-commands.yml",
+    }
+    assert required.issubset({path.name for path in workflows_dir.glob("reviewer-bot-*.yml")})
+    for path in required:
+        data = yaml.safe_load((workflows_dir / path).read_text(encoding="utf-8"))
+        jobs = data.get("jobs", {})
+        for job in jobs.values():
+            permissions = job.get("permissions", {})
+            steps = job.get("steps", [])
+            uses_values = [step.get("uses", "") for step in steps if isinstance(step, dict)]
+            text = (workflows_dir / path).read_text(encoding="utf-8")
+            if "observer" in path:
+                assert permissions.get("contents") == "read"
+                assert all("checkout" not in value for value in uses_values)
+            if permissions.get("contents") == "write" and path != "reviewer-bot-privileged-commands.yml":
+                assert all("checkout" not in value for value in uses_values)
+                assert "Temporary lock debt" in text
+            for value in uses_values:
+                if value:
+                    assert "@" in value and len(value.split("@", 1)[1]) == 40
+
+
+def test_workflow_summaries_and_runbook_references_exist():
+    runbook = Path("docs/reviewer-bot-review-freshness-operator-runbook.md")
+    assert runbook.exists()
+    reconcile = Path(".github/workflows/reviewer-bot-reconcile.yml").read_text(encoding="utf-8")
+    assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
