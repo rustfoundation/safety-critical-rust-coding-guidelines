@@ -45,8 +45,9 @@ def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_
     ("env", "expected"),
     [
         ({"COMMENT_USER_TYPE": "Bot", "COMMENT_AUTHOR": "reviewer-bot"}, "bot_account"),
+        ({"COMMENT_INSTALLATION_ID": "12345"}, "github_app_or_other_automation"),
         ({"COMMENT_USER_TYPE": "User", "COMMENT_AUTHOR": "alice"}, "repo_user_principal"),
-        ({"COMMENT_AUTHOR": "mystery"}, "repo_user_principal"),
+        ({"COMMENT_AUTHOR": "mystery", "COMMENT_USER_TYPE": ""}, "unknown_actor"),
     ],
 )
 def test_classify_issue_comment_actor(monkeypatch, env, expected):
