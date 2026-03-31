@@ -179,6 +179,7 @@ from scripts.reviewer_bot_lib.queue import (
 from scripts.reviewer_bot_lib.queue import (
     sync_members_with_queue as queue_sync_members_with_queue,
 )
+from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
 requests = github_api_module.requests
 random = lease_lock_module.random
@@ -191,10 +192,11 @@ time = lease_lock_module.time
 
 ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
 TOUCHED_ISSUE_NUMBERS: set[int] = set()
+RUNTIME = ReviewerBotRuntime(sys.modules[__name__])
 
 
 def _runtime_bot() -> Any:
-    return sys.modules[__name__]
+    return RUNTIME
 
 
 def get_github_token() -> str:

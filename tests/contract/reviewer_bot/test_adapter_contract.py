@@ -7,6 +7,7 @@ from scripts.reviewer_bot_lib.context import (
     ReviewerBotContext,
     StateStoreContext,
 )
+from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
 
 def test_reviewer_bot_exports_runtime_modules():
@@ -41,3 +42,10 @@ def test_runtime_context_protocol_exposes_structured_head_repair_contract():
     hints = get_type_hints(ReviewerBotContext.maybe_record_head_observation_repair)
 
     assert hints["return"] is reviewer_bot.lifecycle_module.HeadObservationRepairResult
+
+
+def test_runtime_bot_returns_concrete_runtime_object():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert isinstance(runtime, ReviewerBotRuntime)
+    assert runtime.EVENT_INTENT_MUTATING == reviewer_bot.EVENT_INTENT_MUTATING
