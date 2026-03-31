@@ -1,55 +1,11 @@
 import json
 
 import pytest
+from factories import make_state
+from factories import valid_reviewer_board_metadata as _valid_reviewer_board_metadata
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib.context import (
-    GitHubTransportContext,
-    LeaseLockContext,
-    ReviewerBotContext,
-    StateStoreContext,
-)
 from scripts.reviewer_bot_lib.lifecycle import HeadObservationRepairResult
-
-
-def make_state():
-    return {
-        "schema_version": reviewer_bot.STATE_SCHEMA_VERSION,
-        "freshness_runtime_epoch": reviewer_bot.FRESHNESS_RUNTIME_EPOCH_V18,
-        "status_projection_epoch": reviewer_bot.STATUS_PROJECTION_EPOCH,
-        "last_updated": None,
-        "current_index": 0,
-        "queue": [
-            {"github": "alice", "name": "Alice"},
-            {"github": "bob", "name": "Bob"},
-            {"github": "carol", "name": "Carol"},
-        ],
-        "pass_until": [],
-        "recent_assignments": [],
-        "active_reviews": {},
-    }
-
-
-def test_reviewer_bot_exports_runtime_modules():
-    assert reviewer_bot.requests is not None
-    assert reviewer_bot.sys is not None
-    assert reviewer_bot.datetime is not None
-    assert reviewer_bot.timezone is not None
-
-
-def test_reviewer_bot_satisfies_runtime_context_protocol():
-    assert isinstance(reviewer_bot, ReviewerBotContext)
-
-
-def test_reviewer_bot_satisfies_narrower_lock_and_state_protocols():
-    assert isinstance(reviewer_bot, GitHubTransportContext)
-    assert isinstance(reviewer_bot, StateStoreContext)
-    assert isinstance(reviewer_bot, LeaseLockContext)
-
-
-def test_render_lock_commit_message_uses_direct_json_import():
-    rendered = reviewer_bot.render_lock_commit_message({"lock_state": "unlocked"})
-    assert reviewer_bot.LOCK_COMMIT_MARKER in rendered
 
 
 def test_main_show_state_uses_direct_yaml_import(monkeypatch, capsys):
@@ -64,99 +20,33 @@ def test_main_show_state_uses_direct_yaml_import(monkeypatch, capsys):
     assert "Current state:" in output
     assert "freshness_runtime_epoch" in output
 
-
-def _valid_reviewer_board_metadata():
-    return {
-        "data": {
-            "organization": {
-                "projectV2": {
-                    "id": "PVT_kwDOB",
-                    "title": "Reviewer Board",
-                    "fields": {
-                        "nodes": [
-                            {
-                                "__typename": "ProjectV2SingleSelectField",
-                                "id": "field-review-state",
-                                "name": "Review State",
-                                "options": [
-                                    {"id": "opt-ar", "name": "Awaiting Reviewer"},
-                                    {"id": "opt-ac", "name": "Awaiting Contributor"},
-                                    {"id": "opt-aw", "name": "Awaiting Write Approval"},
-                                    {"id": "opt-done", "name": "Done"},
-                                    {"id": "opt-unassigned", "name": "Unassigned"},
-                                ],
-                            },
-                            {
-                                "__typename": "ProjectV2Field",
-                                "dataType": "TEXT",
-                                "id": "field-reviewer",
-                                "name": "Reviewer",
-                            },
-                            {
-                                "__typename": "ProjectV2Field",
-                                "dataType": "DATE",
-                                "id": "field-assigned-at",
-                                "name": "Assigned At",
-                            },
-                            {
-                                "__typename": "ProjectV2Field",
-                                "dataType": "DATE",
-                                "id": "field-waiting-since",
-                                "name": "Waiting Since",
-                            },
-                            {
-                                "__typename": "ProjectV2SingleSelectField",
-                                "id": "field-needs-attention",
-                                "name": "Needs Attention",
-                                "options": [
-                                    {"id": "opt-no", "name": "No"},
-                                    {"id": "opt-warning", "name": "Warning Sent"},
-                                    {"id": "opt-notice", "name": "Transition Notice Sent"},
-                                    {"id": "opt-triage", "name": "Triage Approval Required"},
-                                    {"id": "opt-repair", "name": "Projection Repair Required"},
-                                ],
-                            },
-                        ]
-                    },
-                }
-            }
-        }
-    }
-
-
 def test_classify_event_intent_cross_repo_review_is_non_mutating_defer(monkeypatch):
     monkeypatch.setenv("PR_IS_CROSS_REPOSITORY", "true")
     intent = reviewer_bot.classify_event_intent("pull_request_review", "submitted")
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
-
 
 def test_classify_event_intent_preview_reviewer_board_is_non_mutating(monkeypatch):
     monkeypatch.setenv("MANUAL_ACTION", "preview-reviewer-board")
     intent = reviewer_bot.classify_event_intent("workflow_dispatch", "")
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_READONLY
 
-
 def test_classify_event_intent_same_repo_review_is_non_mutating_defer(monkeypatch):
     intent = reviewer_bot.classify_event_intent("pull_request_review", "submitted")
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
-
 
 def test_classify_event_intent_same_repo_dismissed_review_is_non_mutating_defer(monkeypatch):
     intent = reviewer_bot.classify_event_intent("pull_request_review", "dismissed")
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
 
-
 def test_classify_event_intent_review_comment_is_non_mutating_defer(monkeypatch):
     intent = reviewer_bot.classify_event_intent("pull_request_review_comment", "created")
     assert intent == reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
-
 
 def test_classify_event_intent_workflow_run_dismissed_review_is_mutating(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
     monkeypatch.setenv("WORKFLOW_RUN_EVENT_ACTION", "dismissed")
     intent = reviewer_bot.classify_event_intent("workflow_run", "completed")
     assert intent == reviewer_bot.EVENT_INTENT_MUTATING
-
 
 def test_main_cross_repo_review_does_not_acquire_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_review")
@@ -177,7 +67,6 @@ def test_main_cross_repo_review_does_not_acquire_lock(monkeypatch):
 
     assert acquire_called["value"] is False
 
-
 def test_main_same_repo_review_does_not_acquire_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_review")
     monkeypatch.setenv("EVENT_ACTION", "submitted")
@@ -197,7 +86,6 @@ def test_main_same_repo_review_does_not_acquire_lock(monkeypatch):
     reviewer_bot.main()
 
     assert acquire_called["value"] is False
-
 
 def test_main_workflow_run_reconcile_acquires_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
@@ -229,7 +117,6 @@ def test_main_workflow_run_reconcile_acquires_lock(monkeypatch):
 
     assert acquire_called["value"] is True
 
-
 def test_main_workflow_run_review_comment_reconcile_acquires_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
     monkeypatch.setenv("EVENT_ACTION", "completed")
@@ -259,7 +146,6 @@ def test_main_workflow_run_review_comment_reconcile_acquires_lock(monkeypatch):
     reviewer_bot.main()
 
     assert acquire_called["value"] is True
-
 
 def test_main_reloads_state_before_syncing_status_labels(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -315,7 +201,6 @@ def test_main_reloads_state_before_syncing_status_labels(monkeypatch):
         "sync",
     ]
 
-
 def test_main_preview_reviewer_board_disabled_is_clean_noop(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -354,7 +239,6 @@ def test_main_preview_reviewer_board_disabled_is_clean_noop(monkeypatch, capsys)
     output = capsys.readouterr().out
     assert "Reviewer board preview skipped: reviewer board is disabled." in output
 
-
 def test_main_preview_reviewer_board_missing_token_fails_clearly(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -384,7 +268,6 @@ def test_main_preview_reviewer_board_missing_token_fails_clearly(monkeypatch, ca
 
     assert excinfo.value.code == 1
     assert "REVIEWER_BOARD_TOKEN not set" in capsys.readouterr().err
-
 
 def test_main_preview_reviewer_board_invalid_manifest_fails_clearly(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
@@ -421,7 +304,6 @@ def test_main_preview_reviewer_board_invalid_manifest_fails_clearly(monkeypatch,
 
     assert excinfo.value.code == 1
     assert "Missing reviewer board field: Review State" in capsys.readouterr().err
-
 
 def test_main_preview_reviewer_board_is_read_only(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
@@ -479,7 +361,6 @@ def test_main_preview_reviewer_board_is_read_only(monkeypatch, capsys):
     assert "classification: open_tracked_assigned" in output
     assert "ensure_membership: true" in output
 
-
 def test_issue_close_then_close_comment_does_not_leave_active_review(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -502,7 +383,6 @@ def test_issue_close_then_close_comment_does_not_leave_active_review(monkeypatch
     assert "42" not in state["active_reviews"]
     assert reviewer_bot.handle_comment_event(state) is False
     assert "42" not in state["active_reviews"]
-
 
 def test_main_closed_issue_comment_cleanup_persists_removed_review_entry(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -555,7 +435,6 @@ def test_main_closed_issue_comment_cleanup_persists_removed_review_entry(monkeyp
     assert sync_calls[0][0] is reloaded_state
     assert sync_calls[0][1] == [42]
 
-
 def test_main_closed_issue_comment_without_entry_skips_save(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
@@ -593,7 +472,6 @@ def test_main_closed_issue_comment_without_entry_skips_save(monkeypatch):
 
     assert save_called["value"] is False
     assert sync_calls == [[42]]
-
 
 def test_main_label_signoff_issue_saves_before_status_projection(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -646,7 +524,6 @@ def test_main_label_signoff_issue_saves_before_status_projection(monkeypatch):
     assert initial_state["active_reviews"]["42"]["review_completion_source"] == "issue_label: sign-off: create pr"
     assert call_order == ["save", "sync"]
 
-
 def test_main_label_signoff_issue_does_not_project_labels_when_save_fails(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
@@ -687,7 +564,6 @@ def test_main_label_signoff_issue_does_not_project_labels_when_save_fails(monkey
 
     assert excinfo.value.code == 1
 
-
 def test_main_fails_when_save_state_fails(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
@@ -703,7 +579,6 @@ def test_main_fails_when_save_state_fails(monkeypatch):
         reviewer_bot.main()
 
     assert excinfo.value.code == 1
-
 
 def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
@@ -725,7 +600,6 @@ def test_main_workflow_run_fails_closed_on_invalid_context(monkeypatch):
         reviewer_bot.main()
 
     assert excinfo.value.code == 1
-
 
 def test_main_schedule_backfills_existing_transition_notice_without_duplicate_comment(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
@@ -792,7 +666,6 @@ def test_main_schedule_backfills_existing_transition_notice_without_duplicate_co
     assert review["transition_notice_sent_at"] == "2026-03-25T15:22:42Z"
     assert posted == []
     assert save_calls == ["2026-03-25T15:22:42Z"]
-
 
 def test_main_schedule_reviewer_review_repair_marks_item_for_label_sync(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
@@ -863,7 +736,6 @@ def test_main_schedule_reviewer_review_repair_marks_item_for_label_sync(monkeypa
     assert synced_issue_numbers == [42]
     assert len(save_calls) == 1
 
-
 def test_main_schedule_structured_head_repair_result_without_mutation_skips_save(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -914,7 +786,6 @@ def test_main_schedule_structured_head_repair_result_without_mutation_skips_save
 
     assert save_called["value"] is False
 
-
 def test_main_schedule_status_projection_epoch_mismatch_triggers_label_repair_sweep(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -949,7 +820,6 @@ def test_main_schedule_status_projection_epoch_mismatch_triggers_label_repair_sw
     assert synced_issue_numbers == [42, 99]
     assert saved_epochs[-1] == reviewer_bot.STATUS_PROJECTION_EPOCH
 
-
 def test_main_schedule_status_projection_epoch_not_advanced_on_label_sync_failure(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -980,7 +850,6 @@ def test_main_schedule_status_projection_epoch_not_advanced_on_label_sync_failur
 
     reviewer_bot.main()
     assert all(epoch != reviewer_bot.STATUS_PROJECTION_EPOCH for epoch in saved_epochs)
-
 
 def test_main_schedule_projection_epoch_repair_relabels_previously_repaired_pr(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
@@ -1019,7 +888,6 @@ def test_main_schedule_projection_epoch_repair_relabels_previously_repaired_pr(m
 
     assert synced_issue_numbers == [256]
 
-
 def test_main_mutating_event_fails_closed_when_state_unavailable(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
@@ -1036,7 +904,6 @@ def test_main_mutating_event_fails_closed_when_state_unavailable(monkeypatch):
         reviewer_bot.main()
 
     assert excinfo.value.code == 1
-
 
 def test_main_mutating_event_does_not_sync_or_save_when_state_unavailable(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -1088,183 +955,6 @@ def test_main_mutating_event_does_not_sync_or_save_when_state_unavailable(monkey
         "save": False,
     }
 
-
-def test_acquire_lock_retries_until_expected_token_visible(monkeypatch):
-    monkeypatch.setattr(
-        reviewer_bot.lease_lock_module,
-        "get_lock_owner_context",
-        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
-    )
-    snapshots = iter(
-        [
-            ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            ("stale-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            ("stale-ref-2", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            (
-                "new-ref",
-                "tree",
-                {
-                    "lock_state": "locked",
-                    "lock_token": "token-123",
-                    "lock_owner_run_id": "local-run",
-                    "lock_owner_workflow": "reviewer-bot",
-                    "lock_owner_job": "reviewer-bot",
-                    "lock_expires_at": "2999-01-01T00:00:00+00:00",
-                },
-            ),
-        ]
-    )
-
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(reviewer_bot, "create_lock_commit", lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(201, {"sha": "commit-1"}, {}, "", True))
-    monkeypatch.setattr(reviewer_bot, "cas_update_lock_ref", lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True))
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-
-    context = reviewer_bot.acquire_state_issue_lease_lock()
-
-    assert context.lock_token == "token-123"
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is context
-
-
-def test_acquire_lock_fails_closed_on_conflicting_visible_token(monkeypatch):
-    snapshots = iter(
-        [
-            ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            ("new-ref", "tree", {"lock_state": "locked", "lock_token": "other-token"}),
-        ]
-    )
-
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(reviewer_bot, "create_lock_commit", lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(201, {"sha": "commit-1"}, {}, "", True))
-    monkeypatch.setattr(reviewer_bot, "cas_update_lock_ref", lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True))
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-
-    with pytest.raises(RuntimeError, match="unexpected lock state"):
-        reviewer_bot.acquire_state_issue_lease_lock()
-
-
-def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypatch):
-    monkeypatch.setattr(
-        reviewer_bot.lease_lock_module,
-        "get_lock_owner_context",
-        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
-    )
-    snapshots = iter(
-        [
-            ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            ("stale-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            (
-                "new-ref",
-                "tree",
-                {
-                    "lock_state": "locked",
-                    "lock_token": "token-123",
-                    "lock_owner_run_id": "local-run",
-                    "lock_owner_workflow": "reviewer-bot",
-                    "lock_owner_job": "reviewer-bot",
-                    "lock_expires_at": "2999-01-01T00:00:00+00:00",
-                },
-            ),
-        ]
-    )
-
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(reviewer_bot, "create_lock_commit", lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(201, {"sha": "commit-1"}, {}, "", True))
-    monkeypatch.setattr(reviewer_bot, "cas_update_lock_ref", lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True))
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-
-    context = reviewer_bot.acquire_state_issue_lease_lock()
-
-    assert context.lock_token == "token-123"
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is context
-
-
-def test_acquire_lock_fails_closed_when_own_token_has_mismatched_owner(monkeypatch):
-    monkeypatch.setattr(
-        reviewer_bot.lease_lock_module,
-        "get_lock_owner_context",
-        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
-    )
-    snapshots = iter(
-        [
-            (
-                "new-ref",
-                "tree",
-                {
-                    "lock_state": "locked",
-                    "lock_token": "token-123",
-                    "lock_owner_run_id": "someone-else",
-                    "lock_owner_workflow": "reviewer-bot",
-                    "lock_owner_job": "reviewer-bot",
-                    "lock_expires_at": "2999-01-01T00:00:00+00:00",
-                },
-            )
-        ]
-    )
-
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
-
-    with pytest.raises(RuntimeError, match="owner metadata drifted"):
-        reviewer_bot.acquire_state_issue_lease_lock()
-
-
-def test_release_lock_retries_stale_unlocked_predecessor(monkeypatch):
-    context = reviewer_bot.LeaseContext(
-        lock_token="token-123",
-        lock_owner_run_id="run",
-        lock_owner_workflow="workflow",
-        lock_owner_job="job",
-        state_issue_url="https://example.com/issues/314",
-        lock_ref="refs/heads/reviewer-bot-state-lock",
-        lock_expires_at="2999-01-01T00:00:00+00:00",
-    )
-    snapshots = iter(
-        [
-            ("stale-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
-            ("new-ref", "tree", {"lock_state": "locked", "lock_token": "token-123"}),
-        ]
-    )
-
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", context)
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(reviewer_bot, "create_lock_commit", lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(201, {"sha": "commit-2"}, {}, "", True))
-    monkeypatch.setattr(reviewer_bot, "cas_update_lock_ref", lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True))
-
-    assert reviewer_bot.release_state_issue_lease_lock() is True
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is None
-
-
-def test_release_lock_fails_closed_on_conflicting_token(monkeypatch):
-    context = reviewer_bot.LeaseContext(
-        lock_token="token-123",
-        lock_owner_run_id="run",
-        lock_owner_workflow="workflow",
-        lock_owner_job="job",
-        state_issue_url="https://example.com/issues/314",
-        lock_ref="refs/heads/reviewer-bot-state-lock",
-        lock_expires_at="2999-01-01T00:00:00+00:00",
-    )
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", context)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: ("new-ref", "tree", {"lock_state": "locked", "lock_token": "other-token"}))
-
-    assert reviewer_bot.release_state_issue_lease_lock() is False
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is None
-
-
 def test_schedule_guard_blocks_empty_active_reviews_wipe(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -1301,7 +991,6 @@ def test_schedule_guard_blocks_empty_active_reviews_wipe(monkeypatch):
 
     assert excinfo.value.code == 1
     assert save_called["value"] is False
-
 
 def test_main_workflow_run_bookkeeping_only_reconcile_still_saves_state(tmp_path, monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
@@ -1400,7 +1089,6 @@ def test_main_workflow_run_bookkeeping_only_reconcile_still_saves_state(tmp_path
     assert save_snapshots == [{"reconciled": ["pull_request_review:11"], "gap_present": False}]
     assert synced_issue_numbers == [42]
 
-
 def test_main_pull_request_synchronize_head_only_mutation_still_saves_state(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_target")
     monkeypatch.setenv("EVENT_ACTION", "synchronize")
@@ -1437,7 +1125,6 @@ def test_main_pull_request_synchronize_head_only_mutation_still_saves_state(monk
     reviewer_bot.main()
 
     assert save_calls == ["head-2"]
-
 
 def test_main_schedule_identical_live_read_failure_does_not_repeat_save(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
@@ -1489,7 +1176,6 @@ def test_main_schedule_identical_live_read_failure_does_not_repeat_save(monkeypa
     assert len(save_snapshots) == 1
     assert save_snapshots[0]["kind"] == "live_read_failure"
 
-
 def test_main_identical_projection_failure_does_not_repeat_repair_save(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
@@ -1531,7 +1217,6 @@ def test_main_identical_projection_failure_does_not_repeat_repair_save(monkeypat
 
     assert len(save_markers) == 1
     assert save_markers[0]["kind"] == "projection_failure"
-
 
 def test_main_changed_projection_failure_reason_triggers_new_repair_save(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -1576,7 +1261,6 @@ def test_main_changed_projection_failure_reason_triggers_new_repair_save(monkeyp
     assert len(save_markers) == 2
     assert save_markers[0]["reason"] == "projection failed"
     assert save_markers[1]["reason"] == "projection still failed differently"
-
 
 def test_main_workflow_run_deferred_comment_bookkeeping_only_reconcile_still_saves_state(
     tmp_path, monkeypatch
@@ -1658,7 +1342,6 @@ def test_main_workflow_run_deferred_comment_bookkeeping_only_reconcile_still_sav
     reviewer_bot.main()
 
     assert save_snapshots == [{"reconciled": ["issue_comment:210"], "gap_present": False}]
-
 
 def test_main_workflow_run_deferred_comment_contract_drift_persists_gap_update(
     tmp_path, monkeypatch
@@ -1748,7 +1431,6 @@ def test_main_workflow_run_deferred_comment_contract_drift_persists_gap_update(
 
     assert save_snapshots[0]["reason"] == "reconcile_failed_closed"
 
-
 def test_main_workflow_run_deferred_review_comment_bookkeeping_only_reconcile_still_saves_state(
     tmp_path, monkeypatch
 ):
@@ -1833,7 +1515,6 @@ def test_main_workflow_run_deferred_review_comment_bookkeeping_only_reconcile_st
         {"reconciled": ["pull_request_review_comment:310"], "gap_present": False}
     ]
 
-
 def test_main_schedule_sweeper_bookkeeping_only_mutation_still_saves_state(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -1887,7 +1568,6 @@ def test_main_schedule_sweeper_bookkeeping_only_mutation_still_saves_state(monke
     reviewer_bot.main()
 
     assert save_calls == [["pull_request_review:500"]]
-
 
 def test_main_schedule_reviewer_review_activity_only_repair_still_saves_state(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
@@ -1990,3 +1670,49 @@ def test_main_schedule_reviewer_review_activity_only_repair_still_saves_state(mo
             "transition_notice_sent_at": None,
         }
     ]
+
+def test_classify_event_intent_treats_supported_workflow_run_sources_as_mutating(monkeypatch):
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "issue_comment")
+    assert reviewer_bot.classify_event_intent("workflow_run", "completed") == reviewer_bot.EVENT_INTENT_MUTATING
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review_comment")
+    assert reviewer_bot.classify_event_intent("workflow_run", "completed") == reviewer_bot.EVENT_INTENT_MUTATING
+
+def test_main_records_repair_needed_when_projection_fails(monkeypatch, tmp_path):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    monkeypatch.setenv("EVENT_NAME", "issue_comment")
+    monkeypatch.setenv("EVENT_ACTION", "created")
+    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    monkeypatch.setenv("ISSUE_NUMBER", "42")
+    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    monkeypatch.setenv("COMMENT_BODY", "plain text")
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+    saved_states = []
+
+    def fake_load_state(*, fail_on_unavailable=False):
+        return json.loads(json.dumps(state))
+
+    def fake_save_state(updated_state):
+        saved_states.append(json.loads(json.dumps(updated_state)))
+        state.clear()
+        state.update(json.loads(json.dumps(updated_state)))
+        return True
+
+    monkeypatch.setattr(reviewer_bot, "load_state", fake_load_state)
+    monkeypatch.setattr(reviewer_bot, "save_state", fake_save_state)
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current_state: (current_state, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current_state: (current_state, []))
+    monkeypatch.setattr(reviewer_bot, "get_issue_or_pr_snapshot", lambda issue_number: {"number": issue_number, "state": "open", "labels": [], "pull_request": None})
+    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current_state, issue_numbers: (_ for _ in ()).throw(RuntimeError("projection failed")))
+    output_path = tmp_path / "github-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output_path))
+    reviewer_bot.app_module.main(reviewer_bot)
+    assert state["active_reviews"]["42"]["repair_needed"]["kind"] == "projection_failure"
+    assert len(saved_states) >= 2
