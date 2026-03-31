@@ -49,3 +49,29 @@ def test_runtime_bot_returns_concrete_runtime_object():
 
     assert isinstance(runtime, ReviewerBotRuntime)
     assert runtime.EVENT_INTENT_MUTATING == reviewer_bot.EVENT_INTENT_MUTATING
+
+
+def test_build_event_context_returns_structured_context(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "workflow_run")
+    monkeypatch.setenv("EVENT_ACTION", "completed")
+    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
+    monkeypatch.setenv("ISSUE_LABELS", '["coding guideline"]')
+
+    context = reviewer_bot.build_event_context()
+
+    assert isinstance(context, reviewer_bot.EventContext)
+    assert context.event_name == "workflow_run"
+    assert context.workflow_run_event == "pull_request_review"
+    assert context.issue_labels == ("coding guideline",)
+
+
+def test_execute_run_returns_execution_result(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "pull_request_review")
+    monkeypatch.setenv("EVENT_ACTION", "submitted")
+    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: {"active_reviews": {}})
+    monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
+
+    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+
+    assert isinstance(result, reviewer_bot.ExecutionResult)
+    assert result.exit_code == 0

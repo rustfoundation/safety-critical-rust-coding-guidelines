@@ -3,11 +3,46 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
 from .config import AssignmentAttempt, GitHubApiResult, LeaseContext, StateIssueSnapshot
 from .lifecycle import HeadObservationRepairResult
+
+
+@dataclass(frozen=True)
+class EventContext:
+    event_name: str
+    event_action: str
+    issue_number: int | None = None
+    is_pull_request: bool | None = None
+    issue_author: str | None = None
+    issue_state: str | None = None
+    issue_labels: tuple[str, ...] = ()
+    comment_id: int | None = None
+    comment_author: str | None = None
+    comment_body: str | None = None
+    comment_source_event_key: str | None = None
+    pr_is_cross_repository: bool | None = None
+    review_author: str | None = None
+    review_state: str | None = None
+    workflow_run_event: str | None = None
+    workflow_run_event_action: str | None = None
+    workflow_run_head_sha: str | None = None
+    workflow_run_reconcile_pr_number: int | None = None
+    workflow_run_reconcile_head_sha: str | None = None
+    workflow_run_id: int | None = None
+    workflow_name: str | None = None
+    workflow_job_name: str | None = None
+    manual_action: str | None = None
+
+
+@dataclass(frozen=True)
+class ExecutionResult:
+    exit_code: int
+    state_changed: bool
+    release_failed: bool = False
 
 
 @runtime_checkable

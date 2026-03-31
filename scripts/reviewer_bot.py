@@ -158,6 +158,7 @@ from scripts.reviewer_bot_lib.config import (  # noqa: F401  # noqa: F401
     StateIssueSnapshot,
     get_commands_help,
 )
+from scripts.reviewer_bot_lib.context import EventContext, ExecutionResult  # noqa: F401
 from scripts.reviewer_bot_lib.guidance import (  # noqa: F401
     get_fls_audit_guidance,
     get_issue_guidance,
@@ -919,6 +920,14 @@ def classify_event_intent(event_name: str, event_action: str) -> str:
 def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
     """Backwards-compatible helper for tests and call sites."""
     return app_module.event_requires_lease_lock(_runtime_bot(), event_name, event_action)
+
+
+def build_event_context() -> EventContext:
+    return app_module.build_event_context()
+
+
+def execute_run(context: EventContext) -> ExecutionResult:
+    return app_module.execute_run(_runtime_bot(), context)
 
 
 def main():
