@@ -124,3 +124,84 @@ def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tm
     assert result.exit_code == 0
     assert state["active_reviews"]["42"]["repair_needed"]["kind"] == "projection_failure"
     assert len(saved_states) >= 2
+
+
+def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repair(monkeypatch):
+    monkeypatch.setenv("EVENT_NAME", "schedule")
+    monkeypatch.setenv("EVENT_ACTION", "")
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "iglesias"
+    review["assigned_at"] = "2026-02-26T04:58:03Z"
+    review["active_cycle_started_at"] = "2026-02-26T04:58:03Z"
+    review["last_reviewer_activity"] = "2026-03-18T01:09:05Z"
+    review["transition_warning_sent"] = "2026-04-01T12:12:04Z"
+
+    saved_warning_values = []
+    posted_comments = []
+
+    def fake_load_state(*args, **kwargs):
+        return state
+
+    def fake_sweep(bot, current):
+        bot.reviews_module.record_reviewer_activity(
+            current["active_reviews"]["42"],
+            "2026-03-18T01:09:05Z",
+        )
+        return False
+
+    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
+    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
+    monkeypatch.setattr(reviewer_bot, "load_state", fake_load_state)
+    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
+    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
+    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", fake_sweep)
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot.reviews_module,
+        "repair_missing_reviewer_review_state",
+        lambda bot, issue_number, review_data: False,
+    )
+    monkeypatch.setattr(
+        reviewer_bot.maintenance_module,
+        "maybe_record_head_observation_repair",
+        lambda bot, issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+            changed=False,
+            outcome="unchanged",
+        ),
+    )
+    monkeypatch.setattr(
+        reviewer_bot.reviews_module,
+        "compute_reviewer_response_state",
+        lambda bot, issue_number, review_data, **kwargs: {
+            "state": "awaiting_reviewer_response",
+            "reason": "review_head_stale",
+            "anchor_timestamp": "2026-03-18T12:09:36Z",
+        },
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "post_comment",
+        lambda issue_number, body: posted_comments.append((issue_number, body)) or True,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "save_state",
+        lambda current: saved_warning_values.append(current["active_reviews"]["42"]["transition_warning_sent"])
+        or True,
+    )
+    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current, issue_numbers: False)
+
+    first = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    second = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+
+    assert first.exit_code == 0
+    assert second.exit_code == 0
+    assert posted_comments == []
+    assert review["transition_warning_sent"] == "2026-04-01T12:12:04Z"
+    assert saved_warning_values == []

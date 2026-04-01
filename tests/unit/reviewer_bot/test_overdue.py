@@ -248,3 +248,62 @@ def test_check_overdue_reviews_uses_live_current_head_review_when_stored_review_
     )
 
     assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
+
+
+def test_refresh_reviewer_review_from_live_preferred_review_does_not_clear_transition_warning_when_activity_not_advanced(
+    monkeypatch,
+):
+    review = reviewer_bot.ensure_review_entry(make_state(), 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    review["reviewer_review"] = {
+        "accepted": {
+            "semantic_key": "pull_request_review:10",
+            "timestamp": "2026-03-17T10:01:00Z",
+            "actor": "alice",
+            "reviewed_head_sha": "head-1",
+            "source_precedence": 1,
+            "payload": {},
+        },
+        "seen_keys": ["pull_request_review:10"],
+    }
+    review["last_reviewer_activity"] = "2026-03-17T10:01:00Z"
+    review["transition_warning_sent"] = "2026-04-01T12:12:04Z"
+    review["transition_notice_sent_at"] = "2026-04-15T12:12:04Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            200,
+            {"state": "open", "head": {"sha": "head-1"}}
+            if endpoint == "pulls/42"
+            else [
+                {
+                    "id": 10,
+                    "state": "COMMENTED",
+                    "submitted_at": "2026-03-17T10:01:00Z",
+                    "commit_id": "head-1",
+                    "user": {"login": "alice"},
+                }
+            ],
+            {},
+            "ok",
+            True,
+            None,
+            0,
+            None,
+        ),
+    )
+
+    changed, preferred_review = reviewer_bot.reviews_module.refresh_reviewer_review_from_live_preferred_review(
+        reviewer_bot,
+        42,
+        review,
+    )
+
+    assert changed is False
+    assert preferred_review is not None
+    assert review["last_reviewer_activity"] == "2026-03-17T10:01:00Z"
+    assert review["transition_warning_sent"] == "2026-04-01T12:12:04Z"
+    assert review["transition_notice_sent_at"] == "2026-04-15T12:12:04Z"

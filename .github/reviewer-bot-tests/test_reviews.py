@@ -405,8 +405,8 @@ def test_record_reviewer_activity_does_not_regress_timestamp_on_legacy_backfill(
     review["transition_notice_sent_at"] = "2026-03-22T10:00:00Z"
     reviewer_bot.reviews_module.record_reviewer_activity(review, "2026-03-18T10:00:00Z")
     assert review["last_reviewer_activity"] == "2026-03-20T10:00:00Z"
-    assert review["transition_warning_sent"] is None
-    assert review["transition_notice_sent_at"] is None
+    assert review["transition_warning_sent"] == "2026-03-21T10:00:00Z"
+    assert review["transition_notice_sent_at"] == "2026-03-22T10:00:00Z"
 
 def test_project_status_labels_emits_awaiting_write_approval_only_after_completion(monkeypatch):
     state = make_state()

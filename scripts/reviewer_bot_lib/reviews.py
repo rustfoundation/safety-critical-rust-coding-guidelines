@@ -582,12 +582,16 @@ def clear_transition_timers(review_data: dict) -> None:
     review_data["transition_notice_sent_at"] = None
 
 
-def record_reviewer_activity(review_data: dict, timestamp: str) -> None:
+def record_reviewer_activity(review_data: dict, timestamp: str) -> bool:
     current = parse_github_timestamp(review_data.get("last_reviewer_activity"))
     candidate = parse_github_timestamp(timestamp)
-    if current is None or candidate is None or candidate >= current:
+    if candidate is None:
+        return False
+    if current is None or candidate > current:
         review_data["last_reviewer_activity"] = timestamp
-    clear_transition_timers(review_data)
+        clear_transition_timers(review_data)
+        return True
+    return False
 
 
 def record_transition_notice_sent(review_data: dict, timestamp: str) -> None:

@@ -202,3 +202,45 @@ def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_witho
     assert review["transition_notice_sent_at"] is None
     assert "pull_request_review:202" not in review["deferred_gaps"]
     assert "pull_request_review:202" in review["reconciled_source_events"]
+
+
+def test_visible_review_repair_does_not_clear_transition_warning_for_stale_replayed_review(monkeypatch):
+    monkeypatch.setattr(
+        sweeper,
+        "_now",
+        lambda: reviewer_bot.parse_github_timestamp("2026-03-25T12:30:00Z"),
+    )
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    review["last_reviewer_activity"] = "2026-03-25T11:00:00Z"
+    review["transition_warning_sent"] = "2026-04-01T12:12:04Z"
+    review["transition_notice_sent_at"] = "2026-04-15T12:12:04Z"
+    review["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"state": "open", "head": {"sha": "head-1"}}
+        if endpoint == "pulls/42"
+        else {"workflow_runs": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 202,
+                "submitted_at": "2026-03-25T11:00:00Z",
+                "state": "COMMENTED",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+
+    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
+    assert review["last_reviewer_activity"] == "2026-03-25T11:00:00Z"
+    assert review["transition_warning_sent"] == "2026-04-01T12:12:04Z"
+    assert review["transition_notice_sent_at"] == "2026-04-15T12:12:04Z"
