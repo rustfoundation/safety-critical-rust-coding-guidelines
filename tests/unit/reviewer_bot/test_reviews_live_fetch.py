@@ -252,3 +252,389 @@ def test_refresh_reviewer_review_from_live_preferred_review_returns_true_for_act
     assert review["last_reviewer_activity"] == "2026-03-17T10:01:00Z"
     assert review["transition_warning_sent"] is None
     assert review["transition_notice_sent_at"] is None
+
+
+def test_project_status_labels_uses_commit_id_and_comment_freshness(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_comment",
+        semantic_key="issue_comment:1",
+        timestamp="2026-03-17T10:00:00Z",
+        actor="alice",
+    )
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-17T10:01:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-2"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
+
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}
+    assert metadata["reason"] == "review_head_stale"
+
+
+def test_compute_reviewer_response_state_keeps_contributor_handoff_when_stored_review_is_stale(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:99",
+        timestamp="2026-03-17T11:00:00Z",
+        actor="alice",
+        reviewed_head_sha="head-0",
+        source_precedence=1,
+    )
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "contributor_revision",
+        semantic_key="pull_request_sync:42:head-1",
+        timestamp="2026-03-17T12:00:00Z",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 99,
+                "state": "COMMENTED",
+                "submitted_at": "2026-03-17T11:00:00Z",
+                "commit_id": "head-0",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+
+    response_state = reviewer_bot.compute_reviewer_response_state(42, review)
+
+    assert response_state["state"] == "awaiting_reviewer_response"
+    assert response_state["reason"] == "contributor_revision_newer"
+
+
+def test_project_status_labels_pr256_shape_remains_awaiting_contributor_response(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "vccjgust"
+    review["active_cycle_started_at"] = "2026-02-18T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "contributor_comment",
+        semantic_key="issue_comment:20",
+        timestamp="2026-02-18T09:30:00Z",
+        actor="dana",
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-current"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 30,
+                "state": "COMMENTED",
+                "submitted_at": "2026-02-18T10:00:00Z",
+                "commit_id": "head-older",
+                "user": {"login": "vccjgust"},
+            },
+            {
+                "id": 31,
+                "state": "COMMENTED",
+                "submitted_at": "2026-02-18T11:00:00Z",
+                "commit_id": "head-current",
+                "user": {"login": "vccjgust"},
+            },
+        ],
+    )
+
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}
+    assert metadata["reason"] == "completion_missing"
+
+
+def test_project_status_labels_prefers_newer_contributor_comment_over_live_review_fallback(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "contributor_comment",
+        semantic_key="issue_comment:20",
+        timestamp="2026-03-17T10:05:00Z",
+        actor="bob",
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {"head": {"sha": "head-1"}} if endpoint == "pulls/42" else None,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_pull_request_reviews",
+        lambda issue_number: [
+            {
+                "id": 10,
+                "state": "COMMENTED",
+                "submitted_at": "2026-03-17T10:01:00Z",
+                "commit_id": "head-1",
+                "user": {"login": "alice"},
+            }
+        ],
+    )
+
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}
+    assert metadata["reason"] == "contributor_comment_newer"
+
+
+def test_project_status_labels_emits_awaiting_write_approval_only_after_completion(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_comment",
+        semantic_key="issue_comment:1",
+        timestamp="2026-03-17T10:00:00Z",
+        actor="alice",
+    )
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-17T10:01:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+
+    def fake_github_api_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        if endpoint == "pulls/42":
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload={"state": "open", "head": {"sha": "head-1"}},
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        if endpoint.startswith("pulls/42/reviews"):
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload=[
+                    {
+                        "id": 10,
+                        "state": "APPROVED",
+                        "submitted_at": "2026-03-17T10:01:00Z",
+                        "commit_id": "head-1",
+                        "user": {"login": "bob"},
+                    }
+                ],
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_github_api_request)
+    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "denied")
+
+    desired_labels, metadata = reviewer_bot.project_status_labels_for_item(42, state)
+
+    assert desired_labels == {reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL}
+    assert metadata["state"] == "awaiting_write_approval"
+    review["mandatory_approver_required"] = True
+    desired_labels_again, _ = reviewer_bot.project_status_labels_for_item(42, state)
+    assert desired_labels_again == {reviewer_bot.STATUS_AWAITING_WRITE_APPROVAL_LABEL}
+
+
+def test_compute_reviewer_response_state_reports_pull_request_unavailable(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=502,
+            payload={"message": "bad gateway"},
+            headers={},
+            text="bad gateway",
+            ok=False,
+            failure_kind="server_error",
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    response_state = reviewer_bot.compute_reviewer_response_state(42, review)
+
+    assert response_state["state"] == "projection_failed"
+    assert response_state["reason"] == "pull_request_unavailable"
+
+
+def test_compute_reviewer_response_state_fails_closed_without_stored_activity_when_pr_head_invalid(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+            200,
+            {"state": "open", "head": {}},
+            {},
+            "ok",
+            True,
+            None,
+            0,
+            None,
+        ),
+    )
+
+    response_state = reviewer_bot.compute_reviewer_response_state(42, review)
+
+    assert response_state["state"] == "projection_failed"
+    assert response_state["reason"] == "pull_request_head_unavailable"
+
+
+def test_compute_reviewer_response_state_reports_permission_unavailable(monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    reviewer_bot.reviews_module.accept_channel_event(
+        review,
+        "reviewer_review",
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-17T10:01:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+    monkeypatch.setattr(
+        reviewer_bot,
+        "get_issue_or_pr_snapshot",
+        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+    )
+
+    def fake_github_api_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        if endpoint == "pulls/42":
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload={"state": "open", "head": {"sha": "head-1"}},
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        if endpoint.startswith("pulls/42/reviews"):
+            return reviewer_bot.GitHubApiResult(
+                status_code=200,
+                payload=[
+                    {
+                        "id": 10,
+                        "state": "APPROVED",
+                        "submitted_at": "2026-03-17T10:01:00Z",
+                        "commit_id": "head-1",
+                        "user": {"login": "alice"},
+                    }
+                ],
+                headers={},
+                text="ok",
+                ok=True,
+                failure_kind=None,
+                retry_attempts=0,
+                transport_error=None,
+            )
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_github_api_request)
+    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "unavailable")
+
+    response_state = reviewer_bot.compute_reviewer_response_state(42, review)
+
+    assert response_state["state"] == "projection_failed"
+    assert response_state["reason"] == "permission_unavailable"
