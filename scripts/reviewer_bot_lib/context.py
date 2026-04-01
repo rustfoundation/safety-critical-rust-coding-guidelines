@@ -45,6 +45,34 @@ class ExecutionResult:
     release_failed: bool = False
 
 
+@dataclass(frozen=True)
+class CommentEventRequest:
+    issue_number: int
+    is_pull_request: bool
+    issue_state: str = ""
+    issue_author: str = ""
+    comment_id: int = 0
+    comment_author: str = ""
+    comment_author_id: int = 0
+    comment_body: str = ""
+    comment_created_at: str = ""
+    comment_source_event_key: str = ""
+    comment_user_type: str = ""
+    comment_sender_type: str = ""
+    comment_installation_id: str = ""
+    comment_performed_via_github_app: bool = False
+
+
+@dataclass(frozen=True)
+class PrCommentTrustContext:
+    github_repository: str = ""
+    comment_author_association: str = ""
+    current_workflow_file: str = ""
+    github_ref: str = ""
+    github_run_id: int = 0
+    github_run_attempt: int = 0
+
+
 @runtime_checkable
 class GitHubTransportContext(Protocol):
     """GitHub API transport and mutation surface used by low-level helpers."""

@@ -158,7 +158,12 @@ from scripts.reviewer_bot_lib.config import (  # noqa: F401  # noqa: F401
     StateIssueSnapshot,
     get_commands_help,
 )
-from scripts.reviewer_bot_lib.context import EventContext, ExecutionResult  # noqa: F401
+from scripts.reviewer_bot_lib.context import (  # noqa: F401
+    CommentEventRequest,
+    EventContext,
+    ExecutionResult,
+    PrCommentTrustContext,
+)
 from scripts.reviewer_bot_lib.guidance import (  # noqa: F401
     get_fls_audit_guidance,
     get_issue_guidance,
@@ -888,11 +893,21 @@ def handle_closed_event(state: dict) -> bool:
 
 
 def handle_comment_event(state: dict) -> bool:
-    return comment_routing_module.handle_comment_event(_runtime_bot(), state)
+    return comment_routing_module.handle_comment_event(
+        _runtime_bot(),
+        state,
+        comment_routing_module.build_comment_event_request(),
+        comment_routing_module.build_pr_comment_trust_context(),
+    )
 
 
 def build_pr_comment_observer_payload(issue_number: int) -> dict:
-    return comment_routing_module.build_pr_comment_observer_payload(_runtime_bot(), issue_number)
+    return comment_routing_module.build_pr_comment_observer_payload(
+        _runtime_bot(),
+        issue_number,
+        comment_routing_module.build_comment_event_request(issue_number=issue_number),
+        comment_routing_module.build_pr_comment_trust_context(),
+    )
 
 
 def handle_manual_dispatch(state: dict) -> bool:
