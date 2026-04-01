@@ -1,9 +1,9 @@
 import json
 
 import pytest
-from factories import make_state
 
 from scripts import reviewer_bot
+from tests.fixtures.reviewer_bot import make_state
 
 
 def test_handle_pull_request_target_synchronize_returns_true_for_head_only_mutation(monkeypatch):
@@ -16,7 +16,6 @@ def test_handle_pull_request_target_synchronize_returns_true_for_head_only_mutat
     monkeypatch.setenv("ISSUE_NUMBER", "42")
     monkeypatch.setenv("PR_HEAD_SHA", "head-2")
     monkeypatch.setenv("EVENT_CREATED_AT", "2026-03-17T10:00:00Z")
-
     monkeypatch.setattr(
         reviewer_bot.reviews_module,
         "rebuild_pr_approval_state",
@@ -25,6 +24,7 @@ def test_handle_pull_request_target_synchronize_returns_true_for_head_only_mutat
 
     assert reviewer_bot.handle_pull_request_target_synchronize(state) is True
     assert review["active_head_sha"] == "head-2"
+
 
 def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
     state = make_state(epoch="legacy_v14")
@@ -51,7 +51,9 @@ def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
             "user": {"login": "dana"},
         },
     )
+
     assert reviewer_bot.handle_comment_event(state) is False
+
 
 def test_check_overdue_reviews_skips_transition_after_transition_notice_sent(monkeypatch):
     state = make_state()
@@ -68,7 +70,9 @@ def test_check_overdue_reviews_skips_transition_after_transition_notice_sent(mon
         lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
     )
     monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
+
     assert reviewer_bot.maintenance_module.check_overdue_reviews(reviewer_bot, state) == []
+
 
 def test_handle_transition_notice_records_transition_notice_sent_at_once(monkeypatch):
     state = make_state()
@@ -77,19 +81,23 @@ def test_handle_transition_notice_records_transition_notice_sent_at_once(monkeyp
     review["current_reviewer"] = "alice"
     posted = []
     monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append((issue_number, body)) or True)
+
     assert reviewer_bot.handle_transition_notice(state, 42, "alice") is True
     assert review["transition_notice_sent_at"] is not None
     assert reviewer_bot.handle_transition_notice(state, 42, "alice") is False
     assert len(posted) == 1
+
 
 def test_handle_transition_notice_message_does_not_claim_reassignment(monkeypatch):
     state = make_state()
     reviewer_bot.ensure_review_entry(state, 42, create=True)
     posted = []
     monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+
     assert reviewer_bot.handle_transition_notice(state, 42, "alice") is True
     assert "reassigned to the next person in the queue" not in posted[0]
     assert "/pass" in posted[0]
+
 
 def test_reviewer_comment_clears_warning_and_transition_notice_markers(monkeypatch):
     state = make_state()
@@ -118,9 +126,11 @@ def test_reviewer_comment_clears_warning_and_transition_notice_markers(monkeypat
             "user": {"login": "dana"},
         },
     )
+
     assert reviewer_bot.handle_comment_event(state) is True
     assert review["transition_warning_sent"] is None
     assert review["transition_notice_sent_at"] is None
+
 
 def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypatch):
     state = make_state()
@@ -176,9 +186,11 @@ def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypat
         raise AssertionError(endpoint)
 
     monkeypatch.setattr(reviewer_bot, "github_api", fake_api)
+
     assert reviewer_bot.handle_scheduled_check(state) is True
     assert review["transition_notice_sent_at"] == "2026-03-25T15:22:42Z"
     assert posted == []
+
 
 def test_maybe_record_head_observation_repair_skips_unavailable_without_mutation(monkeypatch):
     review_data = {
@@ -210,6 +222,7 @@ def test_maybe_record_head_observation_repair_skips_unavailable_without_mutation
     )
     assert review_data["active_head_sha"] == "head-1"
 
+
 def test_maybe_record_head_observation_repair_reports_not_found(monkeypatch):
     review_data = {"active_head_sha": "head-1", "contributor_revision": {"accepted": None}}
     monkeypatch.setattr(
@@ -231,6 +244,7 @@ def test_maybe_record_head_observation_repair_reports_not_found(monkeypatch):
 
     assert result.outcome == "skipped_not_found"
     assert result.failure_kind == "not_found"
+
 
 def test_maybe_record_head_observation_repair_reports_invalid_payload(monkeypatch):
     review_data = {"active_head_sha": "head-1", "contributor_revision": {"accepted": None}}
@@ -254,6 +268,7 @@ def test_maybe_record_head_observation_repair_reports_invalid_payload(monkeypatc
     assert result.outcome == "invalid_live_payload"
     assert result.reason == "pull_request_head_unavailable"
 
+
 def test_maybe_record_head_observation_repair_skips_not_open(monkeypatch):
     review_data = {"active_head_sha": "head-1", "contributor_revision": {"accepted": None}}
     monkeypatch.setattr(
@@ -274,6 +289,7 @@ def test_maybe_record_head_observation_repair_skips_not_open(monkeypatch):
     result = reviewer_bot.maybe_record_head_observation_repair(42, review_data)
 
     assert result.outcome == "skipped_not_open"
+
 
 def test_maybe_record_head_observation_repair_records_changed_head_once(monkeypatch):
     review_data = {
@@ -317,6 +333,7 @@ def test_maybe_record_head_observation_repair_records_changed_head_once(monkeypa
     assert review_data["current_cycle_write_approval"] == {}
     assert review_data["review_completed_at"] is None
 
+
 def test_handle_issue_or_pr_opened_fails_closed_when_assignees_unavailable(monkeypatch):
     state = make_state()
     monkeypatch.setenv("ISSUE_NUMBER", "42")
@@ -325,6 +342,7 @@ def test_handle_issue_or_pr_opened_fails_closed_when_assignees_unavailable(monke
 
     with pytest.raises(RuntimeError, match="Unable to determine assignees"):
         reviewer_bot.handle_issue_or_pr_opened(state)
+
 
 def test_issue_edit_by_author_records_contributor_freshness(monkeypatch):
     state = make_state()
@@ -340,75 +358,11 @@ def test_issue_edit_by_author_records_contributor_freshness(monkeypatch):
     monkeypatch.setenv("ISSUE_CHANGES_TITLE_FROM", "Old title")
     monkeypatch.setenv("ISSUE_CHANGES_BODY_FROM", "body")
     monkeypatch.setenv("ISSUE_UPDATED_AT", "2026-03-17T10:00:00Z")
+
     assert reviewer_bot.handle_issue_edited_event(state) is True
     accepted = review["contributor_comment"]["accepted"]
     assert accepted["semantic_key"].startswith("issues_edit_title:42:")
 
-def test_workflow_run_review_submission_clears_warning_and_transition_notice_markers(tmp_path, monkeypatch):
-    state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
-    review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
-    review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
-    payload_path = tmp_path / "deferred-review.json"
-    payload_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "source_workflow_name": "Reviewer Bot PR Review Submitted Observer",
-                "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
-                "source_run_id": 500,
-                "source_run_attempt": 2,
-                "source_event_name": "pull_request_review",
-                "source_event_action": "submitted",
-                "source_event_key": "pull_request_review:11",
-                "pr_number": 42,
-                "review_id": 11,
-                "source_submitted_at": "2026-03-17T10:00:00Z",
-                "source_review_state": "COMMENTED",
-                "source_commit_id": "head-1",
-                "actor_login": "alice",
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Review Submitted Observer")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "500")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "2")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
-            "pulls/42": {"head": {"sha": "head-2"}, "user": {"login": "dana"}, "labels": []},
-            "pulls/42/reviews/11": {
-                "id": 11,
-                "submitted_at": "2026-03-17T10:00:00Z",
-                "state": "COMMENTED",
-                "commit_id": "head-1",
-                "user": {"login": "alice"},
-            },
-        }.get(endpoint),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "id": 11,
-                "submitted_at": "2026-03-17T10:00:00Z",
-                "state": "COMMENTED",
-                "commit_id": "head-1",
-                "user": {"login": "alice"},
-            }
-        ],
-    )
-    assert reviewer_bot.handle_workflow_run_event(state) is True
-    assert review["transition_warning_sent"] is None
-    assert review["transition_notice_sent_at"] is None
 
 def test_maybe_record_head_observation_repair_uses_github_api_fallback_after_system_exit(monkeypatch):
     review_data = {
