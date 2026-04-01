@@ -117,3 +117,35 @@ def test_workflow_summaries_and_runbook_references_exist():
     assert runbook.exists()
     reconcile = Path(".github/workflows/reviewer-bot-reconcile.yml").read_text(encoding="utf-8")
     assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
+
+
+def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):
+    from scripts import reviewer_bot
+
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_AUTHOR", "PLeVasseur")
+    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "COLLABORATOR")
+    monkeypatch.setenv("COMMENT_SENDER_TYPE", "User")
+    monkeypatch.setenv("COMMENT_INSTALLATION_ID", "")
+    monkeypatch.setenv("COMMENT_PERFORMED_VIA_GITHUB_APP", "false")
+    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /r? @felix91gr")
+    monkeypatch.setenv("COMMENT_ID", "100")
+    monkeypatch.setenv("COMMENT_AUTHOR_ID", "123")
+    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-20T20:48:25Z")
+    monkeypatch.setenv("GITHUB_RUN_ID", "999")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api",
+        lambda method, endpoint, data=None: {
+            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+            "user": {"login": "PLeVasseur"},
+        },
+    )
+
+    payload = reviewer_bot.build_pr_comment_observer_payload(42)
+
+    assert payload["kind"] == "observer_noop"
+    assert payload["reason"] == "trusted_direct_same_repo_human_comment"
+    assert payload["source_event_key"] == "issue_comment:100"
