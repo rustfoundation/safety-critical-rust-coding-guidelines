@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  reviewer-bot-tests:
+  reviewer-bot-unit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -32,11 +32,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Run migrated reviewer bot tests with targeted coverage
+      - name: Run reviewer bot unit and integration tests with targeted coverage
         run: >-
           mkdir -p artifacts/coverage &&
           COVERAGE_FILE=artifacts/coverage/.coverage
-          uv run pytest tests --import-mode=importlib
+          uv run pytest tests/unit/reviewer_bot tests/integration/reviewer_bot
           --cov=scripts.reviewer_bot
           --cov=scripts.reviewer_bot_lib
           --cov-branch
@@ -66,3 +66,18 @@ jobs:
                   f"reviewer-bot branch coverage below floor: {branches:.2f}% < 48%"
               )
           PY
+
+  reviewer-bot-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run reviewer bot contract tests
+        run: uv run pytest tests/contract/reviewer_bot
