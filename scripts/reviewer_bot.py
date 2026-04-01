@@ -159,10 +159,12 @@ from scripts.reviewer_bot_lib.config import (  # noqa: F401  # noqa: F401
     get_commands_help,
 )
 from scripts.reviewer_bot_lib.context import (  # noqa: F401
+    AssignmentRequest,
     CommentEventRequest,
     EventContext,
     ExecutionResult,
     PrCommentTrustContext,
+    PrivilegedCommandRequest,
 )
 from scripts.reviewer_bot_lib.guidance import (  # noqa: F401
     get_fls_audit_guidance,
@@ -612,17 +614,38 @@ def parse_command(comment_body: str) -> tuple[str, list[str]] | None:
 
 
 def handle_pass_command(state: dict, issue_number: int, comment_author: str,
-                       reason: str | None) -> tuple[str, bool]:
-    return commands_module.handle_pass_command(_runtime_bot(), state, issue_number, comment_author, reason)
+                        reason: str | None) -> tuple[str, bool]:
+    return commands_module.handle_pass_command(
+        _runtime_bot(),
+        state,
+        issue_number,
+        comment_author,
+        reason,
+        request=commands_module.build_assignment_request(issue_number=issue_number),
+    )
 
 
 def handle_pass_until_command(state: dict, issue_number: int, comment_author: str,
-                              return_date: str, reason: str | None) -> tuple[str, bool]:
-    return commands_module.handle_pass_until_command(_runtime_bot(), state, issue_number, comment_author, return_date, reason)
+                               return_date: str, reason: str | None) -> tuple[str, bool]:
+    return commands_module.handle_pass_until_command(
+        _runtime_bot(),
+        state,
+        issue_number,
+        comment_author,
+        return_date,
+        reason,
+        request=commands_module.build_assignment_request(issue_number=issue_number),
+    )
 
 
 def handle_label_command(state: dict, issue_number: int, label_string: str) -> tuple[str, bool, bool]:
-    return commands_module.handle_label_command(_runtime_bot(), state, issue_number, label_string)
+    return commands_module.handle_label_command(
+        _runtime_bot(),
+        state,
+        issue_number,
+        label_string,
+        request=commands_module.build_assignment_request(issue_number=issue_number),
+    )
 
 
 def parse_issue_labels() -> list[str]:
@@ -654,7 +677,10 @@ def find_open_pr_for_branch_status(branch: str) -> tuple[str, dict | None]:
 
 
 def resolve_workflow_run_pr_number() -> int:
-    return commands_module.resolve_workflow_run_pr_number(_runtime_bot())
+    return commands_module.resolve_workflow_run_pr_number(
+        _runtime_bot(),
+        request=commands_module.build_privileged_command_request(issue_number=0),
+    )
 
 
 def create_pull_request(branch: str, base: str, issue_number: int) -> dict | None:
@@ -662,7 +688,16 @@ def create_pull_request(branch: str, base: str, issue_number: int) -> dict | Non
 
 
 def handle_accept_no_fls_changes_command(issue_number: int, comment_author: str) -> tuple[str, bool]:
-    return automation_module.handle_accept_no_fls_changes_command(_runtime_bot(), issue_number, comment_author)
+    return automation_module.handle_accept_no_fls_changes_command(
+        _runtime_bot(),
+        issue_number,
+        comment_author,
+        request=automation_module.build_privileged_command_request(
+            issue_number=issue_number,
+            actor=comment_author,
+            command_name="accept-no-fls-changes",
+        ),
+    )
 
 
 def handle_sync_members_command(state: dict) -> tuple[str, bool]:
@@ -670,7 +705,11 @@ def handle_sync_members_command(state: dict) -> tuple[str, bool]:
 
 
 def handle_queue_command(state: dict) -> tuple[str, bool]:
-    return commands_module.handle_queue_command(_runtime_bot(), state)
+    return commands_module.handle_queue_command(
+        _runtime_bot(),
+        state,
+        request=commands_module.build_assignment_request(issue_number=0),
+    )
 
 
 def handle_commands_command() -> tuple[str, bool]:
@@ -678,22 +717,46 @@ def handle_commands_command() -> tuple[str, bool]:
 
 
 def handle_claim_command(state: dict, issue_number: int,
-                        comment_author: str) -> tuple[str, bool]:
-    return commands_module.handle_claim_command(_runtime_bot(), state, issue_number, comment_author)
+                         comment_author: str) -> tuple[str, bool]:
+    return commands_module.handle_claim_command(
+        _runtime_bot(),
+        state,
+        issue_number,
+        comment_author,
+        request=commands_module.build_assignment_request(issue_number=issue_number),
+    )
 
 
 def handle_release_command(state: dict, issue_number: int,
-                          comment_author: str, args: list | None = None) -> tuple[str, bool]:
-    return commands_module.handle_release_command(_runtime_bot(), state, issue_number, comment_author, args)
+                           comment_author: str, args: list | None = None) -> tuple[str, bool]:
+    return commands_module.handle_release_command(
+        _runtime_bot(),
+        state,
+        issue_number,
+        comment_author,
+        args,
+        request=commands_module.build_assignment_request(issue_number=issue_number),
+    )
 
 
 def handle_assign_command(state: dict, issue_number: int,
                          username: str) -> tuple[str, bool]:
-    return commands_module.handle_assign_command(_runtime_bot(), state, issue_number, username)
+    return commands_module.handle_assign_command(
+        _runtime_bot(),
+        state,
+        issue_number,
+        username,
+        request=commands_module.build_assignment_request(issue_number=issue_number),
+    )
 
 
 def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[str, bool]:
-    return commands_module.handle_assign_from_queue_command(_runtime_bot(), state, issue_number)
+    return commands_module.handle_assign_from_queue_command(
+        _runtime_bot(),
+        state,
+        issue_number,
+        request=commands_module.build_assignment_request(issue_number=issue_number),
+    )
 
 
 # ==============================================================================

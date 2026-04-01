@@ -11,7 +11,47 @@ from .automation import (
     find_open_pr_for_branch_status as automation_find_open_pr_for_branch_status,
 )
 from .config import AssignmentAttempt
+from .context import AssignmentRequest, PrivilegedCommandRequest
 from .guidance import get_issue_guidance, get_pr_guidance
+
+
+def _parse_issue_labels(labels_json: str) -> list[str]:
+    try:
+        labels = json.loads(labels_json)
+    except json.JSONDecodeError:
+        labels = []
+    if not isinstance(labels, list):
+        return []
+    return [str(label) for label in labels]
+
+
+def build_assignment_request(*, issue_number: int) -> AssignmentRequest:
+    return AssignmentRequest(
+        issue_number=issue_number,
+        issue_author=os.environ.get("ISSUE_AUTHOR", ""),
+        is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
+        issue_labels=tuple(_parse_issue_labels(os.environ.get("ISSUE_LABELS", "[]"))),
+        repo_owner=os.environ.get("REPO_OWNER", ""),
+        repo_name=os.environ.get("REPO_NAME", ""),
+    )
+
+
+def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
+    target_repo_root = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
+    workflow_run_reconcile_pr_number = os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
+    return PrivilegedCommandRequest(
+        issue_number=issue_number,
+        actor=actor,
+        command_name=command_name,
+        is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
+        issue_labels=tuple(_parse_issue_labels(os.environ.get("ISSUE_LABELS", "[]"))),
+        target_repo_root=target_repo_root,
+        workflow_run_reconcile_pr_number=(
+            int(workflow_run_reconcile_pr_number) if workflow_run_reconcile_pr_number else None
+        ),
+        workflow_run_reconcile_head_sha=os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip(),
+        workflow_run_head_sha=os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip(),
+    )
 
 
 def strip_code_blocks(comment_body: str) -> str:
@@ -87,27 +127,26 @@ def parse_command(bot, comment_body: str) -> tuple[str, list[str]] | None:
 def _apply_assignment_side_effects(
     bot,
     state: dict,
-    issue_number: int,
+    request: AssignmentRequest,
     reviewer: str,
     assignment_method: str,
-    issue_author: str,
 ) -> tuple[AssignmentAttempt, str | None]:
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    issue_number = request.issue_number
     assignment_attempt = bot.request_reviewer_assignment(issue_number, reviewer)
     bot.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
-    bot.record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
+    bot.record_assignment(state, reviewer, issue_number, "pr" if request.is_pull_request else "issue")
     failure_comment = bot.get_assignment_failure_comment(reviewer, assignment_attempt)
     if failure_comment:
         bot.post_comment(issue_number, failure_comment)
     if assignment_attempt.success:
-        if is_pr:
-            bot.post_comment(issue_number, get_pr_guidance(reviewer, issue_author))
+        if request.is_pull_request:
+            bot.post_comment(issue_number, get_pr_guidance(reviewer, request.issue_author))
         else:
-            labels = set(parse_issue_labels())
+            labels = set(request.issue_labels)
             guidance = (
-                bot.get_fls_audit_guidance(reviewer, issue_author)
+                bot.get_fls_audit_guidance(reviewer, request.issue_author)
                 if bot.FLS_AUDIT_LABEL in labels
-                else get_issue_guidance(reviewer, issue_author)
+                else get_issue_guidance(reviewer, request.issue_author)
             )
             bot.post_comment(issue_number, guidance)
     return assignment_attempt, failure_comment
@@ -120,7 +159,15 @@ def _current_assignees_or_error(bot, issue_number: int) -> tuple[list[str] | Non
     return current_assignees, None
 
 
-def handle_pass_command(bot, state: dict, issue_number: int, comment_author: str, reason: str | None) -> tuple[str, bool]:
+def handle_pass_command(
+    bot,
+    state: dict,
+    issue_number: int,
+    comment_author: str,
+    reason: str | None,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool]:
+    assignment_request = request or build_assignment_request(issue_number=issue_number)
     issue_data = bot.ensure_review_entry(state, issue_number, create=True)
     if issue_data is None:
         return "❌ Unable to load review state.", False
@@ -137,10 +184,9 @@ def handle_pass_command(bot, state: dict, issue_number: int, comment_author: str
     is_first_pass = len(issue_data["skipped"]) == 0
     if passed_reviewer not in issue_data["skipped"]:
         issue_data["skipped"].append(passed_reviewer)
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
     skip_set = set(issue_data["skipped"])
-    if issue_author:
-        skip_set.add(issue_author)
+    if assignment_request.issue_author:
+        skip_set.add(assignment_request.issue_author)
     next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
     if not next_reviewer:
         return ("❌ No other reviewers available. Everyone in the queue has either passed on this issue or is the author."), False
@@ -149,10 +195,9 @@ def handle_pass_command(bot, state: dict, issue_number: int, comment_author: str
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
-        issue_number,
+        assignment_request,
         next_reviewer,
         "round-robin",
-        issue_author,
     )
     assignment_line = f"@{next_reviewer} is now assigned as the reviewer."
     if not assignment_attempt.success:
@@ -168,7 +213,16 @@ def handle_pass_command(bot, state: dict, issue_number: int, comment_author: str
     return (f"✅ @{passed_reviewer} has passed this review.{reason_text}\n\n{assignment_line}\n\n_@{original_passer} remains next in queue for future issues._"), True
 
 
-def handle_pass_until_command(bot, state: dict, issue_number: int, comment_author: str, return_date: str, reason: str | None) -> tuple[str, bool]:
+def handle_pass_until_command(
+    bot,
+    state: dict,
+    issue_number: int,
+    comment_author: str,
+    return_date: str,
+    reason: str | None,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool]:
+    assignment_request = request or build_assignment_request(issue_number=issue_number)
     try:
         parsed_date = datetime.strptime(return_date, "%Y-%m-%d").date()
     except ValueError:
@@ -214,17 +268,15 @@ def handle_pass_until_command(bot, state: dict, issue_number: int, comment_autho
     reassigned_msg = ""
     if is_current_reviewer:
         bot.unassign_reviewer(issue_number, comment_author)
-        issue_author = os.environ.get("ISSUE_AUTHOR", "")
-        skip_set = {issue_author} if issue_author else set()
+        skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
         next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
         if next_reviewer:
             assignment_attempt, failure_comment = _apply_assignment_side_effects(
                 bot,
                 state,
-                issue_number,
+                assignment_request,
                 next_reviewer,
                 "round-robin",
-                issue_author,
             )
             if assignment_attempt.success:
                 reassigned_msg = f"\n\n@{next_reviewer} has been assigned as the new reviewer for this issue."
@@ -242,7 +294,14 @@ def handle_pass_until_command(bot, state: dict, issue_number: int, comment_autho
     return (f"✅ @{comment_author} is now away until {return_date}{reason_text}.\n\nYou'll be automatically added back to the queue on that date.{reassigned_msg}"), True
 
 
-def handle_label_command(bot, state: dict, issue_number: int, label_string: str) -> tuple[str, bool, bool]:
+def handle_label_command(
+    bot,
+    state: dict,
+    issue_number: int,
+    label_string: str,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool, bool]:
+    assignment_request = request or build_assignment_request(issue_number=issue_number)
     pattern = r'(?:(?<=^)|(?<=\s))([+-])(.+?)(?=\s[+-]|\s*$)'
     matches = re.findall(pattern, label_string)
     if not matches:
@@ -261,7 +320,7 @@ def handle_label_command(bot, state: dict, issue_number: int, label_string: str)
                 all_success = False
             elif bot.add_label(issue_number, label):
                 results.append(f"✅ Added label `{label}`")
-                if label == "sign-off: create pr" and os.environ.get("IS_PULL_REQUEST", "false").lower() != "true":
+                if label == "sign-off: create pr" and not assignment_request.is_pull_request:
                     review_data = bot.ensure_review_entry(state, issue_number)
                     reviewer = review_data.get("current_reviewer") if review_data else None
                     completion_changed = bot.mark_review_complete(
@@ -283,14 +342,7 @@ def handle_label_command(bot, state: dict, issue_number: int, label_string: str)
 
 
 def parse_issue_labels() -> list[str]:
-    labels_json = os.environ.get("ISSUE_LABELS", "[]")
-    try:
-        labels = json.loads(labels_json)
-    except json.JSONDecodeError:
-        labels = []
-    if not isinstance(labels, list):
-        return []
-    return [str(label) for label in labels]
+    return _parse_issue_labels(os.environ.get("ISSUE_LABELS", "[]"))
 
 
 def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
@@ -340,20 +392,20 @@ def find_open_pr_for_branch(bot, branch: str) -> dict | None:
     return pr
 
 
-def resolve_workflow_run_pr_number(bot) -> int:
-    pr_number_raw = os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
-    if not pr_number_raw:
+def resolve_workflow_run_pr_number(
+    bot,
+    request: PrivilegedCommandRequest | None = None,
+) -> int:
+    privileged_request = request or build_privileged_command_request(issue_number=0)
+    if privileged_request.workflow_run_reconcile_pr_number is None:
         raise RuntimeError("Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER in workflow_run reconcile context")
-    try:
-        pr_number = int(pr_number_raw)
-    except ValueError as exc:
-        raise RuntimeError("WORKFLOW_RUN_RECONCILE_PR_NUMBER must be a positive integer") from exc
+    pr_number = privileged_request.workflow_run_reconcile_pr_number
     if pr_number <= 0:
         raise RuntimeError("WORKFLOW_RUN_RECONCILE_PR_NUMBER must be a positive integer")
-    reconcile_head_sha = os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip()
+    reconcile_head_sha = privileged_request.workflow_run_reconcile_head_sha
     if not reconcile_head_sha:
         raise RuntimeError("Missing WORKFLOW_RUN_RECONCILE_HEAD_SHA in workflow_run reconcile context")
-    workflow_run_head_sha = os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip()
+    workflow_run_head_sha = privileged_request.workflow_run_head_sha
     if not workflow_run_head_sha:
         raise RuntimeError("Missing WORKFLOW_RUN_HEAD_SHA for workflow_run reconcile")
     if reconcile_head_sha != workflow_run_head_sha:
@@ -390,10 +442,20 @@ def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict 
     return None
 
 
-def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author: str) -> tuple[str, bool]:
-    if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
+def handle_accept_no_fls_changes_command(
+    bot,
+    issue_number: int,
+    comment_author: str,
+    request: PrivilegedCommandRequest | None = None,
+) -> tuple[str, bool]:
+    privileged_request = request or build_privileged_command_request(
+        issue_number=issue_number,
+        actor=comment_author,
+        command_name="accept-no-fls-changes",
+    )
+    if privileged_request.is_pull_request:
         return "❌ This command can only be used on issues, not PRs.", False
-    labels = bot.parse_issue_labels()
+    labels = list(privileged_request.issue_labels)
     if bot.FLS_AUDIT_LABEL not in labels:
         return "❌ This command is only available on issues labeled `fls-audit`.", False
     permission_status = bot.get_user_permission_status(comment_author, "triage")
@@ -450,10 +512,15 @@ def handle_sync_members_command(bot, state: dict) -> tuple[str, bool]:
     return "✅ Queue is already in sync with members.md.", True
 
 
-def handle_queue_command(bot, state: dict) -> tuple[str, bool]:
+def handle_queue_command(
+    bot,
+    state: dict,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool]:
+    assignment_request = request or build_assignment_request(issue_number=0)
     queue_size = len(state["queue"])
-    repo_owner = os.environ.get("REPO_OWNER", "")
-    repo_name = os.environ.get("REPO_NAME", "")
+    repo_owner = assignment_request.repo_owner
+    repo_name = assignment_request.repo_name
     state_issue_link = ""
     if repo_owner and repo_name and bot.STATE_ISSUE_NUMBER:
         state_issue_link = f"\n\n[View full state details](https://github.com/{repo_owner}/{repo_name}/issues/{bot.STATE_ISSUE_NUMBER})"
@@ -480,7 +547,14 @@ def handle_commands_command(bot) -> tuple[str, bool]:
     return (f"ℹ️ **Available Commands**\n\n**Pass or step away:**\n- `{bot.BOT_MENTION} /pass [reason]` - Pass this review to next in queue (current reviewer only)\n- `{bot.BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n- `{bot.BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n**Assign reviewers:**\n- `{bot.BOT_MENTION} /r? @username` - Assign a specific reviewer\n- `{bot.BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n- `{bot.BOT_MENTION} /claim` - Claim this review for yourself\n\n**Other:**\n- `{bot.BOT_MENTION} /label +label-name` - Add a label\n- `{bot.BOT_MENTION} /label -label-name` - Remove a label\n- `{bot.BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub\n- `{bot.BOT_MENTION} /accept-no-fls-changes` - Update spec.lock and open a PR when no guidelines are impacted\n- `{bot.BOT_MENTION} /queue` - Show current queue status\n- `{bot.BOT_MENTION} /sync-members` - Sync queue with members.md"), True
 
 
-def handle_claim_command(bot, state: dict, issue_number: int, comment_author: str) -> tuple[str, bool]:
+def handle_claim_command(
+    bot,
+    state: dict,
+    issue_number: int,
+    comment_author: str,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool]:
+    assignment_request = request or build_assignment_request(issue_number=issue_number)
     is_producer = any(member["github"].lower() == comment_author.lower() for member in state["queue"])
     is_away = any(member["github"].lower() == comment_author.lower() for member in state.get("pass_until", []))
     if not is_producer and not is_away:
@@ -492,14 +566,12 @@ def handle_claim_command(bot, state: dict, issue_number: int, comment_author: st
         return assignee_error, False
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
-        issue_number,
+        assignment_request,
         comment_author,
         "claim",
-        issue_author,
     )
     prev_text = f" (previously: @{', @'.join(current_assignees)})" if current_assignees else ""
     response = f"✅ @{comment_author} has claimed this review{prev_text}."
@@ -509,8 +581,16 @@ def handle_claim_command(bot, state: dict, issue_number: int, comment_author: st
     return response, True
 
 
-def handle_release_command(bot, state: dict, issue_number: int, comment_author: str, args: list | None = None) -> tuple[str, bool]:
+def handle_release_command(
+    bot,
+    state: dict,
+    issue_number: int,
+    comment_author: str,
+    args: list | None = None,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool]:
     args = args or []
+    request = request or build_assignment_request(issue_number=issue_number)
     target_username = None
     reason = None
     releasing_other = False
@@ -562,7 +642,14 @@ def handle_release_command(bot, state: dict, issue_number: int, comment_author: 
     return (f"✅ @{target_username} has released this review.{reason_text}\n\n_This issue/PR is now unassigned. Use `{bot.BOT_MENTION} /r? producers` to assign the next reviewer from the queue, or `{bot.BOT_MENTION} /claim` to claim it._"), True
 
 
-def handle_assign_command(bot, state: dict, issue_number: int, username: str) -> tuple[str, bool]:
+def handle_assign_command(
+    bot,
+    state: dict,
+    issue_number: int,
+    username: str,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool]:
+    assignment_request = request or build_assignment_request(issue_number=issue_number)
     username = username.lstrip("@")
     if not username:
         return (f"❌ Missing username. Usage: `{bot.BOT_MENTION} /r? @username`"), False
@@ -580,14 +667,12 @@ def handle_assign_command(bot, state: dict, issue_number: int, username: str) ->
         return assignee_error, False
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
-        issue_number,
+        assignment_request,
         username,
         "manual",
-        issue_author,
     )
     prev_text = f" (previously: @{', @'.join(current_assignees)})" if current_assignees else ""
     if assignment_attempt.success:
@@ -598,24 +683,28 @@ def handle_assign_command(bot, state: dict, issue_number: int, username: str) ->
     return response, True
 
 
-def handle_assign_from_queue_command(bot, state: dict, issue_number: int) -> tuple[str, bool]:
+def handle_assign_from_queue_command(
+    bot,
+    state: dict,
+    issue_number: int,
+    request: AssignmentRequest | None = None,
+) -> tuple[str, bool]:
+    assignment_request = request or build_assignment_request(issue_number=issue_number)
     current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
     if assignee_error:
         return assignee_error, False
     for assignee in current_assignees:
         bot.unassign_reviewer(issue_number, assignee)
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
-    skip_set = {issue_author} if issue_author else set()
+    skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
     next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
     if not next_reviewer:
         return (f"❌ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue."), False
     assignment_attempt, _failure_comment = _apply_assignment_side_effects(
         bot,
         state,
-        issue_number,
+        assignment_request,
         next_reviewer,
         "round-robin",
-        issue_author,
     )
     prev_text = f" (previously: @{', @'.join(current_assignees)})" if current_assignees else ""
     if assignment_attempt.success:

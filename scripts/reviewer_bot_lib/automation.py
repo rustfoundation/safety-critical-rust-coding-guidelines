@@ -5,6 +5,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .context import PrivilegedCommandRequest
+
 
 def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True)
@@ -37,6 +39,31 @@ def get_target_repo_root() -> Path:
     if configured:
         return Path(configured)
     return Path(__file__).resolve().parents[2]
+
+
+def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
+    target_repo_root = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
+    return PrivilegedCommandRequest(
+        issue_number=issue_number,
+        actor=actor,
+        command_name=command_name,
+        is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
+        issue_labels=tuple(bot_label for bot_label in bot_parse_issue_labels()),
+        target_repo_root=target_repo_root,
+    )
+
+
+def bot_parse_issue_labels() -> list[str]:
+    labels_json = os.environ.get("ISSUE_LABELS", "[]")
+    try:
+        import json
+
+        labels = json.loads(labels_json)
+    except Exception:
+        labels = []
+    if not isinstance(labels, list):
+        return []
+    return [str(label) for label in labels]
 
 
 def get_default_branch(bot) -> str:
@@ -96,10 +123,20 @@ def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict 
     return None
 
 
-def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author: str) -> tuple[str, bool]:
-    if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
+def handle_accept_no_fls_changes_command(
+    bot,
+    issue_number: int,
+    comment_author: str,
+    request: PrivilegedCommandRequest | None = None,
+) -> tuple[str, bool]:
+    privileged_request = request or build_privileged_command_request(
+        issue_number=issue_number,
+        actor=comment_author,
+        command_name="accept-no-fls-changes",
+    )
+    if privileged_request.is_pull_request:
         return "❌ This command can only be used on issues, not PRs.", False
-    labels = bot.parse_issue_labels()
+    labels = list(privileged_request.issue_labels)
     if bot.FLS_AUDIT_LABEL not in labels:
         return "❌ This command is only available on issues labeled `fls-audit`.", False
     permission_status = bot.get_user_permission_status(comment_author, "triage")
@@ -108,7 +145,7 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
     if permission_status != "granted":
         return "❌ You must have triage permissions to run this command.", False
 
-    repo_root = get_target_repo_root()
+    repo_root = Path(privileged_request.target_repo_root) if privileged_request.target_repo_root else get_target_repo_root()
     if bot.list_changed_files(repo_root):
         return "❌ Working tree is not clean; refusing to update spec.lock.", False
 

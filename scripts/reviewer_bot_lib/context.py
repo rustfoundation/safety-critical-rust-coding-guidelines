@@ -73,6 +73,29 @@ class PrCommentTrustContext:
     github_run_attempt: int = 0
 
 
+@dataclass(frozen=True)
+class AssignmentRequest:
+    issue_number: int
+    issue_author: str = ""
+    is_pull_request: bool = False
+    issue_labels: tuple[str, ...] = ()
+    repo_owner: str = ""
+    repo_name: str = ""
+
+
+@dataclass(frozen=True)
+class PrivilegedCommandRequest:
+    issue_number: int
+    actor: str = ""
+    command_name: str = ""
+    is_pull_request: bool = False
+    issue_labels: tuple[str, ...] = ()
+    target_repo_root: str = ""
+    workflow_run_reconcile_pr_number: int | None = None
+    workflow_run_reconcile_head_sha: str = ""
+    workflow_run_head_sha: str = ""
+
+
 @runtime_checkable
 class GitHubTransportContext(Protocol):
     """GitHub API transport and mutation surface used by low-level helpers."""

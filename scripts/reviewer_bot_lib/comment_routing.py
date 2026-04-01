@@ -372,8 +372,17 @@ def _store_pending_privileged_command(review_data: dict, issue_number: int, sour
 
 def _validate_accept_no_fls_changes_handoff(
     bot,
-    request: CommentEventRequest,
+    request_or_issue_number: CommentEventRequest | int,
+    comment_author: str | None = None,
 ) -> tuple[bool, dict]:
+    if isinstance(request_or_issue_number, CommentEventRequest):
+        request = request_or_issue_number
+    else:
+        request = CommentEventRequest(
+            issue_number=request_or_issue_number,
+            is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
+            comment_author=comment_author or "",
+        )
     if request.is_pull_request:
         return False, {"reason": "pull_request_target_not_allowed"}
     labels = bot.parse_issue_labels()
