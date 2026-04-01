@@ -1,7 +1,9 @@
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.contract
 
 import yaml
-
 
 def test_issue_comment_direct_workflow_exports_issue_state():
     workflow_text = Path(".github/workflows/reviewer-bot-issue-comment-direct.yml").read_text(
@@ -9,13 +11,11 @@ def test_issue_comment_direct_workflow_exports_issue_state():
     )
     assert "ISSUE_STATE: ${{ github.event.issue.state }}" in workflow_text
 
-
 def test_pr_comment_observer_workflow_builds_payload_inline_without_bot_src_root():
     workflow = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
     assert "BOT_SRC_ROOT" not in workflow
     assert "build_pr_comment_observer_payload" not in workflow
     assert "Fetch trusted bot source tarball" not in workflow
-
 
 def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
     data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-trusted.yml").read_text(encoding="utf-8"))
@@ -31,7 +31,6 @@ def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
     assert "https://api.github.com/repos/{repo}/pulls/{pr_number}" in workflow_text
     assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
 
-
 def test_pr_comment_observer_workflow_uses_inline_payload_builder():
     data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8"))
     job = data["jobs"]["observer"]
@@ -41,7 +40,6 @@ def test_pr_comment_observer_workflow_uses_inline_payload_builder():
     workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
     assert "build_pr_comment_observer_payload" not in workflow_text
     assert 'uv run --project "$BOT_SRC_ROOT"' not in workflow_text
-
 
 def test_review_comment_observer_workflow_exists_and_is_read_only():
     data = yaml.safe_load(
@@ -60,7 +58,6 @@ def test_review_comment_observer_workflow_exists_and_is_read_only():
     assert "checkout" not in workflow_text
     assert "pull_request_review_comment" in workflow_text
 
-
 def test_mutating_reviewer_bot_workflows_do_not_share_global_github_concurrency():
     workflow_paths = [
         ".github/workflows/reviewer-bot-issues.yml",
@@ -75,7 +72,6 @@ def test_mutating_reviewer_bot_workflows_do_not_share_global_github_concurrency(
         data = yaml.safe_load(Path(workflow_path).read_text(encoding="utf-8"))
         for job in data.get("jobs", {}).values():
             assert "concurrency" not in job
-
 
 def test_workflow_policy_split_and_lock_only_boundaries():
     workflows_dir = Path(".github/workflows")
@@ -111,13 +107,11 @@ def test_workflow_policy_split_and_lock_only_boundaries():
                 if value:
                     assert "@" in value and len(value.split("@", 1)[1]) == 40
 
-
 def test_workflow_summaries_and_runbook_references_exist():
     runbook = Path("docs/reviewer-bot-review-freshness-operator-runbook.md")
     assert runbook.exists()
     reconcile = Path(".github/workflows/reviewer-bot-reconcile.yml").read_text(encoding="utf-8")
     assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
-
 
 def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):
     from scripts import reviewer_bot

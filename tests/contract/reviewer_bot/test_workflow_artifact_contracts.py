@@ -1,9 +1,9 @@
 from pathlib import Path
-
 import pytest
 
-from scripts import reviewer_bot
+pytestmark = pytest.mark.contract
 
+from scripts import reviewer_bot
 
 @pytest.mark.parametrize(
     ("workflow_path", "artifact_name", "payload_name"),
@@ -37,7 +37,6 @@ def test_observer_workflow_files_match_expected_artifact_contract(
 
     assert artifact_name in workflow_text
     assert payload_name in workflow_text
-
 
 @pytest.mark.parametrize(
     ("payload", "workflow_name", "workflow_file", "artifact_name", "payload_name"),
@@ -106,7 +105,6 @@ def test_deferred_workflow_identity_helpers_match_expected_contract(
     assert reviewer_bot.reconcile_module._artifact_expected_name(payload) == artifact_name
     assert reviewer_bot.reconcile_module._artifact_expected_payload_name(payload) == payload_name
 
-
 def test_validate_workflow_run_artifact_identity_rejects_triggering_name_mismatch(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Wrong Workflow")
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
@@ -121,7 +119,6 @@ def test_validate_workflow_run_artifact_identity_rejects_triggering_name_mismatc
 
     with pytest.raises(RuntimeError, match="Triggering workflow name mismatch"):
         reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
-
 
 def test_validate_workflow_run_artifact_identity_rejects_run_attempt_mismatch(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
@@ -138,7 +135,6 @@ def test_validate_workflow_run_artifact_identity_rejects_run_attempt_mismatch(mo
 
     with pytest.raises(RuntimeError, match="run_attempt mismatch"):
         reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
-
 
 def test_validate_workflow_run_artifact_identity_requires_successful_conclusion(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")

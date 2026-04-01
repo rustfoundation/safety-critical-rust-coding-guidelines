@@ -1,6 +1,8 @@
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
+import pytest
 
+pytestmark = pytest.mark.integration
 
 def test_execute_run_reloads_state_before_syncing_status_labels(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -58,7 +60,6 @@ def test_execute_run_reloads_state_before_syncing_status_labels(monkeypatch):
         "sync",
     ]
 
-
 def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
     monkeypatch.setenv("EVENT_ACTION", "created")
@@ -74,7 +75,6 @@ def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
 
     assert result.exit_code == 1
     assert result.state_changed is True
-
 
 def test_execute_run_returns_failure_for_invalid_workflow_run_context(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")

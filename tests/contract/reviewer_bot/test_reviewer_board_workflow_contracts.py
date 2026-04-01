@@ -1,7 +1,9 @@
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.contract
 
 import yaml
-
 
 def test_sweeper_repair_workflow_exposes_reviewer_board_preview_dispatch():
     data = yaml.safe_load(Path(".github/workflows/reviewer-bot-sweeper-repair.yml").read_text(encoding="utf-8"))
@@ -12,7 +14,6 @@ def test_sweeper_repair_workflow_exposes_reviewer_board_preview_dispatch():
     issue_number_input = workflow_dispatch["inputs"]["issue_number"]
     assert issue_number_input["required"] is False
     assert issue_number_input["type"] == "string"
-
 
 def test_sweeper_repair_workflow_scopes_reviewer_board_env_to_preview_only():
     workflow_text = Path(".github/workflows/reviewer-bot-sweeper-repair.yml").read_text(encoding="utf-8")

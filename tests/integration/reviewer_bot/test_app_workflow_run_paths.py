@@ -1,6 +1,8 @@
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
+import pytest
 
+pytestmark = pytest.mark.integration
 
 def test_execute_run_cross_repo_review_does_not_acquire_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_review")
@@ -21,7 +23,6 @@ def test_execute_run_cross_repo_review_does_not_acquire_lock(monkeypatch):
 
     assert acquire_called["value"] is False
 
-
 def test_execute_run_same_repo_review_does_not_acquire_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_review")
     monkeypatch.setenv("EVENT_ACTION", "submitted")
@@ -41,7 +42,6 @@ def test_execute_run_same_repo_review_does_not_acquire_lock(monkeypatch):
     reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
     assert acquire_called["value"] is False
-
 
 def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
@@ -72,7 +72,6 @@ def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
     reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
     assert acquire_called["value"] is True
-
 
 def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")

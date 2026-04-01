@@ -1,6 +1,8 @@
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
+import pytest
 
+pytestmark = pytest.mark.integration
 
 def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_state(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
@@ -55,7 +57,6 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
 
     assert result.exit_code == 0
     assert save_calls == [["pull_request_review:500"]]
-
 
 def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_state(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")

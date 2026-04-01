@@ -1,10 +1,12 @@
 import json
 import os
+import pytest
+
+pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing
 from tests.fixtures.reviewer_bot import make_state
-
 
 def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping_only_mutations(
     tmp_path, monkeypatch
@@ -74,7 +76,6 @@ def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping
     assert "pull_request_review:11" in review["reconciled_source_events"]
     assert "pull_request_review:11" not in review["deferred_gaps"]
 
-
 def test_handle_workflow_run_event_persists_fail_closed_diagnostic_without_raising(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -140,7 +141,6 @@ def test_handle_workflow_run_event_persists_fail_closed_diagnostic_without_raisi
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["failure_kind"] == "server_error"
 
-
 def test_deferred_comment_reconcile_returns_true_for_bookkeeping_only_mutations(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -196,7 +196,6 @@ def test_deferred_comment_reconcile_returns_true_for_bookkeeping_only_mutations(
     assert "issue_comment:210" in review["reconciled_source_events"]
     assert "issue_comment:210" not in review["deferred_gaps"]
 
-
 def test_deferred_comment_missing_live_object_preserves_source_time_freshness(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -239,7 +238,6 @@ def test_deferred_comment_missing_live_object_preserves_source_time_freshness(tm
     assert reviewer_bot.handle_workflow_run_event(state) is True
     assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"]["semantic_key"] == "issue_comment:99"
     assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:99"]["reason"] == "reconcile_failed_closed"
-
 
 def test_handle_workflow_run_event_rebuilds_completion_from_live_review_commit_id(tmp_path, monkeypatch):
     state = make_state()
@@ -304,7 +302,6 @@ def test_handle_workflow_run_event_rebuilds_completion_from_live_review_commit_i
 
     assert reviewer_bot.handle_workflow_run_event(state) is True
     assert state["active_reviews"]["42"]["current_cycle_completion"]["completed"] is False
-
 
 def test_handle_workflow_run_event_refreshes_stale_stored_reviewer_review_to_current_head_preferred_review(
     tmp_path, monkeypatch
@@ -391,7 +388,6 @@ def test_handle_workflow_run_event_refreshes_stale_stored_reviewer_review_to_cur
     assert accepted["semantic_key"] == "pull_request_review:10"
     assert accepted["reviewed_head_sha"] == "head-1"
 
-
 def test_deferred_review_comment_reconcile_records_contributor_freshness(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -451,7 +447,6 @@ def test_deferred_review_comment_reconcile_records_contributor_freshness(tmp_pat
     assert accepted is not None
     assert accepted["semantic_key"] == "pull_request_review_comment:301"
 
-
 def test_deferred_review_comment_reconcile_records_reviewer_freshness(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -509,7 +504,6 @@ def test_deferred_review_comment_reconcile_records_reviewer_freshness(tmp_path, 
     assert reviewer_bot.handle_workflow_run_event(state) is True
     assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:302"
 
-
 def test_deferred_review_comment_missing_live_object_preserves_source_time_freshness(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -557,7 +551,6 @@ def test_deferred_review_comment_missing_live_object_preserves_source_time_fresh
     assert reviewer_bot.handle_workflow_run_event(state) is True
     assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:303"
     assert review["deferred_gaps"]["pull_request_review_comment:303"]["reason"] == "reconcile_failed_closed"
-
 
 def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguous(tmp_path, monkeypatch):
     state = make_state()
@@ -631,7 +624,6 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
     assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
     assert "issue_comment:201" not in state["active_reviews"]["42"]["reconciled_source_events"]
 
-
 def test_deferred_comment_reconcile_hydrates_pr_author_context_for_contributor_freshness(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -687,7 +679,6 @@ def test_deferred_comment_reconcile_hydrates_pr_author_context_for_contributor_f
     assert os.environ["IS_PULL_REQUEST"] == "true"
     assert os.environ["ISSUE_AUTHOR"] == "dana"
     assert json.loads(os.environ["ISSUE_LABELS"]) == ["coding guideline"]
-
 
 def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(tmp_path, monkeypatch):
     state = make_state()
@@ -782,7 +773,6 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(tmp_p
     assert state["active_reviews"]["42"]["current_reviewer"] == "bob"
     assert posted_comments
 
-
 def test_deferred_comment_reconcile_records_failure_kind_when_live_comment_unavailable(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -849,7 +839,6 @@ def test_deferred_comment_reconcile_records_failure_kind_when_live_comment_unava
     gap = state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:205"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["failure_kind"] == "server_error"
-
 
 def test_deferred_comment_reconcile_fails_closed_when_comment_classification_drifts(tmp_path, monkeypatch):
     state = make_state()

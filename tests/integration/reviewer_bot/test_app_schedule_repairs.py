@@ -1,8 +1,10 @@
 import json
+import pytest
+
+pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
-
 
 def test_execute_run_schedule_status_projection_epoch_mismatch_triggers_label_repair_sweep(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
@@ -39,7 +41,6 @@ def test_execute_run_schedule_status_projection_epoch_mismatch_triggers_label_re
     assert synced_issue_numbers == [42, 99]
     assert saved_epochs[-1] == reviewer_bot.STATUS_PROJECTION_EPOCH
 
-
 def test_execute_run_schedule_status_projection_epoch_not_advanced_on_label_sync_failure(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -72,7 +73,6 @@ def test_execute_run_schedule_status_projection_epoch_not_advanced_on_label_sync
 
     assert result.exit_code == 0
     assert all(epoch != reviewer_bot.STATUS_PROJECTION_EPOCH for epoch in saved_epochs)
-
 
 def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tmp_path):
     state = make_state()
@@ -124,7 +124,6 @@ def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tm
     assert result.exit_code == 0
     assert state["active_reviews"]["42"]["repair_needed"]["kind"] == "projection_failure"
     assert len(saved_states) >= 2
-
 
 def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repair(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "schedule")

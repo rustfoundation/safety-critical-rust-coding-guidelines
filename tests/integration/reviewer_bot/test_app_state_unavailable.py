@@ -1,5 +1,7 @@
 from scripts import reviewer_bot
+import pytest
 
+pytestmark = pytest.mark.integration
 
 def test_execute_run_mutating_event_fails_closed_when_state_unavailable(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -17,7 +19,6 @@ def test_execute_run_mutating_event_fails_closed_when_state_unavailable(monkeypa
 
     assert result.exit_code == 1
     assert result.state_changed is False
-
 
 def test_execute_run_mutating_event_does_not_sync_or_save_when_state_unavailable(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")

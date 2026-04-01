@@ -1,6 +1,8 @@
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
+import pytest
 
+pytestmark = pytest.mark.integration
 
 def test_execute_run_closed_issue_comment_cleanup_persists_removed_review_entry(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")
@@ -53,7 +55,6 @@ def test_execute_run_closed_issue_comment_cleanup_persists_removed_review_entry(
     assert len(sync_calls) == 1
     assert sync_calls[0][0] is reloaded_state
     assert sync_calls[0][1] == [42]
-
 
 def test_execute_run_closed_issue_comment_without_entry_skips_save(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "issue_comment")

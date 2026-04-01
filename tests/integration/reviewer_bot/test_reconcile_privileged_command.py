@@ -1,9 +1,11 @@
 import json
 import os
+import pytest
+
+pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
-
 
 def test_execute_pending_privileged_command_revalidates_live_state(monkeypatch):
     state = make_state()
@@ -28,7 +30,6 @@ def test_execute_pending_privileged_command_revalidates_live_state(monkeypatch):
 
     assert reviewer_bot.handle_manual_dispatch(state) is True
     assert review["pending_privileged_commands"]["issue_comment:100"]["status"] == "executed"
-
 
 def test_execute_pending_privileged_command_hydrates_issue_labels_for_executor(monkeypatch):
     state = make_state()
@@ -68,7 +69,6 @@ def test_execute_pending_privileged_command_hydrates_issue_labels_for_executor(m
         "issue_labels": [reviewer_bot.FLS_AUDIT_LABEL],
     }
     assert review["pending_privileged_commands"]["issue_comment:100"]["status"] == "executed"
-
 
 def test_execute_pending_privileged_command_fails_closed_without_live_fls_audit_label(monkeypatch):
     state = make_state()

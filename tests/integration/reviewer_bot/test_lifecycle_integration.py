@@ -1,8 +1,10 @@
 import json
+import pytest
+
+pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
-
 
 def test_workflow_run_review_submission_clears_warning_and_transition_notice_markers(tmp_path, monkeypatch):
     state = make_state()

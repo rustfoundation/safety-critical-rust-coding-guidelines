@@ -1,8 +1,10 @@
 import json
+import pytest
+
+pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
-
 
 def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypatch):
     state = make_state()
@@ -27,7 +29,6 @@ def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypa
     assert pending["issue_comment:100"]["command_name"] == "accept-no-fls-changes"
     assert pending["issue_comment:100"]["authorization"]["authorized"] is True
 
-
 def test_closed_non_pr_plain_text_comment_does_not_create_review_entry(monkeypatch):
     state = make_state()
     monkeypatch.setenv("IS_PULL_REQUEST", "false")
@@ -42,7 +43,6 @@ def test_closed_non_pr_plain_text_comment_does_not_create_review_entry(monkeypat
 
     assert reviewer_bot.handle_comment_event(state) is False
     assert state["active_reviews"] == {}
-
 
 def test_closed_non_pr_command_comment_does_not_create_pending_privileged_command(monkeypatch):
     state = make_state()
@@ -69,7 +69,6 @@ def test_closed_non_pr_command_comment_does_not_create_pending_privileged_comman
     assert state["active_reviews"] == {}
     assert called["post_comment"] == 0
 
-
 def test_closed_non_pr_comment_removes_stale_review_entry(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -88,7 +87,6 @@ def test_closed_non_pr_comment_removes_stale_review_entry(monkeypatch):
     assert reviewer_bot.handle_comment_event(state) is True
     assert "42" not in state["active_reviews"]
 
-
 def test_closed_non_pr_comment_without_entry_returns_false(monkeypatch):
     state = make_state()
     monkeypatch.setenv("IS_PULL_REQUEST", "false")
@@ -103,7 +101,6 @@ def test_closed_non_pr_comment_without_entry_returns_false(monkeypatch):
 
     assert reviewer_bot.handle_comment_event(state) is False
     assert state["active_reviews"] == {}
-
 
 def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
     state = make_state()
@@ -123,7 +120,6 @@ def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
     assert reviewer_bot.handle_comment_event(state) is True
     accepted = state["active_reviews"]["42"]["contributor_comment"]["accepted"]
     assert accepted["semantic_key"] == "issue_comment:100"
-
 
 def test_observer_noop_payload_is_safe_noop(tmp_path, monkeypatch):
     state = make_state()

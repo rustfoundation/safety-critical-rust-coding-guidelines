@@ -1,11 +1,11 @@
 import json
 import subprocess
-
 import pytest
+
+pytestmark = pytest.mark.integration
 
 from builder import build_cli
 from scripts import reviewer_bot
-
 
 def test_list_changed_files_ignores_untracked_bootstrap_noise(monkeypatch, tmp_path):
     commands_seen = []
@@ -23,7 +23,6 @@ def test_list_changed_files_ignores_untracked_bootstrap_noise(monkeypatch, tmp_p
     assert reviewer_bot.automation_module.list_changed_files(tmp_path) == []
     assert commands_seen == [["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]]
 
-
 def test_list_changed_files_reports_tracked_changes_only(monkeypatch, tmp_path):
     def fake_run_command(command, cwd, check=True):
         if command == ["git", "diff", "--name-only"]:
@@ -35,7 +34,6 @@ def test_list_changed_files_reports_tracked_changes_only(monkeypatch, tmp_path):
     monkeypatch.setattr(reviewer_bot.automation_module, "run_command", fake_run_command)
 
     assert reviewer_bot.automation_module.list_changed_files(tmp_path) == ["README.md", "src/spec.lock"]
-
 
 def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp_path):
     monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
@@ -54,7 +52,6 @@ def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp
 
     assert (message, success) == ("❌ Working tree is not clean; refusing to update spec.lock.", False)
     assert observed["cwd"] == tmp_path
-
 
 def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_path):
     monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
@@ -86,7 +83,6 @@ def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_p
         (["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"], tmp_path, False),
     ]
 
-
 def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, tmp_path):
     monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
     monkeypatch.setenv("IS_PULL_REQUEST", "false")
@@ -109,7 +105,6 @@ def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, t
     assert success is False
     assert "Audit command failed." in message
     assert "--locked was provided" in message
-
 
 def test_update_spec_lock_file_mode_exits_before_build_docs(monkeypatch, tmp_path):
     monkeypatch.setattr(

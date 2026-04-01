@@ -1,5 +1,7 @@
 from pathlib import Path
+import pytest
 
+pytestmark = pytest.mark.contract
 
 def test_privileged_commands_workflow_executes_source_entrypoint():
     workflow_text = Path(".github/workflows/reviewer-bot-privileged-commands.yml").read_text(

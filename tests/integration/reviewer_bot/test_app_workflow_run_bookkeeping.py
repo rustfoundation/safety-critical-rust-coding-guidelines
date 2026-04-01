@@ -1,8 +1,10 @@
 import json
+import pytest
+
+pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state
-
 
 def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(tmp_path, monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")
@@ -103,7 +105,6 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
     assert save_snapshots == [{"reconciled": ["pull_request_review:11"], "gap_present": False}]
     assert synced_issue_numbers == [42]
 
-
 def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_still_saves_state(
     tmp_path, monkeypatch
 ):
@@ -186,7 +187,6 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
 
     assert result.exit_code == 0
     assert save_snapshots == [{"reconciled": ["issue_comment:210"], "gap_present": False}]
-
 
 def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_reconcile_still_saves_state(
     tmp_path, monkeypatch

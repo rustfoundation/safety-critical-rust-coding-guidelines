@@ -1,6 +1,8 @@
 from scripts import reviewer_bot
 from tests.fixtures.reviewer_bot import make_state, valid_reviewer_board_metadata
+import pytest
 
+pytestmark = pytest.mark.integration
 
 def test_execute_run_preview_reviewer_board_disabled_is_clean_noop(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
@@ -41,7 +43,6 @@ def test_execute_run_preview_reviewer_board_disabled_is_clean_noop(monkeypatch, 
     output = capsys.readouterr().out
     assert "Reviewer board preview skipped: reviewer board is disabled." in output
 
-
 def test_execute_run_preview_reviewer_board_missing_token_fails_clearly(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("EVENT_ACTION", "")
@@ -70,7 +71,6 @@ def test_execute_run_preview_reviewer_board_missing_token_fails_clearly(monkeypa
 
     assert result.exit_code == 1
     assert "REVIEWER_BOARD_TOKEN not set" in capsys.readouterr().err
-
 
 def test_execute_run_preview_reviewer_board_invalid_manifest_fails_clearly(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
@@ -106,7 +106,6 @@ def test_execute_run_preview_reviewer_board_invalid_manifest_fails_clearly(monke
 
     assert result.exit_code == 1
     assert "Missing reviewer board field: Review State" in capsys.readouterr().err
-
 
 def test_execute_run_preview_reviewer_board_is_read_only(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")

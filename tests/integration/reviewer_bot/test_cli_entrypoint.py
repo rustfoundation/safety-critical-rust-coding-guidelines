@@ -1,6 +1,7 @@
 import json
-
 import pytest
+
+pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib.lifecycle import HeadObservationRepairResult
@@ -8,7 +9,6 @@ from tests.fixtures.reviewer_bot import make_state
 from tests.fixtures.reviewer_bot import (
     valid_reviewer_board_metadata as _valid_reviewer_board_metadata,
 )
-
 
 def test_main_show_state_uses_direct_yaml_import(monkeypatch, capsys):
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
