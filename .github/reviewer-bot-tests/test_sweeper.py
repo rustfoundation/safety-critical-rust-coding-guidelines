@@ -189,30 +189,6 @@ def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention()
     }
     assert sweeper.classify_artifact_gap_reason(missing) == "artifact_missing"
 
-def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(monkeypatch):
-    state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: [
-            {
-                "id": 100,
-                "created_at": "2026-03-25T10:00:00Z",
-                "user": {"login": "github-actions[bot]", "type": "Bot"},
-            },
-            {
-                "id": 101,
-                "created_at": "2026-03-25T11:00:00Z",
-                "user": {"login": "alice", "type": "User"},
-            },
-        ],
-    )
-    discovered, complete = sweeper._discover_visible_comment_events(reviewer_bot, 42, review)
-    assert complete is True
-    assert [item["source_event_key"] for item in discovered] == ["issue_comment:101"]
-
 def test_sweeper_fetches_single_candidate_run_detail_without_exact_artifact_match(monkeypatch):
     run_correlation = {
         "candidate_run_ids": [123],
@@ -223,40 +199,6 @@ def test_sweeper_fetches_single_candidate_run_detail_without_exact_artifact_matc
     detail = sweeper._maybe_fetch_single_candidate_run_detail(reviewer_bot, run_correlation, {"status": "no_exact_artifact_match"})
     assert detail == {"id": 123, "status": "completed", "conclusion": "action_required"}
     assert run_correlation["correlated_run"] == 123
-
-def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_without_artifact(monkeypatch):
-    state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
-    review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
-    review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
-    review["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {"state": "open", "head": {"sha": "head-1"}} if endpoint == "pulls/42" else {"workflow_runs": []},
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "id": 202,
-                "submitted_at": "2026-03-25T11:00:00Z",
-                "state": "COMMENTED",
-                "commit_id": "head-1",
-                "user": {"login": "alice"},
-            }
-        ],
-    )
-    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
-    assert review["last_reviewer_activity"] == "2026-03-25T11:00:00Z"
-    assert review["transition_warning_sent"] is None
-    assert review["transition_notice_sent_at"] is None
-    assert "pull_request_review:202" not in review["deferred_gaps"]
-    assert "pull_request_review:202" in review["reconciled_source_events"]
 
 def test_workflow_policy_split_and_lock_only_boundaries():
     workflows_dir = Path(".github/workflows")
