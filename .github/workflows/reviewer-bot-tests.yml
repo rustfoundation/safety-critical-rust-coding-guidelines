@@ -34,17 +34,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Run reviewer bot tests with targeted coverage
+      - name: Run migrated reviewer bot tests with targeted coverage
         run: >-
-          uv run pytest .github/reviewer-bot-tests
+          uv run pytest tests --import-mode=importlib
           --cov=scripts.reviewer_bot
           --cov=scripts.reviewer_bot_lib
           --cov-branch
           --cov-report=term-missing
           --cov-report=json:coverage-reviewer-bot.json
 
-      - name: Run migrated reviewer bot tests with importlib collection
-        run: uv run pytest tests --import-mode=importlib
+      - name: Run remaining legacy reviewer bot tests
+        run: uv run pytest .github/reviewer-bot-tests
 
       - name: Enforce reviewer bot statement and branch floors
         run: |
