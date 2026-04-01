@@ -49,6 +49,34 @@ def filter_current_head_reviews_for_cycle(
     return survivors
 
 
+def normalize_reviews_with_parsed_timestamps(
+    reviews: list[dict],
+    *,
+    parse_timestamp,
+) -> list[dict]:
+    normalized_reviews = []
+    for review in reviews:
+        if not isinstance(review, dict):
+            normalized_reviews.append(review)
+            continue
+        normalized = dict(review)
+        normalized["submitted_at"] = parse_timestamp(review.get("submitted_at"))
+        normalized_reviews.append(normalized)
+    return normalized_reviews
+
+
+def collect_permission_statuses(survivors: dict[str, dict], *, permission_status) -> dict[str, str]:
+    statuses: dict[str, str] = {}
+    for review in survivors.values():
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or not author.strip():
+            continue
+        cache_key = author.lower()
+        if cache_key not in statuses:
+            statuses[cache_key] = permission_status(author)
+    return statuses
+
+
 def compute_pr_approval_state_from_reviews(
     survivors: dict[str, dict],
     *,

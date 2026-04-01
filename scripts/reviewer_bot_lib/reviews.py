@@ -13,9 +13,11 @@ from .config import (
     STATUS_LABELS,
 )
 from .reviews_projection import (
+    collect_permission_statuses,
     compute_pr_approval_state_from_reviews,
     desired_labels_from_response_state,
     filter_current_head_reviews_for_cycle,
+    normalize_reviews_with_parsed_timestamps,
 )
 
 
@@ -363,28 +365,19 @@ def compute_pr_approval_state_result(
         return reviews_result
     reviews = reviews_result["reviews"]
 
-    normalized_reviews = []
-    for review in reviews:
-        if not isinstance(review, dict):
-            normalized_reviews.append(review)
-            continue
-        normalized = dict(review)
-        normalized["submitted_at"] = parse_github_timestamp(review.get("submitted_at"))
-        normalized_reviews.append(normalized)
-
+    normalized_reviews = normalize_reviews_with_parsed_timestamps(
+        reviews,
+        parse_timestamp=parse_github_timestamp,
+    )
     survivors = filter_current_head_reviews_for_cycle(
         normalized_reviews,
         boundary=boundary,
         current_head=current_head,
     )
-    permission_cache: dict[str, str] = {}
-    for review in survivors.values():
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author.strip():
-            continue
-        cache_key = author.lower()
-        if cache_key not in permission_cache:
-            permission_cache[cache_key] = _permission_status(bot, author, "push")
+    permission_cache = collect_permission_statuses(
+        survivors,
+        permission_status=lambda author: _permission_status(bot, author, "push"),
+    )
     result = compute_pr_approval_state_from_reviews(
         survivors,
         current_head=current_head,

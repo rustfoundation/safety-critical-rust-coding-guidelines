@@ -115,3 +115,41 @@ def test_compute_pr_approval_state_from_reviews_is_pure():
     assert result["ok"] is True
     assert result["completion"]["completed"] is True
     assert before["survivors"]["alice"]["id"] == 10
+
+
+def test_normalize_reviews_with_parsed_timestamps_is_pure():
+    reviews = [
+        {
+            "id": 10,
+            "state": "APPROVED",
+            "submitted_at": "2026-03-17T10:01:00Z",
+            "commit_id": "head-1",
+            "user": {"login": "alice"},
+        }
+    ]
+    before = json.loads(json.dumps(reviews))
+
+    normalized = reviews_projection.normalize_reviews_with_parsed_timestamps(
+        reviews,
+        parse_timestamp=reviewer_bot.parse_github_timestamp,
+    )
+
+    assert normalized[0]["submitted_at"] == reviewer_bot.parse_github_timestamp("2026-03-17T10:01:00Z")
+    assert reviews == before
+
+
+def test_collect_permission_statuses_deduplicates_authors():
+    survivors = {
+        "alice": {"user": {"login": "alice"}},
+        "alice-2": {"user": {"login": "alice"}},
+        "bob": {"user": {"login": "bob"}},
+    }
+    observed = []
+
+    statuses = reviews_projection.collect_permission_statuses(
+        survivors,
+        permission_status=lambda author: observed.append(author) or "granted",
+    )
+
+    assert statuses == {"alice": "granted", "bob": "granted"}
+    assert observed == ["alice", "bob"]
