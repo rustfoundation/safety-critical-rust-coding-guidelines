@@ -10,15 +10,111 @@ from .config import (
     MANDATORY_TRIAGE_APPROVER_LABEL,
     MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
     MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
-    STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
-    STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
-    STATUS_AWAITING_WRITE_APPROVAL_LABEL,
     STATUS_LABELS,
 )
+from .reviews_projection import (
+    collect_permission_statuses,
+    compute_pr_approval_state_from_reviews,
+    desired_labels_from_response_state,
+    filter_current_head_reviews_for_cycle,
+    normalize_reviews_with_parsed_timestamps,
+)
+
+
+def _mark_canonical(func):
+    setattr(func, "_reviewer_bot_canonical", True)
+    return func
+
+
+def _is_canonical_callable(func) -> bool:
+    return callable(func) and bool(getattr(func, "_reviewer_bot_canonical", False))
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _projection_failure(reason: str, failure_kind: str | None = None) -> dict[str, object]:
+    return {"ok": False, "reason": reason, "failure_kind": failure_kind}
+
+
+def _fallback_pull_request_payload(bot, issue_number: int) -> dict[str, object]:
+    payload = bot.github_api("GET", f"pulls/{issue_number}")
+    if isinstance(payload, dict):
+        return {"ok": True, "pull_request": payload}
+    return _projection_failure("pull_request_unavailable")
+
+
+def _pull_request_read_result(bot, issue_number: int, pull_request: dict | None = None) -> dict[str, object]:
+    if pull_request is not None:
+        if isinstance(pull_request, dict):
+            return {"ok": True, "pull_request": pull_request}
+        return _projection_failure("pull_request_unavailable", "invalid_payload")
+    try:
+        response = bot.github_api_request("GET", f"pulls/{issue_number}", retry_policy="idempotent_read")
+    except SystemExit:
+        return _fallback_pull_request_payload(bot, issue_number)
+    if not response.ok:
+        if response.failure_kind == "not_found":
+            return _projection_failure("pull_request_not_found", response.failure_kind)
+        return _projection_failure("pull_request_unavailable", response.failure_kind)
+    if not isinstance(response.payload, dict):
+        return _projection_failure("pull_request_unavailable", "invalid_payload")
+    return {"ok": True, "pull_request": response.payload}
+
+
+def _fallback_pull_request_reviews_result(bot, issue_number: int) -> dict[str, object]:
+    fallback_loader = getattr(bot, "get_pull_request_reviews", None)
+    if callable(fallback_loader) and not _is_canonical_callable(fallback_loader):
+        fallback_reviews = fallback_loader(issue_number)
+        if not isinstance(fallback_reviews, list):
+            return _projection_failure("reviews_unavailable")
+        return {"ok": True, "reviews": fallback_reviews}
+
+    collected_reviews: list[dict] = []
+    page = 1
+    while True:
+        payload = bot.github_api("GET", f"pulls/{issue_number}/reviews?per_page=100&page={page}")
+        if not isinstance(payload, list):
+            return _projection_failure("reviews_unavailable")
+        page_reviews = [review for review in payload if isinstance(review, dict)]
+        collected_reviews.extend(page_reviews)
+        if len(payload) < 100:
+            return {"ok": True, "reviews": collected_reviews}
+        page += 1
+
+
+def get_pull_request_reviews_result(bot, issue_number: int, reviews: list[dict] | None = None) -> dict[str, object]:
+    if reviews is not None:
+        return {"ok": True, "reviews": reviews}
+    collected_reviews: list[dict] = []
+    page = 1
+    while True:
+        try:
+            response = bot.github_api_request(
+                "GET",
+                f"pulls/{issue_number}/reviews?per_page=100&page={page}",
+                retry_policy="idempotent_read",
+            )
+        except SystemExit:
+            return _fallback_pull_request_reviews_result(bot, issue_number)
+        if not response.ok:
+            return _projection_failure("reviews_unavailable", response.failure_kind)
+        payload = response.payload
+        if not isinstance(payload, list):
+            return _projection_failure("reviews_unavailable", "invalid_payload")
+        page_reviews = [review for review in payload if isinstance(review, dict)]
+        collected_reviews.extend(page_reviews)
+        if len(payload) < 100:
+            return {"ok": True, "reviews": collected_reviews}
+        page += 1
+
+
+def _permission_status(bot, username: str, permission: str) -> str:
+    status = bot.get_user_permission_status(username, permission)
+    if status not in {"granted", "denied", "unavailable"}:
+        return "unavailable"
+    return status
 
 
 def parse_github_timestamp(value: str | None) -> datetime | None:
@@ -152,8 +248,6 @@ def get_preferred_current_reviewer_review_for_cycle(
         return None
     if len(valid_reviews) == 1:
         return valid_reviews[0]
-    if pull_request is None:
-        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
     head = pull_request.get("head") if isinstance(pull_request, dict) else None
     current_head = head.get("sha") if isinstance(head, dict) else None
     current_head_reviews = [review for review in valid_reviews if _review_matches_head(review, current_head)]
@@ -207,6 +301,11 @@ def refresh_reviewer_review_from_live_preferred_review(
     reviews: list[dict] | None = None,
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
+    if pull_request is None:
+        pull_request_result = _pull_request_read_result(bot, issue_number)
+        if not pull_request_result.get("ok"):
+            return False, None
+        pull_request = pull_request_result["pull_request"]
     preferred_review = get_preferred_current_reviewer_review_for_cycle(
         bot,
         issue_number,
@@ -229,8 +328,116 @@ def refresh_reviewer_review_from_live_preferred_review(
         changed = True
     submitted_at = preferred_review.get("submitted_at")
     if isinstance(submitted_at, str):
+        previous_activity = review_data.get("last_reviewer_activity")
+        previous_warning = review_data.get("transition_warning_sent")
+        previous_notice = review_data.get("transition_notice_sent_at")
         record_reviewer_activity(review_data, submitted_at)
+        activity_changed = (
+            previous_activity != review_data.get("last_reviewer_activity")
+            or previous_warning != review_data.get("transition_warning_sent")
+            or previous_notice != review_data.get("transition_notice_sent_at")
+        )
+        changed = changed or activity_changed
     return changed, preferred_review
+
+
+def compute_pr_approval_state_result(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict[str, object]:
+    boundary = get_current_cycle_boundary(bot, review_data)
+    if boundary is None:
+        return _projection_failure("pull_request_unavailable")
+    pull_request_result = _pull_request_read_result(bot, issue_number, pull_request)
+    if not pull_request_result.get("ok"):
+        return pull_request_result
+    pull_request = pull_request_result["pull_request"]
+    head = pull_request.get("head")
+    current_head = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(current_head, str) or not current_head.strip():
+        return _projection_failure("pull_request_head_unavailable", "invalid_payload")
+    reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
+    if not reviews_result.get("ok"):
+        return reviews_result
+    reviews = reviews_result["reviews"]
+
+    normalized_reviews = normalize_reviews_with_parsed_timestamps(
+        reviews,
+        parse_timestamp=parse_github_timestamp,
+    )
+    survivors = filter_current_head_reviews_for_cycle(
+        normalized_reviews,
+        boundary=boundary,
+        current_head=current_head,
+    )
+    permission_cache = collect_permission_statuses(
+        survivors,
+        permission_status=lambda author: _permission_status(bot, author, "push"),
+    )
+    result = compute_pr_approval_state_from_reviews(
+        survivors,
+        current_head=current_head,
+        permission_statuses=permission_cache,
+    )
+    if not result.get("ok"):
+        return _projection_failure(str(result.get("reason")))
+    return result
+
+
+def resolve_pr_approval_state(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> tuple[dict | None, dict | None, str | None]:
+    if not _is_canonical_callable(bot.reviews_module.rebuild_pr_approval_state):
+        completion, write_approval = bot.reviews_module.rebuild_pr_approval_state(
+            bot,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
+        if completion is None or write_approval is None:
+            return None, None, "live_review_state_unknown"
+        return completion, write_approval, None
+
+    approval_result = compute_pr_approval_state_result(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if not approval_result.get("ok"):
+        return None, None, str(approval_result.get("reason"))
+    return approval_result["completion"], approval_result["write_approval"], None
+
+
+def apply_pr_approval_state(
+    review_data: dict,
+    *,
+    completion: dict,
+    write_approval: dict,
+    current_head_sha: str,
+) -> None:
+    review_data["active_head_sha"] = current_head_sha
+    review_data["current_cycle_completion"] = completion
+    review_data["current_cycle_write_approval"] = write_approval
+    if completion.get("completed"):
+        review_data["review_completed_at"] = _now_iso()
+        review_data["review_completed_by"] = None
+        review_data["review_completion_source"] = "live_review_rebuild"
+    else:
+        review_data["review_completed_at"] = None
+        review_data["review_completed_by"] = None
+        review_data["review_completion_source"] = None
 
 
 def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
@@ -375,12 +582,16 @@ def clear_transition_timers(review_data: dict) -> None:
     review_data["transition_notice_sent_at"] = None
 
 
-def record_reviewer_activity(review_data: dict, timestamp: str) -> None:
+def record_reviewer_activity(review_data: dict, timestamp: str) -> bool:
     current = parse_github_timestamp(review_data.get("last_reviewer_activity"))
     candidate = parse_github_timestamp(timestamp)
-    if current is None or candidate is None or candidate >= current:
+    if candidate is None:
+        return False
+    if current is None or candidate > current:
         review_data["last_reviewer_activity"] = timestamp
-    clear_transition_timers(review_data)
+        clear_transition_timers(review_data)
+        return True
+    return False
 
 
 def record_transition_notice_sent(review_data: dict, timestamp: str) -> None:
@@ -506,7 +717,10 @@ def mark_review_complete(state: dict, issue_number: int, reviewer: str | None, s
 
 
 def is_triage_or_higher(bot, username: str) -> bool:
-    return bot.check_user_permission(username, "triage")
+    status = _permission_status(bot, username, "triage")
+    if status == "unavailable":
+        raise RuntimeError(f"Unable to determine triage permission for @{username}")
+    return status == "granted"
 
 
 def trigger_mandatory_approver_escalation(bot, state: dict, issue_number: int) -> bool:
@@ -554,19 +768,11 @@ def satisfy_mandatory_approver_requirement(bot, state: dict, issue_number: int, 
 
 
 def get_pull_request_reviews(bot, issue_number: int) -> list[dict] | None:
-    reviews: list[dict] = []
-    page = 1
-    while True:
-        result = bot.github_api("GET", f"pulls/{issue_number}/reviews?per_page=100&page={page}")
-        if result is None:
-            return None
-        if not isinstance(result, list):
-            return reviews
-        page_reviews = [review for review in result if isinstance(review, dict)]
-        reviews.extend(page_reviews)
-        if len(result) < 100:
-            return reviews
-        page += 1
+    result = get_pull_request_reviews_result(bot, issue_number)
+    if not result.get("ok"):
+        return None
+    reviews = result.get("reviews")
+    return reviews if isinstance(reviews, list) else None
 
 
 def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
@@ -595,6 +801,7 @@ def get_current_cycle_boundary(bot, review_data: dict) -> datetime | None:
     return None
 
 
+@_mark_canonical
 def rebuild_pr_approval_state(
     bot,
     issue_number: int,
@@ -603,92 +810,46 @@ def rebuild_pr_approval_state(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> tuple[dict | None, dict | None]:
-    boundary = get_current_cycle_boundary(bot, review_data)
-    if boundary is None:
+    result = rebuild_pr_approval_state_result(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if not result.get("ok"):
         return None, None
-    if pull_request is None:
-        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
-    if not isinstance(pull_request, dict):
-        return None, None
-    head = pull_request.get("head")
-    current_head = head.get("sha") if isinstance(head, dict) else None
-    if not isinstance(current_head, str) or not current_head.strip():
-        return None, None
-    if reviews is None:
-        reviews = bot.get_pull_request_reviews(issue_number)
-    if reviews is None:
-        return None, None
+    return result.get("completion"), result.get("write_approval")
 
-    survivors: dict[str, dict] = {}
-    for review in reviews:
-        if not isinstance(review, dict):
-            continue
-        state = str(review.get("state", "")).upper()
-        if state == "DISMISSED":
-            continue
-        submitted_at = parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None or submitted_at < boundary:
-            continue
-        commit_id = review.get("commit_id")
-        if not isinstance(commit_id, str) or not commit_id.strip():
-            continue
-        if commit_id.strip() != current_head:
-            continue
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author.strip():
-            continue
-        review_id = str(review.get("id", ""))
-        key = author.lower()
-        candidate_key = (submitted_at, review_id)
-        current = survivors.get(key)
-        if current is None:
-            survivors[key] = review
-            continue
-        current_key = (
-            parse_github_timestamp(current.get("submitted_at")) or datetime.min.replace(tzinfo=timezone.utc),
-            str(current.get("id", "")),
-        )
-        if candidate_key >= current_key:
-            survivors[key] = review
 
-    approvals = [review for review in survivors.values() if str(review.get("state", "")).upper() == "APPROVED"]
-    completion = {
-        "completed": bool(approvals),
-        "current_head_sha": current_head,
-        "qualifying_review_ids": [review.get("id") for review in approvals],
+def rebuild_pr_approval_state_result(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict[str, object]:
+    result = compute_pr_approval_state_result(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if not result.get("ok"):
+        return result
+    apply_pr_approval_state(
+        review_data,
+        completion=result["completion"],
+        write_approval=result["write_approval"],
+        current_head_sha=str(result["current_head_sha"]),
+    )
+    return {
+        "ok": True,
+        "completion": result["completion"],
+        "write_approval": result["write_approval"],
     }
-
-    permission_cache: dict[str, bool] = {}
-    has_write_approval = False
-    write_approvers: list[str] = []
-    for review in approvals:
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author.strip():
-            continue
-        cache_key = author.lower()
-        if cache_key not in permission_cache:
-            permission_cache[cache_key] = bot.check_user_permission(author, "push")
-        if permission_cache[cache_key]:
-            has_write_approval = True
-            write_approvers.append(author)
-    write_approval = {
-        "has_write_approval": has_write_approval,
-        "write_approvers": write_approvers,
-        "current_head_sha": current_head,
-    }
-
-    review_data["active_head_sha"] = current_head
-    review_data["current_cycle_completion"] = completion
-    review_data["current_cycle_write_approval"] = write_approval
-    if completion["completed"]:
-        review_data["review_completed_at"] = _now_iso()
-        review_data["review_completed_by"] = None
-        review_data["review_completion_source"] = "live_review_rebuild"
-    else:
-        review_data["review_completed_at"] = None
-        review_data["review_completed_by"] = None
-        review_data["review_completion_source"] = None
-    return completion, write_approval
 
 
 def pr_has_current_write_approval(
@@ -797,7 +958,20 @@ def compute_reviewer_response_state(
             }
         return {"state": "done", "reason": None}
 
+    pull_request_result = _pull_request_read_result(bot, issue_number, pull_request)
+    if not pull_request_result.get("ok"):
+        return {"state": "projection_failed", "reason": str(pull_request_result.get("reason"))}
+    pull_request = pull_request_result["pull_request"]
+    head = pull_request.get("head")
+    current_head = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(current_head, str) or not current_head.strip():
+        return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
+
     if not reviewer_comment and not reviewer_review:
+        reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
+        if not reviews_result.get("ok"):
+            return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
+        reviews = reviews_result["reviews"]
         preferred_live_review = get_preferred_current_reviewer_review_for_cycle(
             bot,
             issue_number,
@@ -818,25 +992,28 @@ def compute_reviewer_response_state(
                 "contributor_handoff": None,
             }
 
-    if pull_request is None:
-        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
-    if not isinstance(pull_request, dict):
-        return {"state": "projection_failed", "reason": "pull_request_unavailable"}
-    head = pull_request.get("head")
-    current_head = head.get("sha") if isinstance(head, dict) else None
-    if not isinstance(current_head, str) or not current_head.strip():
-        return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
-    review_data["active_head_sha"] = current_head
+    stored_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    refresh_live_review = reviews is not None or reviewer_review is None
+    if not refresh_live_review:
+        refresh_live_review = not isinstance(stored_review_head, str) or stored_review_head != current_head
 
-    preferred_live_review = get_preferred_current_reviewer_review_for_cycle(
-        bot,
-        issue_number,
-        review_data,
-        pull_request=pull_request,
-        reviews=reviews,
-    )
+    preferred_live_review = None
+    if refresh_live_review:
+        reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
+        if not reviews_result.get("ok"):
+            return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
+        reviews = reviews_result["reviews"]
+        preferred_live_review = get_preferred_current_reviewer_review_for_cycle(
+            bot,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
     if preferred_live_review is not None:
         reviewer_review = build_reviewer_review_record_from_live_review(preferred_live_review, actor=current_reviewer)
+    elif refresh_live_review:
+        reviewer_review = None
 
     latest_reviewer_response = reviewer_comment
     if _compare_records(reviewer_review, latest_reviewer_response) > 0:
@@ -846,19 +1023,6 @@ def compute_reviewer_response_state(
     contributor_revision = _contributor_revision_handoff_record(review_data, current_head, reviewer_review if isinstance(reviewer_review, dict) else None)
     if _compare_records(contributor_revision, contributor_handoff) > 0:
         contributor_handoff = contributor_revision
-
-    latest_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
-    if not isinstance(latest_review_head, str) or latest_review_head != current_head:
-        return {
-            "state": "awaiting_reviewer_response",
-            "reason": "review_head_stale",
-            "anchor_timestamp": contributor_handoff.get("timestamp") if isinstance(contributor_handoff, dict) else _initial_reviewer_anchor(review_data),
-            "current_head_sha": current_head,
-            "reviewer_comment": reviewer_comment,
-            "reviewer_review": reviewer_review,
-            "contributor_comment": contributor_comment,
-            "contributor_handoff": contributor_handoff,
-        }
 
     if _compare_cross_channel_conversation(contributor_handoff, latest_reviewer_response) > 0:
         reason = "contributor_comment_newer"
@@ -875,9 +1039,28 @@ def compute_reviewer_response_state(
             "contributor_handoff": contributor_handoff,
         }
 
-    completion, write_approval = rebuild_pr_approval_state(bot, issue_number, review_data, pull_request=pull_request, reviews=reviews)
+    latest_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    if not isinstance(latest_review_head, str) or latest_review_head != current_head:
+        return {
+            "state": "awaiting_reviewer_response",
+            "reason": "review_head_stale",
+            "anchor_timestamp": contributor_handoff.get("timestamp") if isinstance(contributor_handoff, dict) else _initial_reviewer_anchor(review_data),
+            "current_head_sha": current_head,
+            "reviewer_comment": reviewer_comment,
+            "reviewer_review": reviewer_review,
+            "contributor_comment": contributor_comment,
+            "contributor_handoff": contributor_handoff,
+        }
+
+    completion, write_approval, approval_failure = resolve_pr_approval_state(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
     if completion is None or write_approval is None:
-        return {"state": "projection_failed", "reason": "live_review_state_unknown"}
+        return {"state": "projection_failed", "reason": approval_failure or "live_review_state_unknown"}
     if not completion.get("completed"):
         return {
             "state": "awaiting_contributor_response",
@@ -936,15 +1119,7 @@ def project_status_labels_for_item(
     response_state = compute_reviewer_response_state(bot, issue_number, review_data, issue_snapshot=issue_snapshot)
     state_name = response_state.get("state")
     reason = response_state.get("reason")
-    if state_name == "projection_failed":
-        return None, {"state": str(state_name), "reason": str(reason)}
-    if state_name == "awaiting_reviewer_response":
-        return ({STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}, {"state": str(state_name), "reason": str(reason)})
-    if state_name == "awaiting_contributor_response":
-        return ({STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}, {"state": str(state_name), "reason": str(reason)})
-    if state_name == "awaiting_write_approval":
-        return ({STATUS_AWAITING_WRITE_APPROVAL_LABEL}, {"state": str(state_name), "reason": str(reason)})
-    return set(), {"state": str(state_name), "reason": None if reason is None else str(reason)}
+    return desired_labels_from_response_state(str(state_name), None if reason is None else str(reason))
 
 
 def sync_status_labels(bot, issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
@@ -997,11 +1172,20 @@ def list_open_items_with_status_labels(bot) -> list[int]:
         page = 1
         encoded_label = quote(label, safe="")
         while True:
-            result = bot.github_api("GET", f"issues?state=open&labels={encoded_label}&per_page=100&page={page}")
-            if result is None:
-                raise RuntimeError(f"Failed to list open items for status label '{label}'")
+            response = bot.github_api_request(
+                "GET",
+                f"issues?state=open&labels={encoded_label}&per_page=100&page={page}",
+                retry_policy="idempotent_read",
+            )
+            if not response.ok:
+                raise RuntimeError(
+                    f"Failed to list open items for status label '{label}': {response.failure_kind or 'unavailable'}"
+                )
+            result = response.payload
             if not isinstance(result, list):
-                break
+                raise RuntimeError(
+                    f"Failed to list open items for status label '{label}': invalid_payload"
+                )
             for item in result:
                 if isinstance(item, dict):
                     number = item.get("number")

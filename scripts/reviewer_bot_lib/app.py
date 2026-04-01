@@ -1,9 +1,10 @@
 """Top-level reviewer-bot orchestration."""
 
+import json
 import os
 import sys
 
-from .context import ReviewerBotContext
+from .context import EventContext, ExecutionResult, ReviewerBotContext
 from .maintenance import (
     collect_status_projection_repair_items,
     status_projection_repair_needed,
@@ -30,17 +31,91 @@ def _mark_projection_repair_needed(bot: ReviewerBotContext, state: dict, issue_n
         review_data = active_reviews.get(str(issue_number))
         if not isinstance(review_data, dict):
             continue
-        review_data["repair_needed"] = {
+        marker = {
             "kind": "projection_failure",
             "reason": reason,
             "recorded_at": bot.datetime.now(bot.timezone.utc).isoformat(),
         }
+        existing = review_data.get("repair_needed")
+        if isinstance(existing, dict) and {
+            key: value for key, value in existing.items() if key != "recorded_at"
+        } == {
+            key: value for key, value in marker.items() if key != "recorded_at"
+        }:
+            continue
+        review_data["repair_needed"] = marker
         changed = True
     return changed
 
 
-def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action: str) -> str:
-    """Classify whether a run can mutate reviewer-bot state."""
+def _parse_optional_int(value: str) -> int | None:
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def _parse_optional_bool(value: str) -> bool | None:
+    value = value.strip().lower()
+    if not value:
+        return None
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    return None
+
+
+def _parse_issue_labels(value: str) -> tuple[str, ...]:
+    value = value.strip()
+    if not value:
+        return ()
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError:
+        return ()
+    if not isinstance(payload, list):
+        return ()
+    return tuple(label for label in payload if isinstance(label, str))
+
+
+def build_event_context() -> EventContext:
+    return EventContext(
+        event_name=os.environ.get("EVENT_NAME", "").strip(),
+        event_action=os.environ.get("EVENT_ACTION", "").strip(),
+        issue_number=_parse_optional_int(os.environ.get("ISSUE_NUMBER", "")),
+        is_pull_request=_parse_optional_bool(os.environ.get("IS_PULL_REQUEST", "")),
+        issue_author=os.environ.get("ISSUE_AUTHOR", "").strip() or None,
+        issue_state=os.environ.get("ISSUE_STATE", "").strip() or None,
+        issue_labels=_parse_issue_labels(os.environ.get("ISSUE_LABELS", "")),
+        comment_id=_parse_optional_int(os.environ.get("COMMENT_ID", "")),
+        comment_author=os.environ.get("COMMENT_AUTHOR", "").strip() or None,
+        comment_body=os.environ.get("COMMENT_BODY", "") or None,
+        comment_source_event_key=os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip() or None,
+        pr_is_cross_repository=_parse_optional_bool(os.environ.get("PR_IS_CROSS_REPOSITORY", "")),
+        review_author=os.environ.get("REVIEW_AUTHOR", "").strip() or None,
+        review_state=os.environ.get("REVIEW_STATE", "").strip() or None,
+        workflow_run_event=os.environ.get("WORKFLOW_RUN_EVENT", "").strip() or None,
+        workflow_run_event_action=os.environ.get("WORKFLOW_RUN_EVENT_ACTION", "").strip() or None,
+        workflow_run_head_sha=os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip() or None,
+        workflow_run_reconcile_pr_number=_parse_optional_int(
+            os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "")
+        ),
+        workflow_run_reconcile_head_sha=os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip() or None,
+        workflow_run_id=_parse_optional_int(os.environ.get("WORKFLOW_RUN_ID", "")),
+        workflow_name=os.environ.get("WORKFLOW_NAME", "").strip() or None,
+        workflow_job_name=os.environ.get("WORKFLOW_JOB_NAME", "").strip() or None,
+        manual_action=os.environ.get("MANUAL_ACTION", "").strip() or None,
+    )
+
+
+def _classify_event_intent_from_context(bot: ReviewerBotContext, context: EventContext) -> str:
+    event_name = context.event_name
+    event_action = context.event_action
+
     if event_name in {"issues", "pull_request_target"}:
         if event_action in {"opened", "labeled", "edited", "closed", "synchronize"}:
             return bot.EVENT_INTENT_MUTATING
@@ -48,7 +123,7 @@ def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action
 
     if event_name == "issue_comment":
         if event_action == "created":
-            if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
+            if context.is_pull_request is True:
                 trust_class = os.environ.get("REVIEWER_BOT_TRUST_CLASS", "").strip()
                 if trust_class in {"pr_deferred_reconcile", "safe_noop"}:
                     return bot.EVENT_INTENT_NON_MUTATING_DEFER
@@ -68,14 +143,12 @@ def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action
     if event_name == "workflow_run":
         if event_action != "completed":
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
-        workflow_run_event = os.environ.get("WORKFLOW_RUN_EVENT", "").strip()
-        if workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
+        if context.workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
             return bot.EVENT_INTENT_MUTATING
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
     if event_name == "workflow_dispatch":
-        action = os.environ.get("MANUAL_ACTION", "").strip()
-        if action in {"show-state", "preview-reviewer-board"}:
+        if context.manual_action in {"show-state", "preview-reviewer-board"}:
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
         return bot.EVENT_INTENT_MUTATING
 
@@ -85,18 +158,48 @@ def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action
     return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
 
+def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action: str) -> str:
+    """Classify whether a run can mutate reviewer-bot state."""
+    context = build_event_context()
+    context = EventContext(
+        event_name=event_name,
+        event_action=event_action,
+        issue_number=context.issue_number,
+        is_pull_request=context.is_pull_request,
+        issue_author=context.issue_author,
+        issue_state=context.issue_state,
+        issue_labels=context.issue_labels,
+        comment_id=context.comment_id,
+        comment_author=context.comment_author,
+        comment_body=context.comment_body,
+        comment_source_event_key=context.comment_source_event_key,
+        pr_is_cross_repository=context.pr_is_cross_repository,
+        review_author=context.review_author,
+        review_state=context.review_state,
+        workflow_run_event=context.workflow_run_event,
+        workflow_run_event_action=context.workflow_run_event_action,
+        workflow_run_head_sha=context.workflow_run_head_sha,
+        workflow_run_reconcile_pr_number=context.workflow_run_reconcile_pr_number,
+        workflow_run_reconcile_head_sha=context.workflow_run_reconcile_head_sha,
+        workflow_run_id=context.workflow_run_id,
+        workflow_name=context.workflow_name,
+        workflow_job_name=context.workflow_job_name,
+        manual_action=context.manual_action,
+    )
+    return _classify_event_intent_from_context(bot, context)
+
+
 def event_requires_lease_lock(bot: ReviewerBotContext, event_name: str, event_action: str) -> bool:
     """Backwards-compatible helper for tests and call sites."""
     return classify_event_intent(bot, event_name, event_action) == bot.EVENT_INTENT_MUTATING
 
 
-def main(bot: ReviewerBotContext):
-    """Main entry point for the reviewer bot."""
-    event_name = os.environ.get("EVENT_NAME", "")
-    event_action = os.environ.get("EVENT_ACTION", "")
+def execute_run(bot: ReviewerBotContext, context: EventContext) -> ExecutionResult:
     bot.drain_touched_items()
 
-    event_intent = classify_event_intent(bot, event_name, event_action)
+    event_name = context.event_name
+    event_action = context.event_action
+    event_intent = _classify_event_intent_from_context(bot, context)
     lock_required = event_intent == bot.EVENT_INTENT_MUTATING
     print(
         f"Event: {event_name}, Action: {event_action}, Intent: {event_intent}, "
@@ -173,12 +276,12 @@ def main(bot: ReviewerBotContext):
 
         elif event_name == "workflow_run":
             if event_action == "completed":
-                if os.environ.get("WORKFLOW_RUN_EVENT", "").strip() in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
+                if context.workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
                     state_changed = bot.handle_workflow_run_event(state)
                 else:
                     print(
                         "Ignoring workflow_run event with unsupported source event: "
-                        f"{os.environ.get('WORKFLOW_RUN_EVENT', '').strip() or '<missing>'}"
+                        f"{context.workflow_run_event or '<missing>'}"
                     )
 
         touched_items = bot.drain_touched_items()
@@ -258,11 +361,11 @@ def main(bot: ReviewerBotContext):
                             "Status projection epoch repair succeeded but could not be persisted."
                         )
 
+        execution_state_changed = bool(state_changed or sync_changes or restored or status_labels_changed)
+
         with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as output_file:
             output_file.write(
-                "state_changed=true\n"
-                if (state_changed or bool(sync_changes) or bool(restored) or status_labels_changed)
-                else "state_changed=false\n"
+                "state_changed=true\n" if execution_state_changed else "state_changed=false\n"
             )
         if projection_failure is not None:
             print(
@@ -288,5 +391,15 @@ def main(bot: ReviewerBotContext):
         )
         exit_code = 1
 
-    if exit_code:
-        sys.exit(exit_code)
+    return ExecutionResult(
+        exit_code=exit_code,
+        state_changed=bool(state_changed or sync_changes or restored or status_labels_changed),
+        release_failed=release_failed,
+    )
+
+
+def main(bot: ReviewerBotContext):
+    """Main entry point for the reviewer bot."""
+    result = execute_run(bot, build_event_context())
+    if result.exit_code:
+        sys.exit(result.exit_code)

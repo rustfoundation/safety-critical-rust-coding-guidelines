@@ -5,9 +5,22 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from .guidance import get_fls_audit_guidance, get_issue_guidance, get_pr_guidance
+
+
+@dataclass(frozen=True)
+class HeadObservationRepairResult:
+    changed: bool
+    outcome: str
+    failure_kind: str | None = None
+    reason: str | None = None
+
+    def __bool__(self) -> bool:
+        return self.changed
 
 
 def _now_iso() -> str:
@@ -69,6 +82,8 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
     if tracked_reviewer:
         return False
     current_assignees = bot.get_issue_assignees(issue_number)
+    if current_assignees is None:
+        raise RuntimeError(f"Unable to determine assignees for #{issue_number}")
     if current_assignees:
         return False
     labels_json = os.environ.get("ISSUE_LABELS", "[]")
@@ -177,6 +192,12 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     if not head_sha:
         raise RuntimeError("Missing PR_HEAD_SHA for synchronize event")
     bot.collect_touched_item(issue_number)
+    previous_head_sha = review_data.get("active_head_sha")
+    previous_completion = deepcopy(review_data.get("current_cycle_completion"))
+    previous_write_approval = deepcopy(review_data.get("current_cycle_write_approval"))
+    previous_review_completed_at = review_data.get("review_completed_at")
+    previous_review_completed_by = review_data.get("review_completed_by")
+    previous_review_completion_source = review_data.get("review_completion_source")
     review_data["active_head_sha"] = head_sha
     timestamp = os.environ.get("EVENT_CREATED_AT", "") or _now_iso()
     changed = bot.reviews_module.accept_channel_event(
@@ -188,27 +209,79 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
         source_precedence=1,
     )
     bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
-    return changed
+    approval_changed = (
+        previous_completion != review_data.get("current_cycle_completion")
+        or previous_write_approval != review_data.get("current_cycle_write_approval")
+        or previous_review_completed_at != review_data.get("review_completed_at")
+        or previous_review_completed_by != review_data.get("review_completed_by")
+        or previous_review_completion_source != review_data.get("review_completion_source")
+    )
+    return changed or previous_head_sha != review_data.get("active_head_sha") or approval_changed
 
 
-def maybe_record_head_observation_repair(bot, issue_number: int, review_data: dict) -> bool:
-    pull_request = bot.github_api("GET", f"pulls/{issue_number}")
+def maybe_record_head_observation_repair(bot, issue_number: int, review_data: dict) -> HeadObservationRepairResult:
+    try:
+        response = bot.github_api_request("GET", f"pulls/{issue_number}", retry_policy="idempotent_read")
+    except SystemExit:
+        payload = bot.github_api("GET", f"pulls/{issue_number}")
+        if not isinstance(payload, dict):
+            return HeadObservationRepairResult(
+                changed=False,
+                outcome="skipped_unavailable",
+                failure_kind="unavailable",
+                reason="pull_request_unavailable",
+            )
+        response = bot.GitHubApiResult(
+            status_code=200,
+            payload=payload,
+            headers={},
+            text="",
+            ok=True,
+            failure_kind=None,
+            retry_attempts=0,
+            transport_error=None,
+        )
+    if not response.ok:
+        if response.failure_kind == "not_found":
+            return HeadObservationRepairResult(
+                changed=False,
+                outcome="skipped_not_found",
+                failure_kind=response.failure_kind,
+                reason=f"pull_request_{response.failure_kind}",
+            )
+        return HeadObservationRepairResult(
+            changed=False,
+            outcome="skipped_unavailable",
+            failure_kind=response.failure_kind,
+            reason="pull_request_unavailable",
+        )
+    pull_request = response.payload
     if not isinstance(pull_request, dict):
-        raise RuntimeError(f"Failed to fetch live PR #{issue_number} for head observation repair")
+        return HeadObservationRepairResult(
+            changed=False,
+            outcome="invalid_live_payload",
+            failure_kind="invalid_payload",
+            reason="pull_request_payload_invalid",
+        )
     if str(pull_request.get("state", "")).lower() != "open":
-        return False
+        return HeadObservationRepairResult(changed=False, outcome="skipped_not_open")
     head = pull_request.get("head")
     head_sha = head.get("sha") if isinstance(head, dict) else None
     if not isinstance(head_sha, str) or not head_sha.strip():
-        raise RuntimeError(f"Pull request #{issue_number} is missing a usable head SHA")
+        return HeadObservationRepairResult(
+            changed=False,
+            outcome="invalid_live_payload",
+            failure_kind="invalid_payload",
+            reason="pull_request_head_unavailable",
+        )
     head_sha = head_sha.strip()
     current_head = review_data.get("active_head_sha")
     if current_head == head_sha:
-        return False
+        return HeadObservationRepairResult(changed=False, outcome="unchanged")
     contributor_revision = review_data.get("contributor_revision", {}).get("accepted")
     if isinstance(contributor_revision, dict) and contributor_revision.get("reviewed_head_sha") == head_sha:
         review_data["active_head_sha"] = head_sha
-        return False
+        return HeadObservationRepairResult(changed=True, outcome="changed")
     changed = bot.reviews_module.accept_channel_event(
         review_data,
         "contributor_revision",
@@ -223,7 +296,7 @@ def maybe_record_head_observation_repair(bot, issue_number: int, review_data: di
     review_data["review_completed_at"] = None
     review_data["review_completed_by"] = None
     review_data["review_completion_source"] = None
-    return changed
+    return HeadObservationRepairResult(changed=changed, outcome="changed" if changed else "unchanged")
 
 
 def handle_closed_event(bot, state: dict) -> bool:

@@ -15,6 +15,7 @@ from .config import (
     REVIEWER_BOARD_FIELD_REVIEWER,
     REVIEWER_BOARD_FIELD_WAITING_SINCE,
     REVIEWER_BOARD_OPTION_ATTENTION_NO,
+    REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED,
     REVIEWER_BOARD_OPTION_ATTENTION_TRANSITION_NOTICE_SENT,
     REVIEWER_BOARD_OPTION_ATTENTION_TRIAGE_APPROVAL_REQUIRED,
     REVIEWER_BOARD_OPTION_ATTENTION_WARNING_SENT,
@@ -339,7 +340,10 @@ def derive_board_projection(input: BoardProjectionInput) -> BoardProjectionValue
         raise RuntimeError(f"Unsupported board review state for #{input.issue_number}: {derivation.state}")
 
     needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_NO
-    if review_data.get("mandatory_approver_required"):
+    repair_needed = review_data.get("repair_needed")
+    if isinstance(repair_needed, dict) and repair_needed.get("kind") == "projection_failure":
+        needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED
+    elif review_data.get("mandatory_approver_required"):
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_TRIAGE_APPROVAL_REQUIRED
     elif review_data.get("transition_notice_sent_at"):
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_TRANSITION_NOTICE_SENT

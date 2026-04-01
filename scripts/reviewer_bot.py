@@ -158,6 +158,7 @@ from scripts.reviewer_bot_lib.config import (  # noqa: F401  # noqa: F401
     StateIssueSnapshot,
     get_commands_help,
 )
+from scripts.reviewer_bot_lib.context import EventContext, ExecutionResult  # noqa: F401
 from scripts.reviewer_bot_lib.guidance import (  # noqa: F401
     get_fls_audit_guidance,
     get_issue_guidance,
@@ -179,6 +180,7 @@ from scripts.reviewer_bot_lib.queue import (
 from scripts.reviewer_bot_lib.queue import (
     sync_members_with_queue as queue_sync_members_with_queue,
 )
+from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
 requests = github_api_module.requests
 random = lease_lock_module.random
@@ -191,10 +193,11 @@ time = lease_lock_module.time
 
 ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
 TOUCHED_ISSUE_NUMBERS: set[int] = set()
+RUNTIME = ReviewerBotRuntime(sys.modules[__name__])
 
 
 def _runtime_bot() -> Any:
-    return sys.modules[__name__]
+    return RUNTIME
 
 
 def get_github_token() -> str:
@@ -213,6 +216,8 @@ def github_api_request(
     data: dict | None = None,
     extra_headers: dict[str, str] | None = None,
     *,
+    retry_policy: str = "none",
+    timeout_seconds: float | None = None,
     suppress_error_log: bool = False,
 ) -> GitHubApiResult:
     return github_api_module.github_api_request(
@@ -221,6 +226,8 @@ def github_api_request(
         endpoint,
         data,
         extra_headers,
+        retry_policy=retry_policy,
+        timeout_seconds=timeout_seconds,
         suppress_error_log=suppress_error_log,
     )
 
@@ -234,6 +241,8 @@ def github_graphql_request(
     variables: dict | None = None,
     *,
     token: str | None = None,
+    retry_policy: str = "none",
+    timeout_seconds: float | None = None,
     suppress_error_log: bool = False,
 ) -> GitHubApiResult:
     return github_api_module.github_graphql_request(
@@ -241,6 +250,8 @@ def github_graphql_request(
         query,
         variables,
         token=token,
+        retry_policy=retry_policy,
+        timeout_seconds=timeout_seconds,
         suppress_error_log=suppress_error_log,
     )
 
@@ -346,7 +357,7 @@ def get_assignment_failure_comment(reviewer: str, attempt: AssignmentAttempt) ->
     return github_api_module.get_assignment_failure_comment(_runtime_bot(), reviewer, attempt)
 
 
-def get_issue_assignees(issue_number: int) -> list[str]:
+def get_issue_assignees(issue_number: int) -> list[str] | None:
     return github_api_module.get_issue_assignees(_runtime_bot(), issue_number)
 
 
@@ -366,7 +377,11 @@ def unassign_reviewer(issue_number: int, username: str) -> bool:
     return github_api_module.unassign_reviewer(_runtime_bot(), issue_number, username)
 
 
-def check_user_permission(username: str, required_permission: str = "triage") -> bool:
+def get_user_permission_status(username: str, required_permission: str = "triage") -> str:
+    return github_api_module.get_user_permission_status(_runtime_bot(), username, required_permission)
+
+
+def check_user_permission(username: str, required_permission: str = "triage") -> bool | None:
     return github_api_module.check_user_permission(_runtime_bot(), username, required_permission)
 
 
@@ -629,6 +644,10 @@ def find_open_pr_for_branch(branch: str) -> dict | None:
     return automation_module.find_open_pr_for_branch(_runtime_bot(), branch)
 
 
+def find_open_pr_for_branch_status(branch: str) -> tuple[str, dict | None]:
+    return automation_module.find_open_pr_for_branch_status(_runtime_bot(), branch)
+
+
 def resolve_workflow_run_pr_number() -> int:
     return commands_module.resolve_workflow_run_pr_number(_runtime_bot())
 
@@ -736,6 +755,9 @@ def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
     return reviews_module.get_pull_request_reviews(_runtime_bot(), issue_number)
 
 
+get_pull_request_reviews._reviewer_bot_canonical = True
+
+
 def compute_reviewer_response_state(
     issue_number: int,
     review_data: dict,
@@ -794,11 +816,18 @@ def handle_rectify_command(state: dict, issue_number: int, comment_author: str) 
         and current_reviewer.lower() == comment_author.lower()
     )
 
-    has_triage = False
+    triage_status = "denied"
     if not is_current_reviewer:
-        has_triage = check_user_permission(comment_author, "triage")
+        triage_status = get_user_permission_status(comment_author, "triage")
 
-    if not is_current_reviewer and not has_triage:
+    if not is_current_reviewer and triage_status == "unavailable":
+        return (
+            "❌ Unable to verify triage permissions right now; refusing to continue.",
+            False,
+            False,
+        )
+
+    if not is_current_reviewer and triage_status != "granted":
         if current_reviewer:
             return (
                 f"❌ Only the assigned reviewer (@{current_reviewer}) or a maintainer with triage+ "
@@ -840,7 +869,9 @@ def handle_pull_request_target_synchronize(state: dict) -> bool:
     return lifecycle_module.handle_pull_request_target_synchronize(_runtime_bot(), state)
 
 
-def maybe_record_head_observation_repair(issue_number: int, review_data: dict) -> bool:
+def maybe_record_head_observation_repair(
+    issue_number: int, review_data: dict
+) -> lifecycle_module.HeadObservationRepairResult:
     return lifecycle_module.maybe_record_head_observation_repair(_runtime_bot(), issue_number, review_data)
 
 
@@ -892,6 +923,14 @@ def classify_event_intent(event_name: str, event_action: str) -> str:
 def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
     """Backwards-compatible helper for tests and call sites."""
     return app_module.event_requires_lease_lock(_runtime_bot(), event_name, event_action)
+
+
+def build_event_context() -> EventContext:
+    return app_module.build_event_context()
+
+
+def execute_run(context: EventContext) -> ExecutionResult:
+    return app_module.execute_run(_runtime_bot(), context)
 
 
 def main():

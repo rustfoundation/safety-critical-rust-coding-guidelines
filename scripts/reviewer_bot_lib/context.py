@@ -3,10 +3,46 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
 from .config import AssignmentAttempt, GitHubApiResult, LeaseContext, StateIssueSnapshot
+from .lifecycle import HeadObservationRepairResult
+
+
+@dataclass(frozen=True)
+class EventContext:
+    event_name: str
+    event_action: str
+    issue_number: int | None = None
+    is_pull_request: bool | None = None
+    issue_author: str | None = None
+    issue_state: str | None = None
+    issue_labels: tuple[str, ...] = ()
+    comment_id: int | None = None
+    comment_author: str | None = None
+    comment_body: str | None = None
+    comment_source_event_key: str | None = None
+    pr_is_cross_repository: bool | None = None
+    review_author: str | None = None
+    review_state: str | None = None
+    workflow_run_event: str | None = None
+    workflow_run_event_action: str | None = None
+    workflow_run_head_sha: str | None = None
+    workflow_run_reconcile_pr_number: int | None = None
+    workflow_run_reconcile_head_sha: str | None = None
+    workflow_run_id: int | None = None
+    workflow_name: str | None = None
+    workflow_job_name: str | None = None
+    manual_action: str | None = None
+
+
+@dataclass(frozen=True)
+class ExecutionResult:
+    exit_code: int
+    state_changed: bool
+    release_failed: bool = False
 
 
 @runtime_checkable
@@ -28,6 +64,8 @@ class GitHubTransportContext(Protocol):
         data: dict | None = None,
         extra_headers: dict[str, str] | None = None,
         *,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def github_api(self, method: str, endpoint: str, data: dict | None = None) -> Any | None: ...
@@ -37,6 +75,8 @@ class GitHubTransportContext(Protocol):
         variables: dict | None = None,
         *,
         token: str | None = None,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def github_graphql(
@@ -47,6 +87,7 @@ class GitHubTransportContext(Protocol):
         token: str | None = None,
     ) -> Any | None: ...
     def request_reviewer_assignment(self, issue_number: int, username: str) -> AssignmentAttempt: ...
+    def get_user_permission_status(self, username: str, required_permission: str = "triage") -> str: ...
     def remove_assignee(self, issue_number: int, username: str) -> bool: ...
     def remove_pr_reviewer(self, issue_number: int, username: str) -> bool: ...
 
@@ -71,6 +112,8 @@ class StateStoreContext(Protocol):
         data: dict | None = None,
         extra_headers: dict[str, str] | None = None,
         *,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def get_state_issue(self) -> dict | None: ...
@@ -119,6 +162,8 @@ class LeaseLockContext(Protocol):
         data: dict | None = None,
         extra_headers: dict[str, str] | None = None,
         *,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
     def get_lock_ref_display(self) -> str: ...
@@ -169,6 +214,9 @@ class ReviewerBotContext(GitHubTransportContext, StateStoreContext, LeaseLockCon
     def handle_manual_dispatch(self, state: dict) -> bool: ...
     def handle_scheduled_check(self, state: dict) -> bool: ...
     def handle_workflow_run_event(self, state: dict) -> bool: ...
+    def maybe_record_head_observation_repair(
+        self, issue_number: int, review_data: dict
+    ) -> HeadObservationRepairResult: ...
     def sync_status_labels_for_items(self, state: dict, issue_numbers: Iterable[int]) -> bool: ...
     def compute_reviewer_response_state(
         self,

@@ -5,10 +5,14 @@ from __future__ import annotations
 import io
 import json
 import os
+import random
+import time
 import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote
+
+import requests
 
 from .reconcile import (
     _artifact_expected_name,
@@ -39,6 +43,23 @@ def parse_timestamp(value: Any) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _read_api_payload(bot, endpoint: str) -> tuple[Any | None, str | None]:
+    try:
+        response = bot.github_api_request("GET", endpoint, retry_policy="idempotent_read", suppress_error_log=True)
+    except SystemExit:
+        payload = bot.github_api("GET", endpoint)
+        return payload, None if payload is not None else "unavailable"
+    if not response.ok:
+        return None, response.failure_kind or "unavailable"
+    return response.payload, None
+
+
+def _download_retry_delay(bot, retry_attempt: int) -> float:
+    base = float(getattr(bot, "LOCK_RETRY_BASE_SECONDS", 2.0))
+    bounded_base = min(base * (2 ** max(retry_attempt - 1, 0)), 8.0)
+    return bounded_base + random.uniform(0, bounded_base)
 
 
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
@@ -221,8 +242,8 @@ def _fetch_workflow_runs_for_file(bot, workflow_file: str, event_name: str) -> l
     page = 1
     encoded_workflow = quote(workflow_file, safe="")
     while True:
-        response = bot.github_api(
-            "GET",
+        response, _ = _read_api_payload(
+            bot,
             f"actions/workflows/{encoded_workflow}/runs?event={quote(event_name, safe='')}&per_page=100&page={page}",
         )
         if response is None:
@@ -237,7 +258,7 @@ def _fetch_workflow_runs_for_file(bot, workflow_file: str, event_name: str) -> l
 
 
 def _fetch_run_detail(bot, run_id: int) -> dict | None:
-    response = bot.github_api("GET", f"actions/runs/{run_id}")
+    response, _ = _read_api_payload(bot, f"actions/runs/{run_id}")
     if isinstance(response, dict):
         return response
     return None
@@ -247,7 +268,7 @@ def _list_run_artifacts(bot, run_id: int) -> list[dict] | None:
     artifacts: list[dict] = []
     page = 1
     while True:
-        response = bot.github_api("GET", f"actions/runs/{run_id}/artifacts?per_page=100&page={page}")
+        response, _ = _read_api_payload(bot, f"actions/runs/{run_id}/artifacts?per_page=100&page={page}")
         if response is None:
             return None
         page_artifacts = response.get("artifacts") if isinstance(response, dict) else None
@@ -265,15 +286,32 @@ def _download_artifact_payload(bot, artifact: dict, expected_payload_name: str) 
     download_url = artifact.get("archive_download_url")
     if not isinstance(download_url, str) or not download_url:
         return "missing_download_url", None
-    response = bot.requests.request(
-        "GET",
-        download_url,
-        headers={
-            "Authorization": f"Bearer {bot.get_github_token()}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-    )
+    max_attempts = int(getattr(bot, "LOCK_API_RETRY_LIMIT", 5)) + 1
+    response = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = bot.requests.request(
+                "GET",
+                download_url,
+                headers={
+                    "Authorization": f"Bearer {bot.get_github_token()}",
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+            )
+        except requests.RequestException:
+            if attempt < max_attempts:
+                time.sleep(_download_retry_delay(bot, attempt))
+                continue
+            return "download_unavailable", None
+        if response.status_code == 429 or response.status_code >= 500:
+            if attempt < max_attempts:
+                time.sleep(_download_retry_delay(bot, attempt))
+                continue
+            return "download_unavailable", None
+        break
+    if response is None:
+        return "download_unavailable", None
     if response.status_code >= 400:
         return "download_failed", None
     try:
@@ -387,6 +425,8 @@ def evaluate_deferred_gap_state(
         if isinstance(scan_outcomes, dict):
             if any(outcome == "expired" for outcome in scan_outcomes.values()):
                 return "artifact_expired", "prior_visibility_or_retention_proof_required"
+            if any(outcome == "download_unavailable" for outcome in scan_outcomes.values()):
+                return "observer_state_unknown", "artifact_download_unavailable"
             invalid_outcomes = {"missing_download_url", "download_failed", "invalid_payload_layout", "invalid_payload_format"}
             if any(outcome in invalid_outcomes for outcome in scan_outcomes.values()):
                 return "artifact_invalid", "artifact_download_or_payload_invalid"
@@ -441,7 +481,7 @@ def _list_issue_comments_paginated(bot, issue_number: int) -> tuple[list[dict] |
     comments: list[dict] = []
     page = 1
     while True:
-        response = bot.github_api("GET", f"issues/{issue_number}/comments?per_page=100&page={page}")
+        response, _ = _read_api_payload(bot, f"issues/{issue_number}/comments?per_page=100&page={page}")
         if response is None:
             return None, False
         if not isinstance(response, list):
@@ -470,7 +510,7 @@ def _is_automation_comment(comment: dict) -> bool:
 def _fetch_live_issue_comment(bot, comment_id: str) -> dict | None:
     if not comment_id.isdigit():
         return None
-    response = bot.github_api("GET", f"issues/comments/{comment_id}")
+    response, _ = _read_api_payload(bot, f"issues/comments/{comment_id}")
     return response if isinstance(response, dict) else None
 
 
@@ -543,9 +583,9 @@ def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source
     )[0] or changed
     bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
     completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
-    _mark_reconciled_source_event(review_data, source_event_key)
-    _clear_source_event_key(review_data, source_event_key)
-    return changed or completion is not None
+    reconciled_changed = _mark_reconciled_source_event(review_data, source_event_key)
+    gap_cleared_changed = _clear_source_event_key(review_data, source_event_key)
+    return changed or completion is not None or reconciled_changed or gap_cleared_changed
 
 
 def _discover_visible_comment_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
@@ -616,7 +656,7 @@ def _discover_visible_review_events(bot, issue_number: int, review_data: dict) -
 def _discover_visible_review_comment_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
     watermark = _load_surface_watermark(review_data, "review_comments")
     watermark["last_scan_started_at"] = _now_iso()
-    comments = bot.github_api("GET", f"pulls/{issue_number}/comments?per_page=100")
+    comments, _ = _read_api_payload(bot, f"pulls/{issue_number}/comments?per_page=100")
     if comments is None:
         return None, False
     if not isinstance(comments, list):
@@ -767,7 +807,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
         if not isinstance(review_data, dict):
             continue
         issue_number = int(issue_key)
-        pull_request = bot.github_api("GET", f"pulls/{issue_number}")
+        pull_request, _ = _read_api_payload(bot, f"pulls/{issue_number}")
         if not isinstance(pull_request, dict) or str(pull_request.get("state", "")).lower() != "open":
             continue
         deferred_gaps = review_data.get("deferred_gaps")

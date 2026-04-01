@@ -196,7 +196,12 @@ def parse_lock_metadata_from_lock_commit_message(bot: LeaseLockContext, message:
 
 def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
     lock_ref = get_lock_ref_name(bot)
-    response = bot.github_api_request("GET", f"git/ref/{lock_ref}", suppress_error_log=True)
+    response = bot.github_api_request(
+        "GET",
+        f"git/ref/{lock_ref}",
+        retry_policy="idempotent_read",
+        suppress_error_log=True,
+    )
     if response.status_code == 200:
         ref_sha = extract_ref_sha(response.payload)
         if not ref_sha:
@@ -212,6 +217,7 @@ def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
     branch_response = bot.github_api_request(
         "GET",
         f"git/ref/heads/{default_branch}",
+        retry_policy="idempotent_read",
         suppress_error_log=True,
     )
     if branch_response.status_code != 200:
@@ -236,7 +242,12 @@ def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
             f"{get_lock_ref_display(bot)} (status {create_response.status_code}): {create_response.text}"
         )
 
-    refresh_response = bot.github_api_request("GET", f"git/ref/{lock_ref}", suppress_error_log=True)
+    refresh_response = bot.github_api_request(
+        "GET",
+        f"git/ref/{lock_ref}",
+        retry_policy="idempotent_read",
+        suppress_error_log=True,
+    )
     if refresh_response.status_code != 200:
         raise RuntimeError(
             "Unable to read reviewer-bot lock ref after create "
@@ -251,7 +262,12 @@ def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
 
 def get_lock_ref_snapshot(bot: LeaseLockContext) -> tuple[str, str, dict]:
     ref_sha = ensure_lock_ref_exists(bot)
-    commit_response = bot.github_api_request("GET", f"git/commits/{ref_sha}", suppress_error_log=True)
+    commit_response = bot.github_api_request(
+        "GET",
+        f"git/commits/{ref_sha}",
+        retry_policy="idempotent_read",
+        suppress_error_log=True,
+    )
     if commit_response.status_code != 200:
         raise RuntimeError(
             f"Failed to read lock commit {ref_sha} (status {commit_response.status_code}): {commit_response.text}"
