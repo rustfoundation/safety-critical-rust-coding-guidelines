@@ -36,6 +36,13 @@ def _projection_failure(reason: str, failure_kind: str | None = None) -> dict[st
     return {"ok": False, "reason": reason, "failure_kind": failure_kind}
 
 
+def _fallback_pull_request_payload(bot, issue_number: int) -> dict[str, object]:
+    payload = bot.github_api("GET", f"pulls/{issue_number}")
+    if isinstance(payload, dict):
+        return {"ok": True, "pull_request": payload}
+    return _projection_failure("pull_request_unavailable")
+
+
 def _pull_request_read_result(bot, issue_number: int, pull_request: dict | None = None) -> dict[str, object]:
     if pull_request is not None:
         if isinstance(pull_request, dict):
@@ -44,10 +51,7 @@ def _pull_request_read_result(bot, issue_number: int, pull_request: dict | None 
     try:
         response = bot.github_api_request("GET", f"pulls/{issue_number}", retry_policy="idempotent_read")
     except SystemExit:
-        payload = bot.github_api("GET", f"pulls/{issue_number}")
-        if isinstance(payload, dict):
-            return {"ok": True, "pull_request": payload}
-        return _projection_failure("pull_request_unavailable")
+        return _fallback_pull_request_payload(bot, issue_number)
     if not response.ok:
         if response.failure_kind == "not_found":
             return _projection_failure("pull_request_not_found", response.failure_kind)
@@ -55,6 +59,27 @@ def _pull_request_read_result(bot, issue_number: int, pull_request: dict | None 
     if not isinstance(response.payload, dict):
         return _projection_failure("pull_request_unavailable", "invalid_payload")
     return {"ok": True, "pull_request": response.payload}
+
+
+def _fallback_pull_request_reviews_result(bot, issue_number: int) -> dict[str, object]:
+    fallback_loader = getattr(bot, "get_pull_request_reviews", None)
+    if callable(fallback_loader) and not _is_canonical_callable(fallback_loader):
+        fallback_reviews = fallback_loader(issue_number)
+        if not isinstance(fallback_reviews, list):
+            return _projection_failure("reviews_unavailable")
+        return {"ok": True, "reviews": fallback_reviews}
+
+    collected_reviews: list[dict] = []
+    page = 1
+    while True:
+        payload = bot.github_api("GET", f"pulls/{issue_number}/reviews?per_page=100&page={page}")
+        if not isinstance(payload, list):
+            return _projection_failure("reviews_unavailable")
+        page_reviews = [review for review in payload if isinstance(review, dict)]
+        collected_reviews.extend(page_reviews)
+        if len(payload) < 100:
+            return {"ok": True, "reviews": collected_reviews}
+        page += 1
 
 
 def get_pull_request_reviews_result(bot, issue_number: int, reviews: list[dict] | None = None) -> dict[str, object]:
@@ -70,21 +95,7 @@ def get_pull_request_reviews_result(bot, issue_number: int, reviews: list[dict] 
                 retry_policy="idempotent_read",
             )
         except SystemExit:
-            fallback_loader = getattr(bot, "get_pull_request_reviews", None)
-            if callable(fallback_loader) and not _is_canonical_callable(fallback_loader):
-                fallback_reviews = fallback_loader(issue_number)
-                if not isinstance(fallback_reviews, list):
-                    return _projection_failure("reviews_unavailable")
-                return {"ok": True, "reviews": fallback_reviews}
-            payload = bot.github_api("GET", f"pulls/{issue_number}/reviews?per_page=100&page={page}")
-            if not isinstance(payload, list):
-                return _projection_failure("reviews_unavailable")
-            page_reviews = [review for review in payload if isinstance(review, dict)]
-            collected_reviews.extend(page_reviews)
-            if len(payload) < 100:
-                return {"ok": True, "reviews": collected_reviews}
-            page += 1
-            continue
+            return _fallback_pull_request_reviews_result(bot, issue_number)
         if not response.ok:
             return _projection_failure("reviews_unavailable", response.failure_kind)
         payload = response.payload
@@ -382,6 +393,38 @@ def compute_pr_approval_state_result(
     if not result.get("ok"):
         return _projection_failure(str(result.get("reason")))
     return result
+
+
+def resolve_pr_approval_state(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> tuple[dict | None, dict | None, str | None]:
+    if not _is_canonical_callable(bot.reviews_module.rebuild_pr_approval_state):
+        completion, write_approval = bot.reviews_module.rebuild_pr_approval_state(
+            bot,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
+        if completion is None or write_approval is None:
+            return None, None, "live_review_state_unknown"
+        return completion, write_approval, None
+
+    approval_result = compute_pr_approval_state_result(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if not approval_result.get("ok"):
+        return None, None, str(approval_result.get("reason"))
+    return approval_result["completion"], approval_result["write_approval"], None
 
 
 def apply_pr_approval_state(
@@ -1012,28 +1055,15 @@ def compute_reviewer_response_state(
             "contributor_handoff": contributor_handoff,
         }
 
-    if not _is_canonical_callable(bot.reviews_module.rebuild_pr_approval_state):
-        completion, write_approval = bot.reviews_module.rebuild_pr_approval_state(
-            bot,
-            issue_number,
-            review_data,
-            pull_request=pull_request,
-            reviews=reviews,
-        )
-        if completion is None or write_approval is None:
-            return {"state": "projection_failed", "reason": "live_review_state_unknown"}
-    else:
-        approval_result = compute_pr_approval_state_result(
-            bot,
-            issue_number,
-            review_data,
-            pull_request=pull_request,
-            reviews=reviews,
-        )
-        if not approval_result.get("ok"):
-            return {"state": "projection_failed", "reason": str(approval_result.get("reason"))}
-        completion = approval_result["completion"]
-        write_approval = approval_result["write_approval"]
+    completion, write_approval, approval_failure = resolve_pr_approval_state(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if completion is None or write_approval is None:
+        return {"state": "projection_failed", "reason": approval_failure or "live_review_state_unknown"}
     if not completion.get("completed"):
         return {
             "state": "awaiting_contributor_response",
