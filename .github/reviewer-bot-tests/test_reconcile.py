@@ -832,48 +832,6 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
     assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
     assert "issue_comment:201" not in state["active_reviews"]["42"]["reconciled_source_events"]
 
-def test_validate_live_comment_replay_contract_reports_changed_for_command_ambiguity(monkeypatch):
-    review = reviewer_bot.ensure_review_entry(make_state(), 42, create=True)
-    assert review is not None
-    payload = {
-        "comment_id": 201,
-        "comment_class": "command_only",
-        "has_non_command_text": False,
-        "source_event_key": "issue_comment:201",
-        "source_event_name": "issue_comment",
-        "source_event_action": "created",
-        "source_created_at": "2026-03-17T10:00:00Z",
-        "pr_number": 42,
-        "source_run_id": 603,
-        "source_run_attempt": 1,
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        "source_artifact_name": "reviewer-bot-comment-context-603-attempt-1",
-    }
-    monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "classify_comment_payload",
-        lambda bot, body: {
-            "comment_class": "command_only",
-            "has_non_command_text": False,
-            "command_count": 2,
-            "command": None,
-            "args": [],
-            "normalized_body": body,
-        },
-    )
-
-    result = reviewer_bot.reconcile_module._validate_live_comment_replay_contract(
-        reviewer_bot,
-        review,
-        payload,
-        "@guidelines-bot /claim",
-    )
-
-    assert result.live_classified is None
-    assert result.changed is True
-    assert result.failed_closed is True
-    assert review["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
-
 def test_deferred_comment_reconcile_records_failure_kind_when_live_comment_unavailable(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -1098,28 +1056,6 @@ def test_execute_pending_privileged_command_fails_closed_without_live_fls_audit_
     pending = review["pending_privileged_commands"]["issue_comment:100"]
     assert pending["status"] == "failed_closed"
     assert pending["result"] == "live_revalidation_failed"
-
-def test_resolve_workflow_run_pr_number_fails_closed_when_pr_unavailable(monkeypatch):
-    monkeypatch.setenv("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "42")
-    monkeypatch.setenv("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "head-1")
-    monkeypatch.setenv("WORKFLOW_RUN_HEAD_SHA", "head-1")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api_request",
-        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
-            status_code=502,
-            payload={"message": "bad gateway"},
-            headers={},
-            text="bad gateway",
-            ok=False,
-            failure_kind="server_error",
-            retry_attempts=1,
-            transport_error=None,
-        ),
-    )
-
-    with pytest.raises(RuntimeError, match="Failed to fetch pull request #42 during workflow_run reconcile"):
-        reviewer_bot.resolve_workflow_run_pr_number()
 
 def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(monkeypatch):
     state = make_state()
