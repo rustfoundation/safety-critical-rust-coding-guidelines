@@ -75,3 +75,22 @@ def test_list_run_artifacts_returns_none_when_api_payload_unavailable(monkeypatc
     monkeypatch.setattr(sweeper, "_read_api_payload", lambda bot, endpoint: (None, "server_error"))
 
     assert sweeper._list_run_artifacts(reviewer_bot, 42) is None
+
+
+def test_list_run_artifacts_consumes_retry_aware_success(monkeypatch):
+    monkeypatch.setattr(
+        reviewer_bot,
+        "github_api_request",
+        lambda method, endpoint, **kwargs: reviewer_bot.GitHubApiResult(
+            status_code=200,
+            payload={"artifacts": [{"id": 1, "name": "artifact"}]},
+            headers={},
+            text="ok",
+            ok=True,
+            failure_kind=None,
+            retry_attempts=1,
+            transport_error=None,
+        ),
+    )
+
+    assert sweeper._list_run_artifacts(reviewer_bot, 10) == [{"id": 1, "name": "artifact"}]
