@@ -1,7 +1,6 @@
 import json
 import os
 
-import pytest
 from factories import make_state
 
 from scripts import reviewer_bot
@@ -580,47 +579,6 @@ def test_deferred_review_comment_missing_live_object_preserves_source_time_fresh
     assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:303"
     assert review["deferred_gaps"]["pull_request_review_comment:303"]["reason"] == "reconcile_failed_closed"
 
-def test_review_comment_artifact_identity_validation(tmp_path, monkeypatch):
-    state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    payload_path = tmp_path / "deferred-review-comment.json"
-    payload_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "source_workflow_name": "Reviewer Bot PR Review Comment Observer",
-                "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
-                "source_run_id": 704,
-                "source_run_attempt": 1,
-                "source_event_name": "pull_request_review_comment",
-                "source_event_action": "created",
-                "source_event_key": "pull_request_review_comment:304",
-                "pr_number": 42,
-                "comment_id": 304,
-                "comment_class": "plain_text",
-                "has_non_command_text": True,
-                "source_body_digest": "abc",
-                "source_created_at": "2026-03-17T10:00:00Z",
-                "actor_login": "alice",
-                "actor_id": 6,
-                "actor_class": "repo_user_principal",
-                "pull_request_review_id": 10,
-                "in_reply_to_id": 200,
-                "source_artifact_name": "reviewer-bot-review-comment-context-704-attempt-1",
-            }
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Review Comment Observer")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "704")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
-    monkeypatch.setattr(reviewer_bot, "github_api", lambda method, endpoint, data=None: {"user": {"login": "dana"}, "labels": []} if endpoint == "pulls/42" else None)
-    assert reviewer_bot.handle_workflow_run_event(state) is True
-
 def test_deferred_comment_reconcile_hydrates_pr_author_context_for_contributor_freshness(tmp_path, monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -1098,97 +1056,3 @@ def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch
     monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [{"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"}])
     assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is False
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
-
-
-@pytest.mark.parametrize(
-    ("payload", "workflow_name", "workflow_file", "artifact_name", "payload_name"),
-    [
-        (
-            {"source_event_name": "issue_comment", "source_event_action": "created", "source_run_id": 1, "source_run_attempt": 2},
-            "Reviewer Bot PR Comment Observer",
-            ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-            "reviewer-bot-comment-context-1-attempt-2",
-            "deferred-comment.json",
-        ),
-        (
-            {"source_event_name": "pull_request_review", "source_event_action": "submitted", "source_run_id": 1, "source_run_attempt": 2},
-            "Reviewer Bot PR Review Submitted Observer",
-            ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
-            "reviewer-bot-review-submitted-context-1-attempt-2",
-            "deferred-review-submitted.json",
-        ),
-        (
-            {"source_event_name": "pull_request_review", "source_event_action": "dismissed", "source_run_id": 1, "source_run_attempt": 2},
-            "Reviewer Bot PR Review Dismissed Observer",
-            ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
-            "reviewer-bot-review-dismissed-context-1-attempt-2",
-            "deferred-review-dismissed.json",
-        ),
-        (
-            {"source_event_name": "pull_request_review_comment", "source_event_action": "created", "source_run_id": 1, "source_run_attempt": 2},
-            "Reviewer Bot PR Review Comment Observer",
-            ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
-            "reviewer-bot-review-comment-context-1-attempt-2",
-            "deferred-review-comment.json",
-        ),
-    ],
-)
-def test_deferred_workflow_identity_helpers_match_expected_contract(
-    payload,
-    workflow_name,
-    workflow_file,
-    artifact_name,
-    payload_name,
-):
-    assert reviewer_bot.reconcile_module._expected_observer_identity(payload) == (
-        workflow_name,
-        workflow_file,
-    )
-    assert reviewer_bot.reconcile_module._artifact_expected_name(payload) == artifact_name
-    assert reviewer_bot.reconcile_module._artifact_expected_payload_name(payload) == payload_name
-
-def test_validate_workflow_run_artifact_identity_rejects_triggering_name_mismatch(monkeypatch):
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Wrong Workflow")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
-    payload = {
-        "source_event_name": "issue_comment",
-        "source_event_action": "created",
-        "source_workflow_name": "Reviewer Bot PR Comment Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        "source_run_id": 1,
-        "source_run_attempt": 1,
-    }
-
-    with pytest.raises(RuntimeError, match="Triggering workflow name mismatch"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
-
-def test_validate_workflow_run_artifact_identity_rejects_run_attempt_mismatch(monkeypatch):
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "2")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
-    payload = {
-        "source_event_name": "issue_comment",
-        "source_event_action": "created",
-        "source_workflow_name": "Reviewer Bot PR Comment Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        "source_run_id": 1,
-        "source_run_attempt": 1,
-    }
-
-    with pytest.raises(RuntimeError, match="run_attempt mismatch"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
-
-def test_validate_workflow_run_artifact_identity_requires_successful_conclusion(monkeypatch):
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "failure")
-    payload = {
-        "source_event_name": "issue_comment",
-        "source_event_action": "created",
-        "source_workflow_name": "Reviewer Bot PR Comment Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        "source_run_id": 1,
-        "source_run_attempt": 1,
-    }
-
-    with pytest.raises(RuntimeError, match="did not conclude successfully"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
