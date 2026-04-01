@@ -19,6 +19,15 @@ from .reviews_projection import (
 )
 
 
+def _mark_canonical(func):
+    setattr(func, "_reviewer_bot_canonical", True)
+    return func
+
+
+def _is_canonical_callable(func) -> bool:
+    return callable(func) and bool(getattr(func, "_reviewer_bot_canonical", False))
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -62,7 +71,7 @@ def get_pull_request_reviews_result(bot, issue_number: int, reviews: list[dict] 
             )
         except SystemExit:
             fallback_loader = getattr(bot, "get_pull_request_reviews", None)
-            if callable(fallback_loader) and getattr(fallback_loader, "__name__", "") != "get_pull_request_reviews":
+            if callable(fallback_loader) and not _is_canonical_callable(fallback_loader):
                 fallback_reviews = fallback_loader(issue_number)
                 if not isinstance(fallback_reviews, list):
                     return _projection_failure("reviews_unavailable")
@@ -752,6 +761,7 @@ def get_current_cycle_boundary(bot, review_data: dict) -> datetime | None:
     return None
 
 
+@_mark_canonical
 def rebuild_pr_approval_state(
     bot,
     issue_number: int,
@@ -1002,7 +1012,7 @@ def compute_reviewer_response_state(
             "contributor_handoff": contributor_handoff,
         }
 
-    if getattr(bot.reviews_module.rebuild_pr_approval_state, "__name__", "") != "rebuild_pr_approval_state":
+    if not _is_canonical_callable(bot.reviews_module.rebuild_pr_approval_state):
         completion, write_approval = bot.reviews_module.rebuild_pr_approval_state(
             bot,
             issue_number,

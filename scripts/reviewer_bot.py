@@ -755,6 +755,9 @@ def get_pull_request_reviews(issue_number: int) -> list[dict] | None:
     return reviews_module.get_pull_request_reviews(_runtime_bot(), issue_number)
 
 
+get_pull_request_reviews._reviewer_bot_canonical = True
+
+
 def compute_reviewer_response_state(
     issue_number: int,
     review_data: dict,
