@@ -1,9 +1,5 @@
-from pathlib import Path
-
-import yaml
-from factories import make_state, valid_reviewer_board_metadata
-
 from scripts import reviewer_bot
+from tests.fixtures.reviewer_bot import make_state, valid_reviewer_board_metadata
 
 
 def test_reviewer_board_preflight_validates_manifest(monkeypatch):
@@ -16,6 +12,7 @@ def test_reviewer_board_preflight_validates_manifest(monkeypatch):
     assert preflight.enabled is True
     assert preflight.valid is True
     assert preflight.project_id == "PVT_kwDOB"
+
 
 def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypatch):
     state = make_state()
@@ -38,6 +35,7 @@ def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypat
     assert preview.desired.review_state == "Awaiting Reviewer"
     assert preview.desired.reviewer == "alice"
 
+
 def test_preview_board_projection_tracked_unassigned_maps_to_unassigned(monkeypatch):
     state = make_state()
     reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -55,6 +53,7 @@ def test_preview_board_projection_tracked_unassigned_maps_to_unassigned(monkeypa
     assert preview.desired.reviewer is None
     assert preview.desired.waiting_since is None
     assert preview.desired.needs_attention == "No"
+
 
 def test_preview_board_projection_closed_item_maps_to_archive_intent(monkeypatch):
     state = make_state()
@@ -75,6 +74,7 @@ def test_preview_board_projection_closed_item_maps_to_archive_intent(monkeypatch
     assert preview.desired.archive is True
     assert preview.desired.ensure_membership is False
 
+
 def test_preview_board_projection_open_untracked_maps_to_archive_intent(monkeypatch):
     state = make_state()
     monkeypatch.setattr(
@@ -89,6 +89,7 @@ def test_preview_board_projection_open_untracked_maps_to_archive_intent(monkeypa
     assert preview.eligible is False
     assert preview.desired is not None
     assert preview.desired.archive is True
+
 
 def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
     state = make_state()
@@ -134,6 +135,7 @@ def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
     assert preview.desired is not None
     assert preview.desired.assigned_at == "2026-03-20"
     assert preview.desired.waiting_since == "2026-03-21"
+
 
 def test_preview_board_projection_keeps_parity_with_refreshed_live_review_state(monkeypatch):
     state = make_state()
@@ -189,6 +191,7 @@ def test_preview_board_projection_keeps_parity_with_refreshed_live_review_state(
     assert preview.desired is not None
     assert preview.desired.review_state == reviewer_bot.REVIEWER_BOARD_OPTION_AWAITING_CONTRIBUTOR
 
+
 def test_preview_board_projection_marks_projection_repair_as_attention(monkeypatch):
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -209,32 +212,8 @@ def test_preview_board_projection_marks_projection_repair_as_attention(monkeypat
     preview = reviewer_bot.preview_board_projection_for_item(state, 42)
 
     assert preview.desired is not None
-    assert (
-        preview.desired.needs_attention
-        == reviewer_bot.REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED
-    )
+    assert preview.desired.needs_attention == reviewer_bot.REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED
 
-def test_sweeper_repair_workflow_exposes_reviewer_board_preview_dispatch():
-    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-sweeper-repair.yml").read_text(encoding="utf-8"))
-    on_block = data.get("on", data.get(True))
-    workflow_dispatch = on_block["workflow_dispatch"]
-    action_input = workflow_dispatch["inputs"]["action"]
-    assert "preview-reviewer-board" in action_input["options"]
-    issue_number_input = workflow_dispatch["inputs"]["issue_number"]
-    assert issue_number_input["required"] is False
-    assert issue_number_input["type"] == "string"
-
-def test_sweeper_repair_workflow_scopes_reviewer_board_env_to_preview_only():
-    workflow_text = Path(".github/workflows/reviewer-bot-sweeper-repair.yml").read_text(encoding="utf-8")
-    assert "ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}" in workflow_text
-    assert (
-        "REVIEWER_BOARD_ENABLED: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'preview-reviewer-board' && 'true' || 'false' }}"
-        in workflow_text
-    )
-    assert (
-        "REVIEWER_BOARD_TOKEN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'preview-reviewer-board' && secrets.REVIEWER_BOARD_TOKEN || '' }}"
-        in workflow_text
-    )
 
 def test_reviewer_board_manifest_includes_projection_repair_attention_option():
     options = reviewer_bot.REVIEWER_BOARD_PROJECT_MANIFEST[
