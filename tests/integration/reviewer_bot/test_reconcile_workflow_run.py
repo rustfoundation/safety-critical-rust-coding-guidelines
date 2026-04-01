@@ -849,3 +849,70 @@ def test_deferred_comment_reconcile_records_failure_kind_when_live_comment_unava
     gap = state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:205"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["failure_kind"] == "server_error"
+
+
+def test_deferred_comment_reconcile_fails_closed_when_comment_classification_drifts(tmp_path, monkeypatch):
+    state = make_state()
+    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    payload_path = tmp_path / "deferred-comment.json"
+    live_body = "reviewer-bot validation: contributor plain text comment"
+    payload_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "source_workflow_name": "Reviewer Bot PR Comment Observer",
+                "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+                "source_run_id": 604,
+                "source_run_attempt": 1,
+                "source_event_name": "issue_comment",
+                "source_event_action": "created",
+                "source_event_key": "issue_comment:202",
+                "pr_number": 42,
+                "comment_id": 202,
+                "comment_class": "plain_text",
+                "has_non_command_text": True,
+                "source_body_digest": comment_routing._digest_body(live_body),
+                "source_created_at": "2026-03-17T10:00:00Z",
+                "actor_login": "dana",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "604")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
+    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+
+    def fake_github_api(method, endpoint, data=None):
+        if endpoint == "pulls/42":
+            return {"user": {"login": "dana"}, "labels": []}
+        if endpoint == "issues/comments/202":
+            return {
+                "body": live_body,
+                "user": {"login": "dana", "type": "User"},
+                "author_association": "CONTRIBUTOR",
+                "performed_via_github_app": None,
+            }
+        raise AssertionError(f"Unexpected endpoint: {endpoint}")
+
+    monkeypatch.setattr(reviewer_bot, "github_api", fake_github_api)
+    monkeypatch.setattr(
+        reviewer_bot.reconcile_module,
+        "classify_comment_payload",
+        lambda bot, body: {
+            "comment_class": "command_plus_text",
+            "has_non_command_text": True,
+            "command_count": 1,
+            "command": "claim",
+            "args": [],
+            "normalized_body": body,
+        },
+    )
+
+    assert reviewer_bot.handle_workflow_run_event(state) is True
+    assert state["active_reviews"]["42"]["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:202"
+    assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:202"]["reason"] == "reconcile_failed_closed"
+    assert "issue_comment:202" not in state["active_reviews"]["42"]["reconciled_source_events"]
