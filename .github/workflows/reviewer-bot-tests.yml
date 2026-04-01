@@ -8,7 +8,6 @@ on:
       - 'scripts/*.py'
       - 'tests/**'
       - '.github/workflows/reviewer-bot-*.yml'
-      - '.github/reviewer-bot-tests/**'
       - 'pyproject.toml'
   pull_request:
     paths:
@@ -17,7 +16,6 @@ on:
       - 'scripts/*.py'
       - 'tests/**'
       - '.github/workflows/reviewer-bot-*.yml'
-      - '.github/reviewer-bot-tests/**'
       - 'pyproject.toml'
   workflow_dispatch:
 
@@ -42,9 +40,6 @@ jobs:
           --cov-branch
           --cov-report=term-missing
           --cov-report=json:coverage-reviewer-bot.json
-
-      - name: Run remaining legacy reviewer bot tests
-        run: uv run pytest .github/reviewer-bot-tests
 
       - name: Enforce reviewer bot statement and branch floors
         run: |
