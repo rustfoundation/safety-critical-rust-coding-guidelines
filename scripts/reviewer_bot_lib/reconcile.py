@@ -112,6 +112,27 @@ class DeferredCommentReplayContext:
         return self.payload.comment_class in {"plain_text", "command_plus_text"} and self.payload.has_non_command_text
 
 
+@dataclass(frozen=True)
+class DeferredReviewReplayContext:
+    payload: DeferredReviewPayload
+
+    @property
+    def source_event_key(self) -> str:
+        return self.payload.identity.source_event_key
+
+    @property
+    def review_id(self) -> int:
+        return self.payload.review_id
+
+    @property
+    def pr_number(self) -> int:
+        return self.payload.pr_number
+
+    @property
+    def actor_login(self) -> str:
+        return self.payload.actor_login or ""
+
+
 def _build_deferred_identity(payload: dict) -> DeferredArtifactIdentity:
     return DeferredArtifactIdentity(
         schema_version=int(payload["schema_version"]),
@@ -138,6 +159,23 @@ def build_deferred_comment_replay_context(
         expected_event_name=expected_event_name,
         live_comment_endpoint=live_comment_endpoint,
     )
+
+
+def build_deferred_review_replay_context(
+    payload: DeferredReviewPayload,
+    *,
+    expected_event_action: str,
+) -> DeferredReviewReplayContext:
+    expected_prefix = (
+        "pull_request_review:"
+        if expected_event_action == "submitted"
+        else "pull_request_review_dismissed:"
+    )
+    if payload.identity.source_event_action != expected_event_action:
+        raise RuntimeError("Deferred review artifact action mismatch")
+    if payload.identity.source_event_key != f"{expected_prefix}{payload.review_id}":
+        raise RuntimeError(f"Deferred review-{expected_event_action} artifact source_event_key mismatch")
+    return DeferredReviewReplayContext(payload=payload)
 
 
 def _read_reconcile_object(bot, endpoint: str, *, label: str) -> dict:
@@ -820,9 +858,11 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
 
         if event_name == "pull_request_review" and event_action == "submitted" and isinstance(parsed_payload, DeferredReviewPayload):
             _validate_workflow_run_artifact_identity(parsed_payload.raw_payload)
-            review_id = parsed_payload.review_id
-            if source_event_key != f"pull_request_review:{review_id}":
-                raise RuntimeError("Deferred review-submitted artifact source_event_key mismatch")
+            context = build_deferred_review_replay_context(
+                parsed_payload,
+                expected_event_action="submitted",
+            )
+            review_id = context.review_id
             try:
                 live_review = _read_reconcile_object(bot, f"pulls/{pr_number}/reviews/{review_id}", label=f"live review #{review_id}")
             except ReconcileReadError as exc:
@@ -840,7 +880,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 live_state = live_review.get("state") or live_state
             else:
                 live_commit_id = parsed_payload.source_commit_id
-            actor = parsed_payload.actor_login or ""
+            actor = context.actor_login
             state_changed = bot.maybe_record_head_observation_repair(pr_number, review_data).changed
             if isinstance(review_data.get("current_reviewer"), str) and review_data.get("current_reviewer", "").lower() == actor.lower() and isinstance(live_commit_id, str) and isinstance(live_submitted_at, str):
                 bot.reviews_module.accept_channel_event(
@@ -862,9 +902,10 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
 
         if event_name == "pull_request_review" and event_action == "dismissed" and isinstance(parsed_payload, DeferredReviewPayload):
             _validate_workflow_run_artifact_identity(parsed_payload.raw_payload)
-            review_id_value = parsed_payload.review_id
-            if source_event_key != f"pull_request_review_dismissed:{review_id_value}":
-                raise RuntimeError("Deferred review-dismissed artifact source_event_key mismatch")
+            context = build_deferred_review_replay_context(
+                parsed_payload,
+                expected_event_action="dismissed",
+            )
             bot.reviews_module.accept_channel_event(
                 review_data,
                 "review_dismissal",

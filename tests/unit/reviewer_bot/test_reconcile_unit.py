@@ -120,6 +120,66 @@ def test_build_deferred_comment_replay_context_rejects_mismatched_source_event_k
         )
 
 
+def test_build_deferred_review_replay_context_returns_typed_context():
+    payload = reviewer_bot.reconcile_module.DeferredReviewPayload(
+        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+            schema_version=2,
+            source_workflow_name="Reviewer Bot PR Review Submitted Observer",
+            source_workflow_file=".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+            source_run_id=500,
+            source_run_attempt=2,
+            source_event_name="pull_request_review",
+            source_event_action="submitted",
+            source_event_key="pull_request_review:11",
+        ),
+        pr_number=42,
+        review_id=11,
+        source_submitted_at="2026-03-17T10:00:00Z",
+        source_review_state="COMMENTED",
+        source_commit_id="head-1",
+        actor_login="alice",
+        raw_payload={"source_event_key": "pull_request_review:11"},
+    )
+
+    context = reviewer_bot.reconcile_module.build_deferred_review_replay_context(
+        payload,
+        expected_event_action="submitted",
+    )
+
+    assert isinstance(context, reviewer_bot.reconcile_module.DeferredReviewReplayContext)
+    assert context.review_id == 11
+    assert context.pr_number == 42
+    assert context.actor_login == "alice"
+
+
+def test_build_deferred_review_replay_context_rejects_mismatched_source_event_key():
+    payload = reviewer_bot.reconcile_module.DeferredReviewPayload(
+        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+            schema_version=2,
+            source_workflow_name="Reviewer Bot PR Review Submitted Observer",
+            source_workflow_file=".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+            source_run_id=500,
+            source_run_attempt=2,
+            source_event_name="pull_request_review",
+            source_event_action="submitted",
+            source_event_key="pull_request_review:99",
+        ),
+        pr_number=42,
+        review_id=11,
+        source_submitted_at="2026-03-17T10:00:00Z",
+        source_review_state="COMMENTED",
+        source_commit_id="head-1",
+        actor_login="alice",
+        raw_payload={"source_event_key": "pull_request_review:99"},
+    )
+
+    with pytest.raises(RuntimeError, match="source_event_key mismatch"):
+        reviewer_bot.reconcile_module.build_deferred_review_replay_context(
+            payload,
+            expected_event_action="submitted",
+        )
+
+
 def test_parse_deferred_context_payload_returns_typed_observer_noop_payload():
     payload = {
         "schema_version": 1,
