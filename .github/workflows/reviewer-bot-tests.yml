@@ -34,19 +34,21 @@ jobs:
 
       - name: Run migrated reviewer bot tests with targeted coverage
         run: >-
+          mkdir -p artifacts/coverage &&
+          COVERAGE_FILE=artifacts/coverage/.coverage
           uv run pytest tests --import-mode=importlib
           --cov=scripts.reviewer_bot
           --cov=scripts.reviewer_bot_lib
           --cov-branch
           --cov-report=term-missing
-          --cov-report=json:coverage-reviewer-bot.json
+          --cov-report=json:artifacts/coverage/reviewer-bot.json
 
       - name: Enforce reviewer bot statement and branch floors
         run: |
           uv run python - <<'PY'
           import json
 
-          with open("coverage-reviewer-bot.json", encoding="utf-8") as handle:
+          with open("artifacts/coverage/reviewer-bot.json", encoding="utf-8") as handle:
               totals = json.load(handle)["totals"]
 
           statements = totals["percent_statements_covered"]
