@@ -81,6 +81,37 @@ class ObserverNoopPayload:
     raw_payload: dict
 
 
+@dataclass(frozen=True)
+class DeferredCommentReplayContext:
+    payload: DeferredCommentPayload
+    expected_event_name: str
+    live_comment_endpoint: str
+
+    @property
+    def source_event_key(self) -> str:
+        return self.payload.identity.source_event_key
+
+    @property
+    def comment_id(self) -> int:
+        return self.payload.comment_id
+
+    @property
+    def pr_number(self) -> int:
+        return self.payload.pr_number
+
+    @property
+    def actor_login(self) -> str:
+        return self.payload.actor_login or ""
+
+    @property
+    def source_created_at(self) -> str:
+        return self.payload.source_created_at
+
+    @property
+    def source_freshness_eligible(self) -> bool:
+        return self.payload.comment_class in {"plain_text", "command_plus_text"} and self.payload.has_non_command_text
+
+
 def _build_deferred_identity(payload: dict) -> DeferredArtifactIdentity:
     return DeferredArtifactIdentity(
         schema_version=int(payload["schema_version"]),
@@ -91,6 +122,21 @@ def _build_deferred_identity(payload: dict) -> DeferredArtifactIdentity:
         source_event_name=str(payload["source_event_name"]),
         source_event_action=str(payload["source_event_action"]),
         source_event_key=str(payload["source_event_key"]),
+    )
+
+
+def build_deferred_comment_replay_context(
+    payload: DeferredCommentPayload,
+    *,
+    expected_event_name: str,
+    live_comment_endpoint: str,
+) -> DeferredCommentReplayContext:
+    if payload.identity.source_event_key != f"{expected_event_name}:{payload.comment_id}":
+        raise RuntimeError("Deferred comment artifact source_event_key mismatch")
+    return DeferredCommentReplayContext(
+        payload=payload,
+        expected_event_name=expected_event_name,
+        live_comment_endpoint=live_comment_endpoint,
     )
 
 
@@ -558,27 +604,19 @@ def _artifact_expected_payload_name(payload: dict) -> str:
 def _reconcile_deferred_comment(
     bot,
     state: dict,
-    pr_number: int,
     review_data: dict,
-    payload: dict,
-    *,
-    expected_event_name: str,
-    live_comment_endpoint: str,
+    context: DeferredCommentReplayContext,
 ) -> bool:
-    comment_id_value = payload.get("comment_id")
-    if not isinstance(comment_id_value, int):
-        raise RuntimeError("Deferred comment artifact comment_id must be an integer")
-    comment_id = comment_id_value
-    if str(payload.get("source_event_key", "")) != f"{expected_event_name}:{comment_id}":
-        raise RuntimeError("Deferred comment artifact source_event_key mismatch")
-    _set_env_if_present("COMMENT_SOURCE_EVENT_KEY", payload.get("source_event_key"))
+    payload = context.payload.raw_payload
+    comment_id = context.comment_id
+    pr_number = context.pr_number
+    _set_env_if_present("COMMENT_SOURCE_EVENT_KEY", context.source_event_key)
     _hydrate_reconcile_pr_context(bot, pr_number)
-    comment_author = str(payload.get("actor_login", ""))
-    comment_created_at = str(payload.get("source_created_at"))
-    classified = payload.get("comment_class")
-    source_freshness_eligible = classified in {"plain_text", "command_plus_text"} and bool(payload.get("has_non_command_text"))
+    comment_author = context.actor_login
+    comment_created_at = context.source_created_at
+    source_freshness_eligible = context.source_freshness_eligible
     try:
-        live_comment = _read_reconcile_object(bot, live_comment_endpoint, label=f"deferred comment {comment_id}")
+        live_comment = _read_reconcile_object(bot, context.live_comment_endpoint, label=f"deferred comment {comment_id}")
     except ReconcileReadError as exc:
         changed = False
         if source_freshness_eligible:
@@ -624,7 +662,7 @@ def _reconcile_deferred_comment(
     if validation_result.live_classified is None:
         return changed or validation_result.changed
     live_classified = validation_result.live_classified
-    if classified in {"command_only", "command_plus_text"}:
+    if context.payload.comment_class in {"command_only", "command_plus_text"}:
         changed = _handle_command(bot, state, pr_number, comment_author, live_classified) or changed
     reconciled_changed = _mark_reconciled_source_event(review_data, str(payload.get("source_event_key", "")))
     gap_cleared_changed = _clear_source_event_key(review_data, str(payload.get("source_event_key", "")))
@@ -754,26 +792,30 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
 
         if event_name == "issue_comment" and isinstance(parsed_payload, DeferredCommentPayload):
             _validate_workflow_run_artifact_identity(parsed_payload.raw_payload)
+            context = build_deferred_comment_replay_context(
+                parsed_payload,
+                expected_event_name="issue_comment",
+                live_comment_endpoint=f"issues/comments/{parsed_payload.comment_id}",
+            )
             return _reconcile_deferred_comment(
                 bot,
                 state,
-                pr_number,
                 review_data,
-                parsed_payload.raw_payload,
-                expected_event_name="issue_comment",
-                live_comment_endpoint=f"issues/comments/{parsed_payload.comment_id}",
+                context,
             )
 
         if event_name == "pull_request_review_comment" and event_action == "created" and isinstance(parsed_payload, DeferredCommentPayload):
             _validate_workflow_run_artifact_identity(parsed_payload.raw_payload)
+            context = build_deferred_comment_replay_context(
+                parsed_payload,
+                expected_event_name="pull_request_review_comment",
+                live_comment_endpoint=f"pulls/comments/{parsed_payload.comment_id}",
+            )
             return _reconcile_deferred_comment(
                 bot,
                 state,
-                pr_number,
                 review_data,
-                parsed_payload.raw_payload,
-                expected_event_name="pull_request_review_comment",
-                live_comment_endpoint=f"pulls/comments/{parsed_payload.comment_id}",
+                context,
             )
 
         if event_name == "pull_request_review" and event_action == "submitted" and isinstance(parsed_payload, DeferredReviewPayload):

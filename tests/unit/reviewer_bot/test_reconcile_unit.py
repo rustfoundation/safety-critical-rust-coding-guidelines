@@ -56,6 +56,70 @@ def test_parse_deferred_context_payload_returns_typed_comment_payload():
     assert parsed.comment_id == 210
 
 
+def test_build_deferred_comment_replay_context_returns_typed_context():
+    payload = reviewer_bot.reconcile_module.DeferredCommentPayload(
+        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+            schema_version=2,
+            source_workflow_name="Reviewer Bot PR Comment Observer",
+            source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            source_run_id=610,
+            source_run_attempt=1,
+            source_event_name="issue_comment",
+            source_event_action="created",
+            source_event_key="issue_comment:210",
+        ),
+        pr_number=42,
+        comment_id=210,
+        comment_class="command_plus_text",
+        has_non_command_text=True,
+        source_body_digest="abc123",
+        source_created_at="2026-03-17T10:00:00Z",
+        actor_login="bob",
+        raw_payload={"source_event_key": "issue_comment:210"},
+    )
+
+    context = reviewer_bot.reconcile_module.build_deferred_comment_replay_context(
+        payload,
+        expected_event_name="issue_comment",
+        live_comment_endpoint="issues/comments/210",
+    )
+
+    assert isinstance(context, reviewer_bot.reconcile_module.DeferredCommentReplayContext)
+    assert context.comment_id == 210
+    assert context.pr_number == 42
+    assert context.source_freshness_eligible is True
+
+
+def test_build_deferred_comment_replay_context_rejects_mismatched_source_event_key():
+    payload = reviewer_bot.reconcile_module.DeferredCommentPayload(
+        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+            schema_version=2,
+            source_workflow_name="Reviewer Bot PR Comment Observer",
+            source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            source_run_id=610,
+            source_run_attempt=1,
+            source_event_name="issue_comment",
+            source_event_action="created",
+            source_event_key="issue_comment:999",
+        ),
+        pr_number=42,
+        comment_id=210,
+        comment_class="command_only",
+        has_non_command_text=False,
+        source_body_digest="abc123",
+        source_created_at="2026-03-17T10:00:00Z",
+        actor_login="bob",
+        raw_payload={"source_event_key": "issue_comment:999"},
+    )
+
+    with pytest.raises(RuntimeError, match="source_event_key mismatch"):
+        reviewer_bot.reconcile_module.build_deferred_comment_replay_context(
+            payload,
+            expected_event_name="issue_comment",
+            live_comment_endpoint="issues/comments/210",
+        )
+
+
 def test_parse_deferred_context_payload_returns_typed_observer_noop_payload():
     payload = {
         "schema_version": 1,
