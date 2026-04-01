@@ -207,6 +207,22 @@ def _runtime_bot() -> Any:
     return RUNTIME
 
 
+def get_config_value(name: str, default: str = "") -> str:
+    return _runtime_bot().get_config_value(name, default)
+
+
+def set_config_value(name: str, value: Any) -> None:
+    _runtime_bot().set_config_value(name, value)
+
+
+def write_output(name: str, value: str) -> None:
+    _runtime_bot().write_output(name, value)
+
+
+def load_deferred_payload() -> dict:
+    return _runtime_bot().load_deferred_payload()
+
+
 def get_github_token() -> str:
     return github_api_module.get_github_token()
 
@@ -1004,7 +1020,7 @@ def event_requires_lease_lock(event_name: str, event_action: str) -> bool:
 
 
 def build_event_context() -> EventContext:
-    return app_module.build_event_context()
+    return app_module.build_event_context(_runtime_bot())
 
 
 def execute_run(context: EventContext) -> ExecutionResult:

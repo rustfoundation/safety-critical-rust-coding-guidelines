@@ -1,7 +1,6 @@
 """Top-level reviewer-bot orchestration."""
 
 import json
-import os
 import sys
 
 from .context import EventContext, ExecutionResult, ReviewerBotContext
@@ -82,33 +81,33 @@ def _parse_issue_labels(value: str) -> tuple[str, ...]:
     return tuple(label for label in payload if isinstance(label, str))
 
 
-def build_event_context() -> EventContext:
+def build_event_context(bot: ReviewerBotContext) -> EventContext:
     return EventContext(
-        event_name=os.environ.get("EVENT_NAME", "").strip(),
-        event_action=os.environ.get("EVENT_ACTION", "").strip(),
-        issue_number=_parse_optional_int(os.environ.get("ISSUE_NUMBER", "")),
-        is_pull_request=_parse_optional_bool(os.environ.get("IS_PULL_REQUEST", "")),
-        issue_author=os.environ.get("ISSUE_AUTHOR", "").strip() or None,
-        issue_state=os.environ.get("ISSUE_STATE", "").strip() or None,
-        issue_labels=_parse_issue_labels(os.environ.get("ISSUE_LABELS", "")),
-        comment_id=_parse_optional_int(os.environ.get("COMMENT_ID", "")),
-        comment_author=os.environ.get("COMMENT_AUTHOR", "").strip() or None,
-        comment_body=os.environ.get("COMMENT_BODY", "") or None,
-        comment_source_event_key=os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip() or None,
-        pr_is_cross_repository=_parse_optional_bool(os.environ.get("PR_IS_CROSS_REPOSITORY", "")),
-        review_author=os.environ.get("REVIEW_AUTHOR", "").strip() or None,
-        review_state=os.environ.get("REVIEW_STATE", "").strip() or None,
-        workflow_run_event=os.environ.get("WORKFLOW_RUN_EVENT", "").strip() or None,
-        workflow_run_event_action=os.environ.get("WORKFLOW_RUN_EVENT_ACTION", "").strip() or None,
-        workflow_run_head_sha=os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip() or None,
+        event_name=bot.get_config_value("EVENT_NAME").strip(),
+        event_action=bot.get_config_value("EVENT_ACTION").strip(),
+        issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")),
+        is_pull_request=_parse_optional_bool(bot.get_config_value("IS_PULL_REQUEST")),
+        issue_author=bot.get_config_value("ISSUE_AUTHOR").strip() or None,
+        issue_state=bot.get_config_value("ISSUE_STATE").strip() or None,
+        issue_labels=_parse_issue_labels(bot.get_config_value("ISSUE_LABELS")),
+        comment_id=_parse_optional_int(bot.get_config_value("COMMENT_ID")),
+        comment_author=bot.get_config_value("COMMENT_AUTHOR").strip() or None,
+        comment_body=bot.get_config_value("COMMENT_BODY") or None,
+        comment_source_event_key=bot.get_config_value("COMMENT_SOURCE_EVENT_KEY").strip() or None,
+        pr_is_cross_repository=_parse_optional_bool(bot.get_config_value("PR_IS_CROSS_REPOSITORY")),
+        review_author=bot.get_config_value("REVIEW_AUTHOR").strip() or None,
+        review_state=bot.get_config_value("REVIEW_STATE").strip() or None,
+        workflow_run_event=bot.get_config_value("WORKFLOW_RUN_EVENT").strip() or None,
+        workflow_run_event_action=bot.get_config_value("WORKFLOW_RUN_EVENT_ACTION").strip() or None,
+        workflow_run_head_sha=bot.get_config_value("WORKFLOW_RUN_HEAD_SHA").strip() or None,
         workflow_run_reconcile_pr_number=_parse_optional_int(
-            os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "")
+            bot.get_config_value("WORKFLOW_RUN_RECONCILE_PR_NUMBER")
         ),
-        workflow_run_reconcile_head_sha=os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip() or None,
-        workflow_run_id=_parse_optional_int(os.environ.get("WORKFLOW_RUN_ID", "")),
-        workflow_name=os.environ.get("WORKFLOW_NAME", "").strip() or None,
-        workflow_job_name=os.environ.get("WORKFLOW_JOB_NAME", "").strip() or None,
-        manual_action=os.environ.get("MANUAL_ACTION", "").strip() or None,
+        workflow_run_reconcile_head_sha=bot.get_config_value("WORKFLOW_RUN_RECONCILE_HEAD_SHA").strip() or None,
+        workflow_run_id=_parse_optional_int(bot.get_config_value("WORKFLOW_RUN_ID")),
+        workflow_name=bot.get_config_value("WORKFLOW_NAME").strip() or None,
+        workflow_job_name=bot.get_config_value("WORKFLOW_JOB_NAME").strip() or None,
+        manual_action=bot.get_config_value("MANUAL_ACTION").strip() or None,
     )
 
 
@@ -124,7 +123,7 @@ def _classify_event_intent_from_context(bot: ReviewerBotContext, context: EventC
     if event_name == "issue_comment":
         if event_action == "created":
             if context.is_pull_request is True:
-                trust_class = os.environ.get("REVIEWER_BOT_TRUST_CLASS", "").strip()
+                trust_class = bot.get_config_value("REVIEWER_BOT_TRUST_CLASS").strip()
                 if trust_class in {"pr_deferred_reconcile", "safe_noop"}:
                     return bot.EVENT_INTENT_NON_MUTATING_DEFER
             return bot.EVENT_INTENT_MUTATING
@@ -160,7 +159,7 @@ def _classify_event_intent_from_context(bot: ReviewerBotContext, context: EventC
 
 def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action: str) -> str:
     """Classify whether a run can mutate reviewer-bot state."""
-    context = build_event_context()
+    context = build_event_context(bot)
     context = EventContext(
         event_name=event_name,
         event_action=event_action,
@@ -307,7 +306,7 @@ def execute_run(bot: ReviewerBotContext, context: EventContext) -> ExecutionResu
                     len(current_active_reviews) if isinstance(current_active_reviews, dict) else 0
                 )
                 allow_empty_override = (
-                    os.environ.get("ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE", "").strip().lower() == "true"
+                    bot.get_config_value("ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE").strip().lower() == "true"
                 )
                 if (
                     loaded_active_reviews_count > 0
@@ -363,10 +362,10 @@ def execute_run(bot: ReviewerBotContext, context: EventContext) -> ExecutionResu
 
         execution_state_changed = bool(state_changed or sync_changes or restored or status_labels_changed)
 
-        with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as output_file:
-            output_file.write(
-                "state_changed=true\n" if execution_state_changed else "state_changed=false\n"
-            )
+        bot.write_output(
+            "state_changed",
+            "true" if execution_state_changed else "false",
+        )
         if projection_failure is not None:
             print(
                 "PROJECTION_REPAIR_REQUIRED: labels remain unchanged until a trusted repair path succeeds.",
@@ -400,6 +399,6 @@ def execute_run(bot: ReviewerBotContext, context: EventContext) -> ExecutionResu
 
 def main(bot: ReviewerBotContext):
     """Main entry point for the reviewer bot."""
-    result = execute_run(bot, build_event_context())
+    result = execute_run(bot, build_event_context(bot))
     if result.exit_code:
         sys.exit(result.exit_code)
