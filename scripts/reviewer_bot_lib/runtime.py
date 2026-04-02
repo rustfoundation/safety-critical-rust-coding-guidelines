@@ -1,15 +1,34 @@
-"""Concrete runtime object for reviewer-bot orchestration."""
+"""Explicit runtime service composition for reviewer-bot orchestration."""
 
 from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
+from .config import (
+    AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
+    BOT_MENTION,
+    BOT_NAME,
+    COMMANDS,
+    DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS,
+    DEFERRED_DISCOVERY_OVERLAP_SECONDS,
+    EVENT_INTENT_MUTATING,
+    EVENT_INTENT_NON_MUTATING_DEFER,
+    EVENT_INTENT_NON_MUTATING_READONLY,
+    FLS_AUDIT_LABEL,
+    REVIEW_DEADLINE_DAYS,
+    REVIEW_FRESHNESS_RUNBOOK_PATH,
+    REVIEW_LABELS,
+    REVIEWER_REQUEST_422_TEMPLATE,
+    STATUS_PROJECTION_EPOCH,
+    TRANSITION_PERIOD_DAYS,
+)
 
-class _ModuleConfig:
+
+class _EnvConfig:
     def get(self, name: str, default: str = "") -> str:
         return os.environ.get(name, default)
 
@@ -17,8 +36,8 @@ class _ModuleConfig:
         os.environ[name] = str(value)
 
 
-class _ModuleOutputSink:
-    def __init__(self, config: _ModuleConfig):
+class _FileOutputSink:
+    def __init__(self, config: _EnvConfig):
         self._config = config
 
     def write(self, name: str, value: str) -> None:
@@ -27,8 +46,8 @@ class _ModuleOutputSink:
             output_file.write(f"{name}={value}\n")
 
 
-class _ModuleDeferredPayloadLoader:
-    def __init__(self, config: _ModuleConfig):
+class _JsonDeferredPayloadLoader:
+    def __init__(self, config: _EnvConfig):
         self._config = config
 
     def load(self) -> dict:
@@ -42,82 +61,322 @@ class _ModuleDeferredPayloadLoader:
         return payload
 
 
-class _ModuleStateStore:
-    def __init__(self, module: ModuleType):
-        self._module = module
+class _TouchTracker:
+    def __init__(self):
+        self._touched: set[int] = set()
 
-    def load_state(self, *, fail_on_unavailable: bool = False) -> dict:
-        return self._module.load_state(fail_on_unavailable=fail_on_unavailable)
+    def collect(self, issue_number: int | None) -> None:
+        if isinstance(issue_number, int) and issue_number > 0:
+            self._touched.add(issue_number)
 
-    def save_state(self, state: dict) -> bool:
-        return self._module.save_state(state)
-
-
-class _ModuleGitHubTransport:
-    def __init__(self, module: ModuleType):
-        self._module = module
-
-    def github_api_request(self, *args, **kwargs):
-        return self._module.github_api_request(*args, **kwargs)
-
-    def github_api(self, *args, **kwargs):
-        return self._module.github_api(*args, **kwargs)
+    def drain(self) -> list[int]:
+        touched = sorted(self._touched)
+        self._touched.clear()
+        return touched
 
 
 class ReviewerBotRuntime:
-    """Runtime service host with adapter-compatible fallbacks."""
+    """Runtime object built from explicit services and named adapters."""
+
+    BOT_NAME = BOT_NAME
+    BOT_MENTION = BOT_MENTION
+    COMMANDS = COMMANDS
+    FLS_AUDIT_LABEL = FLS_AUDIT_LABEL
+    AUTHOR_ASSOCIATION_TRUST_ALLOWLIST = AUTHOR_ASSOCIATION_TRUST_ALLOWLIST
+    REVIEWER_REQUEST_422_TEMPLATE = REVIEWER_REQUEST_422_TEMPLATE
+    REVIEW_FRESHNESS_RUNBOOK_PATH = REVIEW_FRESHNESS_RUNBOOK_PATH
+    REVIEW_DEADLINE_DAYS = REVIEW_DEADLINE_DAYS
+    TRANSITION_PERIOD_DAYS = TRANSITION_PERIOD_DAYS
+    REVIEW_LABELS = REVIEW_LABELS
+    DEFERRED_DISCOVERY_OVERLAP_SECONDS = DEFERRED_DISCOVERY_OVERLAP_SECONDS
+    DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS = DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS
+    EVENT_INTENT_MUTATING = EVENT_INTENT_MUTATING
+    EVENT_INTENT_NON_MUTATING_DEFER = EVENT_INTENT_NON_MUTATING_DEFER
+    EVENT_INTENT_NON_MUTATING_READONLY = EVENT_INTENT_NON_MUTATING_READONLY
+    STATUS_PROJECTION_EPOCH = STATUS_PROJECTION_EPOCH
+    datetime = datetime
+    timezone = timezone
 
     def __init__(
         self,
-        module: ModuleType,
         *,
+        requests: Any,
+        sys: Any,
+        random: Any,
+        time: Any,
         config: Any | None = None,
         outputs: Any | None = None,
         deferred_payloads: Any | None = None,
-        state_store: Any | None = None,
-        github: Any | None = None,
+        state_store: Any,
+        github: Any,
+        locks: Any,
+        handlers: Any,
+        adapters: Any,
+        touch_tracker: Any | None = None,
+        active_lease_context: Any | None = None,
     ):
-        object.__setattr__(self, "_module", module)
-        config_service = config or _ModuleConfig()
-        object.__setattr__(self, "_config", config_service)
-        object.__setattr__(self, "_outputs", outputs or _ModuleOutputSink(config_service))
-        object.__setattr__(
-            self,
-            "_deferred_payloads",
-            deferred_payloads or _ModuleDeferredPayloadLoader(config_service),
-        )
-        object.__setattr__(self, "_state_store", state_store or _ModuleStateStore(module))
-        object.__setattr__(self, "_github", github or _ModuleGitHubTransport(module))
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._module, name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if name.startswith("_"):
-            object.__setattr__(self, name, value)
-            return
-        setattr(self._module, name, value)
+        self.requests = requests
+        self.sys = sys
+        self.random = random
+        self.time = time
+        self.config = config or _EnvConfig()
+        self.outputs = outputs or _FileOutputSink(self.config)
+        self.deferred_payloads = deferred_payloads or _JsonDeferredPayloadLoader(self.config)
+        self.state_store = state_store
+        self.github = github
+        self.locks = locks
+        self.handlers = handlers
+        self.adapters = adapters
+        self.touch_tracker = touch_tracker or _TouchTracker()
+        self.ACTIVE_LEASE_CONTEXT = active_lease_context
 
     def get_config_value(self, name: str, default: str = "") -> str:
-        return self._config.get(name, default)
+        return self.config.get(name, default)
 
     def set_config_value(self, name: str, value: Any) -> None:
-        self._config.set(name, value)
+        self.config.set(name, value)
 
     def write_output(self, name: str, value: str) -> None:
-        self._outputs.write(name, value)
+        self.outputs.write(name, value)
 
     def load_deferred_payload(self) -> dict:
-        return self._deferred_payloads.load()
+        return self.deferred_payloads.load()
 
     def load_state(self, *, fail_on_unavailable: bool = False) -> dict:
-        return self._state_store.load_state(fail_on_unavailable=fail_on_unavailable)
+        return self.state_store.load_state(fail_on_unavailable=fail_on_unavailable)
 
     def save_state(self, state: dict) -> bool:
-        return self._state_store.save_state(state)
+        return self.state_store.save_state(state)
 
     def github_api_request(self, *args, **kwargs):
-        return self._github.github_api_request(*args, **kwargs)
+        return self.github.github_api_request(*args, **kwargs)
 
     def github_api(self, *args, **kwargs):
-        return self._github.github_api(*args, **kwargs)
+        return self.github.github_api(*args, **kwargs)
+
+    def collect_touched_item(self, issue_number: int | None) -> None:
+        self.touch_tracker.collect(issue_number)
+
+    def drain_touched_items(self) -> list[int]:
+        return self.touch_tracker.drain()
+
+    def handle_issue_or_pr_opened(self, state: dict) -> bool:
+        return self.handlers.handle_issue_or_pr_opened(state)
+
+    def handle_labeled_event(self, state: dict) -> bool:
+        return self.handlers.handle_labeled_event(state)
+
+    def handle_issue_edited_event(self, state: dict) -> bool:
+        return self.handlers.handle_issue_edited_event(state)
+
+    def handle_closed_event(self, state: dict) -> bool:
+        return self.handlers.handle_closed_event(state)
+
+    def handle_pull_request_target_synchronize(self, state: dict) -> bool:
+        return self.handlers.handle_pull_request_target_synchronize(state)
+
+    def handle_pull_request_review_event(self, state: dict) -> bool:
+        return self.handlers.handle_pull_request_review_event(state)
+
+    def handle_comment_event(self, state: dict) -> bool:
+        return self.handlers.handle_comment_event(state)
+
+    def handle_manual_dispatch(self, state: dict) -> bool:
+        return self.handlers.handle_manual_dispatch(state)
+
+    def handle_scheduled_check(self, state: dict) -> bool:
+        return self.handlers.handle_scheduled_check(state)
+
+    def handle_workflow_run_event(self, state: dict) -> bool:
+        return self.handlers.handle_workflow_run_event(state)
+
+    def assert_lock_held(self, context: str) -> None:
+        return self.adapters.assert_lock_held(context)
+
+    def get_github_token(self) -> str:
+        return self.adapters.get_github_token()
+
+    def get_github_graphql_token(self, *, prefer_board_token: bool = False) -> str:
+        return self.adapters.get_github_graphql_token(prefer_board_token=prefer_board_token)
+
+    def github_graphql(self, query: str, variables=None, *, token=None):
+        return self.adapters.github_graphql(query, variables, token=token)
+
+    def post_comment(self, issue_number: int, body: str) -> bool:
+        return self.adapters.post_comment(issue_number, body)
+
+    def get_repo_labels(self):
+        return self.adapters.get_repo_labels()
+
+    def add_label(self, issue_number: int, label: str) -> bool:
+        return self.adapters.add_label(issue_number, label)
+
+    def remove_label(self, issue_number: int, label: str) -> bool:
+        return self.adapters.remove_label(issue_number, label)
+
+    def ensure_label_exists(self, label: str, *, color: str | None = None, description: str | None = None) -> bool:
+        return self.adapters.ensure_label_exists(label, color=color, description=description)
+
+    def get_issue_assignees(self, issue_number: int):
+        return self.adapters.get_issue_assignees(issue_number)
+
+    def request_reviewer_assignment(self, issue_number: int, username: str):
+        return self.adapters.request_reviewer_assignment(issue_number, username)
+
+    def get_assignment_failure_comment(self, reviewer: str, attempt):
+        return self.adapters.get_assignment_failure_comment(reviewer, attempt)
+
+    def add_reaction(self, comment_id: int, reaction: str) -> bool:
+        return self.adapters.add_reaction(comment_id, reaction)
+
+    def remove_assignee(self, issue_number: int, username: str) -> bool:
+        return self.adapters.remove_assignee(issue_number, username)
+
+    def remove_pr_reviewer(self, issue_number: int, username: str) -> bool:
+        return self.adapters.remove_pr_reviewer(issue_number, username)
+
+    def unassign_reviewer(self, issue_number: int, username: str) -> bool:
+        return self.adapters.unassign_reviewer(issue_number, username)
+
+    def get_user_permission_status(self, username: str, required_permission: str = "triage") -> str:
+        return self.adapters.get_user_permission_status(username, required_permission)
+
+    def check_user_permission(self, username: str, required_permission: str = "triage"):
+        return self.adapters.check_user_permission(username, required_permission)
+
+    def get_issue_or_pr_snapshot(self, issue_number: int):
+        return self.adapters.get_issue_or_pr_snapshot(issue_number)
+
+    def get_pull_request_reviews(self, issue_number: int):
+        return self.adapters.get_pull_request_reviews(issue_number)
+
+    def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
+        return self.adapters.maybe_record_head_observation_repair(issue_number, review_data)
+
+    def ensure_review_entry(self, state: dict, issue_number: int, create: bool = False):
+        return self.adapters.ensure_review_entry(state, issue_number, create=create)
+
+    def set_current_reviewer(self, state: dict, issue_number: int, reviewer: str, assignment_method: str = "round-robin") -> None:
+        return self.adapters.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
+
+    def update_reviewer_activity(self, state: dict, issue_number: int, reviewer: str) -> bool:
+        return self.adapters.update_reviewer_activity(state, issue_number, reviewer)
+
+    def mark_review_complete(self, state: dict, issue_number: int, reviewer: str | None, source: str) -> bool:
+        return self.adapters.mark_review_complete(state, issue_number, reviewer, source)
+
+    def is_triage_or_higher(self, username: str) -> bool:
+        return self.adapters.is_triage_or_higher(username)
+
+    def trigger_mandatory_approver_escalation(self, state: dict, issue_number: int) -> bool:
+        return self.adapters.trigger_mandatory_approver_escalation(state, issue_number)
+
+    def satisfy_mandatory_approver_requirement(self, state: dict, issue_number: int, approver: str) -> bool:
+        return self.adapters.satisfy_mandatory_approver_requirement(state, issue_number, approver)
+
+    def get_next_reviewer(self, state: dict, skip_usernames=None):
+        return self.adapters.get_next_reviewer(state, skip_usernames)
+
+    def strip_code_blocks(self, comment_body: str) -> str:
+        return self.adapters.strip_code_blocks(comment_body)
+
+    def parse_command(self, comment_body: str):
+        return self.adapters.parse_command(comment_body)
+
+    def record_assignment(self, state: dict, github: str, issue_number: int, kind: str) -> None:
+        return self.adapters.record_assignment(state, github, issue_number, kind)
+
+    def reposition_member_as_next(self, state: dict, username: str) -> bool:
+        return self.adapters.reposition_member_as_next(state, username)
+
+    def parse_iso8601_timestamp(self, value: Any):
+        return self.adapters.parse_iso8601_timestamp(value)
+
+    def compute_reviewer_response_state(self, issue_number: int, review_data: dict, *, issue_snapshot=None):
+        return self.adapters.compute_reviewer_response_state(issue_number, review_data, issue_snapshot=issue_snapshot)
+
+    def run_command(self, command, cwd, check=False):
+        return self.adapters.run_command(command, cwd, check)
+
+    def summarize_output(self, result, limit: int = 20) -> str:
+        return self.adapters.summarize_output(result, limit)
+
+    def list_changed_files(self, repo_root):
+        return self.adapters.list_changed_files(repo_root)
+
+    def get_default_branch(self) -> str:
+        return self.adapters.get_default_branch()
+
+    def find_open_pr_for_branch_status(self, branch: str):
+        return self.adapters.find_open_pr_for_branch_status(branch)
+
+    def create_pull_request(self, branch: str, base: str, issue_number: int):
+        return self.adapters.create_pull_request(branch, base, issue_number)
+
+    def parse_issue_labels(self) -> list[str]:
+        return self.adapters.parse_issue_labels()
+
+    def normalize_lock_metadata(self, lock_meta: dict | None):
+        return self.adapters.normalize_lock_metadata(lock_meta)
+
+    def get_state_issue(self):
+        return self.adapters.get_state_issue()
+
+    def clear_lock_metadata(self):
+        return self.adapters.clear_lock_metadata()
+
+    def get_state_issue_snapshot(self):
+        return self.adapters.get_state_issue_snapshot()
+
+    def conditional_patch_state_issue(self, body: str, etag: str | None = None):
+        return self.adapters.conditional_patch_state_issue(body, etag)
+
+    def parse_lock_metadata_from_issue_body(self, body: str):
+        return self.adapters.parse_lock_metadata_from_issue_body(body)
+
+    def render_state_issue_body(self, state: dict, lock_meta: dict, base_body: str | None = None, *, preserve_state_block: bool = False):
+        return self.adapters.render_state_issue_body(
+            state,
+            lock_meta,
+            base_body,
+            preserve_state_block=preserve_state_block,
+        )
+
+    def get_state_issue_html_url(self):
+        return self.adapters.get_state_issue_html_url()
+
+    def get_lock_ref_display(self):
+        return self.adapters.get_lock_ref_display()
+
+    def get_lock_ref_snapshot(self):
+        return self.adapters.get_lock_ref_snapshot()
+
+    def build_lock_metadata(self, *args, **kwargs):
+        return self.adapters.build_lock_metadata(*args, **kwargs)
+
+    def create_lock_commit(self, parent_sha: str, tree_sha: str, lock_meta: dict):
+        return self.adapters.create_lock_commit(parent_sha, tree_sha, lock_meta)
+
+    def cas_update_lock_ref(self, new_sha: str):
+        return self.adapters.cas_update_lock_ref(new_sha)
+
+    def lock_is_currently_valid(self, lock_meta: dict, now: datetime | None = None):
+        return self.adapters.lock_is_currently_valid(lock_meta, now)
+
+    def renew_state_issue_lease_lock(self, context):
+        result = self.adapters.renew_state_issue_lease_lock(context)
+        self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
+        return result
+
+    def ensure_state_issue_lease_lock_fresh(self) -> bool:
+        return self.adapters.ensure_state_issue_lease_lock_fresh()
+
+    def acquire_state_issue_lease_lock(self):
+        context = self.adapters.acquire_state_issue_lease_lock()
+        self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
+        return context
+
+    def release_state_issue_lease_lock(self) -> bool:
+        result = self.adapters.release_state_issue_lease_lock()
+        self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
+        return result

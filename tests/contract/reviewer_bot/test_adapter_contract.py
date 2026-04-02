@@ -79,8 +79,9 @@ def test_build_event_context_returns_structured_context(monkeypatch):
 def test_execute_run_returns_execution_result(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "pull_request_review")
     monkeypatch.setenv("EVENT_ACTION", "submitted")
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: {"active_reviews": {}})
-    monkeypatch.setattr(reviewer_bot, "handle_pull_request_review_event", lambda state: False)
+    runtime = reviewer_bot._runtime_bot()
+    monkeypatch.setattr(runtime.state_store, "load_state", lambda *, fail_on_unavailable=False: {"active_reviews": {}})
+    monkeypatch.setattr(runtime.handlers, "handle_pull_request_review_event", lambda state: False)
 
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
 

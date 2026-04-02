@@ -59,6 +59,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from datetime import timezone as _timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 # GitHub API interaction
@@ -203,10 +204,12 @@ time = lease_lock_module.time
 
 ACTIVE_LEASE_CONTEXT: LeaseContext | None = None
 TOUCHED_ISSUE_NUMBERS: set[int] = set()
-RUNTIME = ReviewerBotRuntime(sys.modules[__name__])
+RUNTIME: ReviewerBotRuntime | None = None
 
 
 def _runtime_bot() -> Any:
+    if RUNTIME is None:
+        raise RuntimeError("ReviewerBotRuntime not initialized")
     return RUNTIME
 
 
@@ -331,15 +334,12 @@ def ensure_label_exists(
 
 def collect_touched_item(issue_number: int | None) -> None:
     """Record an issue/PR number for centralized status-label sync."""
-    if isinstance(issue_number, int) and issue_number > 0:
-        TOUCHED_ISSUE_NUMBERS.add(issue_number)
+    _runtime_bot().collect_touched_item(issue_number)
 
 
 def drain_touched_items() -> list[int]:
     """Return touched issue numbers and clear the collector."""
-    touched = sorted(TOUCHED_ISSUE_NUMBERS)
-    TOUCHED_ISSUE_NUMBERS.clear()
-    return touched
+    return _runtime_bot().drain_touched_items()
 
 
 def get_issue_or_pr_snapshot(issue_number: int) -> dict | None:
@@ -576,15 +576,21 @@ def ensure_state_issue_lease_lock_fresh() -> bool:
 
 
 def renew_state_issue_lease_lock(context: LeaseContext) -> bool:
-    return lease_lock_module.renew_state_issue_lease_lock(_runtime_bot(), context)
+    result = lease_lock_module.renew_state_issue_lease_lock(_runtime_bot(), context)
+    globals()["ACTIVE_LEASE_CONTEXT"] = _runtime_bot().ACTIVE_LEASE_CONTEXT
+    return result
 
 
 def acquire_state_issue_lease_lock() -> LeaseContext:
-    return lease_lock_module.acquire_state_issue_lease_lock(_runtime_bot())
+    context = lease_lock_module.acquire_state_issue_lease_lock(_runtime_bot())
+    globals()["ACTIVE_LEASE_CONTEXT"] = _runtime_bot().ACTIVE_LEASE_CONTEXT
+    return context
 
 
 def release_state_issue_lease_lock() -> bool:
-    return lease_lock_module.release_state_issue_lease_lock(_runtime_bot())
+    result = lease_lock_module.release_state_issue_lease_lock(_runtime_bot())
+    globals()["ACTIVE_LEASE_CONTEXT"] = _runtime_bot().ACTIVE_LEASE_CONTEXT
+    return result
 
 
 def sync_members_with_queue(state: dict) -> tuple[dict, list[str]]:
@@ -1032,6 +1038,115 @@ def execute_run(context: EventContext) -> ExecutionResult:
 
 def main():
     app_module.main(_runtime_bot())
+
+
+def _build_runtime() -> ReviewerBotRuntime:
+    runtime: ReviewerBotRuntime | None = None
+    state_store = SimpleNamespace(
+        load_state=lambda *, fail_on_unavailable=False: state_store_module.load_state(runtime, fail_on_unavailable=fail_on_unavailable),
+        save_state=lambda state: state_store_module.save_state(runtime, state),
+    )
+    github = SimpleNamespace(
+        github_api_request=lambda *args, **kwargs: github_api_module.github_api_request(runtime, *args, **kwargs),
+        github_api=lambda *args, **kwargs: github_api_module.github_api(runtime, *args, **kwargs),
+    )
+    locks = SimpleNamespace()
+    handlers = SimpleNamespace(
+        handle_issue_or_pr_opened=lambda state: handle_issue_or_pr_opened(state),
+        handle_labeled_event=lambda state: handle_labeled_event(state),
+        handle_issue_edited_event=lambda state: handle_issue_edited_event(state),
+        handle_closed_event=lambda state: handle_closed_event(state),
+        handle_pull_request_target_synchronize=lambda state: handle_pull_request_target_synchronize(state),
+        handle_pull_request_review_event=lambda state: handle_pull_request_review_event(state),
+        handle_comment_event=lambda state: handle_comment_event(state),
+        handle_manual_dispatch=lambda state: handle_manual_dispatch(state),
+        handle_scheduled_check=lambda state: handle_scheduled_check(state),
+        handle_workflow_run_event=lambda state: handle_workflow_run_event(state),
+    )
+    adapters = SimpleNamespace(
+        assert_lock_held=lambda context: state_store_module.assert_lock_held(runtime, context),
+        get_github_token=github_api_module.get_github_token,
+        get_github_graphql_token=lambda *, prefer_board_token=False: github_api_module.get_github_graphql_token(runtime, prefer_board_token=prefer_board_token),
+        github_graphql=lambda query, variables=None, *, token=None: github_api_module.github_graphql(runtime, query, variables, token=token),
+        post_comment=lambda issue_number, body: github_api_module.post_comment(runtime, issue_number, body),
+        get_repo_labels=lambda: github_api_module.get_repo_labels(runtime),
+        add_label=lambda issue_number, label: github_api_module.add_label(runtime, issue_number, label),
+        remove_label=lambda issue_number, label: github_api_module.remove_label(runtime, issue_number, label),
+        ensure_label_exists=lambda label, *, color=None, description=None: github_api_module.ensure_label_exists(runtime, label, color=color, description=description),
+        get_issue_assignees=lambda issue_number: github_api_module.get_issue_assignees(runtime, issue_number),
+        request_reviewer_assignment=lambda issue_number, username: github_api_module.request_reviewer_assignment(runtime, issue_number, username),
+        get_assignment_failure_comment=lambda reviewer, attempt: github_api_module.get_assignment_failure_comment(runtime, reviewer, attempt),
+        add_reaction=lambda comment_id, reaction: github_api_module.add_reaction(runtime, comment_id, reaction),
+        remove_assignee=lambda issue_number, username: github_api_module.remove_assignee(runtime, issue_number, username),
+        remove_pr_reviewer=lambda issue_number, username: github_api_module.remove_pr_reviewer(runtime, issue_number, username),
+        unassign_reviewer=lambda issue_number, username: github_api_module.unassign_reviewer(runtime, issue_number, username),
+        get_user_permission_status=lambda username, required_permission="triage": github_api_module.get_user_permission_status(runtime, username, required_permission),
+        check_user_permission=lambda username, required_permission="triage": github_api_module.check_user_permission(runtime, username, required_permission),
+        get_issue_or_pr_snapshot=lambda issue_number: get_issue_or_pr_snapshot(issue_number),
+        get_pull_request_reviews=lambda issue_number: reviews_module.get_pull_request_reviews(runtime, issue_number),
+        maybe_record_head_observation_repair=lambda issue_number, review_data: lifecycle_module.maybe_record_head_observation_repair(runtime, issue_number, review_data),
+        ensure_review_entry=lambda state, issue_number, create=False: review_state_module.ensure_review_entry(state, issue_number, create=create),
+        set_current_reviewer=lambda state, issue_number, reviewer, assignment_method="round-robin": review_state_module.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method),
+        update_reviewer_activity=lambda state, issue_number, reviewer: review_state_module.update_reviewer_activity(state, issue_number, reviewer),
+        mark_review_complete=lambda state, issue_number, reviewer, source: review_state_module.mark_review_complete(state, issue_number, reviewer, source),
+        is_triage_or_higher=lambda username: reviews_module.is_triage_or_higher(runtime, username),
+        trigger_mandatory_approver_escalation=lambda state, issue_number: reviews_module.trigger_mandatory_approver_escalation(runtime, state, issue_number),
+        satisfy_mandatory_approver_requirement=lambda state, issue_number, approver: reviews_module.satisfy_mandatory_approver_requirement(runtime, state, issue_number, approver),
+        get_next_reviewer=lambda state, skip_usernames=None: queue_get_next_reviewer(state, skip_usernames),
+        strip_code_blocks=commands_module.strip_code_blocks,
+        parse_command=lambda comment_body: commands_module.parse_command(runtime, comment_body),
+        record_assignment=queue_record_assignment,
+        reposition_member_as_next=queue_reposition_member_as_next,
+        parse_iso8601_timestamp=state_store_module.parse_iso8601_timestamp,
+        compute_reviewer_response_state=lambda issue_number, review_data, *, issue_snapshot=None: reviews_module.compute_reviewer_response_state(runtime, issue_number, review_data, issue_snapshot=issue_snapshot),
+        run_command=automation_module.run_command,
+        summarize_output=automation_module.summarize_output,
+        list_changed_files=automation_module.list_changed_files,
+        get_default_branch=lambda: github_api_module.get_default_branch(runtime),
+        find_open_pr_for_branch_status=lambda branch: automation_module.find_open_pr_for_branch_status(runtime, branch),
+        create_pull_request=lambda branch, base, issue_number: automation_module.create_pull_request(runtime, branch, base, issue_number),
+        parse_issue_labels=automation_module.bot_parse_issue_labels,
+        normalize_lock_metadata=state_store_module.normalize_lock_metadata,
+        get_state_issue=lambda: state_store_module.get_state_issue(runtime),
+        clear_lock_metadata=lambda: lease_lock_module.clear_lock_metadata(runtime),
+        get_state_issue_snapshot=lambda: state_store_module.get_state_issue_snapshot(runtime),
+        conditional_patch_state_issue=lambda body, etag=None: state_store_module.conditional_patch_state_issue(runtime, body, etag),
+        parse_lock_metadata_from_issue_body=state_store_module.parse_lock_metadata_from_issue_body,
+        render_state_issue_body=lambda state, lock_meta, base_body=None, *, preserve_state_block=False: state_store_module.render_state_issue_body(
+            state,
+            lock_meta,
+            base_body,
+            preserve_state_block=preserve_state_block,
+        ),
+        get_state_issue_html_url=lambda: lease_lock_module.get_state_issue_html_url(runtime),
+        get_lock_ref_display=lambda: lease_lock_module.get_lock_ref_display(runtime),
+        get_lock_ref_snapshot=lambda: lease_lock_module.get_lock_ref_snapshot(runtime),
+        build_lock_metadata=lambda *args, **kwargs: lease_lock_module.build_lock_metadata(runtime, *args, **kwargs),
+        create_lock_commit=lambda parent_sha, tree_sha, lock_meta: lease_lock_module.create_lock_commit(runtime, parent_sha, tree_sha, lock_meta),
+        cas_update_lock_ref=lambda new_sha: lease_lock_module.cas_update_lock_ref(runtime, new_sha),
+        lock_is_currently_valid=lambda lock_meta, now=None: lease_lock_module.lock_is_currently_valid(runtime, lock_meta, now),
+        renew_state_issue_lease_lock=lambda context: lease_lock_module.renew_state_issue_lease_lock(runtime, context),
+        ensure_state_issue_lease_lock_fresh=lambda: lease_lock_module.ensure_state_issue_lease_lock_fresh(runtime),
+        acquire_state_issue_lease_lock=lambda: lease_lock_module.acquire_state_issue_lease_lock(runtime),
+        release_state_issue_lease_lock=lambda: lease_lock_module.release_state_issue_lease_lock(runtime),
+        get_active_lease_context=lambda: runtime.ACTIVE_LEASE_CONTEXT,
+    )
+    runtime = ReviewerBotRuntime(
+        requests=requests,
+        sys=sys,
+        random=random,
+        time=time,
+        state_store=state_store,
+        github=github,
+        locks=locks,
+        handlers=handlers,
+        adapters=adapters,
+        active_lease_context=ACTIVE_LEASE_CONTEXT,
+    )
+    return runtime
+
+
+RUNTIME = _build_runtime()
 
 
 if __name__ == "__main__":
