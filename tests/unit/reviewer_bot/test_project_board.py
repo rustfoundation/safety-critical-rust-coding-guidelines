@@ -1,5 +1,12 @@
 from scripts import reviewer_bot
-from tests.fixtures.reviewer_bot import make_state, valid_reviewer_board_metadata
+from tests.fixtures.reviewer_bot import (
+    accept_reviewer_comment,
+    accept_reviewer_review,
+    issue_snapshot,
+    make_state,
+    make_tracked_review_state,
+    valid_reviewer_board_metadata,
+)
 
 
 def test_reviewer_board_preflight_validates_manifest(monkeypatch):
@@ -16,15 +23,17 @@ def test_reviewer_board_preflight_validates_manifest(monkeypatch):
 
 def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["assigned_at"] = "2026-03-20T12:34:56Z"
-    review["active_cycle_started_at"] = "2026-03-20T12:34:56Z"
+    make_tracked_review_state(
+        state,
+        42,
+        reviewer="alice",
+        assigned_at="2026-03-20T12:34:56Z",
+        active_cycle_started_at="2026-03-20T12:34:56Z",
+    )
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+        lambda issue_number: issue_snapshot(issue_number, state="open"),
     )
 
     preview = reviewer_bot.preview_board_projection_for_item(state, 42)
@@ -38,11 +47,11 @@ def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypat
 
 def test_preview_board_projection_tracked_unassigned_maps_to_unassigned(monkeypatch):
     state = make_state()
-    reviewer_bot.ensure_review_entry(state, 42, create=True)
+    make_tracked_review_state(state, 42)
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+        lambda issue_number: issue_snapshot(issue_number, state="open"),
     )
 
     preview = reviewer_bot.preview_board_projection_for_item(state, 42)
@@ -57,13 +66,11 @@ def test_preview_board_projection_tracked_unassigned_maps_to_unassigned(monkeypa
 
 def test_preview_board_projection_closed_item_maps_to_archive_intent(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
+    make_tracked_review_state(state, 42, reviewer="alice")
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "closed", "pull_request": None, "labels": []},
+        lambda issue_number: issue_snapshot(issue_number, state="closed"),
     )
 
     preview = reviewer_bot.preview_board_projection_for_item(state, 42)
@@ -80,7 +87,7 @@ def test_preview_board_projection_open_untracked_maps_to_archive_intent(monkeypa
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+        lambda issue_number: issue_snapshot(issue_number, state="open"),
     )
 
     preview = reviewer_bot.preview_board_projection_for_item(state, 42)
@@ -93,21 +100,21 @@ def test_preview_board_projection_open_untracked_maps_to_archive_intent(monkeypa
 
 def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["assigned_at"] = "2026-03-20T12:34:56Z"
-    review["active_cycle_started_at"] = "2026-03-20T12:34:56Z"
-    reviewer_bot.reviews_module.accept_channel_event(
+    review = make_tracked_review_state(
+        state,
+        42,
+        reviewer="alice",
+        assigned_at="2026-03-20T12:34:56Z",
+        active_cycle_started_at="2026-03-20T12:34:56Z",
+    )
+    accept_reviewer_comment(
         review,
-        "reviewer_comment",
         semantic_key="issue_comment:1",
         timestamp="2026-03-21T08:00:00Z",
         actor="alice",
     )
-    reviewer_bot.reviews_module.accept_channel_event(
+    accept_reviewer_review(
         review,
-        "reviewer_review",
         semantic_key="pull_request_review:10",
         timestamp="2026-03-21T08:00:00Z",
         actor="alice",
@@ -117,7 +124,7 @@ def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+        lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True),
     )
     monkeypatch.setattr(
         reviewer_bot,
@@ -139,14 +146,15 @@ def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
 
 def test_preview_board_projection_keeps_parity_with_refreshed_live_review_state(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["assigned_at"] = "2026-03-17T09:00:00Z"
-    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
-    reviewer_bot.reviews_module.accept_channel_event(
+    review = make_tracked_review_state(
+        state,
+        42,
+        reviewer="alice",
+        assigned_at="2026-03-17T09:00:00Z",
+        active_cycle_started_at="2026-03-17T09:00:00Z",
+    )
+    accept_reviewer_review(
         review,
-        "reviewer_review",
         semantic_key="pull_request_review:99",
         timestamp="2026-03-17T11:00:00Z",
         actor="alice",
@@ -156,7 +164,7 @@ def test_preview_board_projection_keeps_parity_with_refreshed_live_review_state(
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+        lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True),
     )
     monkeypatch.setattr(
         reviewer_bot,
@@ -194,19 +202,21 @@ def test_preview_board_projection_keeps_parity_with_refreshed_live_review_state(
 
 def test_preview_board_projection_marks_projection_repair_as_attention(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["assigned_at"] = "2026-03-20T12:34:56Z"
-    review["active_cycle_started_at"] = "2026-03-20T12:34:56Z"
-    review["repair_needed"] = {
-        "kind": "projection_failure",
-        "reason": "projection_failed",
-    }
+    make_tracked_review_state(
+        state,
+        42,
+        reviewer="alice",
+        assigned_at="2026-03-20T12:34:56Z",
+        active_cycle_started_at="2026-03-20T12:34:56Z",
+        repair_needed={
+            "kind": "projection_failure",
+            "reason": "projection_failed",
+        },
+    )
     monkeypatch.setattr(
         reviewer_bot,
         "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
+        lambda issue_number: issue_snapshot(issue_number, state="open"),
     )
 
     preview = reviewer_bot.preview_board_projection_for_item(state, 42)

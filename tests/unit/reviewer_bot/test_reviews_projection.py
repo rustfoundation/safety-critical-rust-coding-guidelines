@@ -2,15 +2,22 @@ import json
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import reviews_projection
-from tests.fixtures.reviewer_bot import make_state
+from tests.fixtures.reviewer_bot import (
+    make_state,
+    make_tracked_review_state,
+    pull_request_payload,
+    review_payload,
+)
 
 
 def test_compute_reviewer_response_state_is_pure_for_pr_projection(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    review = make_tracked_review_state(
+        state,
+        42,
+        reviewer="alice",
+        active_cycle_started_at="2026-03-17T09:00:00Z",
+    )
     before = json.loads(json.dumps(review))
     monkeypatch.setattr(
         reviewer_bot,
@@ -22,7 +29,7 @@ def test_compute_reviewer_response_state_is_pure_for_pr_projection(monkeypatch):
         "github_api_request",
         lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
             200,
-            {"state": "open", "head": {"sha": "head-1"}} if endpoint == "pulls/42" else [],
+            pull_request_payload(42, head_sha="head-1") if endpoint == "pulls/42" else [],
             {},
             "ok",
             True,
@@ -39,26 +46,28 @@ def test_compute_reviewer_response_state_is_pure_for_pr_projection(monkeypatch):
 
 
 def test_compute_pr_approval_state_result_is_pure(monkeypatch):
-    review = reviewer_bot.ensure_review_entry(make_state(), 42, create=True)
-    assert review is not None
-    review["current_reviewer"] = "alice"
-    review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
+    review = make_tracked_review_state(
+        make_state(),
+        42,
+        reviewer="alice",
+        active_cycle_started_at="2026-03-17T09:00:00Z",
+    )
     before = json.loads(json.dumps(review))
     monkeypatch.setattr(
         reviewer_bot,
         "github_api_request",
         lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
             200,
-            {"state": "open", "head": {"sha": "head-1"}}
+            pull_request_payload(42, head_sha="head-1")
             if endpoint == "pulls/42"
             else [
-                {
-                    "id": 10,
-                    "state": "APPROVED",
-                    "submitted_at": "2026-03-17T10:01:00Z",
-                    "commit_id": "head-1",
-                    "user": {"login": "alice"},
-                }
+                review_payload(
+                    10,
+                    state="APPROVED",
+                    submitted_at="2026-03-17T10:01:00Z",
+                    commit_id="head-1",
+                    author="alice",
+                )
             ],
             {},
             "ok",
