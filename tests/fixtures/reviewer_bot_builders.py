@@ -140,7 +140,7 @@ def accept_contributor_revision(
         semantic_key=semantic_key,
         timestamp=timestamp,
         actor=actor,
-        head_sha=head_sha,
+        reviewed_head_sha=head_sha,
     )
 
 
