@@ -22,11 +22,11 @@ def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypa
         comment_author="dana",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
-    effects = harness.side_effects()
-    monkeypatch.setattr(reviewer_bot, "parse_issue_labels", lambda: [reviewer_bot.FLS_AUDIT_LABEL])
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "granted")
+    effects = harness.capture_comment_side_effects()
+    harness.runtime.parse_issue_labels = lambda: [reviewer_bot.FLS_AUDIT_LABEL]
+    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
 
-    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is True
+    assert reviewer_bot.comment_routing_module.handle_comment_event(harness.runtime, state, request) is True
     pending = state["active_reviews"]["42"]["pending_privileged_commands"]
     assert pending["issue_comment:100"]["command_name"] == "accept-no-fls-changes"
     assert pending["issue_comment:100"]["authorization"]["authorized"] is True
@@ -51,7 +51,7 @@ def test_closed_non_pr_plain_text_comment_does_not_create_review_entry(monkeypat
         comment_body="reviewer-bot validation: close comment",
     )
 
-    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is False
+    assert reviewer_bot.comment_routing_module.handle_comment_event(harness.runtime, state, request) is False
     assert state["active_reviews"] == {}
 
 def test_closed_non_pr_command_comment_does_not_create_pending_privileged_command(monkeypatch):
@@ -65,11 +65,11 @@ def test_closed_non_pr_command_comment_does_not_create_pending_privileged_comman
         comment_author="dana",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
-    effects = harness.side_effects()
+    effects = harness.capture_comment_side_effects()
     monkeypatch.setattr(reviewer_bot, "parse_issue_labels", lambda: [reviewer_bot.FLS_AUDIT_LABEL])
     monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
 
-    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is False
+    assert reviewer_bot.comment_routing_module.handle_comment_event(harness.runtime, state, request) is False
     assert state["active_reviews"] == {}
     assert effects.comments == []
 
@@ -88,7 +88,7 @@ def test_closed_non_pr_comment_removes_stale_review_entry(monkeypatch):
         comment_body="reviewer-bot validation: close comment",
     )
 
-    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is True
+    assert reviewer_bot.comment_routing_module.handle_comment_event(harness.runtime, state, request) is True
     assert "42" not in state["active_reviews"]
 
 def test_closed_non_pr_comment_without_entry_returns_false(monkeypatch):
@@ -103,7 +103,7 @@ def test_closed_non_pr_comment_without_entry_returns_false(monkeypatch):
         comment_body="reviewer-bot validation: close comment",
     )
 
-    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is False
+    assert reviewer_bot.comment_routing_module.handle_comment_event(harness.runtime, state, request) is False
     assert state["active_reviews"] == {}
 
 def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
@@ -112,7 +112,7 @@ def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    harness.set_wrapper_env(
+    harness.apply_wrapper_inputs(
         issue_number=42,
         is_pull_request=False,
         issue_state="open",

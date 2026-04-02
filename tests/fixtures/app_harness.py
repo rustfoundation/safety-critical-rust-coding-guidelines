@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from scripts import reviewer_bot
 
 from .fake_runtime import FakeReviewerBotRuntime
+from .reviewer_bot_env import set_env_values
 
 
 @dataclass
@@ -22,8 +23,7 @@ class AppHarness:
         self._monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
 
     def set_event(self, **values) -> None:
-        for name, value in values.items():
-            self.config.set(name, value)
+        set_env_values(self.config, **values)
 
     def set_state_sequence(self, *states: dict) -> None:
         self.runtime.stub_state_sequence(*states)

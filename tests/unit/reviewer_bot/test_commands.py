@@ -29,7 +29,7 @@ def test_label_signoff_create_pr_marks_issue_review_complete_without_inline_stat
         lambda *args, **kwargs: pytest.fail("status sync should run only from app orchestration after save"),
     )
     harness.runtime.add_reaction = lambda *args, **kwargs: True
-    posted = harness.record_comments()
+    posted = harness.capture_posted_comments()
 
     assert reviewer_bot.handle_comment_event(state) is True
     assert review["review_completion_source"] == "issue_label: sign-off: create pr"

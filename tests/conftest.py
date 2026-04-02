@@ -1,54 +1,20 @@
 import pytest
 
 from scripts import reviewer_bot
+from tests.fixtures.reviewer_bot_env import (
+    build_test_lease_context,
+    reset_reviewer_bot_process_state,
+)
+from tests.fixtures.reviewer_bot_recorders import (
+    record_comment_dicts,
+    record_status_label_ops,
+)
 
 
 @pytest.fixture(autouse=True)
-def clear_reviewer_bot_env():
-    env_vars = {
-        "COMMENT_BODY",
-        "COMMENT_AUTHOR",
-        "COMMENT_ID",
-        "COMMENT_SOURCE_EVENT_KEY",
-        "ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE",
-        "EVENT_ACTION",
-        "EVENT_NAME",
-        "ISSUE_NUMBER",
-        "ISSUE_AUTHOR",
-        "IS_PULL_REQUEST",
-        "ISSUE_LABELS",
-        "LABEL_NAME",
-        "MANUAL_ACTION",
-        "PR_IS_CROSS_REPOSITORY",
-        "REVIEW_AUTHOR",
-        "REVIEW_STATE",
-        "REPO_OWNER",
-        "REPO_NAME",
-        "WORKFLOW_RUN_EVENT",
-        "WORKFLOW_RUN_EVENT_ACTION",
-        "WORKFLOW_RUN_HEAD_SHA",
-        "WORKFLOW_RUN_RECONCILE_PR_NUMBER",
-        "WORKFLOW_RUN_RECONCILE_HEAD_SHA",
-        "WORKFLOW_RUN_ID",
-        "WORKFLOW_NAME",
-        "WORKFLOW_JOB_NAME",
-    }
+def reset_reviewer_bot_process_state_fixture():
     with pytest.MonkeyPatch().context() as monkeypatch:
-        for name in env_vars:
-            monkeypatch.delenv(name, raising=False)
-        monkeypatch.setattr(
-            reviewer_bot,
-            "ACTIVE_LEASE_CONTEXT",
-            reviewer_bot.LeaseContext(
-                lock_token="test-lock-token",
-                lock_owner_run_id="test-run",
-                lock_owner_workflow="test-workflow",
-                lock_owner_job="test-job",
-                state_issue_url="https://example.com/state",
-            ),
-        )
-        monkeypatch.setattr(reviewer_bot, "TOUCHED_ISSUE_NUMBERS", set())
-        monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+        reset_reviewer_bot_process_state(monkeypatch)
         yield
 
 
@@ -63,13 +29,7 @@ def setenv_many(monkeypatch):
 
 @pytest.fixture
 def lease_context():
-    return reviewer_bot.LeaseContext(
-        lock_token="test-lock-token",
-        lock_owner_run_id="test-run",
-        lock_owner_workflow="test-workflow",
-        lock_owner_job="test-job",
-        state_issue_url="https://example.com/state",
-    )
+    return build_test_lease_context()
 
 
 @pytest.fixture
@@ -113,29 +73,9 @@ def stub_api(monkeypatch):
 
 @pytest.fixture
 def captured_comments(monkeypatch):
-    comments = []
-
-    def record_comment(issue_number, body):
-        comments.append({"issue_number": issue_number, "body": body})
-        return True
-
-    monkeypatch.setattr(reviewer_bot, "post_comment", record_comment)
-    return comments
+    return record_comment_dicts(reviewer_bot)
 
 
 @pytest.fixture
 def captured_status_label_ops(monkeypatch):
-    operations = []
-
-    def record_add(issue_number, label):
-        operations.append(("add", issue_number, label))
-        return True
-
-    def record_remove(issue_number, label):
-        operations.append(("remove", issue_number, label))
-        return True
-
-    monkeypatch.setattr(reviewer_bot, "add_label_with_status", record_add)
-    monkeypatch.setattr(reviewer_bot, "remove_label_with_status", record_remove)
-    monkeypatch.setattr(reviewer_bot, "ensure_label_exists", lambda *args, **kwargs: True)
-    return operations
+    return record_status_label_ops(reviewer_bot)

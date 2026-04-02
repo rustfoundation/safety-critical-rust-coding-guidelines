@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib.context import CommentEventRequest, PrCommentTrustContext
 
 from .fake_runtime import FakeReviewerBotRuntime
+from .reviewer_bot_env import set_env_values
 from .reviewer_bot_fakes import RouteGitHubApi
-
-
-@dataclass
-class SideEffects:
-    comments: list[tuple[int, str]]
-    reactions: list[tuple[int, str]]
+from .reviewer_bot_recorders import record_comment_side_effects
 
 
 class CommentRoutingHarness:
@@ -87,14 +81,10 @@ class CommentRoutingHarness:
         )
         self.github.add_request("GET", f"pulls/{issue_number}", status_code=200, payload=payload)
 
-    def side_effects(self) -> SideEffects:
-        comments: list[tuple[int, str]] = []
-        reactions: list[tuple[int, str]] = []
-        self.runtime.post_comment = lambda issue_number, body: comments.append((issue_number, body)) or True
-        self.runtime.add_reaction = lambda comment_id, reaction: reactions.append((comment_id, reaction)) or True
-        return SideEffects(comments=comments, reactions=reactions)
+    def capture_comment_side_effects(self):
+        return record_comment_side_effects(self.runtime)
 
-    def set_wrapper_env(
+    def apply_wrapper_inputs(
         self,
         *,
         issue_number: int,
@@ -111,20 +101,23 @@ class CommentRoutingHarness:
         github_repository: str = "",
         github_ref: str = "",
     ) -> None:
-        self.config.set("ISSUE_NUMBER", issue_number)
-        self.config.set("IS_PULL_REQUEST", str(is_pull_request).lower())
-        self.config.set("ISSUE_STATE", issue_state)
-        self.config.set("ISSUE_AUTHOR", issue_author)
-        self.config.set("COMMENT_ID", comment_id)
-        self.config.set("COMMENT_AUTHOR", comment_author)
-        self.config.set("COMMENT_BODY", comment_body)
-        self.config.set("COMMENT_CREATED_AT", comment_created_at)
-        self.config.set("COMMENT_USER_TYPE", comment_user_type)
+        values = {
+            "ISSUE_NUMBER": issue_number,
+            "IS_PULL_REQUEST": str(is_pull_request).lower(),
+            "ISSUE_STATE": issue_state,
+            "ISSUE_AUTHOR": issue_author,
+            "COMMENT_ID": comment_id,
+            "COMMENT_AUTHOR": comment_author,
+            "COMMENT_BODY": comment_body,
+            "COMMENT_CREATED_AT": comment_created_at,
+            "COMMENT_USER_TYPE": comment_user_type,
+        }
         if comment_author_association:
-            self.config.set("COMMENT_AUTHOR_ASSOCIATION", comment_author_association)
+            values["COMMENT_AUTHOR_ASSOCIATION"] = comment_author_association
         if current_workflow_file:
-            self.config.set("CURRENT_WORKFLOW_FILE", current_workflow_file)
+            values["CURRENT_WORKFLOW_FILE"] = current_workflow_file
         if github_repository:
-            self.config.set("GITHUB_REPOSITORY", github_repository)
+            values["GITHUB_REPOSITORY"] = github_repository
         if github_ref:
-            self.config.set("GITHUB_REF", github_ref)
+            values["GITHUB_REF"] = github_ref
+        set_env_values(self.config, **values)

@@ -5,6 +5,8 @@ import subprocess
 from scripts import reviewer_bot
 
 from .fake_runtime import FakeReviewerBotRuntime
+from .reviewer_bot_env import set_env_values
+from .reviewer_bot_recorders import record_comments
 
 
 class AutomationRunner:
@@ -46,26 +48,28 @@ class CommandHarness:
         comment_id: int = 100,
         created_at: str = "2026-03-17T10:00:00Z",
     ) -> None:
-        self.config.set("ISSUE_NUMBER", issue_number)
-        self.config.set("IS_PULL_REQUEST", str(is_pull_request).lower())
-        self.config.set("ISSUE_AUTHOR", issue_author)
-        self.config.set("COMMENT_USER_TYPE", "User")
-        self.config.set("COMMENT_AUTHOR", actor)
-        self.config.set("COMMENT_ID", comment_id)
-        self.config.set("COMMENT_CREATED_AT", created_at)
-        self.config.set("COMMENT_BODY", body)
+        values = {
+            "ISSUE_NUMBER": issue_number,
+            "IS_PULL_REQUEST": str(is_pull_request).lower(),
+            "ISSUE_AUTHOR": issue_author,
+            "COMMENT_USER_TYPE": "User",
+            "COMMENT_AUTHOR": actor,
+            "COMMENT_ID": comment_id,
+            "COMMENT_CREATED_AT": created_at,
+            "COMMENT_BODY": body,
+        }
         if author_association:
-            self.config.set("COMMENT_AUTHOR_ASSOCIATION", author_association)
+            values["COMMENT_AUTHOR_ASSOCIATION"] = author_association
         if workflow_file:
-            self.config.set("CURRENT_WORKFLOW_FILE", workflow_file)
+            values["CURRENT_WORKFLOW_FILE"] = workflow_file
         if repository:
-            self.config.set("GITHUB_REPOSITORY", repository)
+            values["GITHUB_REPOSITORY"] = repository
         if ref:
-            self.config.set("GITHUB_REF", ref)
+            values["GITHUB_REF"] = ref
+        set_env_values(self.config, **values)
 
     def set_assignment_context(self, *, issue_author: str, is_pull_request: bool) -> None:
-        self.config.set("ISSUE_AUTHOR", issue_author)
-        self.config.set("IS_PULL_REQUEST", str(is_pull_request).lower())
+        set_env_values(self.config, ISSUE_AUTHOR=issue_author, IS_PULL_REQUEST=str(is_pull_request).lower())
 
     def set_privileged_context(
         self,
@@ -76,19 +80,15 @@ class CommandHarness:
     ) -> None:
         import json
 
-        self.config.set("IS_PULL_REQUEST", str(is_pull_request).lower())
-        self.config.set("ISSUE_LABELS", json.dumps(labels))
+        set_env_values(self.config, IS_PULL_REQUEST=str(is_pull_request).lower(), ISSUE_LABELS=json.dumps(labels))
         if target_repo_root is not None:
             self.config.set("REVIEWER_BOT_TARGET_REPO_ROOT", target_repo_root)
 
     def set_manual_dispatch(self, *, source_event_key: str) -> None:
-        self.config.set("MANUAL_ACTION", "execute-pending-privileged-command")
-        self.config.set("PRIVILEGED_SOURCE_EVENT_KEY", source_event_key)
+        set_env_values(self.config, MANUAL_ACTION="execute-pending-privileged-command", PRIVILEGED_SOURCE_EVENT_KEY=source_event_key)
 
-    def record_comments(self):
-        posted = []
-        self.runtime.post_comment = lambda issue_number, body: posted.append((issue_number, body)) or True
-        return posted
+    def capture_posted_comments(self):
+        return record_comments(self.runtime)
 
     def stub_assignees(self, assignees):
         self.runtime.get_issue_assignees = lambda issue_number: assignees

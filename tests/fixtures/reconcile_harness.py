@@ -7,6 +7,7 @@ from scripts.reviewer_bot_lib import comment_routing
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import pull_request_payload, review_payload
+from .reviewer_bot_env import set_env_values
 from .reviewer_bot_fakes import RouteGitHubApi, github_result
 
 
@@ -135,10 +136,13 @@ class ReconcileHarness:
         return payload
 
     def set_trigger_from_payload(self, payload: dict, *, conclusion: str = "success") -> None:
-        self.config.set("WORKFLOW_RUN_TRIGGERING_NAME", payload["source_workflow_name"])
-        self.config.set("WORKFLOW_RUN_TRIGGERING_ID", payload["source_run_id"])
-        self.config.set("WORKFLOW_RUN_TRIGGERING_ATTEMPT", payload["source_run_attempt"])
-        self.config.set("WORKFLOW_RUN_TRIGGERING_CONCLUSION", conclusion)
+        set_env_values(
+            self.config,
+            WORKFLOW_RUN_TRIGGERING_NAME=payload["source_workflow_name"],
+            WORKFLOW_RUN_TRIGGERING_ID=payload["source_run_id"],
+            WORKFLOW_RUN_TRIGGERING_ATTEMPT=payload["source_run_attempt"],
+            WORKFLOW_RUN_TRIGGERING_CONCLUSION=conclusion,
+        )
 
     def add_pull_request(
         self,
