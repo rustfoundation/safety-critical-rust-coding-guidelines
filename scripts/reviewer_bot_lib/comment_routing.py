@@ -402,11 +402,32 @@ def _validate_accept_no_fls_changes_handoff(
     }
 
 
-def _handle_command(bot, state: dict, request: CommentEventRequest, classified: dict) -> bool:
+def _handle_command(
+    bot,
+    state: dict,
+    request_or_issue_number: CommentEventRequest | int,
+    comment_author: str | dict | None = None,
+    classified: dict | None = None,
+) -> bool:
+    if isinstance(request_or_issue_number, CommentEventRequest):
+        request = request_or_issue_number
+        classified_payload = classified if classified is not None else comment_author
+    else:
+        request = CommentEventRequest(
+            issue_number=request_or_issue_number,
+            is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
+            issue_author=os.environ.get("ISSUE_AUTHOR", ""),
+            comment_id=int(os.environ.get("COMMENT_ID", "0") or 0),
+            comment_author=str(comment_author or ""),
+            comment_source_event_key=os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip(),
+        )
+        classified_payload = classified
+    if not isinstance(classified_payload, dict):
+        return False
     issue_number = request.issue_number
     comment_author = request.comment_author
-    command = classified.get("command")
-    args = classified.get("args") or []
+    command = classified_payload.get("command")
+    args = classified_payload.get("args") or []
     if not isinstance(command, str):
         return False
     actor_class = _classify_issue_comment_actor(request)
