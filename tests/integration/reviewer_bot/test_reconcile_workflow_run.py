@@ -113,7 +113,7 @@ def test_deferred_comment_reconcile_returns_true_for_bookkeeping_only_mutations(
         author_type="User",
         author_association="MEMBER",
     )
-    monkeypatch.setattr(reviewer_bot.reconcile_module, "_handle_command", lambda *args, **kwargs: False)
+    monkeypatch.setattr(reviewer_bot.comment_application_module, "apply_comment_command", lambda *args, **kwargs: False)
 
     assert harness.run(state) is True
     assert "issue_comment:210" in review["reconciled_source_events"]
@@ -421,8 +421,8 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
     )
     command_calls = []
     monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "_handle_command",
+        reviewer_bot.comment_application_module,
+        "apply_comment_command",
         lambda *args, **kwargs: command_calls.append("called") or True,
     )
 
@@ -502,9 +502,9 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
     harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
     claim_contexts = []
     monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "_handle_command",
-        lambda bot, state_obj, request, classified: claim_contexts.append(
+        reviewer_bot.comment_application_module,
+        "apply_comment_command",
+        lambda bot, state_obj, request, classified, classify_issue_comment_actor=None: claim_contexts.append(
             {
                 "issue_number": request.issue_number,
                 "username": request.comment_author,

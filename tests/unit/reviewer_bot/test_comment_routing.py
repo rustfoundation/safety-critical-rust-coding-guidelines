@@ -1,7 +1,7 @@
 import pytest
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import comment_routing
+from scripts.reviewer_bot_lib import comment_application, comment_routing
 from scripts.reviewer_bot_lib.context import CommentEventRequest
 from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 from tests.fixtures.reviewer_bot import make_state
@@ -34,7 +34,7 @@ def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_
         comment_source_event_key="issue_comment:100",
     )
 
-    changed = reviewer_bot.comment_routing_module._record_conversation_freshness(
+    changed = comment_application.record_conversation_freshness(
         reviewer_bot,
         state,
         request,

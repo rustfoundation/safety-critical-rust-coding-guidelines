@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import comment_routing
+from scripts.reviewer_bot_lib import comment_application
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import pull_request_payload, review_payload
@@ -67,7 +67,7 @@ def issue_comment_payload(
         "comment_id": comment_id,
         "comment_class": comment_class,
         "has_non_command_text": has_non_command_text,
-        "source_body_digest": comment_routing._digest_body(body),
+        "source_body_digest": comment_application.digest_comment_body(body),
         "source_created_at": source_created_at,
         "actor_login": actor_login,
     }
@@ -103,7 +103,7 @@ def review_comment_payload(
         "comment_id": comment_id,
         "comment_class": comment_class,
         "has_non_command_text": has_non_command_text,
-        "source_body_digest": comment_routing._digest_body(body),
+        "source_body_digest": comment_application.digest_comment_body(body),
         "source_created_at": source_created_at,
         "actor_login": actor_login,
         "actor_id": actor_id,

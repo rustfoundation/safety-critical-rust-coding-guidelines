@@ -5,12 +5,12 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 
-from .comment_routing import (
-    _digest_body,
-    _handle_command,
-    _record_conversation_freshness,
-    classify_comment_payload,
+from .comment_application import (
+    digest_comment_body,
+    process_comment_event,
+    record_conversation_freshness,
 )
+from .comment_routing import classify_comment_payload, classify_issue_comment_actor
 from .context import CommentEventRequest
 from .reviews import (
     find_triage_approval_after,
@@ -674,7 +674,7 @@ def _reconcile_deferred_comment(
     except ReconcileReadError as exc:
         changed = False
         if source_freshness_eligible:
-            changed = _record_conversation_freshness(bot, state, replay_request())
+            changed = record_conversation_freshness(bot, state, replay_request())
         if exc.failure_kind == "not_found":
             summary = (
                 f"Deferred comment {comment_id} is no longer visible; source-time freshness only may be preserved. "
@@ -698,15 +698,15 @@ def _reconcile_deferred_comment(
     live_body = live_comment.get("body")
     if not isinstance(live_body, str):
         raise RuntimeError("Live deferred comment body is unavailable")
-    if _digest_body(live_body) != payload.get("source_body_digest"):
+    if digest_comment_body(live_body) != payload.get("source_body_digest"):
         changed = False
         if source_freshness_eligible:
-            changed = _record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body))
+            changed = record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body))
         gap_changed = _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {comment_id} body digest changed; command execution suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
         return changed or gap_changed
     changed = False
     if source_freshness_eligible:
-        changed = _record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body)) or changed
+        changed = record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body)) or changed
     validation_result = _validate_live_comment_replay_contract(
         bot,
         review_data,
@@ -717,7 +717,13 @@ def _reconcile_deferred_comment(
         return changed or validation_result.changed
     live_classified = validation_result.live_classified
     if context.payload.comment_class in {"command_only", "command_plus_text"}:
-        changed = _handle_command(bot, state, replay_request(comment_context, comment_body=live_body), live_classified) or changed
+        changed = process_comment_event(
+            bot,
+            state,
+            replay_request(comment_context, comment_body=live_body),
+            classify_comment_payload=lambda _bot, _body: live_classified,
+            classify_issue_comment_actor=classify_issue_comment_actor,
+        ) or changed
     reconciled_changed = _mark_reconciled_source_event(review_data, str(payload.get("source_event_key", "")))
     gap_cleared_changed = _clear_source_event_key(review_data, str(payload.get("source_event_key", "")))
     return changed or reconciled_changed or gap_cleared_changed

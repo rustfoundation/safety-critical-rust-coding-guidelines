@@ -67,6 +67,7 @@ timezone = _timezone
 
 import scripts.reviewer_bot_lib.automation as automation_module
 import scripts.reviewer_bot_lib.commands as commands_module
+import scripts.reviewer_bot_lib.comment_application as comment_application_module  # noqa: F401
 import scripts.reviewer_bot_lib.comment_routing as comment_routing_module
 import scripts.reviewer_bot_lib.events as events_module
 import scripts.reviewer_bot_lib.github_api as github_api_module
