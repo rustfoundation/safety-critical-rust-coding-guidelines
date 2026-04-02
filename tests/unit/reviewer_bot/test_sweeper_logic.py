@@ -1,14 +1,31 @@
+import pytest
+
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import sweeper
 from tests.fixtures.reviewer_bot import make_state
+from tests.fixtures.reviewer_bot_sweeper_builders import (
+    artifact_payload,
+    issue_comment_event,
+    pull_request_review_event,
+    review_comment_event,
+    workflow_run,
+)
 
 
-def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_dismissals(monkeypatch):
-    monkeypatch.setattr(
-        sweeper,
-        "_now",
-        lambda: reviewer_bot.parse_github_timestamp("2026-03-25T12:30:00Z"),
-    )
+@pytest.fixture
+def freeze_sweeper_now(monkeypatch):
+    def apply(timestamp: str) -> None:
+        monkeypatch.setattr(
+            sweeper,
+            "_now",
+            lambda: reviewer_bot.parse_github_timestamp(timestamp),
+        )
+
+    return apply
+
+
+def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_dismissals(monkeypatch, freeze_sweeper_now):
+    freeze_sweeper_now("2026-03-25T12:30:00Z")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -18,15 +35,15 @@ def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_di
         "github_api",
         lambda method, endpoint, data=None: {
             "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
-            "issues/42/comments?per_page=100&page=1": [{"id": 101, "created_at": "2026-03-25T10:00:00Z"}],
+            "issues/42/comments?per_page=100&page=1": [issue_comment_event(101, created_at="2026-03-25T10:00:00Z")],
         }.get(endpoint),
     )
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
         lambda issue_number: [
-            {"id": 202, "submitted_at": "2026-03-25T11:00:00Z", "state": "APPROVED"},
-            {"id": 303, "submitted_at": "2026-03-25T09:00:00Z", "updated_at": "2026-03-25T12:00:00Z", "state": "DISMISSED"},
+            pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="APPROVED"),
+            pull_request_review_event(303, submitted_at="2026-03-25T09:00:00Z", updated_at="2026-03-25T12:00:00Z", state="DISMISSED"),
         ],
     )
 
@@ -38,12 +55,8 @@ def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_di
     assert gaps["pull_request_review_dismissed:303"]["source_workflow_file"] == ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml"
 
 
-def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypatch):
-    monkeypatch.setattr(
-        sweeper,
-        "_now",
-        lambda: reviewer_bot.parse_github_timestamp("2026-03-25T12:30:00Z"),
-    )
+def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypatch, freeze_sweeper_now):
+    freeze_sweeper_now("2026-03-25T12:30:00Z")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -55,7 +68,7 @@ def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypa
         if endpoint == "issues/42/comments?per_page=100&page=1":
             return []
         if endpoint == "pulls/42/comments?per_page=100":
-            return [{"id": 404, "created_at": "2026-03-25T10:30:00Z", "user": {"login": "dana", "type": "User"}}]
+            return [review_comment_event(404, created_at="2026-03-25T10:30:00Z", login="dana")]
         if endpoint.startswith("actions/workflows/"):
             return {"workflow_runs": []}
         return None
@@ -69,12 +82,8 @@ def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypa
     assert gaps["pull_request_review_comment:404"]["source_workflow_file"] == ".github/workflows/reviewer-bot-pr-review-comment-observer.yml"
 
 
-def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(monkeypatch):
-    monkeypatch.setattr(
-        sweeper,
-        "_now",
-        lambda: reviewer_bot.parse_github_timestamp("2026-03-17T12:30:00Z"),
-    )
+def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(monkeypatch, freeze_sweeper_now):
+    freeze_sweeper_now("2026-03-17T12:30:00Z")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -91,21 +100,15 @@ def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
-        lambda issue_number: [
-            {"id": 303, "submitted_at": "2026-03-17T09:00:00Z", "updated_at": "2026-03-17T12:00:00Z", "state": "DISMISSED"},
-        ],
+        lambda issue_number: [pull_request_review_event(303, submitted_at="2026-03-17T09:00:00Z", updated_at="2026-03-17T12:00:00Z", state="DISMISSED")],
     )
 
     assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is False
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
-def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch):
-    monkeypatch.setattr(
-        sweeper,
-        "_now",
-        lambda: reviewer_bot.parse_github_timestamp("2026-03-17T12:30:00Z"),
-    )
+def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch, freeze_sweeper_now):
+    freeze_sweeper_now("2026-03-17T12:30:00Z")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -116,25 +119,21 @@ def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch
         "github_api",
         lambda method, endpoint, data=None: {
             "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
-            "issues/42/comments?per_page=100&page=1": [{"id": 101, "created_at": "2026-03-17T10:00:00Z"}],
+            "issues/42/comments?per_page=100&page=1": [issue_comment_event(101, created_at="2026-03-17T10:00:00Z")],
         }.get(endpoint),
     )
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
-        lambda issue_number: [{"id": 202, "submitted_at": "2026-03-17T11:00:00Z", "state": "APPROVED"}],
+        lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-17T11:00:00Z", state="APPROVED")],
     )
 
     assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is False
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
-def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(monkeypatch):
-    monkeypatch.setattr(
-        sweeper,
-        "_now",
-        lambda: reviewer_bot.parse_github_timestamp("2026-03-25T12:30:00Z"),
-    )
+def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(monkeypatch, freeze_sweeper_now):
+    freeze_sweeper_now("2026-03-25T12:30:00Z")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -142,16 +141,8 @@ def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(m
         reviewer_bot,
         "github_api",
         lambda method, endpoint, data=None: [
-            {
-                "id": 100,
-                "created_at": "2026-03-25T10:00:00Z",
-                "user": {"login": "github-actions[bot]", "type": "Bot"},
-            },
-            {
-                "id": 101,
-                "created_at": "2026-03-25T11:00:00Z",
-                "user": {"login": "alice", "type": "User"},
-            },
+            issue_comment_event(100, created_at="2026-03-25T10:00:00Z", login="github-actions[bot]", user_type="Bot"),
+            issue_comment_event(101, created_at="2026-03-25T11:00:00Z", login="alice"),
         ],
     )
 
@@ -161,12 +152,8 @@ def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(m
     assert [item["source_event_key"] for item in discovered] == ["issue_comment:101"]
 
 
-def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_without_artifact(monkeypatch):
-    monkeypatch.setattr(
-        sweeper,
-        "_now",
-        lambda: reviewer_bot.parse_github_timestamp("2026-03-25T12:30:00Z"),
-    )
+def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_without_artifact(monkeypatch, freeze_sweeper_now):
+    freeze_sweeper_now("2026-03-25T12:30:00Z")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -185,15 +172,7 @@ def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_witho
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "id": 202,
-                "submitted_at": "2026-03-25T11:00:00Z",
-                "state": "COMMENTED",
-                "commit_id": "head-1",
-                "user": {"login": "alice"},
-            }
-        ],
+        lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")],
     )
 
     assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
@@ -204,12 +183,8 @@ def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_witho
     assert "pull_request_review:202" in review["reconciled_source_events"]
 
 
-def test_visible_review_repair_does_not_clear_transition_warning_for_stale_replayed_review(monkeypatch):
-    monkeypatch.setattr(
-        sweeper,
-        "_now",
-        lambda: reviewer_bot.parse_github_timestamp("2026-03-25T12:30:00Z"),
-    )
+def test_visible_review_repair_does_not_clear_transition_warning_for_stale_replayed_review(monkeypatch, freeze_sweeper_now):
+    freeze_sweeper_now("2026-03-25T12:30:00Z")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -229,15 +204,7 @@ def test_visible_review_repair_does_not_clear_transition_warning_for_stale_repla
     monkeypatch.setattr(
         reviewer_bot,
         "get_pull_request_reviews",
-        lambda issue_number: [
-            {
-                "id": 202,
-                "submitted_at": "2026-03-25T11:00:00Z",
-                "state": "COMMENTED",
-                "commit_id": "head-1",
-                "user": {"login": "alice"},
-            }
-        ],
+        lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")],
     )
 
     assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
@@ -273,13 +240,7 @@ def test_repair_visible_review_gap_returns_true_for_bookkeeping_only_mutations(m
         review,
         42,
         "pull_request_review:303",
-        {
-            "id": 303,
-            "submitted_at": "2026-03-25T11:00:00Z",
-            "state": "COMMENTED",
-            "commit_id": "head-1",
-            "user": {"login": "alice"},
-        },
+        pull_request_review_event(303, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1"),
     )
 
     assert changed is True
@@ -327,22 +288,8 @@ def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_win
         pr_number=42,
         workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
         workflow_runs=[
-            {
-                "id": 1,
-                "event": "issue_comment",
-                "path": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-                "created_at": "2026-03-17T10:05:00Z",
-                "repository": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"},
-                "pull_requests": [{"number": 42}],
-            },
-            {
-                "id": 2,
-                "event": "issue_comment",
-                "path": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-                "created_at": "2026-03-17T10:40:00Z",
-                "repository": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"},
-                "pull_requests": [{"number": 42}],
-            },
+            workflow_run(1, event="issue_comment", path=".github/workflows/reviewer-bot-pr-comment-observer.yml", created_at="2026-03-17T10:05:00Z"),
+            workflow_run(2, event="issue_comment", path=".github/workflows/reviewer-bot-pr-comment-observer.yml", created_at="2026-03-17T10:40:00Z"),
         ],
     )
     assert result["candidate_run_ids"] == [1]
@@ -351,8 +298,8 @@ def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_win
 def test_stage_b_artifact_correlation_rejects_ambiguous_exact_matches():
     result = sweeper.correlate_run_artifacts_exact(
         {
-            10: [{"source_event_key": "issue_comment:101", "source_run_id": 10, "source_run_attempt": 1, "pr_number": 42}],
-            11: [{"source_event_key": "issue_comment:101", "source_run_id": 11, "source_run_attempt": 1, "pr_number": 42}],
+            10: [artifact_payload(source_event_key="issue_comment:101", source_run_id=10)],
+            11: [artifact_payload(source_event_key="issue_comment:101", source_run_id=11)],
         },
         "issue_comment:101",
         pr_number=42,

@@ -1,9 +1,11 @@
 from pathlib import Path
+
 import pytest
 
 pytestmark = pytest.mark.contract
 
 from scripts import reviewer_bot
+
 
 @pytest.mark.parametrize(
     ("workflow_path", "artifact_name", "payload_name"),
@@ -118,7 +120,7 @@ def test_validate_workflow_run_artifact_identity_rejects_triggering_name_mismatc
     }
 
     with pytest.raises(RuntimeError, match="Triggering workflow name mismatch"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
+        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(reviewer_bot, payload)
 
 def test_validate_workflow_run_artifact_identity_rejects_run_attempt_mismatch(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
@@ -134,7 +136,7 @@ def test_validate_workflow_run_artifact_identity_rejects_run_attempt_mismatch(mo
     }
 
     with pytest.raises(RuntimeError, match="run_attempt mismatch"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
+        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(reviewer_bot, payload)
 
 def test_validate_workflow_run_artifact_identity_requires_successful_conclusion(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
@@ -149,4 +151,4 @@ def test_validate_workflow_run_artifact_identity_requires_successful_conclusion(
     }
 
     with pytest.raises(RuntimeError, match="did not conclude successfully"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(payload)
+        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(reviewer_bot, payload)
