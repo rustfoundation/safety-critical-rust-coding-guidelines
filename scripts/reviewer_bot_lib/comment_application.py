@@ -6,6 +6,11 @@ import hashlib
 from datetime import datetime, timezone
 
 from .context import CommentEventRequest
+from .review_state import (
+    accept_channel_event,
+    ensure_review_entry,
+    record_reviewer_activity,
+)
 
 
 def _now() -> datetime:
@@ -30,14 +35,14 @@ def record_conversation_freshness(
     request: CommentEventRequest,
 ) -> bool:
     issue_number = request.issue_number
-    review_data = bot.ensure_review_entry(state, issue_number, create=True)
+    review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
     comment_author = request.comment_author
     created_at = request.comment_created_at
     semantic_key = request.comment_source_event_key or f"issue_comment:{request.comment_id}"
     if request.issue_author and request.issue_author.lower() == comment_author.lower():
-        return bot.reviews_module.accept_channel_event(
+        return accept_channel_event(
             review_data,
             "contributor_comment",
             semantic_key=semantic_key,
@@ -46,7 +51,7 @@ def record_conversation_freshness(
         )
     current_reviewer = review_data.get("current_reviewer")
     if isinstance(current_reviewer, str) and current_reviewer.lower() == comment_author.lower():
-        changed = bot.reviews_module.accept_channel_event(
+        changed = accept_channel_event(
             review_data,
             "reviewer_comment",
             semantic_key=semantic_key,
@@ -56,7 +61,7 @@ def record_conversation_freshness(
         previous_activity = review_data.get("last_reviewer_activity")
         previous_warning = review_data.get("transition_warning_sent")
         previous_notice = review_data.get("transition_notice_sent_at")
-        bot.reviews_module.record_reviewer_activity(review_data, created_at)
+        record_reviewer_activity(review_data, created_at)
         activity_changed = (
             previous_activity != review_data.get("last_reviewer_activity")
             or previous_warning != review_data.get("transition_warning_sent")
@@ -122,7 +127,7 @@ def apply_comment_command(
     actor_class = classify_issue_comment_actor(request)
     if actor_class in {"unknown_actor", "bot_account", "github_app_or_other_automation"}:
         return False
-    review_data = bot.ensure_review_entry(state, issue_number, create=True)
+    review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
     source_event_key = request.comment_source_event_key or f"issue_comment:{request.comment_id}"
