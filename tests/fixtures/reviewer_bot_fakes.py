@@ -82,6 +82,22 @@ class RouteGitHubApi:
         self._api_routes[(method, endpoint)] = payload
         return self
 
+    def add_pull_request_snapshot(self, issue_number: int, payload: Any) -> "RouteGitHubApi":
+        return self.add_api("GET", f"pulls/{issue_number}", payload).add_request(
+            "GET",
+            f"pulls/{issue_number}",
+            status_code=200,
+            payload=payload,
+        )
+
+    def add_pull_request_reviews(self, issue_number: int, reviews: Any, *, page: int = 1) -> "RouteGitHubApi":
+        return self.add_request(
+            "GET",
+            f"pulls/{issue_number}/reviews?per_page=100&page={page}",
+            status_code=200,
+            payload=reviews,
+        )
+
     def raise_system_exit_on_request(self) -> "RouteGitHubApi":
         self._raise_system_exit_on_request = True
         return self

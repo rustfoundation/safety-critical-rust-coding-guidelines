@@ -22,24 +22,17 @@ def test_project_status_labels_uses_live_current_reviewer_review_when_channel_st
         reviewer="alice",
         active_cycle_started_at="2026-03-17T09:00:00Z",
     )
-    routes = (
-        RouteGitHubApi()
-        .add_api("GET", "pulls/42", pull_request_payload(42, head_sha="head-1"))
-        .add_request("GET", "pulls/42", status_code=200, payload=pull_request_payload(42, head_sha="head-1"))
-        .add_request(
-            "GET",
-            "pulls/42/reviews?per_page=100&page=1",
-            status_code=200,
-            payload=[
-                review_payload(
-                    10,
-                    state="COMMENTED",
-                    submitted_at="2026-03-17T10:01:00Z",
-                    commit_id="head-1",
-                    author="alice",
-                )
-            ],
-        )
+    routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1")).add_pull_request_reviews(
+        42,
+        [
+            review_payload(
+                10,
+                state="COMMENTED",
+                submitted_at="2026-03-17T10:01:00Z",
+                commit_id="head-1",
+                author="alice",
+            )
+        ],
     )
     monkeypatch.setattr(
         reviewer_bot,
@@ -72,31 +65,24 @@ def test_compute_reviewer_response_state_refreshes_stale_stored_review_from_live
         reviewed_head_sha="head-0",
         source_precedence=1,
     )
-    routes = (
-        RouteGitHubApi()
-        .add_api("GET", "pulls/42", pull_request_payload(42, head_sha="head-1"))
-        .add_request("GET", "pulls/42", status_code=200, payload=pull_request_payload(42, head_sha="head-1"))
-        .add_request(
-            "GET",
-            "pulls/42/reviews?per_page=100&page=1",
-            status_code=200,
-            payload=[
-                review_payload(
-                    10,
-                    state="COMMENTED",
-                    submitted_at="2026-03-17T10:01:00Z",
-                    commit_id="head-1",
-                    author="alice",
-                ),
-                review_payload(
-                    99,
-                    state="COMMENTED",
-                    submitted_at="2026-03-17T11:00:00Z",
-                    commit_id="head-0",
-                    author="alice",
-                ),
-            ],
-        )
+    routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1")).add_pull_request_reviews(
+        42,
+        [
+            review_payload(
+                10,
+                state="COMMENTED",
+                submitted_at="2026-03-17T10:01:00Z",
+                commit_id="head-1",
+                author="alice",
+            ),
+            review_payload(
+                99,
+                state="COMMENTED",
+                submitted_at="2026-03-17T11:00:00Z",
+                commit_id="head-0",
+                author="alice",
+            ),
+        ],
     )
     monkeypatch.setattr(
         reviewer_bot,
@@ -136,31 +122,24 @@ def test_project_status_labels_refreshes_stale_stored_review_from_live_current_h
         reviewed_head_sha="head-0",
         source_precedence=1,
     )
-    routes = (
-        RouteGitHubApi()
-        .add_api("GET", "pulls/42", pull_request_payload(42, head_sha="head-1"))
-        .add_request("GET", "pulls/42", status_code=200, payload=pull_request_payload(42, head_sha="head-1"))
-        .add_request(
-            "GET",
-            "pulls/42/reviews?per_page=100&page=1",
-            status_code=200,
-            payload=[
-                review_payload(
-                    10,
-                    state="COMMENTED",
-                    submitted_at="2026-03-17T10:01:00Z",
-                    commit_id="head-1",
-                    author="alice",
-                ),
-                review_payload(
-                    99,
-                    state="COMMENTED",
-                    submitted_at="2026-03-17T11:00:00Z",
-                    commit_id="head-0",
-                    author="alice",
-                ),
-            ],
-        )
+    routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1")).add_pull_request_reviews(
+        42,
+        [
+            review_payload(
+                10,
+                state="COMMENTED",
+                submitted_at="2026-03-17T10:01:00Z",
+                commit_id="head-1",
+                author="alice",
+            ),
+            review_payload(
+                99,
+                state="COMMENTED",
+                submitted_at="2026-03-17T11:00:00Z",
+                commit_id="head-0",
+                author="alice",
+            ),
+        ],
     )
     monkeypatch.setattr(
         reviewer_bot,
