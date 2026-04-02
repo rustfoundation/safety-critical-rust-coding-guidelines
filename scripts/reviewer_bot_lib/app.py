@@ -3,14 +3,19 @@
 import json
 import sys
 
-from .context import EventContext, ExecutionResult, ReviewerBotContext
+from .context import (
+    AppEventContextRuntime,
+    AppExecutionRuntime,
+    EventContext,
+    ExecutionResult,
+)
 from .maintenance import (
     collect_status_projection_repair_items,
     status_projection_repair_needed,
 )
 
 
-def _revalidate_epoch(bot: ReviewerBotContext, expected_epoch: str | None, phase: str) -> None:
+def _revalidate_epoch(bot: AppExecutionRuntime, expected_epoch: str | None, phase: str) -> None:
     if expected_epoch is None:
         return
     latest_state = bot.load_state(fail_on_unavailable=True)
@@ -21,7 +26,7 @@ def _revalidate_epoch(bot: ReviewerBotContext, expected_epoch: str | None, phase
         )
 
 
-def _mark_projection_repair_needed(bot: ReviewerBotContext, state: dict, issue_numbers: list[int], reason: str) -> bool:
+def _mark_projection_repair_needed(bot: AppExecutionRuntime, state: dict, issue_numbers: list[int], reason: str) -> bool:
     changed = False
     active_reviews = state.get("active_reviews")
     if not isinstance(active_reviews, dict):
@@ -81,7 +86,7 @@ def _parse_issue_labels(value: str) -> tuple[str, ...]:
     return tuple(label for label in payload if isinstance(label, str))
 
 
-def build_event_context(bot: ReviewerBotContext) -> EventContext:
+def build_event_context(bot: AppEventContextRuntime) -> EventContext:
     return EventContext(
         event_name=bot.get_config_value("EVENT_NAME").strip(),
         event_action=bot.get_config_value("EVENT_ACTION").strip(),
@@ -111,7 +116,7 @@ def build_event_context(bot: ReviewerBotContext) -> EventContext:
     )
 
 
-def _classify_event_intent_from_context(bot: ReviewerBotContext, context: EventContext) -> str:
+def _classify_event_intent_from_context(bot: AppEventContextRuntime, context: EventContext) -> str:
     event_name = context.event_name
     event_action = context.event_action
 
@@ -157,7 +162,7 @@ def _classify_event_intent_from_context(bot: ReviewerBotContext, context: EventC
     return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
 
-def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action: str) -> str:
+def classify_event_intent(bot: AppEventContextRuntime, event_name: str, event_action: str) -> str:
     """Classify whether a run can mutate reviewer-bot state."""
     context = build_event_context(bot)
     context = EventContext(
@@ -188,12 +193,12 @@ def classify_event_intent(bot: ReviewerBotContext, event_name: str, event_action
     return _classify_event_intent_from_context(bot, context)
 
 
-def event_requires_lease_lock(bot: ReviewerBotContext, event_name: str, event_action: str) -> bool:
+def event_requires_lease_lock(bot: AppEventContextRuntime, event_name: str, event_action: str) -> bool:
     """Backwards-compatible helper for tests and call sites."""
     return classify_event_intent(bot, event_name, event_action) == bot.EVENT_INTENT_MUTATING
 
 
-def execute_run(bot: ReviewerBotContext, context: EventContext) -> ExecutionResult:
+def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionResult:
     bot.drain_touched_items()
 
     event_name = context.event_name
@@ -397,7 +402,7 @@ def execute_run(bot: ReviewerBotContext, context: EventContext) -> ExecutionResu
     )
 
 
-def main(bot: ReviewerBotContext):
+def main(bot: AppExecutionRuntime):
     """Main entry point for the reviewer bot."""
     result = execute_run(bot, build_event_context(bot))
     if result.exit_code:

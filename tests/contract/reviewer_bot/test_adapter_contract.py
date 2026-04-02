@@ -1,16 +1,21 @@
 from typing import get_type_hints
+
 import pytest
 
 pytestmark = pytest.mark.contract
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib.context import (
+    AppEventContextRuntime,
+    AppExecutionRuntime,
     GitHubTransportContext,
     LeaseLockContext,
     ReviewerBotContext,
     StateStoreContext,
 )
 from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
+from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+
 
 def test_reviewer_bot_exports_runtime_modules():
     assert reviewer_bot.requests is not None
@@ -25,6 +30,11 @@ def test_reviewer_bot_satisfies_narrower_lock_and_state_protocols():
     assert isinstance(reviewer_bot, GitHubTransportContext)
     assert isinstance(reviewer_bot, StateStoreContext)
     assert isinstance(reviewer_bot, LeaseLockContext)
+
+
+def test_reviewer_bot_satisfies_app_specific_runtime_protocols():
+    assert isinstance(reviewer_bot, AppEventContextRuntime)
+    assert isinstance(reviewer_bot, AppExecutionRuntime)
 
 def test_render_lock_commit_message_uses_direct_json_import():
     rendered = reviewer_bot.render_lock_commit_message({"lock_state": "unlocked"})
@@ -45,6 +55,13 @@ def test_runtime_bot_returns_concrete_runtime_object():
 
     assert isinstance(runtime, ReviewerBotRuntime)
     assert runtime.EVENT_INTENT_MUTATING == reviewer_bot.EVENT_INTENT_MUTATING
+
+
+def test_fake_runtime_satisfies_app_execution_runtime_protocol(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime, AppEventContextRuntime)
+    assert isinstance(runtime, AppExecutionRuntime)
 
 def test_build_event_context_returns_structured_context(monkeypatch):
     monkeypatch.setenv("EVENT_NAME", "workflow_run")

@@ -74,6 +74,9 @@ class FakeReviewerBotRuntime:
     def save_state(self, state: dict) -> bool:
         return self._save_state_impl(state)
 
+    def ensure_state_issue_lease_lock_fresh(self) -> bool:
+        return self._module.ensure_state_issue_lease_lock_fresh()
+
     def acquire_state_issue_lease_lock(self):
         return self._acquire_impl()
 
@@ -88,6 +91,36 @@ class FakeReviewerBotRuntime:
 
     def sync_status_labels_for_items(self, state: dict, issue_numbers):
         return self._sync_status_labels_impl(state, issue_numbers)
+
+    def handle_issue_or_pr_opened(self, state: dict) -> bool:
+        return self._module.handle_issue_or_pr_opened(state)
+
+    def handle_labeled_event(self, state: dict) -> bool:
+        return self._module.handle_labeled_event(state)
+
+    def handle_issue_edited_event(self, state: dict) -> bool:
+        return self._module.handle_issue_edited_event(state)
+
+    def handle_closed_event(self, state: dict) -> bool:
+        return self._module.handle_closed_event(state)
+
+    def handle_pull_request_target_synchronize(self, state: dict) -> bool:
+        return self._module.handle_pull_request_target_synchronize(state)
+
+    def handle_pull_request_review_event(self, state: dict) -> bool:
+        return self._module.handle_pull_request_review_event(state)
+
+    def handle_comment_event(self, state: dict) -> bool:
+        return self._module.handle_comment_event(state)
+
+    def handle_manual_dispatch(self, state: dict) -> bool:
+        return self._module.handle_manual_dispatch(state)
+
+    def handle_scheduled_check(self, state: dict) -> bool:
+        return self._module.handle_scheduled_check(state)
+
+    def handle_workflow_run_event(self, state: dict) -> bool:
+        return self._module.handle_workflow_run_event(state)
 
     def github_api(self, method: str, endpoint: str, data=None):
         if self._github is not None:
