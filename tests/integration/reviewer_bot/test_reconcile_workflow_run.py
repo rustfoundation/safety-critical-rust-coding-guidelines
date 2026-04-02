@@ -194,7 +194,7 @@ def test_handle_workflow_run_event_rebuilds_completion_from_live_review_commit_i
             )
         ],
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
     assert review["current_cycle_completion"]["completed"] is False
@@ -260,7 +260,7 @@ def test_handle_workflow_run_event_refreshes_stale_stored_reviewer_review_to_cur
             ),
         ],
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
     accepted = review["reviewer_review"]["accepted"]
@@ -299,7 +299,7 @@ def test_deferred_review_comment_reconcile_records_contributor_freshness(monkeyp
         author_type="User",
         author_association="CONTRIBUTOR",
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
     accepted = state["active_reviews"]["42"]["contributor_comment"]["accepted"]
@@ -338,7 +338,7 @@ def test_deferred_review_comment_reconcile_records_reviewer_freshness(monkeypatc
         author_type="User",
         author_association="MEMBER",
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
     assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:302"
@@ -373,7 +373,7 @@ def test_deferred_review_comment_missing_live_object_preserves_source_time_fresh
         payload={"message": "missing"},
         failure_kind="not_found",
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
     assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:303"
@@ -459,7 +459,7 @@ def test_deferred_comment_reconcile_hydrates_pr_author_context_for_contributor_f
         author_type="User",
         author_association="CONTRIBUTOR",
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
     assert state["active_reviews"]["42"]["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:199"
@@ -499,7 +499,7 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
         author_type="User",
         author_association="MEMBER",
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
     claim_contexts = []
     monkeypatch.setattr(
         reviewer_bot.reconcile_module,
@@ -513,7 +513,7 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
             }
         ) or state_obj["active_reviews"][str(request.issue_number)].__setitem__("current_reviewer", request.comment_author) or True,
     )
-    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
+    harness.runtime.add_reaction = lambda *args, **kwargs: True
 
     assert harness.run(state) is True
     assert claim_contexts == [

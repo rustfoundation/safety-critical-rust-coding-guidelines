@@ -17,9 +17,9 @@ def test_execute_run_cross_repo_review_does_not_acquire_lock(monkeypatch):
         acquire_called["value"] = True
         raise AssertionError("acquire_state_issue_lease_lock should not be called")
 
-    harness.runtime.set_acquire_lock(fail_if_called)
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    setattr(harness.runtime, "handle_pull_request_review_event", lambda state: False)
+    harness.stub_lock(acquire=fail_if_called)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_handler("handle_pull_request_review_event", lambda state: False)
 
     harness.run_execute()
 
@@ -35,11 +35,11 @@ def test_execute_run_same_repo_review_does_not_acquire_lock(monkeypatch):
         acquire_called["value"] = True
         raise AssertionError("acquire_state_issue_lease_lock should not be called")
 
-    harness.runtime.set_acquire_lock(fail_if_called)
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_pass_until(lambda state: (state, []))
-    harness.runtime.set_sync_members(lambda state: (state, []))
-    setattr(harness.runtime, "handle_pull_request_review_event", lambda state: False)
+    harness.stub_lock(acquire=fail_if_called)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_pull_request_review_event", lambda state: False)
 
     harness.run_execute()
 
@@ -63,12 +63,11 @@ def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
             lock_expires_at="2999-01-01T00:00:00+00:00",
         )
 
-    harness.runtime.set_acquire_lock(fake_acquire)
-    harness.runtime.set_release_lock(lambda: True)
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_pass_until(lambda state: (state, []))
-    harness.runtime.set_sync_members(lambda state: (state, []))
-    setattr(harness.runtime, "handle_workflow_run_event", lambda state: False)
+    harness.stub_lock(acquire=fake_acquire, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_workflow_run_event", lambda state: False)
 
     harness.run_execute()
 
@@ -92,12 +91,11 @@ def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeyp
             lock_expires_at="2999-01-01T00:00:00+00:00",
         )
 
-    harness.runtime.set_acquire_lock(fake_acquire)
-    harness.runtime.set_release_lock(lambda: True)
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_pass_until(lambda state: (state, []))
-    harness.runtime.set_sync_members(lambda state: (state, []))
-    setattr(harness.runtime, "handle_workflow_run_event", lambda state: False)
+    harness.stub_lock(acquire=fake_acquire, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_workflow_run_event", lambda state: False)
 
     harness.run_execute()
 

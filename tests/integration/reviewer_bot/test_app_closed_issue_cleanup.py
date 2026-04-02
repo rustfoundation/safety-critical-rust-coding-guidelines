@@ -38,13 +38,12 @@ def test_execute_run_closed_issue_comment_cleanup_persists_removed_review_entry(
             return initial_state
         return reloaded_state
 
-    harness.runtime.set_acquire_lock(lambda: None)
-    harness.runtime.set_release_lock(lambda: True)
-    harness.runtime._load_state_impl = fake_load_state
-    harness.runtime.set_pass_until(lambda state: (state, []))
-    harness.runtime.set_sync_members(lambda state: (state, []))
-    harness.runtime.set_save_state(lambda state: save_calls.append("42" in state["active_reviews"]) or True)
-    harness.runtime.set_sync_status_labels(lambda state, issue_numbers: sync_calls.append((state, list(issue_numbers))) or True)
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(fake_load_state)
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_save_state(lambda state: save_calls.append("42" in state["active_reviews"]) or True)
+    harness.stub_sync_status_labels(lambda state, issue_numbers: sync_calls.append((state, list(issue_numbers))) or True)
 
     result = harness.run_execute()
 
@@ -74,13 +73,12 @@ def test_execute_run_closed_issue_comment_without_entry_skips_save(monkeypatch):
     save_called = {"value": False}
     sync_calls = []
 
-    harness.runtime.set_acquire_lock(lambda: None)
-    harness.runtime.set_release_lock(lambda: True)
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: state
-    harness.runtime.set_pass_until(lambda current: (current, []))
-    harness.runtime.set_sync_members(lambda current: (current, []))
-    harness.runtime.set_save_state(lambda current: save_called.__setitem__("value", True) or True)
-    harness.runtime.set_sync_status_labels(lambda current, issue_numbers: sync_calls.append(list(issue_numbers)) or False)
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_pass_until(lambda current: (current, []))
+    harness.stub_sync_members(lambda current: (current, []))
+    harness.stub_save_state(lambda current: save_called.__setitem__("value", True) or True)
+    harness.stub_sync_status_labels(lambda current, issue_numbers: sync_calls.append(list(issue_numbers)) or False)
 
     result = harness.run_execute()
 

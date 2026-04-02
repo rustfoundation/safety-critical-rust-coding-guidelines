@@ -8,8 +8,7 @@ pytestmark = pytest.mark.integration
 def test_execute_run_mutating_event_fails_closed_when_state_unavailable(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")
-    harness.runtime.set_acquire_lock(lambda: None)
-    harness.runtime.set_release_lock(lambda: True)
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
     harness.runtime.stub_state_unavailable("state unavailable")
 
     result = harness.run_execute()
@@ -20,8 +19,7 @@ def test_execute_run_mutating_event_fails_closed_when_state_unavailable(monkeypa
 def test_execute_run_mutating_event_does_not_sync_or_save_when_state_unavailable(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")
-    harness.runtime.set_acquire_lock(lambda: None)
-    harness.runtime.set_release_lock(lambda: True)
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
 
     called = {
         "pass_until": False,
@@ -47,10 +45,10 @@ def test_execute_run_mutating_event_does_not_sync_or_save_when_state_unavailable
         return True
 
     harness.runtime.stub_state_unavailable("state unavailable")
-    harness.runtime.set_pass_until(track_pass_until)
-    harness.runtime.set_sync_members(track_sync)
-    setattr(harness.runtime, "handle_comment_event", track_handler)
-    harness.runtime.set_save_state(track_save)
+    harness.stub_pass_until(track_pass_until)
+    harness.stub_sync_members(track_sync)
+    harness.stub_handler("handle_comment_event", track_handler)
+    harness.stub_save_state(track_save)
 
     result = harness.run_execute()
 

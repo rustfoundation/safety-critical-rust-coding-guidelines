@@ -21,14 +21,14 @@ def test_label_signoff_create_pr_marks_issue_review_complete_without_inline_stat
         issue_author="dana",
         is_pull_request=False,
     )
-    monkeypatch.setattr(reviewer_bot, "get_repo_labels", lambda: ["sign-off: create pr"])
-    monkeypatch.setattr(reviewer_bot, "add_label", lambda issue_number, label: True)
+    harness.runtime.get_repo_labels = lambda: ["sign-off: create pr"]
+    harness.runtime.add_label = lambda issue_number, label: True
     monkeypatch.setattr(
         reviewer_bot,
         "sync_status_labels_for_items",
         lambda *args, **kwargs: pytest.fail("status sync should run only from app orchestration after save"),
     )
-    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
+    harness.runtime.add_reaction = lambda *args, **kwargs: True
     posted = harness.record_comments()
 
     assert reviewer_bot.handle_comment_event(state) is True
@@ -54,36 +54,29 @@ def test_label_signoff_create_pr_on_pr_does_not_mark_issue_complete(monkeypatch)
         repository="rustfoundation/safety-critical-rust-coding-guidelines",
         ref="refs/heads/main",
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
-            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
-            "user": {"login": "dana"},
-        },
-    )
-    monkeypatch.setattr(reviewer_bot, "get_repo_labels", lambda: ["sign-off: create pr"])
-    monkeypatch.setattr(reviewer_bot, "add_label", lambda issue_number, label: True)
+    harness.runtime.github_api = lambda method, endpoint, data=None: {
+        "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
+        "user": {"login": "dana"},
+    }
+    harness.runtime.get_repo_labels = lambda: ["sign-off: create pr"]
+    harness.runtime.add_label = lambda issue_number, label: True
     monkeypatch.setattr(
         reviewer_bot,
         "sync_status_labels_for_items",
         lambda *args, **kwargs: pytest.fail("status sync should not run for PR sign-off label command"),
     )
-    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
-    monkeypatch.setattr(reviewer_bot, "post_comment", lambda *args, **kwargs: True)
+    harness.runtime.add_reaction = lambda *args, **kwargs: True
+    harness.runtime.post_comment = lambda *args, **kwargs: True
 
     assert reviewer_bot.handle_comment_event(state) is False
     assert review["review_completion_source"] is None
 
 
 def test_create_pull_request_fails_closed_when_open_pr_lookup_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     called = {"post": 0}
-    monkeypatch.setattr(reviewer_bot, "find_open_pr_for_branch_status", lambda branch: ("unavailable", None))
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: called.__setitem__("post", called["post"] + 1) or None,
-    )
+    harness.runtime.find_open_pr_for_branch_status = lambda branch: ("unavailable", None)
+    harness.runtime.github_api = lambda method, endpoint, data=None: called.__setitem__("post", called["post"] + 1) or None
 
     with pytest.raises(RuntimeError, match="Unable to determine whether branch 'feature-branch' already has an open PR"):
         reviewer_bot.create_pull_request("feature-branch", "main", 42)
@@ -92,9 +85,10 @@ def test_create_pull_request_fails_closed_when_open_pr_lookup_unavailable(monkey
 
 
 def test_assign_command_fails_closed_when_assignees_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+    harness.runtime.get_issue_assignees = lambda issue_number: None
 
     response, success = reviewer_bot.handle_assign_command(state, 42, "@felix91gr")
 
@@ -110,7 +104,7 @@ def test_assign_command_posts_pr_guidance_on_success(monkeypatch):
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
-    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = reviewer_bot.handle_assign_command(state, 42, "@felix91gr")
 
@@ -127,7 +121,7 @@ def test_claim_command_posts_pr_guidance_on_success(monkeypatch):
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
-    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = reviewer_bot.handle_claim_command(state, 42, "felix91gr")
 
@@ -149,9 +143,9 @@ def test_pass_command_posts_pr_guidance_for_new_reviewer(monkeypatch):
     harness.set_assignment_context(issue_author="PLeVasseur", is_pull_request=True)
     harness.stub_assignees(["alice"])
     harness.stub_assignment()
-    monkeypatch.setattr(reviewer_bot, "unassign_reviewer", lambda issue_number, username: True)
+    harness.runtime.unassign_reviewer = lambda issue_number, username: True
     posted = []
-    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = reviewer_bot.handle_pass_command(state, 42, "alice", None)
 
@@ -168,7 +162,7 @@ def test_assign_from_queue_posts_guidance_only_once(monkeypatch):
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
-    monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append(body) or True)
+    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = reviewer_bot.handle_assign_from_queue_command(state, 42)
 
@@ -189,10 +183,11 @@ def test_handle_accept_no_fls_changes_command_fails_closed_when_permission_unava
 
 
 def test_pass_command_fails_closed_when_assignees_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+    harness.runtime.get_issue_assignees = lambda issue_number: None
 
     response, success = reviewer_bot.handle_pass_command(state, 42, "alice", None)
 
@@ -201,12 +196,13 @@ def test_pass_command_fails_closed_when_assignees_unavailable(monkeypatch):
 
 
 def test_away_command_fails_closed_when_assignees_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "alice", "name": "Alice"}, {"github": "bob", "name": "Bob"}]
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+    harness.runtime.get_issue_assignees = lambda issue_number: None
 
     response, success = reviewer_bot.handle_pass_until_command(
         state,
@@ -221,9 +217,10 @@ def test_away_command_fails_closed_when_assignees_unavailable(monkeypatch):
 
 
 def test_claim_command_fails_closed_when_assignees_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "alice", "name": "Alice"}]
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+    harness.runtime.get_issue_assignees = lambda issue_number: None
 
     response, success = reviewer_bot.handle_claim_command(state, 42, "alice")
 
@@ -232,8 +229,9 @@ def test_claim_command_fails_closed_when_assignees_unavailable(monkeypatch):
 
 
 def test_release_command_fails_closed_when_permission_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     state = make_state()
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "unavailable")
+    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     response, success = reviewer_bot.handle_release_command(state, 42, "alice", ["@bob"])
 
@@ -242,8 +240,9 @@ def test_release_command_fails_closed_when_permission_unavailable(monkeypatch):
 
 
 def test_release_command_fails_closed_when_assignees_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     state = make_state()
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+    harness.runtime.get_issue_assignees = lambda issue_number: None
 
     response, success = reviewer_bot.handle_release_command(state, 42, "alice")
 
@@ -252,9 +251,10 @@ def test_release_command_fails_closed_when_assignees_unavailable(monkeypatch):
 
 
 def test_assign_from_queue_command_fails_closed_when_assignees_unavailable(monkeypatch):
+    harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "alice", "name": "Alice"}]
-    monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: None)
+    harness.runtime.get_issue_assignees = lambda issue_number: None
 
     response, success = reviewer_bot.handle_assign_from_queue_command(state, 42)
 
@@ -321,12 +321,8 @@ def test_manual_dispatch_marks_live_permission_unavailable_for_pending_privilege
         }
     }
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "labels": [{"name": reviewer_bot.FLS_AUDIT_LABEL}]},
-    )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "unavailable")
+    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": reviewer_bot.FLS_AUDIT_LABEL}]}
+    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     assert reviewer_bot.handle_manual_dispatch(state) is True
     pending = review["pending_privileged_commands"]["issue_comment:100"]

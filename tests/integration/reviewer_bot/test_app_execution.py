@@ -39,14 +39,13 @@ def test_execute_run_reloads_state_before_syncing_status_labels(monkeypatch):
         assert list(issue_numbers) == [42]
         return True
 
-    harness.runtime.set_acquire_lock(lambda: None)
-    harness.runtime.set_release_lock(lambda: True)
-    harness.runtime._load_state_impl = fake_load_state
-    harness.runtime.set_pass_until(lambda state: (state, []))
-    harness.runtime.set_sync_members(lambda state: (state, []))
-    setattr(harness.runtime, "handle_comment_event", fake_handle_comment_event)
-    harness.runtime.set_save_state(fake_save_state)
-    harness.runtime.set_sync_status_labels(fake_sync_status_labels_for_items)
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(fake_load_state)
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_comment_event", fake_handle_comment_event)
+    harness.stub_save_state(fake_save_state)
+    harness.stub_sync_status_labels(fake_sync_status_labels_for_items)
 
     result = harness.run_execute()
 
@@ -65,13 +64,12 @@ def test_execute_run_reloads_state_before_syncing_status_labels(monkeypatch):
 def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")
-    harness.runtime.set_acquire_lock(lambda: None)
-    harness.runtime.set_release_lock(lambda: True)
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_pass_until(lambda state: (state, []))
-    harness.runtime.set_sync_members(lambda state: (state, []))
-    setattr(harness.runtime, "handle_comment_event", lambda state: True)
-    harness.runtime.set_save_state(lambda state: False)
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_comment_event", lambda state: True)
+    harness.stub_save_state(lambda state: False)
 
     result = harness.run_execute()
 
@@ -86,12 +84,11 @@ def test_execute_run_returns_failure_for_invalid_workflow_run_context(monkeypatc
         WORKFLOW_RUN_EVENT="pull_request_review",
         WORKFLOW_RUN_EVENT_ACTION="submitted",
     )
-    harness.runtime.set_acquire_lock(lambda: None)
-    harness.runtime.set_release_lock(lambda: True)
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_pass_until(lambda state: (state, []))
-    harness.runtime.set_sync_members(lambda state: (state, []))
-    setattr(harness.runtime, "handle_workflow_run_event", lambda state: (_ for _ in ()).throw(RuntimeError("invalid deferred context")))
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_workflow_run_event", lambda state: (_ for _ in ()).throw(RuntimeError("invalid deferred context")))
 
     result = harness.run_execute()
 

@@ -4,32 +4,10 @@ from dataclasses import dataclass
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing
-from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
+from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import pull_request_payload, review_payload
 from .reviewer_bot_fakes import RouteGitHubApi, github_result
-
-
-class _ConfigBag:
-    def __init__(self, monkeypatch):
-        self.monkeypatch = monkeypatch
-        self.values: dict[str, str] = {}
-
-    def get(self, name: str, default: str = "") -> str:
-        return self.values.get(name, default)
-
-    def set(self, name: str, value) -> None:
-        rendered = str(value)
-        self.values[name] = rendered
-        self.monkeypatch.setenv(name, rendered)
-
-
-class _DeferredPayloads:
-    def __init__(self, payload: dict):
-        self.payload = payload
-
-    def load(self) -> dict:
-        return self.payload
 
 
 def review_submitted_payload(
@@ -143,21 +121,16 @@ class ReconcileHarness:
     payload: dict
 
     def __post_init__(self) -> None:
-        self.config = _ConfigBag(self.monkeypatch)
-        self.deferred_payloads = _DeferredPayloads(self.payload)
         self.github = RouteGitHubApi()
-        runtime = ReviewerBotRuntime(
-            reviewer_bot,
-            config=self.config,
-            deferred_payloads=self.deferred_payloads,
-            github=self.github,
-        )
-        self.monkeypatch.setattr(reviewer_bot, "RUNTIME", runtime)
+        self.runtime = FakeReviewerBotRuntime(self.monkeypatch, github=self.github)
+        self.config = self.runtime.config
+        self.runtime.stub_deferred_payload(self.payload)
+        self.monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
         self.set_trigger_from_payload(self.payload)
 
     def set_payload(self, payload: dict) -> dict:
         self.payload = payload
-        self.deferred_payloads.payload = payload
+        self.runtime.stub_deferred_payload(payload)
         self.set_trigger_from_payload(payload)
         return payload
 
@@ -290,13 +263,9 @@ class ReconcileHarness:
         )
 
     def stub_head_repair(self, *, changed: bool = False, outcome: str = "unchanged") -> None:
-        self.monkeypatch.setattr(
-            reviewer_bot,
-            "maybe_record_head_observation_repair",
-            lambda issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
-                changed=changed,
-                outcome=outcome,
-            ),
+        self.runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+            changed=changed,
+            outcome=outcome,
         )
 
     def stub_review_rebuild(self, *, changed: bool = False) -> None:

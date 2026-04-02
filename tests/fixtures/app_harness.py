@@ -28,6 +28,27 @@ class AppHarness:
     def set_state_sequence(self, *states: dict) -> None:
         self.runtime.stub_state_sequence(*states)
 
+    def stub_load_state(self, func) -> None:
+        self.runtime.stub_load_state(func)
+
+    def stub_save_state(self, func) -> None:
+        self.runtime.stub_save_state(func)
+
+    def stub_lock(self, *, acquire=None, release=None, refresh=None) -> None:
+        self.runtime.stub_lock(acquire=acquire, release=release, refresh=refresh)
+
+    def stub_handler(self, name: str, func) -> None:
+        self.runtime.stub_handler(name, func)
+
+    def stub_pass_until(self, func) -> None:
+        self.runtime.stub_pass_until(func)
+
+    def stub_sync_members(self, func) -> None:
+        self.runtime.stub_sync_members(func)
+
+    def stub_sync_status_labels(self, func) -> None:
+        self.runtime.stub_sync_status_labels(func)
+
     def stub_execute_run(self, result: reviewer_bot.ExecutionResult) -> MainRun:
         captured = MainRun(exit_code=None)
 

@@ -16,12 +16,12 @@ def test_execute_run_preview_reviewer_board_disabled_is_clean_noop(monkeypatch, 
         REVIEWER_BOARD_ENABLED="false",
     )
 
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_acquire_lock(lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
-    harness.runtime.set_pass_until(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")))
-    harness.runtime.set_sync_members(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip member sync")))
-    harness.runtime.set_save_state(lambda state: (_ for _ in ()).throw(AssertionError("preview should not save state")))
-    harness.runtime.set_sync_status_labels(lambda state, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")))
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_lock(acquire=lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
+    harness.stub_pass_until(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")))
+    harness.stub_sync_members(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip member sync")))
+    harness.stub_save_state(lambda state: (_ for _ in ()).throw(AssertionError("preview should not save state")))
+    harness.stub_sync_status_labels(lambda state, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")))
 
     result = harness.run_execute()
 
@@ -37,12 +37,12 @@ def test_execute_run_preview_reviewer_board_missing_token_fails_clearly(monkeypa
         MANUAL_ACTION="preview-reviewer-board",
         REVIEWER_BOARD_ENABLED="true",
     )
-    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+    monkeypatch.setattr(harness.runtime, "_reviewer_board_project_metadata", None, raising=False)
 
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_acquire_lock(lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
-    harness.runtime.set_pass_until(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")))
-    harness.runtime.set_sync_members(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip member sync")))
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_lock(acquire=lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
+    harness.stub_pass_until(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")))
+    harness.stub_sync_members(lambda state: (_ for _ in ()).throw(AssertionError("preview should skip member sync")))
 
     result = harness.run_execute()
 
@@ -58,12 +58,12 @@ def test_execute_run_preview_reviewer_board_invalid_manifest_fails_clearly(monke
         REVIEWER_BOARD_ENABLED="true",
         REVIEWER_BOARD_TOKEN="board-token",
     )
-    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+    monkeypatch.setattr(harness.runtime, "_reviewer_board_project_metadata", None, raising=False)
 
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: make_state()
-    harness.runtime.set_acquire_lock(lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_lock(acquire=lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
     monkeypatch.setattr(
-        reviewer_bot,
+        harness.runtime,
         "github_graphql",
         lambda query, variables=None, *, token=None: {
             "data": {
@@ -93,7 +93,7 @@ def test_execute_run_preview_reviewer_board_is_read_only(monkeypatch, capsys):
         REVIEWER_BOARD_TOKEN="board-token",
         ISSUE_NUMBER=42,
     )
-    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+    monkeypatch.setattr(harness.runtime, "_reviewer_board_project_metadata", None, raising=False)
 
     state = make_state()
     state["status_projection_epoch"] = "status_projection_v1"
@@ -103,18 +103,14 @@ def test_execute_run_preview_reviewer_board_is_read_only(monkeypatch, capsys):
     review["assigned_at"] = "2026-03-20T12:34:56Z"
     review["active_cycle_started_at"] = "2026-03-20T12:34:56Z"
 
-    harness.runtime._load_state_impl = lambda *, fail_on_unavailable=False: state
-    harness.runtime.set_acquire_lock(lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
-    harness.runtime.set_pass_until(lambda current: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")))
-    harness.runtime.set_sync_members(lambda current: (_ for _ in ()).throw(AssertionError("preview should skip member sync")))
-    harness.runtime.set_save_state(lambda current: (_ for _ in ()).throw(AssertionError("preview should not save state")))
-    harness.runtime.set_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")))
-    monkeypatch.setattr(reviewer_bot, "github_graphql", lambda query, variables=None, *, token=None: valid_reviewer_board_metadata())
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []},
-    )
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_lock(acquire=lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
+    harness.stub_pass_until(lambda current: (_ for _ in ()).throw(AssertionError("preview should skip pass-until processing")))
+    harness.stub_sync_members(lambda current: (_ for _ in ()).throw(AssertionError("preview should skip member sync")))
+    harness.stub_save_state(lambda current: (_ for _ in ()).throw(AssertionError("preview should not save state")))
+    harness.stub_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")))
+    monkeypatch.setattr(harness.runtime, "github_graphql", lambda query, variables=None, *, token=None: valid_reviewer_board_metadata())
+    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []}
 
     result = harness.run_execute()
 

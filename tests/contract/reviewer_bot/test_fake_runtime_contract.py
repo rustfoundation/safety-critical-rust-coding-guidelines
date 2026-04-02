@@ -12,6 +12,8 @@ def test_fake_runtime_config_writes_mirror_env(monkeypatch):
     runtime.set_config_value("EVENT_NAME", "issue_comment")
 
     assert runtime.get_config_value("EVENT_NAME") == "issue_comment"
+    assert hasattr(FakeReviewerBotRuntime, "__getattr__") is False
+    assert "_module" not in vars(runtime)
 
 
 def test_fake_runtime_output_sink_records_writes(monkeypatch):
@@ -69,12 +71,29 @@ def test_fake_runtime_record_saves_captures_structured_snapshots(monkeypatch):
 def test_fake_runtime_optional_lock_hooks_are_replaceable(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     calls = []
-    runtime.set_acquire_lock(lambda: calls.append("acquire") or None)
-    runtime.set_release_lock(lambda: calls.append("release") or True)
+    runtime.stub_lock(acquire=lambda: calls.append("acquire") or None, release=lambda: calls.append("release") or True)
 
     assert runtime.acquire_state_issue_lease_lock() is None
     assert runtime.release_state_issue_lease_lock() is True
     assert calls == ["acquire", "release"]
+
+
+def test_fake_runtime_uses_explicit_public_service_fields(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.config is not None
+    assert runtime.outputs is not None
+    assert runtime.deferred_payloads is not None
+    assert runtime.state_store is not None
+    assert runtime.github is not None
+    assert runtime.locks is not None
+
+
+def test_fake_runtime_rejects_unknown_handler_names(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    with pytest.raises(AssertionError, match="Unsupported runtime handler override"):
+        runtime.stub_handler("handle_everything", lambda state: False)
 
 
 def test_fake_runtime_github_transport_delegates_to_shared_route_fake(monkeypatch):

@@ -90,16 +90,8 @@ class CommentRoutingHarness:
     def side_effects(self) -> SideEffects:
         comments: list[tuple[int, str]] = []
         reactions: list[tuple[int, str]] = []
-        self._monkeypatch.setattr(
-            reviewer_bot,
-            "post_comment",
-            lambda issue_number, body: comments.append((issue_number, body)) or True,
-        )
-        self._monkeypatch.setattr(
-            reviewer_bot,
-            "add_reaction",
-            lambda comment_id, reaction: reactions.append((comment_id, reaction)) or True,
-        )
+        self.runtime.post_comment = lambda issue_number, body: comments.append((issue_number, body)) or True
+        self.runtime.add_reaction = lambda comment_id, reaction: reactions.append((comment_id, reaction)) or True
         return SideEffects(comments=comments, reactions=reactions)
 
     def set_wrapper_env(

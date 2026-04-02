@@ -87,24 +87,25 @@ class CommandHarness:
 
     def record_comments(self):
         posted = []
-        self._monkeypatch.setattr(reviewer_bot, "post_comment", lambda issue_number, body: posted.append((issue_number, body)) or True)
+        self.runtime.post_comment = lambda issue_number, body: posted.append((issue_number, body)) or True
         return posted
 
     def stub_assignees(self, assignees):
-        self._monkeypatch.setattr(reviewer_bot, "get_issue_assignees", lambda issue_number: assignees)
+        self.runtime.get_issue_assignees = lambda issue_number: assignees
 
     def stub_assignment(self, *, success: bool = True, status_code: int = 201):
-        self._monkeypatch.setattr(
-            reviewer_bot,
-            "request_reviewer_assignment",
-            lambda issue_number, username: reviewer_bot.AssignmentAttempt(success=success, status_code=status_code),
+        self.runtime.request_reviewer_assignment = lambda issue_number, username: reviewer_bot.AssignmentAttempt(
+            success=success, status_code=status_code
         )
 
     def stub_permission(self, status: str) -> None:
-        self._monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": status)
+        self.runtime.get_user_permission_status = lambda username, required_permission="triage": status
+
+    def stub_handler(self, name: str, func) -> None:
+        self.runtime.stub_handler(name, func)
 
     def automation_runner(self) -> AutomationRunner:
         runner = AutomationRunner()
-        self._monkeypatch.setattr(reviewer_bot, "run_command", runner.run)
         self._monkeypatch.setattr(reviewer_bot.automation_module, "run_command", runner.run)
+        self.runtime.run_command = runner.run
         return runner
