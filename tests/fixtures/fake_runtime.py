@@ -28,6 +28,7 @@ from scripts.reviewer_bot_lib.config import (
     STATUS_PROJECTION_EPOCH,
     AssignmentAttempt,
 )
+from scripts.reviewer_bot_lib.context import LeaseContext
 
 
 class ConfigBag:
@@ -179,6 +180,13 @@ class FakeReviewerBotRuntime:
     timezone = timezone
 
     def __init__(self, monkeypatch, *, github=None):
+        self.ACTIVE_LEASE_CONTEXT = LeaseContext(
+            lock_token="test-lock-token",
+            lock_owner_run_id="test-run",
+            lock_owner_workflow="test-workflow",
+            lock_owner_job="test-job",
+            state_issue_url="https://example.com/state",
+        )
         self.config = ConfigBag(monkeypatch)
         self.outputs = OutputCapture()
         self.deferred_payloads = DeferredPayloadStore()
