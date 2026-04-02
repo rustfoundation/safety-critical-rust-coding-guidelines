@@ -1,44 +1,39 @@
-import json
-import subprocess
 import pytest
 
 pytestmark = pytest.mark.integration
 
 from builder import build_cli
 from scripts import reviewer_bot
+from tests.fixtures.commands_harness import CommandHarness
+
 
 def test_list_changed_files_ignores_untracked_bootstrap_noise(monkeypatch, tmp_path):
-    commands_seen = []
-
-    def fake_run_command(command, cwd, check=True):
-        commands_seen.append(command)
-        if command == ["git", "diff", "--name-only"]:
-            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-        if command == ["git", "diff", "--cached", "--name-only"]:
-            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
-        raise AssertionError(f"Unexpected command: {command}")
-
-    monkeypatch.setattr(reviewer_bot.automation_module, "run_command", fake_run_command)
+    harness = CommandHarness(monkeypatch)
+    runner = harness.automation_runner()
+    runner.when(["git", "diff", "--name-only"], stdout="")
+    runner.when(["git", "diff", "--cached", "--name-only"], stdout="")
 
     assert reviewer_bot.automation_module.list_changed_files(tmp_path) == []
-    assert commands_seen == [["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]]
+    assert [command for command, _cwd, _check in runner.calls] == [
+        ["git", "diff", "--name-only"],
+        ["git", "diff", "--cached", "--name-only"],
+    ]
 
 def test_list_changed_files_reports_tracked_changes_only(monkeypatch, tmp_path):
-    def fake_run_command(command, cwd, check=True):
-        if command == ["git", "diff", "--name-only"]:
-            return subprocess.CompletedProcess(command, 0, stdout="README.md\nsrc/spec.lock\n", stderr="")
-        if command == ["git", "diff", "--cached", "--name-only"]:
-            return subprocess.CompletedProcess(command, 0, stdout="src/spec.lock\n", stderr="")
-        raise AssertionError(f"Unexpected command: {command}")
-
-    monkeypatch.setattr(reviewer_bot.automation_module, "run_command", fake_run_command)
+    harness = CommandHarness(monkeypatch)
+    runner = harness.automation_runner()
+    runner.when(["git", "diff", "--name-only"], stdout="README.md\nsrc/spec.lock\n")
+    runner.when(["git", "diff", "--cached", "--name-only"], stdout="src/spec.lock\n")
 
     assert reviewer_bot.automation_module.list_changed_files(tmp_path) == ["README.md", "src/spec.lock"]
 
 def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp_path):
-    monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_LABELS", json.dumps([reviewer_bot.FLS_AUDIT_LABEL]))
+    harness = CommandHarness(monkeypatch)
+    harness.set_privileged_context(
+        labels=[reviewer_bot.FLS_AUDIT_LABEL],
+        is_pull_request=False,
+        target_repo_root=tmp_path,
+    )
     monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
     observed = {"cwd": None}
 
@@ -54,9 +49,12 @@ def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp
     assert observed["cwd"] == tmp_path
 
 def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_path):
-    monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_LABELS", json.dumps([reviewer_bot.FLS_AUDIT_LABEL]))
+    harness = CommandHarness(monkeypatch)
+    harness.set_privileged_context(
+        labels=[reviewer_bot.FLS_AUDIT_LABEL],
+        is_pull_request=False,
+        target_repo_root=tmp_path,
+    )
     monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
     list_calls = {"count": 0}
 
@@ -65,40 +63,36 @@ def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_p
         assert repo_root == tmp_path
         return []
 
-    commands = []
-
-    def fake_run_command(command, cwd, check=False):
-        commands.append((command, cwd, check))
-        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+    runner = harness.automation_runner()
+    runner.when(["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"])
+    runner.when(["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"])
 
     monkeypatch.setattr(reviewer_bot, "list_changed_files", fake_list_changed_files)
-    monkeypatch.setattr(reviewer_bot, "run_command", fake_run_command)
 
     message, success = reviewer_bot.handle_accept_no_fls_changes_command(42, "alice")
 
     assert (message, success) == ("✅ `src/spec.lock` is already up to date; no PR needed.", True)
     assert list_calls["count"] == 2
-    assert commands == [
+    assert runner.calls == [
         (["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"], tmp_path, False),
         (["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"], tmp_path, False),
     ]
 
 def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, tmp_path):
-    monkeypatch.setenv("REVIEWER_BOT_TARGET_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_LABELS", json.dumps([reviewer_bot.FLS_AUDIT_LABEL]))
+    harness = CommandHarness(monkeypatch)
+    harness.set_privileged_context(
+        labels=[reviewer_bot.FLS_AUDIT_LABEL],
+        is_pull_request=False,
+        target_repo_root=tmp_path,
+    )
     monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
     monkeypatch.setattr(reviewer_bot, "list_changed_files", lambda repo_root: [])
-
-    def fake_run_command(command, cwd, check=False):
-        return subprocess.CompletedProcess(
-            command,
-            1,
-            stdout="",
-            stderr="error: lockfile at uv.lock needs to be updated, but --locked was provided",
-        )
-
-    monkeypatch.setattr(reviewer_bot, "run_command", fake_run_command)
+    runner = harness.automation_runner()
+    runner.when(
+        ["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
+        returncode=1,
+        stderr="error: lockfile at uv.lock needs to be updated, but --locked was provided",
+    )
 
     message, success = reviewer_bot.handle_accept_no_fls_changes_command(42, "alice")
 
