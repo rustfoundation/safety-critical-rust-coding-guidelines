@@ -1,121 +1,125 @@
 import json
+
 import pytest
 
 pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
+from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 from tests.fixtures.reviewer_bot import make_state
 
+
 def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
     entry = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert entry is not None
     entry["current_reviewer"] = "alice"
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_NUMBER", "42")
-    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_ID", "100")
-    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
-    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /accept-no-fls-changes")
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_author="dana",
+        comment_author="dana",
+        comment_body="@guidelines-bot /accept-no-fls-changes",
+    )
+    effects = harness.side_effects()
     monkeypatch.setattr(reviewer_bot, "parse_issue_labels", lambda: [reviewer_bot.FLS_AUDIT_LABEL])
-    monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
-    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
-    monkeypatch.setattr(reviewer_bot, "post_comment", lambda *args, **kwargs: True)
+    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "granted")
 
-    assert reviewer_bot.handle_comment_event(state) is True
+    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is True
     pending = state["active_reviews"]["42"]["pending_privileged_commands"]
     assert pending["issue_comment:100"]["command_name"] == "accept-no-fls-changes"
     assert pending["issue_comment:100"]["authorization"]["authorized"] is True
+    assert effects.comments == [
+        (
+            42,
+            "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. "
+            "Use the isolated privileged workflow to execute it from issue `#314` state.",
+        )
+    ]
+    assert effects.reactions == []
 
 def test_closed_non_pr_plain_text_comment_does_not_create_review_entry(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_STATE", "closed")
-    monkeypatch.setenv("ISSUE_NUMBER", "42")
-    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_ID", "100")
-    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
-    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation: close comment")
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_state="closed",
+        issue_author="dana",
+        comment_author="dana",
+        comment_body="reviewer-bot validation: close comment",
+    )
 
-    assert reviewer_bot.handle_comment_event(state) is False
+    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is False
     assert state["active_reviews"] == {}
 
 def test_closed_non_pr_command_comment_does_not_create_pending_privileged_command(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_STATE", "closed")
-    monkeypatch.setenv("ISSUE_NUMBER", "42")
-    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_ID", "100")
-    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
-    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /accept-no-fls-changes")
-    called = {"post_comment": 0}
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_state="closed",
+        issue_author="dana",
+        comment_author="dana",
+        comment_body="@guidelines-bot /accept-no-fls-changes",
+    )
+    effects = harness.side_effects()
     monkeypatch.setattr(reviewer_bot, "parse_issue_labels", lambda: [reviewer_bot.FLS_AUDIT_LABEL])
     monkeypatch.setattr(reviewer_bot, "check_user_permission", lambda username, required_permission="triage": True)
-    monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "post_comment",
-        lambda *args, **kwargs: called.__setitem__("post_comment", called["post_comment"] + 1) or True,
-    )
 
-    assert reviewer_bot.handle_comment_event(state) is False
+    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is False
     assert state["active_reviews"] == {}
-    assert called["post_comment"] == 0
+    assert effects.comments == []
 
 def test_closed_non_pr_comment_removes_stale_review_entry(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_STATE", "closed")
-    monkeypatch.setenv("ISSUE_NUMBER", "42")
-    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_ID", "100")
-    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
-    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation: close comment")
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_state="closed",
+        issue_author="dana",
+        comment_author="dana",
+        comment_body="reviewer-bot validation: close comment",
+    )
 
-    assert reviewer_bot.handle_comment_event(state) is True
+    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is True
     assert "42" not in state["active_reviews"]
 
 def test_closed_non_pr_comment_without_entry_returns_false(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_STATE", "closed")
-    monkeypatch.setenv("ISSUE_NUMBER", "42")
-    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_ID", "100")
-    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
-    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation: close comment")
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_state="closed",
+        issue_author="dana",
+        comment_author="dana",
+        comment_body="reviewer-bot validation: close comment",
+    )
 
-    assert reviewer_bot.handle_comment_event(state) is False
+    assert reviewer_bot.comment_routing_module.handle_comment_event(reviewer_bot, state, request) is False
     assert state["active_reviews"] == {}
 
 def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
-    monkeypatch.setenv("ISSUE_STATE", "open")
-    monkeypatch.setenv("ISSUE_NUMBER", "42")
-    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_ID", "100")
-    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
-    monkeypatch.setenv("COMMENT_BODY", "reviewer-bot validation: contributor plain text comment")
+    harness.set_wrapper_env(
+        issue_number=42,
+        is_pull_request=False,
+        issue_state="open",
+        issue_author="dana",
+        comment_author="dana",
+        comment_body="reviewer-bot validation: contributor plain text comment",
+    )
 
     assert reviewer_bot.handle_comment_event(state) is True
     accepted = state["active_reviews"]["42"]["contributor_comment"]["accepted"]

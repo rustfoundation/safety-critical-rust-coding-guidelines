@@ -2,10 +2,13 @@ import pytest
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing
+from scripts.reviewer_bot_lib.context import CommentEventRequest
+from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 from tests.fixtures.reviewer_bot import make_state
 
 
 def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_changes(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -20,16 +23,21 @@ def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_
         timestamp="2026-03-17T09:00:00Z",
         actor="alice",
     )
-    monkeypatch.setenv("ISSUE_AUTHOR", "dana")
-    monkeypatch.setenv("COMMENT_SOURCE_EVENT_KEY", "issue_comment:100")
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_author="dana",
+        comment_id=100,
+        comment_author="alice",
+        comment_body="hello",
+        comment_created_at="2026-03-17T10:00:00Z",
+        comment_source_event_key="issue_comment:100",
+    )
 
     changed = reviewer_bot.comment_routing_module._record_conversation_freshness(
         reviewer_bot,
         state,
-        42,
-        "alice",
-        100,
-        "2026-03-17T10:00:00Z",
+        request,
     )
 
     assert changed is True
@@ -48,9 +56,21 @@ def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_
     ],
 )
 def test_classify_issue_comment_actor(monkeypatch, env, expected):
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
-    assert comment_routing.classify_issue_comment_actor() == expected
+    harness = CommentRoutingHarness(monkeypatch)
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        comment_author=env.get("COMMENT_AUTHOR", ""),
+        comment_body="hello",
+        comment_user_type=env.get("COMMENT_USER_TYPE", ""),
+    )
+    request = CommentEventRequest(
+        **{
+            **request.__dict__,
+            "comment_installation_id": env.get("COMMENT_INSTALLATION_ID", ""),
+        }
+    )
+    assert comment_routing.classify_issue_comment_actor(request) == expected
 
 
 def test_classify_comment_payload_distinguishes_command_plus_text():
@@ -60,39 +80,78 @@ def test_classify_comment_payload_distinguishes_command_plus_text():
 
 
 def test_route_issue_comment_trust_allows_only_same_repo_repo_user_principal(monkeypatch):
-    monkeypatch.setenv("IS_PULL_REQUEST", "true")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
-    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
-    monkeypatch.setenv("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
-    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
-    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
-            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
-            "user": {"login": "carol"},
-        },
+    harness = CommentRoutingHarness(monkeypatch)
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=True,
+        issue_author="carol",
+        comment_author="alice",
+        comment_body="hello",
     )
-    assert comment_routing.route_issue_comment_trust(reviewer_bot, 42) == "pr_trusted_direct"
+    trust_context = harness.trust_context(
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
+        comment_author_association="MEMBER",
+        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
+        github_ref="refs/heads/main",
+    )
+    harness.add_pull_request_metadata(
+        issue_number=42,
+        head_repo_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_author="carol",
+    )
+    assert comment_routing.route_issue_comment_trust(reviewer_bot, 42, request, trust_context) == "pr_trusted_direct"
 
 
 def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypatch):
-    monkeypatch.setenv("IS_PULL_REQUEST", "true")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "")
-    monkeypatch.setenv("COMMENT_AUTHOR", "alice")
-    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
-    monkeypatch.setenv("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
-    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
-    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
-            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
-            "user": {"login": "carol"},
-        },
+    harness = CommentRoutingHarness(monkeypatch)
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=True,
+        issue_author="carol",
+        comment_author="alice",
+        comment_body="hello",
+        comment_user_type="",
+    )
+    trust_context = harness.trust_context(
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
+        comment_author_association="MEMBER",
+        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
+        github_ref="refs/heads/main",
+    )
+    harness.add_pull_request_metadata(
+        issue_number=42,
+        head_repo_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_author="carol",
     )
     with pytest.raises(RuntimeError, match="Ambiguous same-repo PR comment trust posture"):
-        comment_routing.route_issue_comment_trust(reviewer_bot, 42)
+        comment_routing.route_issue_comment_trust(reviewer_bot, 42, request, trust_context)
+
+
+def test_build_pr_comment_observer_payload_wrapper_uses_explicit_env_facts(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    harness.set_wrapper_env(
+        issue_number=42,
+        is_pull_request=True,
+        issue_author="dana",
+        comment_author="alice",
+        comment_body="@guidelines-bot /queue",
+        comment_author_association="MEMBER",
+        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
+        github_ref="refs/heads/main",
+    )
+    harness.config.set("GITHUB_RUN_ID", 777)
+    harness.config.set("GITHUB_RUN_ATTEMPT", 2)
+    harness.add_pull_request_metadata(
+        issue_number=42,
+        head_repo_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_author="dana",
+    )
+
+    payload = reviewer_bot.build_pr_comment_observer_payload(42)
+
+    assert payload["kind"] == "observer_noop"
+    assert payload["reason"] == "trusted_direct_same_repo_human_comment"
+    assert payload["source_run_id"] == 777
+    assert payload["source_run_attempt"] == 2
+    assert payload["pr_number"] == 42
