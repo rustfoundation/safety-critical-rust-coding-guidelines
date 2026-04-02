@@ -3,10 +3,14 @@
 import json
 import os
 import re
-import subprocess
 from datetime import datetime, timezone
-from pathlib import Path
 
+from .automation import (
+    bot_parse_issue_labels,
+)
+from .automation import (
+    build_privileged_command_request as automation_build_privileged_command_request,
+)
 from .automation import (
     find_open_pr_for_branch_status as automation_find_open_pr_for_branch_status,
 )
@@ -37,20 +41,10 @@ def build_assignment_request(*, issue_number: int) -> AssignmentRequest:
 
 
 def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
-    target_repo_root = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
-    workflow_run_reconcile_pr_number = os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
-    return PrivilegedCommandRequest(
+    return automation_build_privileged_command_request(
         issue_number=issue_number,
         actor=actor,
         command_name=command_name,
-        is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
-        issue_labels=tuple(_parse_issue_labels(os.environ.get("ISSUE_LABELS", "[]"))),
-        target_repo_root=target_repo_root,
-        workflow_run_reconcile_pr_number=(
-            int(workflow_run_reconcile_pr_number) if workflow_run_reconcile_pr_number else None
-        ),
-        workflow_run_reconcile_head_sha=os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip(),
-        workflow_run_head_sha=os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip(),
     )
 
 
@@ -342,40 +336,7 @@ def handle_label_command(
 
 
 def parse_issue_labels() -> list[str]:
-    return _parse_issue_labels(os.environ.get("ISSUE_LABELS", "[]"))
-
-
-def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
-    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True)
-    if check and result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout or "Command failed").strip())
-    return result
-
-
-def summarize_output(result: subprocess.CompletedProcess, limit: int = 20) -> str:
-    combined = "\n".join([line for line in [result.stdout, result.stderr] if line]).strip()
-    if not combined:
-        return ""
-    lines = combined.splitlines()
-    return "\n".join(lines[-limit:])
-
-
-def list_changed_files(repo_root: Path) -> list[str]:
-    files: list[str] = []
-    for command in (["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]):
-        result = run_command(command, cwd=repo_root)
-        for line in result.stdout.splitlines():
-            path = line.strip()
-            if path:
-                files.append(path)
-    return sorted(set(files))
-
-
-def get_target_repo_root() -> Path:
-    configured = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
-    if configured:
-        return Path(configured)
-    return Path(__file__).resolve().parents[2]
+    return bot_parse_issue_labels()
 
 
 def get_default_branch(bot) -> str:
@@ -426,82 +387,6 @@ def resolve_workflow_run_pr_number(
         raise RuntimeError(f"Pull request #{pr_number} head SHA does not match workflow_run reconcile context")
     print(f"Resolved workflow_run PR from reconcile context: #{pr_number}")
     return pr_number
-
-
-def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict | None:
-    lookup_status, existing = automation_find_open_pr_for_branch_status(bot, branch)
-    if lookup_status == "found":
-        return existing
-    if lookup_status == "unavailable":
-        raise RuntimeError(f"Unable to determine whether branch '{branch}' already has an open PR")
-    title = "chore: update spec.lock (no guideline impact)"
-    body = "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n" f"Closes #{issue_number}"
-    response = bot.github_api("POST", "pulls", {"title": title, "head": branch, "base": base, "body": body})
-    if isinstance(response, dict):
-        return response
-    return None
-
-
-def handle_accept_no_fls_changes_command(
-    bot,
-    issue_number: int,
-    comment_author: str,
-    request: PrivilegedCommandRequest | None = None,
-) -> tuple[str, bool]:
-    privileged_request = request or build_privileged_command_request(
-        issue_number=issue_number,
-        actor=comment_author,
-        command_name="accept-no-fls-changes",
-    )
-    if privileged_request.is_pull_request:
-        return "❌ This command can only be used on issues, not PRs.", False
-    labels = list(privileged_request.issue_labels)
-    if bot.FLS_AUDIT_LABEL not in labels:
-        return "❌ This command is only available on issues labeled `fls-audit`.", False
-    permission_status = bot.get_user_permission_status(comment_author, "triage")
-    if permission_status == "unavailable":
-        return "❌ Unable to verify triage permissions right now; refusing to run this command.", False
-    if permission_status != "granted":
-        return "❌ You must have triage permissions to run this command.", False
-    repo_root = get_target_repo_root()
-    if bot.list_changed_files(repo_root):
-        return "❌ Working tree is not clean; refusing to update spec.lock.", False
-    audit_result = bot.run_command(["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"], cwd=repo_root, check=False)
-    if audit_result.returncode == 2:
-        return ("❌ The audit reports affected guidelines. Please review and open a PR with the necessary guideline updates instead."), False
-    if audit_result.returncode != 0:
-        details = bot.summarize_output(audit_result)
-        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
-        return (f"❌ Audit command failed.{detail_text}"), False
-    update_result = bot.run_command(["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"], cwd=repo_root, check=False)
-    if update_result.returncode != 0:
-        details = bot.summarize_output(update_result)
-        detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
-        return (f"❌ Failed to update spec.lock.{detail_text}"), False
-    changed_files = bot.list_changed_files(repo_root)
-    if not changed_files:
-        return "✅ `src/spec.lock` is already up to date; no PR needed.", True
-    unexpected = {path for path in changed_files if path != "src/spec.lock"}
-    if unexpected:
-        paths = ", ".join(sorted(unexpected))
-        return (f"❌ Unexpected tracked file changes detected; refusing to open a PR. Please review: {paths}"), False
-    branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    base_branch = bot.get_default_branch()
-    branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
-    if bot.run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
-        suffix = datetime.now(timezone.utc).strftime("%H%M%S")
-        branch_name = f"{branch_name}-{suffix}"
-    try:
-        bot.run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
-        bot.run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
-        bot.run_command(["git", "-c", "user.name=guidelines-bot", "-c", "user.email=guidelines-bot@users.noreply.github.com", "commit", "-m", "chore: update spec.lock; no affected guidelines"], cwd=repo_root)
-        bot.run_command(["git", "push", "origin", branch_name], cwd=repo_root)
-    except RuntimeError as exc:
-        return (f"❌ Failed to create branch or push changes: {exc}"), False
-    pr = bot.create_pull_request(branch_name, base_branch, issue_number)
-    if not pr or "html_url" not in pr:
-        return "❌ Failed to open a pull request for the spec.lock update.", False
-    return (f"✅ Opened PR {pr['html_url']}"), True
 
 
 def handle_sync_members_command(bot, state: dict) -> tuple[str, bool]:

@@ -1,5 +1,6 @@
 """Automation-heavy reviewer-bot helpers."""
 
+import json
 import os
 import subprocess
 from datetime import datetime, timezone
@@ -43,6 +44,7 @@ def get_target_repo_root() -> Path:
 
 def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
     target_repo_root = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
+    workflow_run_reconcile_pr_number = os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
     return PrivilegedCommandRequest(
         issue_number=issue_number,
         actor=actor,
@@ -50,14 +52,17 @@ def build_privileged_command_request(*, issue_number: int, actor: str = "", comm
         is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
         issue_labels=tuple(bot_label for bot_label in bot_parse_issue_labels()),
         target_repo_root=target_repo_root,
+        workflow_run_reconcile_pr_number=(
+            int(workflow_run_reconcile_pr_number) if workflow_run_reconcile_pr_number else None
+        ),
+        workflow_run_reconcile_head_sha=os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip(),
+        workflow_run_head_sha=os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip(),
     )
 
 
 def bot_parse_issue_labels() -> list[str]:
     labels_json = os.environ.get("ISSUE_LABELS", "[]")
     try:
-        import json
-
         labels = json.loads(labels_json)
     except Exception:
         labels = []
