@@ -63,7 +63,7 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
     harness.stub_sync_members(lambda current: (current, []))
     harness.stub_handler(
         "handle_workflow_run_event",
-        lambda current: harness.runtime.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review:11") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review:11", None) or True,
+        lambda current: reviewer_bot.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review:11") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review:11", None) or True,
     )
     harness.stub_save_state(
         lambda current: save_snapshots.append(
@@ -138,7 +138,7 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
     harness.stub_sync_members(lambda current: (current, []))
     harness.stub_handler(
         "handle_workflow_run_event",
-        lambda current: harness.runtime.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("issue_comment:210") or current["active_reviews"]["42"]["deferred_gaps"].pop("issue_comment:210", None) or True,
+        lambda current: reviewer_bot.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("issue_comment:210") or current["active_reviews"]["42"]["deferred_gaps"].pop("issue_comment:210", None) or True,
     )
     harness.stub_save_state(
         lambda current: save_snapshots.append(
@@ -213,7 +213,7 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
 
     harness.stub_handler(
         "handle_workflow_run_event",
-        lambda current: harness.runtime.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review_comment:310") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review_comment:310", None) or True,
+        lambda current: reviewer_bot.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review_comment:310") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review_comment:310", None) or True,
     )
     harness.stub_save_state(
         lambda current: save_snapshots.append(
