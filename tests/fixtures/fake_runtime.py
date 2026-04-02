@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import random
+import sys
+import time
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -171,6 +174,7 @@ class FakeReviewerBotRuntime:
     AUTHOR_ASSOCIATION_TRUST_ALLOWLIST = AUTHOR_ASSOCIATION_TRUST_ALLOWLIST
     REVIEWER_REQUEST_422_TEMPLATE = REVIEWER_REQUEST_422_TEMPLATE
     REVIEW_FRESHNESS_RUNBOOK_PATH = REVIEW_FRESHNESS_RUNBOOK_PATH
+    REVIEW_DEADLINE_DAYS = 14
     AssignmentAttempt = AssignmentAttempt
     reviews_module = reviews_module
     review_state_module = review_state_module
@@ -182,6 +186,9 @@ class FakeReviewerBotRuntime:
     timezone = timezone
 
     def __init__(self, monkeypatch, *, github=None):
+        self.sys = sys
+        self.random = random
+        self.time = time
         self.ACTIVE_LEASE_CONTEXT = LeaseContext(
             lock_token="test-lock-token",
             lock_owner_run_id="test-run",
@@ -301,6 +308,9 @@ class FakeReviewerBotRuntime:
 
     def get_pull_request_reviews(self, issue_number: int):
         return reviews_module.get_pull_request_reviews(self, issue_number)
+
+    def list_open_items_with_status_labels(self) -> list[int]:
+        return reviews_module.list_open_items_with_status_labels(self)
 
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
         return lifecycle_module.maybe_record_head_observation_repair(self, issue_number, review_data)

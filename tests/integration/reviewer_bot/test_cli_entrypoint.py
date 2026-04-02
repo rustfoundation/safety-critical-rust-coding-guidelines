@@ -14,7 +14,7 @@ def test_main_show_state_uses_direct_yaml_import(monkeypatch, capsys):
         EVENT_ACTION="",
         MANUAL_ACTION="show-state",
     )
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: make_state())
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
 
     run = harness.run_main()
 

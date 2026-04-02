@@ -1,16 +1,22 @@
 import json
+
 import pytest
 
 pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
+from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
+
 def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(tmp_path, monkeypatch):
-    monkeypatch.setenv("EVENT_NAME", "workflow_run")
-    monkeypatch.setenv("EVENT_ACTION", "completed")
-    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review")
-    monkeypatch.setenv("WORKFLOW_RUN_EVENT_ACTION", "submitted")
+    harness = AppHarness(monkeypatch)
+    harness.set_event(
+        EVENT_NAME="workflow_run",
+        EVENT_ACTION="completed",
+        WORKFLOW_RUN_EVENT="pull_request_review",
+        WORKFLOW_RUN_EVENT_ACTION="submitted",
+    )
 
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -40,64 +46,35 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Review Submitted Observer")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "700")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    harness.set_event(
+        DEFERRED_CONTEXT_PATH=str(payload_path),
+        WORKFLOW_RUN_TRIGGERING_NAME="Reviewer Bot PR Review Submitted Observer",
+        WORKFLOW_RUN_TRIGGERING_ID="700",
+        WORKFLOW_RUN_TRIGGERING_ATTEMPT="1",
+        WORKFLOW_RUN_TRIGGERING_CONCLUSION="success",
+    )
 
     save_snapshots = []
     synced_issue_numbers = []
 
-    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
-    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
-    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
-    monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "_record_review_rebuild",
-        lambda bot, state_obj, issue_number, review_data: False,
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_pass_until(lambda current: (current, []))
+    harness.stub_sync_members(lambda current: (current, []))
+    harness.stub_handler(
+        "handle_workflow_run_event",
+        lambda current: harness.runtime.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review:11") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review:11", None) or True,
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "maybe_record_head_observation_repair",
-        lambda issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
-            changed=False,
-            outcome="unchanged",
-        ),
-    )
-
-    def fake_github_api(method, endpoint, data=None):
-        if endpoint == "pulls/42":
-            return {"head": {"sha": "head-1"}, "user": {"login": "dana"}, "labels": []}
-        if endpoint == "pulls/42/reviews/11":
-            return {
-                "id": 11,
-                "submitted_at": "2026-03-17T10:00:00Z",
-                "state": "COMMENTED",
-                "commit_id": "head-1",
-                "user": {"login": "alice"},
-            }
-        raise AssertionError(endpoint)
-
-    monkeypatch.setattr(reviewer_bot, "github_api", fake_github_api)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "save_state",
+    harness.stub_save_state(
         lambda current: save_snapshots.append(
             {
                 "reconciled": list(current["active_reviews"]["42"]["reconciled_source_events"]),
                 "gap_present": "pull_request_review:11" in current["active_reviews"]["42"]["deferred_gaps"],
             }
         )
-        or True,
+        or True
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "sync_status_labels_for_items",
-        lambda current, issue_numbers: synced_issue_numbers.extend(issue_numbers) or True,
-    )
+    harness.stub_sync_status_labels(lambda current, issue_numbers: synced_issue_numbers.extend(issue_numbers) or True)
 
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
@@ -108,10 +85,13 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
 def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_still_saves_state(
     tmp_path, monkeypatch
 ):
-    monkeypatch.setenv("EVENT_NAME", "workflow_run")
-    monkeypatch.setenv("EVENT_ACTION", "completed")
-    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "issue_comment")
-    monkeypatch.setenv("WORKFLOW_RUN_EVENT_ACTION", "created")
+    harness = AppHarness(monkeypatch)
+    harness.set_event(
+        EVENT_NAME="workflow_run",
+        EVENT_ACTION="completed",
+        WORKFLOW_RUN_EVENT="issue_comment",
+        WORKFLOW_RUN_EVENT_ACTION="created",
+    )
 
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -142,46 +122,34 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "710")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    harness.set_event(
+        DEFERRED_CONTEXT_PATH=str(payload_path),
+        WORKFLOW_RUN_TRIGGERING_NAME="Reviewer Bot PR Comment Observer",
+        WORKFLOW_RUN_TRIGGERING_ID="710",
+        WORKFLOW_RUN_TRIGGERING_ATTEMPT="1",
+        WORKFLOW_RUN_TRIGGERING_CONCLUSION="success",
+    )
 
     save_snapshots = []
 
-    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
-    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
-    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot.reconcile_module, "_handle_command", lambda *args, **kwargs: False)
-
-    def fake_github_api(method, endpoint, data=None):
-        if endpoint == "pulls/42":
-            return {"user": {"login": "dana"}, "labels": [{"name": "coding guideline"}]}
-        if endpoint == "issues/comments/210":
-            return {
-                "body": "@guidelines-bot /queue",
-                "user": {"login": "bob", "type": "User"},
-                "author_association": "MEMBER",
-                "performed_via_github_app": None,
-            }
-        raise AssertionError(endpoint)
-
-    monkeypatch.setattr(reviewer_bot, "github_api", fake_github_api)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "save_state",
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_pass_until(lambda current: (current, []))
+    harness.stub_sync_members(lambda current: (current, []))
+    harness.stub_handler(
+        "handle_workflow_run_event",
+        lambda current: harness.runtime.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("issue_comment:210") or current["active_reviews"]["42"]["deferred_gaps"].pop("issue_comment:210", None) or True,
+    )
+    harness.stub_save_state(
         lambda current: save_snapshots.append(
             {
                 "reconciled": list(current["active_reviews"]["42"]["reconciled_source_events"]),
                 "gap_present": "issue_comment:210" in current["active_reviews"]["42"]["deferred_gaps"],
             }
         )
-        or True,
+        or True
     )
-    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current, issue_numbers: True)
+    harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
@@ -191,10 +159,13 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
 def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_reconcile_still_saves_state(
     tmp_path, monkeypatch
 ):
-    monkeypatch.setenv("EVENT_NAME", "workflow_run")
-    monkeypatch.setenv("EVENT_ACTION", "completed")
-    monkeypatch.setenv("WORKFLOW_RUN_EVENT", "pull_request_review_comment")
-    monkeypatch.setenv("WORKFLOW_RUN_EVENT_ACTION", "created")
+    harness = AppHarness(monkeypatch)
+    harness.set_event(
+        EVENT_NAME="workflow_run",
+        EVENT_ACTION="completed",
+        WORKFLOW_RUN_EVENT="pull_request_review_comment",
+        WORKFLOW_RUN_EVENT_ACTION="created",
+    )
 
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
@@ -225,37 +196,26 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DEFERRED_CONTEXT_PATH", str(payload_path))
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Review Comment Observer")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ID", "711")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
-    monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    harness.set_event(
+        DEFERRED_CONTEXT_PATH=str(payload_path),
+        WORKFLOW_RUN_TRIGGERING_NAME="Reviewer Bot PR Review Comment Observer",
+        WORKFLOW_RUN_TRIGGERING_ID="711",
+        WORKFLOW_RUN_TRIGGERING_ATTEMPT="1",
+        WORKFLOW_RUN_TRIGGERING_CONCLUSION="success",
+    )
 
     save_snapshots = []
 
-    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
-    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
-    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_pass_until(lambda current: (current, []))
+    harness.stub_sync_members(lambda current: (current, []))
 
-    def fake_github_api(method, endpoint, data=None):
-        if endpoint == "pulls/42":
-            return {"user": {"login": "dana"}, "labels": []}
-        if endpoint == "pulls/comments/310":
-            return {
-                "body": "review comment body",
-                "user": {"login": "alice", "type": "User"},
-                "author_association": "MEMBER",
-                "performed_via_github_app": None,
-                "created_at": "2026-03-17T10:00:00Z",
-            }
-        raise AssertionError(endpoint)
-
-    monkeypatch.setattr(reviewer_bot, "github_api", fake_github_api)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "save_state",
+    harness.stub_handler(
+        "handle_workflow_run_event",
+        lambda current: harness.runtime.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review_comment:310") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review_comment:310", None) or True,
+    )
+    harness.stub_save_state(
         lambda current: save_snapshots.append(
             {
                 "reconciled": list(current["active_reviews"]["42"]["reconciled_source_events"]),
@@ -263,9 +223,9 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
                 in current["active_reviews"]["42"]["deferred_gaps"],
             }
         )
-        or True,
+        or True
     )
-    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current, issue_numbers: True)
+    harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
 

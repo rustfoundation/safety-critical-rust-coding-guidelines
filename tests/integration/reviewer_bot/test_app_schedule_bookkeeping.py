@@ -1,12 +1,14 @@
-from scripts import reviewer_bot
-from tests.fixtures.reviewer_bot import make_state
 import pytest
+
+from scripts import reviewer_bot
+from tests.fixtures.app_harness import AppHarness
+from tests.fixtures.reviewer_bot import make_state
 
 pytestmark = pytest.mark.integration
 
 def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_state(monkeypatch):
-    monkeypatch.setenv("EVENT_NAME", "schedule")
-    monkeypatch.setenv("EVENT_ACTION", "")
+    harness = AppHarness(monkeypatch)
+    harness.set_event(EVENT_NAME="schedule", EVENT_ACTION="")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -20,23 +22,14 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
         )
         return True
 
-    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
-    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
-    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_pass_until(lambda current: (current, []))
+    harness.stub_sync_members(lambda current: (current, []))
     monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", fake_sweep)
     monkeypatch.setattr(reviewer_bot.maintenance_module, "check_overdue_reviews", lambda bot, current: [])
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
-    )
-    monkeypatch.setattr(
-        reviewer_bot.reviews_module,
-        "repair_missing_reviewer_review_state",
-        lambda bot, issue_number, review_data: False,
-    )
+    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
+    monkeypatch.setattr(reviewer_bot.review_state_module, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data, *, reviews=None: False)
     monkeypatch.setattr(
         reviewer_bot.maintenance_module,
         "maybe_record_head_observation_repair",
@@ -45,13 +38,8 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
             outcome="unchanged",
         ),
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "save_state",
-        lambda current: save_calls.append(list(current["active_reviews"]["42"]["reconciled_source_events"]))
-        or True,
-    )
-    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current, issue_numbers: True)
+    harness.stub_save_state(lambda current: save_calls.append(list(current["active_reviews"]["42"]["reconciled_source_events"])) or True)
+    harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
@@ -59,8 +47,8 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
     assert save_calls == [["pull_request_review:500"]]
 
 def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_state(monkeypatch):
-    monkeypatch.setenv("EVENT_NAME", "schedule")
-    monkeypatch.setenv("EVENT_ACTION", "")
+    harness = AppHarness(monkeypatch)
+    harness.set_event(EVENT_NAME="schedule", EVENT_ACTION="")
     state = make_state()
     review = reviewer_bot.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -116,19 +104,14 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
             )
         raise AssertionError(endpoint)
 
-    monkeypatch.setattr(reviewer_bot, "acquire_state_issue_lease_lock", lambda: None)
-    monkeypatch.setattr(reviewer_bot, "release_state_issue_lease_lock", lambda: True)
-    monkeypatch.setattr(reviewer_bot, "load_state", lambda *args, **kwargs: state)
-    monkeypatch.setattr(reviewer_bot, "process_pass_until_expirations", lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot, "sync_members_with_queue", lambda current: (current, []))
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_pass_until(lambda current: (current, []))
+    harness.stub_sync_members(lambda current: (current, []))
     monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, current: False)
     monkeypatch.setattr(reviewer_bot.maintenance_module, "check_overdue_reviews", lambda bot, current: [])
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
-    )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_github_api_request)
+    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
+    harness.runtime.github_api_request = fake_github_api_request
     monkeypatch.setattr(
         reviewer_bot.maintenance_module,
         "maybe_record_head_observation_repair",
@@ -137,9 +120,7 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
             outcome="unchanged",
         ),
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "save_state",
+    harness.stub_save_state(
         lambda current: save_calls.append(
             {
                 "last_reviewer_activity": current["active_reviews"]["42"]["last_reviewer_activity"],
@@ -147,9 +128,9 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
                 "transition_notice_sent_at": current["active_reviews"]["42"]["transition_notice_sent_at"],
             }
         )
-        or True,
+        or True
     )
-    monkeypatch.setattr(reviewer_bot, "sync_status_labels_for_items", lambda current, issue_numbers: True)
+    harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
