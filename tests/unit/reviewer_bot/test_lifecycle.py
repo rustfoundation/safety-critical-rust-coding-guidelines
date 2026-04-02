@@ -317,7 +317,7 @@ def test_maybe_record_head_observation_repair_records_changed_head_once(monkeypa
         ),
     )
     monkeypatch.setattr(
-        reviewer_bot.reviews_module,
+        reviewer_bot.lifecycle_module,
         "accept_channel_event",
         lambda review_data, channel, **kwargs: accepted.append((channel, kwargs)) or True,
     )

@@ -220,17 +220,17 @@ def test_repair_visible_review_gap_returns_true_for_bookkeeping_only_mutations(m
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
     review["deferred_gaps"]["pull_request_review:303"] = {"reason": "artifact_missing"}
     monkeypatch.setattr(
-        reviewer_bot.reviews_module,
+        reviewer_bot.sweeper_module,
         "accept_reviewer_review_from_live_review",
         lambda review_data, live_review, actor=None: False,
     )
     monkeypatch.setattr(
-        reviewer_bot.reviews_module,
+        reviewer_bot.sweeper_module,
         "refresh_reviewer_review_from_live_preferred_review",
         lambda bot, issue_number, review_data, actor=None: (False, None),
     )
     monkeypatch.setattr(
-        reviewer_bot.reviews_module,
+        reviewer_bot.sweeper_module,
         "rebuild_pr_approval_state",
         lambda bot, issue_number, review_data: (None, None),
     )

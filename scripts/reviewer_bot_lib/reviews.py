@@ -396,8 +396,9 @@ def resolve_pr_approval_state(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> tuple[dict | None, dict | None, str | None]:
-    if not _is_canonical_callable(bot.reviews_module.rebuild_pr_approval_state):
-        completion, write_approval = bot.reviews_module.rebuild_pr_approval_state(
+    rebuild_fn = getattr(bot, "rebuild_pr_approval_state", rebuild_pr_approval_state)
+    if not _is_canonical_callable(rebuild_fn):
+        completion, write_approval = rebuild_fn(
             bot,
             issue_number,
             review_data,

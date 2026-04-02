@@ -18,6 +18,10 @@ from .project_board import (
     preview_board_projection_for_item,
     reviewer_board_preflight,
 )
+from .review_state import (
+    list_open_tracked_review_items,
+    repair_missing_reviewer_review_state,
+)
 from .sweeper import sweep_deferred_gaps
 
 
@@ -76,7 +80,7 @@ def status_projection_repair_needed(bot, state: dict) -> bool:
 
 def collect_status_projection_repair_items(bot, state: dict) -> list[int]:
     numbers = set(bot.list_open_items_with_status_labels())
-    numbers.update(bot.reviews_module.list_open_tracked_review_items(state))
+    numbers.update(list_open_tracked_review_items(state))
     return sorted(number for number in numbers if isinstance(number, int) and number > 0)
 
 
@@ -208,7 +212,7 @@ def handle_scheduled_check(bot, state: dict) -> bool:
             if not isinstance(issue_snapshot, dict) or not isinstance(issue_snapshot.get("pull_request"), dict):
                 continue
             try:
-                if bot.reviews_module.repair_missing_reviewer_review_state(bot, issue_number, review_data):
+                if repair_missing_reviewer_review_state(bot, issue_number, review_data):
                     changed = True
                     bot.collect_touched_item(issue_number)
                 if _clear_maintenance_repair_marker(review_data, "review_repair"):

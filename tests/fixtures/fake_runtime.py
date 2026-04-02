@@ -13,6 +13,7 @@ from scripts.reviewer_bot_lib import lifecycle as lifecycle_module
 from scripts.reviewer_bot_lib import maintenance as maintenance_module
 from scripts.reviewer_bot_lib import queue as queue_module
 from scripts.reviewer_bot_lib import reconcile as reconcile_module
+from scripts.reviewer_bot_lib import review_state as review_state_module
 from scripts.reviewer_bot_lib import reviews as reviews_module
 from scripts.reviewer_bot_lib import state_store as state_store_module
 from scripts.reviewer_bot_lib.config import (
@@ -172,6 +173,7 @@ class FakeReviewerBotRuntime:
     REVIEW_FRESHNESS_RUNBOOK_PATH = REVIEW_FRESHNESS_RUNBOOK_PATH
     AssignmentAttempt = AssignmentAttempt
     reviews_module = reviews_module
+    review_state_module = review_state_module
     EVENT_INTENT_MUTATING = EVENT_INTENT_MUTATING
     EVENT_INTENT_NON_MUTATING_DEFER = EVENT_INTENT_NON_MUTATING_DEFER
     EVENT_INTENT_NON_MUTATING_READONLY = EVENT_INTENT_NON_MUTATING_READONLY
@@ -252,7 +254,7 @@ class FakeReviewerBotRuntime:
         return self._sync_status_labels(state, issue_numbers)
 
     def ensure_review_entry(self, state: dict, issue_number: int, create: bool = False):
-        return reviews_module.ensure_review_entry(state, issue_number, create=create)
+        return review_state_module.ensure_review_entry(state, issue_number, create=create)
 
     def get_issue_assignees(self, issue_number: int):
         return github_api_module.get_issue_assignees(self, issue_number)
@@ -304,10 +306,47 @@ class FakeReviewerBotRuntime:
         return lifecycle_module.maybe_record_head_observation_repair(self, issue_number, review_data)
 
     def set_current_reviewer(self, state: dict, issue_number: int, reviewer: str, assignment_method: str | None = None) -> None:
-        return reviews_module.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
+        return review_state_module.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
 
     def mark_review_complete(self, state: dict, issue_number: int, reviewer: str | None, source: str) -> bool:
-        return reviews_module.mark_review_complete(state, issue_number, reviewer, source)
+        return review_state_module.mark_review_complete(state, issue_number, reviewer, source)
+
+    def update_reviewer_activity(self, state: dict, issue_number: int, reviewer: str) -> bool:
+        return review_state_module.update_reviewer_activity(state, issue_number, reviewer)
+
+    def record_transition_notice_sent(self, review_data: dict, timestamp: str) -> None:
+        return review_state_module.record_transition_notice_sent(review_data, timestamp)
+
+    def accept_channel_event(self, review_data: dict, channel_name: str, **kwargs) -> bool:
+        return review_state_module.accept_channel_event(review_data, channel_name, **kwargs)
+
+    def record_reviewer_activity(self, review_data: dict, timestamp: str) -> bool:
+        return review_state_module.record_reviewer_activity(review_data, timestamp)
+
+    def get_current_cycle_boundary(self, review_data: dict):
+        return review_state_module.get_current_cycle_boundary(self, review_data)
+
+    def accept_reviewer_review_from_live_review(self, review_data: dict, review: dict, *, actor: str | None = None) -> bool:
+        return review_state_module.accept_reviewer_review_from_live_review(review_data, review, actor=actor)
+
+    def refresh_reviewer_review_from_live_preferred_review(self, issue_number: int, review_data: dict, *, pull_request=None, reviews=None, actor: str | None = None):
+        return review_state_module.refresh_reviewer_review_from_live_preferred_review(
+            self,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+            actor=actor,
+        )
+
+    def repair_missing_reviewer_review_state(self, issue_number: int, review_data: dict, *, reviews=None) -> bool:
+        return review_state_module.repair_missing_reviewer_review_state(self, issue_number, review_data, reviews=reviews)
+
+    def list_open_tracked_review_items(self, state: dict) -> list[int]:
+        return review_state_module.list_open_tracked_review_items(state)
+
+    def semantic_key_seen(self, review_data: dict, channel_name: str, semantic_key: str) -> bool:
+        return review_state_module.semantic_key_seen(review_data, channel_name, semantic_key)
 
     def get_next_reviewer(self, state: dict, skip_usernames=None):
         return queue_module.get_next_reviewer(state, skip_usernames)
@@ -329,6 +368,15 @@ class FakeReviewerBotRuntime:
 
     def compute_reviewer_response_state(self, issue_number: int, state: dict, *, issue_snapshot=None):
         return reviews_module.compute_reviewer_response_state(self, issue_number, state, issue_snapshot=issue_snapshot)
+
+    def rebuild_pr_approval_state(self, issue_number: int, review_data: dict, *, pull_request=None, reviews=None):
+        return reviews_module.rebuild_pr_approval_state(
+            self,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
 
     def get_github_graphql_token(self, *, prefer_board_token: bool = False) -> str:
         if prefer_board_token:

@@ -12,8 +12,10 @@ from .comment_application import (
 )
 from .comment_routing import classify_comment_payload, classify_issue_comment_actor
 from .context import CommentEventRequest
+from .review_state import accept_channel_event, record_reviewer_activity
 from .reviews import (
     find_triage_approval_after,
+    rebuild_pr_approval_state_result,
     refresh_reviewer_review_from_live_preferred_review,
 )
 
@@ -263,7 +265,7 @@ def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dic
         reviews=reviews,
         actor=review_data.get("current_reviewer"),
     )
-    approval_result = bot.reviews_module.rebuild_pr_approval_state_result(
+    approval_result = rebuild_pr_approval_state_result(
         bot,
         issue_number,
         review_data,
@@ -905,7 +907,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
             actor = context.actor_login
             state_changed = bot.maybe_record_head_observation_repair(pr_number, review_data).changed
             if isinstance(review_data.get("current_reviewer"), str) and review_data.get("current_reviewer", "").lower() == actor.lower() and isinstance(live_commit_id, str) and isinstance(live_submitted_at, str):
-                bot.reviews_module.accept_channel_event(
+                accept_channel_event(
                     review_data,
                     "reviewer_review",
                     semantic_key=source_event_key,
@@ -914,7 +916,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                     reviewed_head_sha=live_commit_id,
                     source_precedence=1,
                 )
-                bot.reviews_module.record_reviewer_activity(review_data, live_submitted_at)
+                record_reviewer_activity(review_data, live_submitted_at)
                 state_changed = True
             if _record_review_rebuild(bot, state, pr_number, review_data):
                 state_changed = True
@@ -928,7 +930,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 parsed_payload,
                 expected_event_action="dismissed",
             )
-            bot.reviews_module.accept_channel_event(
+            accept_channel_event(
                 review_data,
                 "review_dismissal",
                 semantic_key=source_event_key,

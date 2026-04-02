@@ -22,6 +22,14 @@ from .reconcile import (
     _update_deferred_gap,
     _was_reconciled_source_event,
 )
+from .review_state import (
+    accept_reviewer_review_from_live_review,
+    get_current_cycle_boundary,
+    record_reviewer_activity,
+    refresh_reviewer_review_from_live_preferred_review,
+    semantic_key_seen,
+)
+from .reviews import rebuild_pr_approval_state
 
 
 def _now() -> datetime:
@@ -560,7 +568,7 @@ def _can_repair_visible_review(bot, review_data: dict, review: dict, source_even
         return None
     if not isinstance(submitted_at, str):
         return None
-    boundary = bot.reviews_module.get_current_cycle_boundary(bot, review_data)
+    boundary = get_current_cycle_boundary(bot, review_data)
     submitted_dt = parse_timestamp(submitted_at)
     if boundary is None or submitted_dt is None or submitted_dt < boundary:
         return None
@@ -574,15 +582,15 @@ def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source
     if repair is None:
         return False
     author, submitted_at, commit_id = repair
-    changed = bot.reviews_module.accept_reviewer_review_from_live_review(review_data, review, actor=author)
-    changed = bot.reviews_module.refresh_reviewer_review_from_live_preferred_review(
+    changed = accept_reviewer_review_from_live_review(review_data, review, actor=author)
+    changed = refresh_reviewer_review_from_live_preferred_review(
         bot,
         issue_number,
         review_data,
         actor=author,
     )[0] or changed
-    bot.reviews_module.record_reviewer_activity(review_data, submitted_at)
-    completion, _ = bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
+    record_reviewer_activity(review_data, submitted_at)
+    completion, _ = rebuild_pr_approval_state(bot, issue_number, review_data)
     reconciled_changed = _mark_reconciled_source_event(review_data, source_event_key)
     gap_cleared_changed = _clear_source_event_key(review_data, source_event_key)
     return changed or completion is not None or reconciled_changed or gap_cleared_changed
@@ -795,7 +803,7 @@ def _should_skip_discovered_key(bot, review_data: dict, source_event_key: str, c
             "reconcile_failed_closed",
         }:
             return False
-    return any(bot.reviews_module._semantic_key_seen(review_data, channel, source_event_key) for channel in channels)
+    return any(semantic_key_seen(review_data, channel, source_event_key) for channel in channels)
 
 
 def sweep_deferred_gaps(bot, state: dict) -> bool:

@@ -10,6 +10,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from .guidance import get_fls_audit_guidance, get_issue_guidance, get_pr_guidance
+from .review_state import (
+    accept_channel_event,
+    ensure_review_entry,
+    mark_review_complete,
+    record_transition_notice_sent,
+    set_current_reviewer,
+)
+from .reviews import rebuild_pr_approval_state
 
 
 @dataclass(frozen=True)
@@ -44,7 +52,7 @@ def _semantic_digest(value: str) -> str:
 
 
 def handle_transition_notice(bot, state: dict, issue_number: int, reviewer: str) -> bool:
-    review_data = bot.ensure_review_entry(state, issue_number, create=True)
+    review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
     if review_data.get("transition_notice_sent_at"):
@@ -60,7 +68,7 @@ You may still continue this review, or use `{bot.BOT_MENTION} /pass`, `{bot.BOT_
 _If you believe this is in error or have extenuating circumstances, please reach out to the subcommittee._"""
     if not bot.post_comment(issue_number, notice_message):
         return False
-    bot.reviews_module.record_transition_notice_sent(
+    record_transition_notice_sent(
         review_data,
         bot.datetime.now(bot.timezone.utc).isoformat(),
     )
@@ -100,8 +108,8 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
         return False
     is_pr = _is_pr_event()
     assignment_attempt = bot.request_reviewer_assignment(issue_number, reviewer)
-    bot.set_current_reviewer(state, issue_number, reviewer)
-    review_data = bot.ensure_review_entry(state, issue_number, create=True)
+    set_current_reviewer(state, issue_number, reviewer)
+    review_data = ensure_review_entry(state, issue_number, create=True)
     if is_pr and isinstance(review_data, dict):
         head_sha = os.environ.get("PR_HEAD_SHA", "").strip()
         if head_sha:
@@ -130,7 +138,7 @@ def handle_issue_edited_event(bot, state: dict) -> bool:
     editor = os.environ.get("SENDER_LOGIN", "").strip() or issue_author
     if not issue_author or editor.lower() != issue_author.lower():
         return False
-    review_data = bot.ensure_review_entry(state, issue_number)
+    review_data = ensure_review_entry(state, issue_number)
     if review_data is None:
         return False
     updated_at = os.environ.get("ISSUE_UPDATED_AT", "").strip() or _now_iso()
@@ -148,7 +156,7 @@ def handle_issue_edited_event(bot, state: dict) -> bool:
         semantic_key = f"issues_edit_title:{issue_number}:{_semantic_digest(current_title)}"
     else:
         semantic_key = f"issues_edit_body:{issue_number}:{_semantic_digest(current_body)}"
-    return bot.reviews_module.accept_channel_event(
+    return accept_channel_event(
         review_data,
         "contributor_comment",
         semantic_key=semantic_key,
@@ -169,9 +177,9 @@ def handle_labeled_event(bot, state: dict) -> bool:
     if label_name == "sign-off: create pr":
         if is_pr:
             return False
-        review_data = bot.ensure_review_entry(state, issue_number)
+        review_data = ensure_review_entry(state, issue_number)
         reviewer = review_data.get("current_reviewer") if review_data else None
-        return bot.mark_review_complete(state, issue_number, reviewer, "issue_label: sign-off: create pr")
+        return mark_review_complete(state, issue_number, reviewer, "issue_label: sign-off: create pr")
     if label_name not in bot.REVIEW_LABELS:
         return False
     return handle_issue_or_pr_opened(bot, state)
@@ -185,7 +193,7 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
     if not issue_number:
         return False
-    review_data = bot.ensure_review_entry(state, issue_number)
+    review_data = ensure_review_entry(state, issue_number)
     if review_data is None or not review_data.get("current_reviewer"):
         return False
     head_sha = os.environ.get("PR_HEAD_SHA", "").strip()
@@ -200,7 +208,7 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     previous_review_completion_source = review_data.get("review_completion_source")
     review_data["active_head_sha"] = head_sha
     timestamp = os.environ.get("EVENT_CREATED_AT", "") or _now_iso()
-    changed = bot.reviews_module.accept_channel_event(
+    changed = accept_channel_event(
         review_data,
         "contributor_revision",
         semantic_key=f"pull_request_sync:{issue_number}:{head_sha}",
@@ -208,7 +216,7 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
         reviewed_head_sha=head_sha,
         source_precedence=1,
     )
-    bot.reviews_module.rebuild_pr_approval_state(bot, issue_number, review_data)
+    rebuild_pr_approval_state(bot, issue_number, review_data)
     approval_changed = (
         previous_completion != review_data.get("current_cycle_completion")
         or previous_write_approval != review_data.get("current_cycle_write_approval")
@@ -282,7 +290,7 @@ def maybe_record_head_observation_repair(bot, issue_number: int, review_data: di
     if isinstance(contributor_revision, dict) and contributor_revision.get("reviewed_head_sha") == head_sha:
         review_data["active_head_sha"] = head_sha
         return HeadObservationRepairResult(changed=True, outcome="changed")
-    changed = bot.reviews_module.accept_channel_event(
+    changed = accept_channel_event(
         review_data,
         "contributor_revision",
         semantic_key=f"pull_request_head_observed:{issue_number}:{head_sha}",

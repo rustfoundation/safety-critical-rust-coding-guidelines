@@ -76,8 +76,10 @@ import scripts.reviewer_bot_lib.lifecycle as lifecycle_module
 import scripts.reviewer_bot_lib.maintenance as maintenance_module
 import scripts.reviewer_bot_lib.project_board as project_board_module
 import scripts.reviewer_bot_lib.reconcile as reconcile_module
+import scripts.reviewer_bot_lib.review_state as review_state_module
 import scripts.reviewer_bot_lib.reviews as reviews_module
 import scripts.reviewer_bot_lib.state_store as state_store_module
+import scripts.reviewer_bot_lib.sweeper as sweeper_module  # noqa: F401
 from scripts.reviewer_bot_lib import app as app_module
 
 # Exported runtime config surface used by extracted modules and tests.
@@ -782,16 +784,16 @@ def handle_assign_from_queue_command(state: dict, issue_number: int) -> tuple[st
 
 
 def ensure_review_entry(state: dict, issue_number: int, create: bool = False) -> dict | None:
-    return reviews_module.ensure_review_entry(state, issue_number, create=create)
+    return review_state_module.ensure_review_entry(state, issue_number, create=create)
 
 
 def set_current_reviewer(state: dict, issue_number: int, reviewer: str,
-                        assignment_method: str = "round-robin") -> None:
-    reviews_module.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
+                         assignment_method: str = "round-robin") -> None:
+    review_state_module.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
 
 
 def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
-    return reviews_module.update_reviewer_activity(state, issue_number, reviewer)
+    return review_state_module.update_reviewer_activity(state, issue_number, reviewer)
 
 
 def mark_review_complete(
@@ -800,7 +802,7 @@ def mark_review_complete(
     reviewer: str | None,
     source: str,
 ) -> bool:
-    return reviews_module.mark_review_complete(state, issue_number, reviewer, source)
+    return review_state_module.mark_review_complete(state, issue_number, reviewer, source)
 
 
 def is_triage_or_higher(username: str) -> bool:
