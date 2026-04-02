@@ -302,23 +302,8 @@ def build_pr_comment_observer_payload(
 def _record_conversation_freshness(
     bot,
     state: dict,
-    request_or_issue_number: CommentEventRequest | int,
-    comment_author: str | None = None,
-    comment_id: int | None = None,
-    created_at: str | None = None,
+    request: CommentEventRequest,
 ) -> bool:
-    if isinstance(request_or_issue_number, CommentEventRequest):
-        request = request_or_issue_number
-    else:
-        request = CommentEventRequest(
-            issue_number=request_or_issue_number,
-            is_pull_request=False,
-            issue_author=os.environ.get("ISSUE_AUTHOR", ""),
-            comment_id=comment_id or 0,
-            comment_author=comment_author or "",
-            comment_created_at=created_at or "",
-            comment_source_event_key=os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip(),
-        )
     issue_number = request.issue_number
     review_data = bot.ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
@@ -372,17 +357,8 @@ def _store_pending_privileged_command(review_data: dict, issue_number: int, sour
 
 def _validate_accept_no_fls_changes_handoff(
     bot,
-    request_or_issue_number: CommentEventRequest | int,
-    comment_author: str | None = None,
+    request: CommentEventRequest,
 ) -> tuple[bool, dict]:
-    if isinstance(request_or_issue_number, CommentEventRequest):
-        request = request_or_issue_number
-    else:
-        request = CommentEventRequest(
-            issue_number=request_or_issue_number,
-            is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
-            comment_author=comment_author or "",
-        )
     if request.is_pull_request:
         return False, {"reason": "pull_request_target_not_allowed"}
     labels = bot.parse_issue_labels()
@@ -405,29 +381,15 @@ def _validate_accept_no_fls_changes_handoff(
 def _handle_command(
     bot,
     state: dict,
-    request_or_issue_number: CommentEventRequest | int,
-    comment_author: str | dict | None = None,
-    classified: dict | None = None,
+    request: CommentEventRequest,
+    classified: dict,
 ) -> bool:
-    if isinstance(request_or_issue_number, CommentEventRequest):
-        request = request_or_issue_number
-        classified_payload = classified if classified is not None else comment_author
-    else:
-        request = CommentEventRequest(
-            issue_number=request_or_issue_number,
-            is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
-            issue_author=os.environ.get("ISSUE_AUTHOR", ""),
-            comment_id=int(os.environ.get("COMMENT_ID", "0") or 0),
-            comment_author=str(comment_author or ""),
-            comment_source_event_key=os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip(),
-        )
-        classified_payload = classified
-    if not isinstance(classified_payload, dict):
+    if not isinstance(classified, dict):
         return False
     issue_number = request.issue_number
     comment_author = request.comment_author
-    command = classified_payload.get("command")
-    args = classified_payload.get("args") or []
+    command = classified.get("command")
+    args = classified.get("args") or []
     if not isinstance(command, str):
         return False
     actor_class = _classify_issue_comment_actor(request)

@@ -4,6 +4,7 @@ import pytest
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing
 from tests.fixtures.commands_harness import CommandHarness
+from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 from tests.fixtures.reviewer_bot import make_state
 
 
@@ -286,14 +287,19 @@ def test_handle_rectify_command_reports_permission_denied(monkeypatch):
 
 
 def test_validate_accept_no_fls_changes_handoff_distinguishes_permission_unavailable(monkeypatch):
-    monkeypatch.setenv("IS_PULL_REQUEST", "false")
+    harness = CommentRoutingHarness(monkeypatch)
     monkeypatch.setattr(reviewer_bot, "parse_issue_labels", lambda: [reviewer_bot.FLS_AUDIT_LABEL])
     monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="triage": "unavailable")
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        comment_author="alice",
+        comment_body="@guidelines-bot /accept-no-fls-changes",
+    )
 
     ok, metadata = comment_routing._validate_accept_no_fls_changes_handoff(
         reviewer_bot,
-        42,
-        "alice",
+        request,
     )
 
     assert ok is False

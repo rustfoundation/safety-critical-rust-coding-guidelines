@@ -507,14 +507,14 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
     monkeypatch.setattr(
         reviewer_bot.reconcile_module,
         "_handle_command",
-        lambda bot, state_obj, issue_number, comment_author, classified: claim_contexts.append(
+        lambda bot, state_obj, request, classified: claim_contexts.append(
             {
-                "issue_number": issue_number,
-                "username": comment_author,
+                "issue_number": request.issue_number,
+                "username": request.comment_author,
                 "is_pull_request": harness.config.values.get("IS_PULL_REQUEST"),
                 "issue_author": harness.config.values.get("ISSUE_AUTHOR"),
             }
-        ) or state_obj["active_reviews"][str(issue_number)].__setitem__("current_reviewer", comment_author) or True,
+        ) or state_obj["active_reviews"][str(request.issue_number)].__setitem__("current_reviewer", request.comment_author) or True,
     )
     monkeypatch.setattr(reviewer_bot, "add_reaction", lambda *args, **kwargs: True)
 
