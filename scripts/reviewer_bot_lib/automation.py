@@ -1,12 +1,17 @@
 """Automation-heavy reviewer-bot helpers."""
 
-import json
-import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .context import PrivilegedCommandRequest
+from .event_inputs import (
+    build_privileged_command_request as decode_privileged_command_request,
+)
+from .event_inputs import (
+    get_target_repo_root_from_env,
+    parse_issue_labels_env,
+)
 
 
 def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
@@ -36,39 +41,22 @@ def list_changed_files(repo_root: Path) -> list[str]:
 
 
 def get_target_repo_root() -> Path:
-    configured = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
-    if configured:
-        return Path(configured)
+    configured = get_target_repo_root_from_env()
+    if configured is not None:
+        return configured
     return Path(__file__).resolve().parents[2]
 
 
 def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
-    target_repo_root = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
-    workflow_run_reconcile_pr_number = os.environ.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
-    return PrivilegedCommandRequest(
+    return decode_privileged_command_request(
         issue_number=issue_number,
         actor=actor,
         command_name=command_name,
-        is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
-        issue_labels=tuple(bot_label for bot_label in bot_parse_issue_labels()),
-        target_repo_root=target_repo_root,
-        workflow_run_reconcile_pr_number=(
-            int(workflow_run_reconcile_pr_number) if workflow_run_reconcile_pr_number else None
-        ),
-        workflow_run_reconcile_head_sha=os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip(),
-        workflow_run_head_sha=os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip(),
     )
 
 
 def bot_parse_issue_labels() -> list[str]:
-    labels_json = os.environ.get("ISSUE_LABELS", "[]")
-    try:
-        labels = json.loads(labels_json)
-    except Exception:
-        labels = []
-    if not isinstance(labels, list):
-        return []
-    return [str(label) for label in labels]
+    return parse_issue_labels_env()
 
 
 def get_default_branch(bot) -> str:
@@ -79,7 +67,7 @@ def get_default_branch(bot) -> str:
 
 
 def find_open_pr_for_branch_status(bot, branch: str) -> tuple[str, dict | None]:
-    owner = os.environ.get("REPO_OWNER", "").strip()
+    owner = bot.get_config_value("REPO_OWNER", "").strip()
     branch = branch.strip()
     if not owner or not branch:
         return "not_found", None

@@ -1,47 +1,27 @@
 """Reviewer-bot command parsing and handlers."""
 
-import json
-import os
 import re
 from datetime import datetime, timezone
 
-from .automation import (
-    bot_parse_issue_labels,
-)
-from .automation import (
-    build_privileged_command_request as automation_build_privileged_command_request,
-)
+from .automation import bot_parse_issue_labels
 from .automation import (
     find_open_pr_for_branch_status as automation_find_open_pr_for_branch_status,
 )
 from .config import AssignmentAttempt
 from .context import AssignmentRequest, PrivilegedCommandRequest
+from .event_inputs import build_assignment_request as decode_assignment_request
+from .event_inputs import (
+    build_privileged_command_request as decode_privileged_command_request,
+)
 from .guidance import get_issue_guidance, get_pr_guidance
 
 
-def _parse_issue_labels(labels_json: str) -> list[str]:
-    try:
-        labels = json.loads(labels_json)
-    except json.JSONDecodeError:
-        labels = []
-    if not isinstance(labels, list):
-        return []
-    return [str(label) for label in labels]
-
-
 def build_assignment_request(*, issue_number: int) -> AssignmentRequest:
-    return AssignmentRequest(
-        issue_number=issue_number,
-        issue_author=os.environ.get("ISSUE_AUTHOR", ""),
-        is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
-        issue_labels=tuple(_parse_issue_labels(os.environ.get("ISSUE_LABELS", "[]"))),
-        repo_owner=os.environ.get("REPO_OWNER", ""),
-        repo_name=os.environ.get("REPO_NAME", ""),
-    )
+    return decode_assignment_request(issue_number=issue_number)
 
 
 def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
-    return automation_build_privileged_command_request(
+    return decode_privileged_command_request(
         issue_number=issue_number,
         actor=actor,
         command_name=command_name,

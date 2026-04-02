@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from datetime import datetime, timezone
 
 from .context import CommentEventRequest, PrCommentTrustContext
+from .event_inputs import (
+    build_comment_event_request as decode_comment_event_request,
+)
+from .event_inputs import (
+    build_pr_comment_trust_context as decode_pr_comment_trust_context,
+)
 
 
 def _now() -> datetime:
@@ -23,35 +28,11 @@ def _runtime_epoch(state: dict) -> str:
 
 
 def build_comment_event_request(*, issue_number: int | None = None) -> CommentEventRequest:
-    return CommentEventRequest(
-        issue_number=issue_number if issue_number is not None else int(os.environ.get("ISSUE_NUMBER", "0") or 0),
-        is_pull_request=os.environ.get("IS_PULL_REQUEST", "false").lower() == "true",
-        issue_state=os.environ.get("ISSUE_STATE", "").strip().lower(),
-        issue_author=os.environ.get("ISSUE_AUTHOR", ""),
-        comment_id=int(os.environ.get("COMMENT_ID", "0") or 0),
-        comment_author=os.environ.get("COMMENT_AUTHOR", ""),
-        comment_author_id=int(os.environ.get("COMMENT_AUTHOR_ID", "0") or 0),
-        comment_body=os.environ.get("COMMENT_BODY", ""),
-        comment_created_at=os.environ.get("COMMENT_CREATED_AT", ""),
-        comment_source_event_key=os.environ.get("COMMENT_SOURCE_EVENT_KEY", "").strip(),
-        comment_user_type=os.environ.get("COMMENT_USER_TYPE", "").strip(),
-        comment_sender_type=os.environ.get("COMMENT_SENDER_TYPE", "").strip(),
-        comment_installation_id=os.environ.get("COMMENT_INSTALLATION_ID", "").strip(),
-        comment_performed_via_github_app=(
-            os.environ.get("COMMENT_PERFORMED_VIA_GITHUB_APP", "").strip().lower() == "true"
-        ),
-    )
+    return decode_comment_event_request(issue_number=issue_number)
 
 
 def build_pr_comment_trust_context() -> PrCommentTrustContext:
-    return PrCommentTrustContext(
-        github_repository=os.environ.get("GITHUB_REPOSITORY", ""),
-        comment_author_association=os.environ.get("COMMENT_AUTHOR_ASSOCIATION", "").strip(),
-        current_workflow_file=os.environ.get("CURRENT_WORKFLOW_FILE", "").strip(),
-        github_ref=os.environ.get("GITHUB_REF", "").strip(),
-        github_run_id=int(os.environ.get("GITHUB_RUN_ID", "0") or 0),
-        github_run_attempt=int(os.environ.get("GITHUB_RUN_ATTEMPT", "0") or 0),
-    )
+    return decode_pr_comment_trust_context()
 
 
 def _require_v18_for_pr(state: dict, request: CommentEventRequest, context: str) -> bool:
