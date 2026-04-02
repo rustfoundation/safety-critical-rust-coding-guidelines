@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from dataclasses import dataclass
 
@@ -46,6 +45,22 @@ class DeferredArtifactIdentity:
     source_event_name: str
     source_event_action: str
     source_event_key: str
+
+
+@dataclass(frozen=True)
+class LivePrReplayContext:
+    issue_author: str
+    issue_labels: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class LiveCommentReplayContext:
+    comment_author: str
+    comment_user_type: str
+    comment_author_association: str
+    comment_sender_type: str
+    comment_installation_id: str
+    comment_performed_via_github_app: bool
 
 
 @dataclass(frozen=True)
@@ -473,13 +488,7 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
     raise RuntimeError("Unsupported deferred workflow_run payload")
 
 
-def _set_config_if_present(bot, name: str, value) -> None:
-    if value is None:
-        return
-    bot.set_config_value(name, value)
-
-
-def _hydrate_reconcile_pr_context(bot, pr_number: int) -> dict:
+def _read_live_pr_replay_context(bot, pr_number: int) -> LivePrReplayContext:
     pull_request = _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number} for reconcile context")
     author = pull_request.get("user")
     if not isinstance(author, dict):
@@ -500,13 +509,10 @@ def _hydrate_reconcile_pr_context(bot, pr_number: int) -> dict:
         if not isinstance(name, str):
             raise RuntimeError(f"Live PR #{pr_number} contains a label without a valid name")
         label_names.append(name)
-    bot.set_config_value("IS_PULL_REQUEST", "true")
-    bot.set_config_value("ISSUE_AUTHOR", author_login)
-    bot.set_config_value("ISSUE_LABELS", json.dumps(label_names))
-    return pull_request
+    return LivePrReplayContext(issue_author=author_login, issue_labels=tuple(label_names))
 
 
-def _hydrate_reconcile_comment_context(bot, live_comment: dict, payload: dict) -> None:
+def _read_live_comment_replay_context(live_comment: dict, payload: dict) -> LiveCommentReplayContext:
     user = live_comment.get("user")
     if not isinstance(user, dict):
         raise RuntimeError("Live deferred comment user metadata is unavailable")
@@ -519,17 +525,13 @@ def _hydrate_reconcile_comment_context(bot, live_comment: dict, payload: dict) -
     author_association = live_comment.get("author_association")
     if not isinstance(author_association, str) or not author_association.strip():
         raise RuntimeError("Live deferred comment author association is unavailable")
-    _set_config_if_present(bot, "COMMENT_AUTHOR", comment_author)
-    _set_config_if_present(bot, "COMMENT_ID", payload.get("comment_id"))
-    _set_config_if_present(bot, "COMMENT_SOURCE_EVENT_KEY", payload.get("source_event_key"))
-    _set_config_if_present(bot, "COMMENT_CREATED_AT", payload.get("source_created_at"))
-    _set_config_if_present(bot, "COMMENT_USER_TYPE", comment_user_type)
-    _set_config_if_present(bot, "COMMENT_AUTHOR_ASSOCIATION", author_association)
-    _set_config_if_present(bot, "COMMENT_SENDER_TYPE", comment_user_type)
-    bot.set_config_value("COMMENT_INSTALLATION_ID", "")
-    bot.set_config_value(
-        "COMMENT_PERFORMED_VIA_GITHUB_APP",
-        "true" if live_comment.get("performed_via_github_app") else "false",
+    return LiveCommentReplayContext(
+        comment_author=comment_author,
+        comment_user_type=comment_user_type,
+        comment_author_association=author_association,
+        comment_sender_type=comment_user_type,
+        comment_installation_id="",
+        comment_performed_via_github_app=bool(live_comment.get("performed_via_github_app")),
     )
 
 
@@ -644,27 +646,26 @@ def _reconcile_deferred_comment(
     payload = context.payload.raw_payload
     comment_id = context.comment_id
     pr_number = context.pr_number
-    _set_config_if_present(bot, "COMMENT_SOURCE_EVENT_KEY", context.source_event_key)
-    _hydrate_reconcile_pr_context(bot, pr_number)
+    pr_context = _read_live_pr_replay_context(bot, pr_number)
     comment_author = context.actor_login
     comment_created_at = context.source_created_at
     source_freshness_eligible = context.source_freshness_eligible
 
-    def replay_request(*, comment_body: str = "") -> CommentEventRequest:
+    def replay_request(comment_context: LiveCommentReplayContext | None = None, *, comment_body: str = "") -> CommentEventRequest:
         return CommentEventRequest(
             issue_number=pr_number,
             is_pull_request=True,
-            issue_author=bot.get_config_value("ISSUE_AUTHOR"),
+            issue_author=pr_context.issue_author,
             comment_id=comment_id,
-            comment_author=comment_author or "",
+            comment_author=(comment_context.comment_author if comment_context is not None else (comment_author or "")),
             comment_body=comment_body,
             comment_created_at=comment_created_at,
             comment_source_event_key=context.source_event_key,
-            comment_user_type=bot.get_config_value("COMMENT_USER_TYPE"),
-            comment_sender_type=bot.get_config_value("COMMENT_SENDER_TYPE"),
-            comment_installation_id=bot.get_config_value("COMMENT_INSTALLATION_ID"),
+            comment_user_type=(comment_context.comment_user_type if comment_context is not None else ""),
+            comment_sender_type=(comment_context.comment_sender_type if comment_context is not None else ""),
+            comment_installation_id=(comment_context.comment_installation_id if comment_context is not None else ""),
             comment_performed_via_github_app=(
-                bot.get_config_value("COMMENT_PERFORMED_VIA_GITHUB_APP").strip().lower() == "true"
+                comment_context.comment_performed_via_github_app if comment_context is not None else False
             ),
         )
 
@@ -693,19 +694,19 @@ def _reconcile_deferred_comment(
             failure_kind=exc.failure_kind,
         )
         return changed or gap_changed
-    _hydrate_reconcile_comment_context(bot, live_comment, payload)
+    comment_context = _read_live_comment_replay_context(live_comment, payload)
     live_body = live_comment.get("body")
     if not isinstance(live_body, str):
         raise RuntimeError("Live deferred comment body is unavailable")
     if _digest_body(live_body) != payload.get("source_body_digest"):
         changed = False
         if source_freshness_eligible:
-            changed = _record_conversation_freshness(bot, state, replay_request(comment_body=live_body))
+            changed = _record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body))
         gap_changed = _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {comment_id} body digest changed; command execution suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
         return changed or gap_changed
     changed = False
     if source_freshness_eligible:
-        changed = _record_conversation_freshness(bot, state, replay_request(comment_body=live_body)) or changed
+        changed = _record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body)) or changed
     validation_result = _validate_live_comment_replay_contract(
         bot,
         review_data,
@@ -716,7 +717,7 @@ def _reconcile_deferred_comment(
         return changed or validation_result.changed
     live_classified = validation_result.live_classified
     if context.payload.comment_class in {"command_only", "command_plus_text"}:
-        changed = _handle_command(bot, state, replay_request(comment_body=live_body), live_classified) or changed
+        changed = _handle_command(bot, state, replay_request(comment_context, comment_body=live_body), live_classified) or changed
     reconciled_changed = _mark_reconciled_source_event(review_data, str(payload.get("source_event_key", "")))
     gap_cleared_changed = _clear_source_event_key(review_data, str(payload.get("source_event_key", "")))
     return changed or reconciled_changed or gap_cleared_changed

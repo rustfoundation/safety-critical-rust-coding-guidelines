@@ -464,9 +464,6 @@ def test_deferred_comment_reconcile_hydrates_pr_author_context_for_contributor_f
     assert harness.run(state) is True
     assert state["active_reviews"]["42"]["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:199"
     assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"] is None
-    assert harness.config.values["IS_PULL_REQUEST"] == "true"
-    assert harness.config.values["ISSUE_AUTHOR"] == "dana"
-    assert harness.config.values["ISSUE_LABELS"] == '["coding guideline"]'
 
 
 def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monkeypatch):
@@ -511,8 +508,8 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
             {
                 "issue_number": request.issue_number,
                 "username": request.comment_author,
-                "is_pull_request": harness.config.values.get("IS_PULL_REQUEST"),
-                "issue_author": harness.config.values.get("ISSUE_AUTHOR"),
+                "is_pull_request": request.is_pull_request,
+                "issue_author": request.issue_author,
             }
         ) or state_obj["active_reviews"][str(request.issue_number)].__setitem__("current_reviewer", request.comment_author) or True,
     )
@@ -523,7 +520,7 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
         {
             "issue_number": 42,
             "username": "bob",
-            "is_pull_request": "true",
+            "is_pull_request": True,
             "issue_author": "dana",
         }
     ]
