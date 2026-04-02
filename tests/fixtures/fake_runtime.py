@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import json
+from copy import deepcopy
+from typing import Any
+
+from scripts import reviewer_bot
+
+
+class ConfigBag:
+    def __init__(self, monkeypatch):
+        self._monkeypatch = monkeypatch
+        self.values: dict[str, str] = {}
+
+    def get(self, name: str, default: str = "") -> str:
+        return self.values.get(name, default)
+
+    def set(self, name: str, value) -> None:
+        rendered = str(value)
+        self.values[name] = rendered
+        self._monkeypatch.setenv(name, rendered)
+
+
+class OutputCapture:
+    def __init__(self):
+        self.writes: list[tuple[str, str]] = []
+
+    def write(self, name: str, value: str) -> None:
+        self.writes.append((name, value))
+
+
+class FakeReviewerBotRuntime:
+    EVENT_INTENT_MUTATING = reviewer_bot.EVENT_INTENT_MUTATING
+    EVENT_INTENT_NON_MUTATING_DEFER = reviewer_bot.EVENT_INTENT_NON_MUTATING_DEFER
+    EVENT_INTENT_NON_MUTATING_READONLY = reviewer_bot.EVENT_INTENT_NON_MUTATING_READONLY
+    STATUS_PROJECTION_EPOCH = reviewer_bot.STATUS_PROJECTION_EPOCH
+    datetime = reviewer_bot.datetime
+    timezone = reviewer_bot.timezone
+
+    def __init__(self, monkeypatch):
+        self._monkeypatch = monkeypatch
+        self._module = reviewer_bot
+        self.config = ConfigBag(monkeypatch)
+        self.outputs = OutputCapture()
+        self._load_state_impl = lambda *, fail_on_unavailable=False: reviewer_bot.load_state(
+            fail_on_unavailable=fail_on_unavailable
+        )
+        self._save_state_impl = lambda state: reviewer_bot.save_state(state)
+        self._acquire_impl = lambda: reviewer_bot.acquire_state_issue_lease_lock()
+        self._release_impl = lambda: reviewer_bot.release_state_issue_lease_lock()
+        self._process_pass_until_impl = lambda state: reviewer_bot.process_pass_until_expirations(state)
+        self._sync_members_impl = lambda state: reviewer_bot.sync_members_with_queue(state)
+        self._sync_status_labels_impl = lambda state, issue_numbers: reviewer_bot.sync_status_labels_for_items(
+            state, issue_numbers
+        )
+        self._touched_items: list[int] = []
+
+    def __getattr__(self, name: str):
+        return getattr(self._module, name)
+
+    def get_config_value(self, name: str, default: str = "") -> str:
+        return self.config.get(name, default)
+
+    def set_config_value(self, name: str, value: Any) -> None:
+        self.config.set(name, value)
+
+    def write_output(self, name: str, value: str) -> None:
+        self.outputs.write(name, value)
+
+    def load_state(self, *, fail_on_unavailable: bool = False) -> dict:
+        return self._load_state_impl(fail_on_unavailable=fail_on_unavailable)
+
+    def save_state(self, state: dict) -> bool:
+        return self._save_state_impl(state)
+
+    def acquire_state_issue_lease_lock(self):
+        return self._acquire_impl()
+
+    def release_state_issue_lease_lock(self) -> bool:
+        return self._release_impl()
+
+    def process_pass_until_expirations(self, state: dict):
+        return self._process_pass_until_impl(state)
+
+    def sync_members_with_queue(self, state: dict):
+        return self._sync_members_impl(state)
+
+    def sync_status_labels_for_items(self, state: dict, issue_numbers):
+        return self._sync_status_labels_impl(state, issue_numbers)
+
+    def collect_touched_item(self, issue_number: int) -> None:
+        if issue_number not in self._touched_items:
+            self._touched_items.append(issue_number)
+
+    def drain_touched_items(self) -> list[int]:
+        items = list(self._touched_items)
+        self._touched_items.clear()
+        return items
+
+    def stub_state_sequence(self, *states: dict) -> None:
+        state_queue = [deepcopy(state) for state in states]
+
+        def fake_load_state(*, fail_on_unavailable: bool = False):
+            if not state_queue:
+                raise AssertionError("No more fake states queued")
+            if len(state_queue) == 1:
+                return state_queue[0]
+            return state_queue.pop(0)
+
+        self._load_state_impl = fake_load_state
+
+    def stub_state_unavailable(self, message: str = "state unavailable") -> None:
+        def fake_load_state(*, fail_on_unavailable: bool = False):
+            assert fail_on_unavailable is True
+            raise RuntimeError(message)
+
+        self._load_state_impl = fake_load_state
+
+    def record_saves(self, snapshots: list):
+        def fake_save_state(state: dict) -> bool:
+            snapshots.append(json.loads(json.dumps(state)))
+            return True
+
+        self._save_state_impl = fake_save_state
+
+    def set_save_state(self, func) -> None:
+        self._save_state_impl = func
+
+    def set_acquire_lock(self, func) -> None:
+        self._acquire_impl = func
+
+    def set_release_lock(self, func) -> None:
+        self._release_impl = func
+
+    def set_pass_until(self, func) -> None:
+        self._process_pass_until_impl = func
+
+    def set_sync_members(self, func) -> None:
+        self._sync_members_impl = func
+
+    def set_sync_status_labels(self, func) -> None:
+        self._sync_status_labels_impl = func

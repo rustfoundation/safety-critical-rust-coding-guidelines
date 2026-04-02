@@ -3,29 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
-
-class _ConfigBag:
-    def __init__(self, monkeypatch):
-        self._monkeypatch = monkeypatch
-        self.values: dict[str, str] = {}
-
-    def get(self, name: str, default: str = "") -> str:
-        return self.values.get(name, default)
-
-    def set(self, name: str, value) -> None:
-        rendered = str(value)
-        self.values[name] = rendered
-        self._monkeypatch.setenv(name, rendered)
-
-
-class _OutputCapture:
-    def __init__(self):
-        self.writes: list[tuple[str, str]] = []
-
-    def write(self, name: str, value: str) -> None:
-        self.writes.append((name, value))
+from .fake_runtime import FakeReviewerBotRuntime
 
 
 @dataclass
@@ -37,18 +16,17 @@ class MainRun:
 class AppHarness:
     def __init__(self, monkeypatch):
         self._monkeypatch = monkeypatch
-        self.config = _ConfigBag(monkeypatch)
-        self.outputs = _OutputCapture()
-        runtime = ReviewerBotRuntime(
-            reviewer_bot,
-            config=self.config,
-            outputs=self.outputs,
-        )
-        self._monkeypatch.setattr(reviewer_bot, "RUNTIME", runtime)
+        self.runtime = FakeReviewerBotRuntime(monkeypatch)
+        self.config = self.runtime.config
+        self.outputs = self.runtime.outputs
+        self._monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
 
     def set_event(self, **values) -> None:
         for name, value in values.items():
             self.config.set(name, value)
+
+    def set_state_sequence(self, *states: dict) -> None:
+        self.runtime.stub_state_sequence(*states)
 
     def stub_execute_run(self, result: reviewer_bot.ExecutionResult) -> MainRun:
         captured = MainRun(exit_code=None)
@@ -59,6 +37,9 @@ class AppHarness:
 
         self._monkeypatch.setattr(reviewer_bot.app_module, "execute_run", fake_execute_run)
         return captured
+
+    def run_execute(self):
+        return reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
     def run_main(self) -> MainRun:
         try:
