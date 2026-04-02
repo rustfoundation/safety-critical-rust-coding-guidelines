@@ -37,9 +37,10 @@ class FakeReviewerBotRuntime:
     datetime = reviewer_bot.datetime
     timezone = reviewer_bot.timezone
 
-    def __init__(self, monkeypatch):
+    def __init__(self, monkeypatch, *, github=None):
         self._monkeypatch = monkeypatch
         self._module = reviewer_bot
+        self._github = github
         self.config = ConfigBag(monkeypatch)
         self.outputs = OutputCapture()
         self._load_state_impl = lambda *, fail_on_unavailable=False: reviewer_bot.load_state(
@@ -87,6 +88,28 @@ class FakeReviewerBotRuntime:
 
     def sync_status_labels_for_items(self, state: dict, issue_numbers):
         return self._sync_status_labels_impl(state, issue_numbers)
+
+    def github_api(self, method: str, endpoint: str, data=None):
+        if self._github is not None:
+            return self._github.github_api(method, endpoint, data=data)
+        return self._module.github_api(method, endpoint, data=data)
+
+    def github_api_request(self, method: str, endpoint: str, data=None, extra_headers=None, **kwargs):
+        if self._github is not None:
+            return self._github.github_api_request(
+                method,
+                endpoint,
+                data=data,
+                extra_headers=extra_headers,
+                **kwargs,
+            )
+        return self._module.github_api_request(
+            method,
+            endpoint,
+            data=data,
+            extra_headers=extra_headers,
+            **kwargs,
+        )
 
     def collect_touched_item(self, issue_number: int) -> None:
         if issue_number not in self._touched_items:

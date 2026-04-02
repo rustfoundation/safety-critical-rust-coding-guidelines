@@ -3,21 +3,8 @@ from __future__ import annotations
 import subprocess
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
-
-class _ConfigBag:
-    def __init__(self, monkeypatch):
-        self._monkeypatch = monkeypatch
-        self.values: dict[str, str] = {}
-
-    def get(self, name: str, default: str = "") -> str:
-        return self.values.get(name, default)
-
-    def set(self, name: str, value) -> None:
-        rendered = str(value)
-        self.values[name] = rendered
-        self._monkeypatch.setenv(name, rendered)
+from .fake_runtime import FakeReviewerBotRuntime
 
 
 class AutomationRunner:
@@ -40,8 +27,8 @@ class AutomationRunner:
 class CommandHarness:
     def __init__(self, monkeypatch):
         self._monkeypatch = monkeypatch
-        self.config = _ConfigBag(monkeypatch)
-        self.runtime = ReviewerBotRuntime(reviewer_bot, config=self.config)
+        self.runtime = FakeReviewerBotRuntime(monkeypatch)
+        self.config = self.runtime.config
         self._monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
 
     def set_comment_command(

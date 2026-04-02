@@ -4,23 +4,9 @@ from dataclasses import dataclass
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib.context import CommentEventRequest, PrCommentTrustContext
-from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
+from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_fakes import RouteGitHubApi
-
-
-class _ConfigBag:
-    def __init__(self, monkeypatch):
-        self._monkeypatch = monkeypatch
-        self.values: dict[str, str] = {}
-
-    def get(self, name: str, default: str = "") -> str:
-        return self.values.get(name, default)
-
-    def set(self, name: str, value) -> None:
-        rendered = str(value)
-        self.values[name] = rendered
-        self._monkeypatch.setenv(name, rendered)
 
 
 @dataclass
@@ -32,9 +18,9 @@ class SideEffects:
 class CommentRoutingHarness:
     def __init__(self, monkeypatch):
         self._monkeypatch = monkeypatch
-        self.config = _ConfigBag(monkeypatch)
         self.github = RouteGitHubApi()
-        self.runtime = ReviewerBotRuntime(reviewer_bot, config=self.config, github=self.github)
+        self.runtime = FakeReviewerBotRuntime(monkeypatch, github=self.github)
+        self.config = self.runtime.config
         self._monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
 
     def request(
