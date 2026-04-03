@@ -129,8 +129,8 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
         handle_assign_from_queue_command=lambda current_state, issue_number, request=None: commands.handle_assign_from_queue_command(
             runtime, current_state, issue_number, request=request
         ),
-        handle_accept_no_fls_changes_command=lambda issue_number, comment_author: automation.handle_accept_no_fls_changes_command(
-            runtime, issue_number, comment_author
+        handle_accept_no_fls_changes_command=lambda issue_number, comment_author, request=None: automation.handle_accept_no_fls_changes_command(
+            runtime, issue_number, comment_author, request=request
         ),
         get_commands_help=config.get_commands_help,
         # Adapter-only mutable review-state compatibility surface.

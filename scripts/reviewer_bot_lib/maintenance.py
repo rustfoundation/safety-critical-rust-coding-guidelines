@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import os
 
 import yaml
 
+from .context import PrivilegedCommandRequest
 from .lifecycle import maybe_record_head_observation_repair
 from .overdue import (
     backfill_transition_notice_if_present,
@@ -27,6 +27,28 @@ from .sweeper import sweep_deferred_gaps
 
 def _now_iso(bot) -> str:
     return bot.datetime.now(bot.timezone.utc).isoformat()
+
+
+def build_revalidated_privileged_command_request(
+    bot,
+    *,
+    issue_number: int,
+    actor: str,
+    command_name: str,
+    labels: set[str],
+) -> PrivilegedCommandRequest:
+    workflow_run_reconcile_pr_number = bot.get_config_value("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
+    return PrivilegedCommandRequest(
+        issue_number=issue_number,
+        actor=actor,
+        command_name=command_name,
+        is_pull_request=False,
+        issue_labels=tuple(sorted(labels)),
+        target_repo_root=bot.get_config_value("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip(),
+        workflow_run_reconcile_pr_number=int(workflow_run_reconcile_pr_number) if workflow_run_reconcile_pr_number else None,
+        workflow_run_reconcile_head_sha=bot.get_config_value("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip(),
+        workflow_run_head_sha=bot.get_config_value("WORKFLOW_RUN_HEAD_SHA", "").strip(),
+    )
 
 
 def _clear_maintenance_repair_marker(review_data: dict, phase: str) -> bool:
@@ -189,8 +211,14 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 record["completed_at"] = _now_iso(bot)
                 record["result"] = "live_revalidation_failed"
                 return True
-            os.environ["ISSUE_LABELS"] = json.dumps(sorted(labels))
-            message, success = bot.handle_accept_no_fls_changes_command(issue_number, actor)
+            request = build_revalidated_privileged_command_request(
+                bot,
+                issue_number=issue_number,
+                actor=actor,
+                command_name=str(command_name),
+                labels=labels,
+            )
+            message, success = bot.handle_accept_no_fls_changes_command(issue_number, actor, request=request)
             record["completed_at"] = _now_iso(bot)
             record["result_message"] = message
             record["status"] = "executed" if success else "failed_closed"

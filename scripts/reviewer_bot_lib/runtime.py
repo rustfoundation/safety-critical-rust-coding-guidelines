@@ -304,8 +304,8 @@ class ReviewerBotRuntime:
     def handle_assign_from_queue_command(self, state: dict, issue_number: int, request=None):
         return self.adapters.handle_assign_from_queue_command(state, issue_number, request=request)
 
-    def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str):
-        return self.adapters.handle_accept_no_fls_changes_command(issue_number, comment_author)
+    def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str, request=None):
+        return self.adapters.handle_accept_no_fls_changes_command(issue_number, comment_author, request=request)
 
     def get_commands_help(self) -> str:
         return self.adapters.get_commands_help()

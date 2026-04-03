@@ -449,8 +449,8 @@ class FakeReviewerBotRuntime:
     def handle_assign_from_queue_command(self, state: dict, issue_number: int, request=None):
         return commands_module.handle_assign_from_queue_command(self, state, issue_number, request=request)
 
-    def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str):
-        return automation_module.handle_accept_no_fls_changes_command(self, issue_number, comment_author)
+    def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str, request=None):
+        return automation_module.handle_accept_no_fls_changes_command(self, issue_number, comment_author, request=request)
 
     def handle_rectify_command(self, state: dict, issue_number: int, comment_author: str):
         return reconcile_module.handle_rectify_command(self, state, issue_number, comment_author)
