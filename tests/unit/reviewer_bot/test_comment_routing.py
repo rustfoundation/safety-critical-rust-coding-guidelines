@@ -1,7 +1,8 @@
 import pytest
 
-from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import comment_application, comment_routing
+from types import SimpleNamespace
+
+from scripts.reviewer_bot_lib import comment_application, comment_routing, review_state
 from scripts.reviewer_bot_lib.context import CommentEventRequest
 from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 from tests.fixtures.reviewer_bot import make_state
@@ -10,13 +11,13 @@ from tests.fixtures.reviewer_bot import make_state
 def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_changes(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["last_reviewer_activity"] = "2026-03-17T09:00:00Z"
     review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
     review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
-    reviewer_bot.reviews_module.accept_channel_event(
+    review_state.accept_channel_event(
         review,
         "reviewer_comment",
         semantic_key="issue_comment:100",
@@ -35,7 +36,7 @@ def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_
     )
 
     changed = comment_application.record_conversation_freshness(
-        reviewer_bot,
+        harness.runtime,
         state,
         request,
     )
@@ -74,7 +75,7 @@ def test_classify_issue_comment_actor(monkeypatch, env, expected):
 
 
 def test_classify_comment_payload_distinguishes_command_plus_text():
-    payload = comment_routing.classify_comment_payload(reviewer_bot, "hello\n@guidelines-bot /queue")
+    payload = comment_routing.classify_comment_payload(SimpleNamespace(BOT_MENTION="@guidelines-bot"), "hello\n@guidelines-bot /queue")
     assert payload["comment_class"] == "command_plus_text"
     assert payload["has_non_command_text"] is True
 
@@ -99,7 +100,7 @@ def test_route_issue_comment_trust_allows_only_same_repo_repo_user_principal(mon
         head_repo_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
         pr_author="carol",
     )
-    assert comment_routing.route_issue_comment_trust(reviewer_bot, 42, request, trust_context) == "pr_trusted_direct"
+    assert comment_routing.route_issue_comment_trust(harness.runtime, 42, request, trust_context) == "pr_trusted_direct"
 
 
 def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypatch):
@@ -124,7 +125,7 @@ def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypa
         pr_author="carol",
     )
     with pytest.raises(RuntimeError, match="Ambiguous same-repo PR comment trust posture"):
-        comment_routing.route_issue_comment_trust(reviewer_bot, 42, request, trust_context)
+        comment_routing.route_issue_comment_trust(harness.runtime, 42, request, trust_context)
 
 
 def test_build_pr_comment_observer_payload_wrapper_uses_explicit_env_facts(monkeypatch):
@@ -148,7 +149,7 @@ def test_build_pr_comment_observer_payload_wrapper_uses_explicit_env_facts(monke
         pr_author="dana",
     )
 
-    payload = reviewer_bot.build_pr_comment_observer_payload(42)
+    payload = harness.build_observer_payload(42)
 
     assert payload["kind"] == "observer_noop"
     assert payload["reason"] == "trusted_direct_same_repo_human_comment"

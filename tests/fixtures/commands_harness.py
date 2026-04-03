@@ -3,6 +3,10 @@ from __future__ import annotations
 import subprocess
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import automation as automation_module
+from scripts.reviewer_bot_lib import commands as commands_module
+from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
+from scripts.reviewer_bot_lib import event_inputs
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_env import set_env_values
@@ -106,6 +110,60 @@ class CommandHarness:
 
     def automation_runner(self) -> AutomationRunner:
         runner = AutomationRunner()
-        self._monkeypatch.setattr(reviewer_bot.automation_module, "run_command", runner.run)
+        self._monkeypatch.setattr(automation_module, "run_command", runner.run)
         self.runtime.run_command = runner.run
         return runner
+
+    def assignment_request(self, *, issue_number: int):
+        return event_inputs.build_assignment_request(issue_number=issue_number)
+
+    def privileged_request(self, *, issue_number: int, actor: str = "", command_name: str = ""):
+        return event_inputs.build_privileged_command_request(
+            issue_number=issue_number,
+            actor=actor,
+            command_name=command_name,
+        )
+
+    def handle_assign(self, state: dict, issue_number: int, username: str):
+        return commands_module.handle_assign_command(
+            self.runtime,
+            state,
+            issue_number,
+            username,
+            request=self.assignment_request(issue_number=issue_number),
+        )
+
+    def handle_claim(self, state: dict, issue_number: int, comment_author: str):
+        return commands_module.handle_claim_command(
+            self.runtime,
+            state,
+            issue_number,
+            comment_author,
+            request=self.assignment_request(issue_number=issue_number),
+        )
+
+    def handle_pass(self, state: dict, issue_number: int, comment_author: str, reason: str | None):
+        return commands_module.handle_pass_command(
+            self.runtime,
+            state,
+            issue_number,
+            comment_author,
+            reason,
+            request=self.assignment_request(issue_number=issue_number),
+        )
+
+    def handle_accept_no_fls_changes(self, issue_number: int, comment_author: str):
+        return automation_module.handle_accept_no_fls_changes_command(
+            self.runtime,
+            issue_number,
+            comment_author,
+            request=self.privileged_request(issue_number=issue_number, actor=comment_author, command_name="accept-no-fls-changes"),
+        )
+
+    def handle_comment_event(self, state: dict):
+        return comment_routing_module.handle_comment_event(
+            self.runtime,
+            state,
+            event_inputs.build_comment_event_request(),
+            event_inputs.build_pr_comment_trust_context(),
+        )

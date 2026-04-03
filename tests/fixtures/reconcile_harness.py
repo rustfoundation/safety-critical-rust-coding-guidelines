@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import comment_application
+from scripts.reviewer_bot_lib import comment_application, reconcile
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import pull_request_payload, review_payload
@@ -128,6 +128,9 @@ class ReconcileHarness:
         self.runtime.stub_deferred_payload(self.payload)
         self.monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
         self.set_trigger_from_payload(self.payload)
+
+    def handle_workflow_run_event(self, state: dict) -> bool:
+        return reconcile.handle_workflow_run_event(self.runtime, state)
 
     def set_payload(self, payload: dict) -> dict:
         self.payload = payload
@@ -280,4 +283,4 @@ class ReconcileHarness:
         )
 
     def run(self, state: dict) -> bool:
-        return reviewer_bot.handle_workflow_run_event(state)
+        return self.handle_workflow_run_event(state)
