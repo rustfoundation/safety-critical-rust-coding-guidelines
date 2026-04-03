@@ -32,12 +32,12 @@ def _runtime_epoch(state: dict) -> str:
     return str(state.get("freshness_runtime_epoch", "")).strip() or "legacy_v14"
 
 
-def build_comment_event_request(*, issue_number: int | None = None) -> CommentEventRequest:
-    return decode_comment_event_request(issue_number=issue_number)
+def build_comment_event_request(bot, *, issue_number: int | None = None) -> CommentEventRequest:
+    return decode_comment_event_request(bot, issue_number=issue_number)
 
 
-def build_pr_comment_trust_context() -> PrCommentTrustContext:
-    return decode_pr_comment_trust_context()
+def build_pr_comment_trust_context(bot) -> PrCommentTrustContext:
+    return decode_pr_comment_trust_context(bot)
 
 
 def _require_v18_for_pr(state: dict, request: CommentEventRequest, context: str) -> bool:
@@ -121,7 +121,9 @@ def _classify_issue_comment_actor(request: CommentEventRequest) -> str:
 
 
 def classify_issue_comment_actor(request: CommentEventRequest | None = None) -> str:
-    return _classify_issue_comment_actor(request or build_comment_event_request())
+    if request is None:
+        raise RuntimeError("classify_issue_comment_actor requires an explicit request or runtime-aware caller")
+    return _classify_issue_comment_actor(request)
 
 
 def _is_self_comment(bot, author: str) -> bool:
@@ -168,11 +170,11 @@ def classify_pr_comment_processing_target(
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
 ) -> str:
-    comment_request = request or build_comment_event_request(issue_number=issue_number)
+    comment_request = request or build_comment_event_request(bot, issue_number=issue_number)
     return _classify_pr_comment_processing_target(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(),
+        trust_context or build_pr_comment_trust_context(bot),
     )
 
 
@@ -199,11 +201,11 @@ def route_issue_comment_trust(
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
 ) -> str:
-    comment_request = request or build_comment_event_request(issue_number=issue_number)
+    comment_request = request or build_comment_event_request(bot, issue_number=issue_number)
     return _route_issue_comment_trust(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(),
+        trust_context or build_pr_comment_trust_context(bot),
     )
 
 
@@ -277,11 +279,11 @@ def build_pr_comment_observer_payload(
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
 ) -> dict:
-    comment_request = request or build_comment_event_request(issue_number=issue_number)
+    comment_request = request or build_comment_event_request(bot, issue_number=issue_number)
     return _build_pr_comment_observer_payload(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(),
+        trust_context or build_pr_comment_trust_context(bot),
     )
 
 
@@ -302,7 +304,7 @@ def handle_comment_event(
     trust_context: PrCommentTrustContext | None = None,
 ) -> bool:
     bot.assert_lock_held("handle_comment_event")
-    comment_request = request or build_comment_event_request()
+    comment_request = request or build_comment_event_request(bot)
     issue_number = comment_request.issue_number
     if not issue_number:
         return False
@@ -310,7 +312,7 @@ def handle_comment_event(
     route = _route_issue_comment_trust(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(),
+        trust_context or build_pr_comment_trust_context(bot),
     )
     if route == "safe_noop":
         return False

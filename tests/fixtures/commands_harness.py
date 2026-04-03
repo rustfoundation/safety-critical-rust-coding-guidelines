@@ -128,7 +128,7 @@ class CommandHarness:
         return runner
 
     def assignment_request(self, *, issue_number: int):
-        labels = tuple(event_inputs.parse_issue_labels_env())
+        labels = tuple(event_inputs.parse_issue_labels(self.runtime))
         return build_assignment_request(
             issue_number=issue_number,
             issue_author=self.config.get("ISSUE_AUTHOR", ""),
@@ -158,7 +158,7 @@ class CommandHarness:
         )
 
     def privileged_request(self, *, issue_number: int, actor: str = "", command_name: str = ""):
-        labels = tuple(event_inputs.parse_issue_labels_env())
+        labels = tuple(event_inputs.parse_issue_labels(self.runtime))
         return build_privileged_command_request(
             issue_number=issue_number,
             actor=actor,
@@ -318,8 +318,8 @@ class CommandHarness:
         return comment_routing_module.handle_comment_event(
             self.runtime,
             state,
-            request or event_inputs.build_comment_event_request(),
-            trust_context or event_inputs.build_pr_comment_trust_context(),
+            request or event_inputs.build_comment_event_request(self.runtime),
+            trust_context or event_inputs.build_pr_comment_trust_context(self.runtime),
         )
 
     def handle_manual_dispatch(self, state: dict):

@@ -73,6 +73,92 @@ def test_event_inputs_build_manual_dispatch_request_from_runtime_config(monkeypa
     assert request.privileged_source_event_key == "issue_comment:100"
 
 
+def test_event_inputs_build_comment_request_and_trust_context_from_runtime_config(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("ISSUE_NUMBER", "42")
+    runtime.set_config_value("IS_PULL_REQUEST", "true")
+    runtime.set_config_value("ISSUE_STATE", "open")
+    runtime.set_config_value("ISSUE_AUTHOR", "dana")
+    runtime.set_config_value("COMMENT_ID", "100")
+    runtime.set_config_value("COMMENT_AUTHOR", "alice")
+    runtime.set_config_value("COMMENT_AUTHOR_ID", "200")
+    runtime.set_config_value("COMMENT_BODY", "hello")
+    runtime.set_config_value("COMMENT_CREATED_AT", "2026-03-17T10:00:00Z")
+    runtime.set_config_value("COMMENT_SOURCE_EVENT_KEY", "issue_comment:100")
+    runtime.set_config_value("COMMENT_USER_TYPE", "User")
+    runtime.set_config_value("COMMENT_SENDER_TYPE", "User")
+    runtime.set_config_value("COMMENT_INSTALLATION_ID", "")
+    runtime.set_config_value("COMMENT_PERFORMED_VIA_GITHUB_APP", "false")
+    runtime.set_config_value("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    runtime.set_config_value("COMMENT_AUTHOR_ASSOCIATION", "MEMBER")
+    runtime.set_config_value("CURRENT_WORKFLOW_FILE", ".github/workflows/reviewer-bot-pr-comment-trusted.yml")
+    runtime.set_config_value("GITHUB_REF", "refs/heads/main")
+    runtime.set_config_value("GITHUB_RUN_ID", "123")
+    runtime.set_config_value("GITHUB_RUN_ATTEMPT", "2")
+
+    request = event_inputs.build_comment_event_request(runtime)
+    trust_context = event_inputs.build_pr_comment_trust_context(runtime)
+
+    assert request.issue_number == 42
+    assert request.is_pull_request is True
+    assert request.comment_id == 100
+    assert request.comment_author == "alice"
+    assert request.comment_author_id == 200
+    assert request.comment_source_event_key == "issue_comment:100"
+    assert trust_context.github_repository == "rustfoundation/safety-critical-rust-coding-guidelines"
+    assert trust_context.comment_author_association == "MEMBER"
+    assert trust_context.current_workflow_file == ".github/workflows/reviewer-bot-pr-comment-trusted.yml"
+    assert trust_context.github_ref == "refs/heads/main"
+    assert trust_context.github_run_id == 123
+    assert trust_context.github_run_attempt == 2
+
+
+def test_event_inputs_build_assignment_and_privileged_requests_from_runtime_config(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("ISSUE_AUTHOR", "dana")
+    runtime.set_config_value("IS_PULL_REQUEST", "true")
+    runtime.set_config_value("ISSUE_LABELS", '["fls-audit"]')
+    runtime.set_config_value("REPO_OWNER", "rustfoundation")
+    runtime.set_config_value("REPO_NAME", "safety-critical-rust-coding-guidelines")
+    runtime.set_config_value("REVIEWER_BOT_TARGET_REPO_ROOT", "/tmp/repo")
+    runtime.set_config_value("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "42")
+    runtime.set_config_value("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "head-1")
+    runtime.set_config_value("WORKFLOW_RUN_HEAD_SHA", "head-1")
+
+    assignment_request = event_inputs.build_assignment_request(runtime, issue_number=42)
+    privileged_request = event_inputs.build_privileged_command_request(
+        runtime,
+        issue_number=42,
+        actor="alice",
+        command_name="accept-no-fls-changes",
+    )
+
+    assert assignment_request.issue_number == 42
+    assert assignment_request.issue_author == "dana"
+    assert assignment_request.is_pull_request is True
+    assert assignment_request.issue_labels == ("fls-audit",)
+    assert assignment_request.repo_owner == "rustfoundation"
+    assert assignment_request.repo_name == "safety-critical-rust-coding-guidelines"
+    assert privileged_request.issue_number == 42
+    assert privileged_request.actor == "alice"
+    assert privileged_request.command_name == "accept-no-fls-changes"
+    assert privileged_request.is_pull_request is True
+    assert privileged_request.issue_labels == ("fls-audit",)
+    assert privileged_request.target_repo_root == "/tmp/repo"
+    assert privileged_request.workflow_run_reconcile_pr_number == 42
+    assert privileged_request.workflow_run_reconcile_head_sha == "head-1"
+    assert privileged_request.workflow_run_head_sha == "head-1"
+
+
+def test_event_inputs_parse_labels_and_target_repo_root_from_runtime_config(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("ISSUE_LABELS", '["coding guideline", "fls-audit"]')
+    runtime.set_config_value("REVIEWER_BOT_TARGET_REPO_ROOT", "/tmp/repo")
+
+    assert event_inputs.parse_issue_labels(runtime) == ["coding guideline", "fls-audit"]
+    assert str(event_inputs.get_target_repo_root(runtime)) == "/tmp/repo"
+
+
 def test_event_inputs_build_issue_lifecycle_request_from_runtime_config(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("ISSUE_NUMBER", "42")

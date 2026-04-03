@@ -9,8 +9,8 @@ from .event_inputs import (
     build_privileged_command_request as decode_privileged_command_request,
 )
 from .event_inputs import (
-    get_target_repo_root_from_env,
-    parse_issue_labels_env,
+    get_target_repo_root as decode_target_repo_root,
+    parse_issue_labels as decode_issue_labels,
 )
 
 
@@ -40,23 +40,24 @@ def list_changed_files(repo_root: Path) -> list[str]:
     return sorted(set(files))
 
 
-def get_target_repo_root() -> Path:
-    configured = get_target_repo_root_from_env()
+def get_target_repo_root(bot) -> Path:
+    configured = decode_target_repo_root(bot)
     if configured is not None:
         return configured
     return Path(__file__).resolve().parents[2]
 
 
-def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
+def build_privileged_command_request(bot, *, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
     return decode_privileged_command_request(
+        bot,
         issue_number=issue_number,
         actor=actor,
         command_name=command_name,
     )
 
 
-def bot_parse_issue_labels() -> list[str]:
-    return parse_issue_labels_env()
+def bot_parse_issue_labels(bot) -> list[str]:
+    return decode_issue_labels(bot)
 
 
 def get_default_branch(bot) -> str:
@@ -123,6 +124,7 @@ def handle_accept_no_fls_changes_command(
     request: PrivilegedCommandRequest | None = None,
 ) -> tuple[str, bool]:
     privileged_request = request or build_privileged_command_request(
+        bot,
         issue_number=issue_number,
         actor=comment_author,
         command_name="accept-no-fls-changes",
@@ -138,7 +140,7 @@ def handle_accept_no_fls_changes_command(
     if permission_status != "granted":
         return "❌ You must have triage permissions to run this command.", False
 
-    repo_root = Path(privileged_request.target_repo_root) if privileged_request.target_repo_root else get_target_repo_root()
+    repo_root = Path(privileged_request.target_repo_root) if privileged_request.target_repo_root else get_target_repo_root(bot)
     if bot.list_changed_files(repo_root):
         return "❌ Working tree is not clean; refusing to update spec.lock.", False
 

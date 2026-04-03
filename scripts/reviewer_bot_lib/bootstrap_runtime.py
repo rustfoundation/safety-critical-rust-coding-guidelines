@@ -175,7 +175,7 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
         create_pull_request=lambda branch, base, issue_number: automation.create_pull_request(
             runtime, branch, base, issue_number
         ),
-        parse_issue_labels=automation.bot_parse_issue_labels,
+        parse_issue_labels=lambda: automation.bot_parse_issue_labels(runtime),
         normalize_lock_metadata=state_store.normalize_lock_metadata,
         get_state_issue=lambda: state_store.get_state_issue(runtime),
         clear_lock_metadata=lambda: lease_lock.clear_lock_metadata(runtime),

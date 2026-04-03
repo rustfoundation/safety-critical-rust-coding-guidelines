@@ -17,12 +17,13 @@ from .event_inputs import (
 from .guidance import get_issue_guidance, get_pr_guidance
 
 
-def build_assignment_request(*, issue_number: int) -> AssignmentRequest:
-    return decode_assignment_request(issue_number=issue_number)
+def build_assignment_request(bot, *, issue_number: int) -> AssignmentRequest:
+    return decode_assignment_request(bot, issue_number=issue_number)
 
 
-def build_privileged_command_request(*, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
+def build_privileged_command_request(bot, *, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
     return decode_privileged_command_request(
+        bot,
         issue_number=issue_number,
         actor=actor,
         command_name=command_name,
@@ -142,7 +143,7 @@ def handle_pass_command(
     reason: str | None,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
-    assignment_request = request or build_assignment_request(issue_number=issue_number)
+    assignment_request = request or decode_assignment_request(bot, issue_number=issue_number)
     issue_data = review_state.ensure_review_entry(state, issue_number, create=True)
     if issue_data is None:
         return "❌ Unable to load review state.", False
@@ -197,7 +198,7 @@ def handle_pass_until_command(
     reason: str | None,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
-    assignment_request = request or build_assignment_request(issue_number=issue_number)
+    assignment_request = request or decode_assignment_request(bot, issue_number=issue_number)
     try:
         parsed_date = datetime.strptime(return_date, "%Y-%m-%d").date()
     except ValueError:
@@ -276,7 +277,7 @@ def handle_label_command(
     label_string: str,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool, bool]:
-    assignment_request = request or build_assignment_request(issue_number=issue_number)
+    assignment_request = request or decode_assignment_request(bot, issue_number=issue_number)
     pattern = r'(?:(?<=^)|(?<=\s))([+-])(.+?)(?=\s[+-]|\s*$)'
     matches = re.findall(pattern, label_string)
     if not matches:
@@ -316,8 +317,8 @@ def handle_label_command(
     return "\n".join(results), all_success, state_changed
 
 
-def parse_issue_labels() -> list[str]:
-    return bot_parse_issue_labels()
+def parse_issue_labels(bot) -> list[str]:
+    return bot_parse_issue_labels(bot)
 
 
 def get_default_branch(bot) -> str:
@@ -338,7 +339,7 @@ def resolve_workflow_run_pr_number(
     bot,
     request: PrivilegedCommandRequest | None = None,
 ) -> int:
-    privileged_request = request or build_privileged_command_request(issue_number=0)
+    privileged_request = request or decode_privileged_command_request(bot, issue_number=0)
     if privileged_request.workflow_run_reconcile_pr_number is None:
         raise RuntimeError("Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER in workflow_run reconcile context")
     pr_number = privileged_request.workflow_run_reconcile_pr_number
@@ -383,7 +384,7 @@ def handle_queue_command(
     state: dict,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
-    assignment_request = request or build_assignment_request(issue_number=0)
+    assignment_request = request or decode_assignment_request(bot, issue_number=0)
     queue_size = len(state["queue"])
     repo_owner = assignment_request.repo_owner
     repo_name = assignment_request.repo_name
@@ -420,7 +421,7 @@ def handle_claim_command(
     comment_author: str,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
-    assignment_request = request or build_assignment_request(issue_number=issue_number)
+    assignment_request = request or decode_assignment_request(bot, issue_number=issue_number)
     is_producer = any(member["github"].lower() == comment_author.lower() for member in state["queue"])
     is_away = any(member["github"].lower() == comment_author.lower() for member in state.get("pass_until", []))
     if not is_producer and not is_away:
@@ -456,7 +457,7 @@ def handle_release_command(
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
     args = args or []
-    request = request or build_assignment_request(issue_number=issue_number)
+    request = request or decode_assignment_request(bot, issue_number=issue_number)
     target_username = None
     reason = None
     releasing_other = False
@@ -515,7 +516,7 @@ def handle_assign_command(
     username: str,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
-    assignment_request = request or build_assignment_request(issue_number=issue_number)
+    assignment_request = request or decode_assignment_request(bot, issue_number=issue_number)
     username = username.lstrip("@")
     if not username:
         return (f"❌ Missing username. Usage: `{bot.BOT_MENTION} /r? @username`"), False
@@ -555,7 +556,7 @@ def handle_assign_from_queue_command(
     issue_number: int,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
-    assignment_request = request or build_assignment_request(issue_number=issue_number)
+    assignment_request = request or decode_assignment_request(bot, issue_number=issue_number)
     current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
     if assignee_error:
         return assignee_error, False

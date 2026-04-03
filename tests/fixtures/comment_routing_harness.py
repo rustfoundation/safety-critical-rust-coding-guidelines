@@ -21,10 +21,10 @@ class CommentRoutingHarness:
         self.config = self.runtime.config
 
     def env_build_request(self, *, issue_number: int | None = None):
-        return event_inputs.build_comment_event_request(issue_number=issue_number)
+        return event_inputs.build_comment_event_request(self.runtime, issue_number=issue_number)
 
     def env_build_trust_context(self):
-        return event_inputs.build_pr_comment_trust_context()
+        return event_inputs.build_pr_comment_trust_context(self.runtime)
 
     wrapper_request = env_build_request
     wrapper_trust_context = env_build_trust_context

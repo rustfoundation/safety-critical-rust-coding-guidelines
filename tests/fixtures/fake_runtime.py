@@ -459,7 +459,7 @@ class FakeReviewerBotRuntime:
         return config_module.get_commands_help()
 
     def parse_issue_labels(self) -> list[str]:
-        return automation_module.bot_parse_issue_labels()
+        return automation_module.bot_parse_issue_labels(self)
 
     def run_command(self, command, cwd, check=False):
         return automation_module.run_command(command, cwd=cwd, check=check)
