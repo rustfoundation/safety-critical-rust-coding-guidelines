@@ -1,22 +1,25 @@
 import pytest
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import reviews
+from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.github import RouteGitHubApi, github_result
 
 
 def test_list_open_items_with_status_labels_fails_closed_on_unavailable(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
     routes = RouteGitHubApi().add_request(
         "GET",
         "issues?state=open&labels=status%3A%20awaiting%20contributor%20response&per_page=100&page=1",
         result=github_result(502, {"message": "bad gateway"}, retry_attempts=1),
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", routes.github_api_request)
+    runtime.stub_github(routes)
 
     with pytest.raises(RuntimeError, match="server_error"):
-        reviewer_bot.list_open_items_with_status_labels()
+        reviews.list_open_items_with_status_labels(runtime)
 
 
 def test_get_pull_request_reviews_result_paginates(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
     routes = (
         RouteGitHubApi()
         .add_request(
@@ -32,64 +35,68 @@ def test_get_pull_request_reviews_result_paginates(monkeypatch):
             payload=[{"id": 100}],
         )
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", routes.github_api_request)
+    runtime.stub_github(routes)
 
-    result = reviewer_bot.reviews_module.get_pull_request_reviews_result(reviewer_bot, 42)
+    result = reviews.get_pull_request_reviews_result(runtime, 42)
 
     assert result["ok"] is True
     assert len(result["reviews"]) == 101
 
 
 def test_get_pull_request_reviews_result_uses_fallback_loader_after_system_exit(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
     routes = RouteGitHubApi().raise_system_exit_on_request().add_api(
         "GET",
         "pulls/42/reviews?per_page=100&page=1",
         [{"id": 10}],
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", routes.github_api_request)
-    monkeypatch.setattr(reviewer_bot, "github_api", routes.github_api)
+    runtime.stub_github(routes)
+    runtime.get_pull_request_reviews = lambda issue_number: [{"id": 10}]
 
-    result = reviewer_bot.reviews_module.get_pull_request_reviews_result(reviewer_bot, 42)
+    result = reviews.get_pull_request_reviews_result(runtime, 42)
 
     assert result == {"ok": True, "reviews": [{"id": 10}]}
 
 
 def test_get_pull_request_reviews_result_reports_invalid_payload(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
     routes = RouteGitHubApi().add_request(
         "GET",
         "pulls/42/reviews?per_page=100&page=1",
         status_code=200,
         payload={"not": "a list"},
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", routes.github_api_request)
+    runtime.stub_github(routes)
 
-    result = reviewer_bot.reviews_module.get_pull_request_reviews_result(reviewer_bot, 42)
+    result = reviews.get_pull_request_reviews_result(runtime, 42)
 
     assert result == {"ok": False, "reason": "reviews_unavailable", "failure_kind": "invalid_payload"}
 
 
 def test_pull_request_read_result_reports_not_found(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
     routes = RouteGitHubApi().add_request(
         "GET",
         "pulls/42",
         result=github_result(404, {"message": "missing"}),
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", routes.github_api_request)
+    runtime.stub_github(routes)
 
-    result = reviewer_bot.reviews_module._pull_request_read_result(reviewer_bot, 42)
+    result = reviews._pull_request_read_result(runtime, 42)
 
     assert result == {"ok": False, "reason": "pull_request_not_found", "failure_kind": "not_found"}
 
 
 def test_pull_request_read_result_reports_invalid_payload(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
     routes = RouteGitHubApi().add_request(
         "GET",
         "pulls/42",
         status_code=200,
         payload=["not", "a", "dict"],
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", routes.github_api_request)
+    runtime.stub_github(routes)
 
-    result = reviewer_bot.reviews_module._pull_request_read_result(reviewer_bot, 42)
+    result = reviews._pull_request_read_result(runtime, 42)
 
     assert result == {"ok": False, "reason": "pull_request_unavailable", "failure_kind": "invalid_payload"}
