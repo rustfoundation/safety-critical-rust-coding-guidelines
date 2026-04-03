@@ -134,6 +134,75 @@ class PullRequestSyncRequest:
 
 
 @runtime_checkable
+class ConfigProvider(Protocol):
+    def get(self, name: str, default: str = "") -> str: ...
+
+    def set(self, name: str, value: Any) -> None: ...
+
+
+@runtime_checkable
+class Clock(Protocol):
+    def now(self) -> datetime: ...
+
+
+@runtime_checkable
+class Sleeper(Protocol):
+    def sleep(self, seconds: float) -> None: ...
+
+
+@runtime_checkable
+class JitterSource(Protocol):
+    def uniform(self, lower: float, upper: float) -> float: ...
+
+
+@runtime_checkable
+class UuidSource(Protocol):
+    def uuid4_hex(self) -> str: ...
+
+
+@runtime_checkable
+class Logger(Protocol):
+    def event(self, level: str, message: str, **fields: Any) -> None: ...
+
+
+@runtime_checkable
+class RestTransport(Protocol):
+    def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        json_data: dict[str, Any] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> Any: ...
+
+
+@runtime_checkable
+class GraphQLTransport(Protocol):
+    def query(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        query: str,
+        variables: dict[str, Any] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> Any: ...
+
+
+@runtime_checkable
+class ArtifactDownloadTransport(Protocol):
+    def download(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> Any: ...
+
+
+@runtime_checkable
 class AppEventContextRuntime(Protocol):
     EVENT_INTENT_MUTATING: str
     EVENT_INTENT_NON_MUTATING_DEFER: str
