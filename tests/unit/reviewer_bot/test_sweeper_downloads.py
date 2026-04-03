@@ -1,6 +1,6 @@
 from scripts.reviewer_bot_lib import sweeper
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
-from tests.fixtures.github import FakeGitHubResponse
+from tests.fixtures.http_responses import FakeGitHubResponse
 from tests.fixtures.reviewer_bot import make_zip_payload
 
 

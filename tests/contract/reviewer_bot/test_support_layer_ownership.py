@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures import (
-    github,
+    http_responses,
     reviewer_bot_env,
     reviewer_bot_fakes,
     reviewer_bot_recorders,
@@ -29,13 +29,13 @@ def test_transport_fake_authority_is_owned_by_reviewer_bot_fakes():
     assert reviewer_bot_fakes.github_result is not None
 
 
-def test_github_fixture_module_is_limited_to_low_level_response_helper_only():
-    github_text = _read("tests/fixtures/github.py")
+def test_low_level_http_response_helper_has_dedicated_home():
+    response_text = _read("tests/fixtures/http_responses.py")
 
-    assert "class FakeGitHubResponse:" in github_text
-    assert "RouteGitHubApi" not in github_text
-    assert "github_result" not in github_text
-    assert github.__all__ == ["FakeGitHubResponse"]
+    assert "class FakeGitHubResponse:" in response_text
+    assert "RouteGitHubApi" not in response_text
+    assert "github_result" not in response_text
+    assert http_responses.__all__ == ["FakeGitHubResponse"]
 
 
 def test_harnesses_do_not_define_local_config_bags_or_deferred_payload_loaders():
@@ -74,6 +74,7 @@ def test_no_second_fake_runtime_or_transport_home_exists():
     assert "commands_harness.py" in fixture_files
     assert "comment_routing_harness.py" in fixture_files
     assert "reconcile_harness.py" in fixture_files
+    assert "http_responses.py" in fixture_files
 
 
 def test_support_layer_ownership_contract_targets_current_authority_hotspots_only():
@@ -86,8 +87,16 @@ def test_support_layer_ownership_contract_targets_current_authority_hotspots_onl
 
 def test_transport_fakes_are_not_imported_from_github_helper_module_anywhere_in_tests():
     for path in ROOT.glob("tests/**/*.py"):
-        if path.name == "github.py" or path.name == "test_support_layer_ownership.py":
+        if path.name == "test_support_layer_ownership.py":
             continue
         text = path.read_text(encoding="utf-8")
         assert "from tests.fixtures.github import RouteGitHubApi" not in text
         assert "from tests.fixtures.github import github_result" not in text
+
+
+def test_fake_github_response_uses_dedicated_low_level_helper_home():
+    for path in ROOT.glob("tests/**/*.py"):
+        if path.name == "test_support_layer_ownership.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "from tests.fixtures.github import FakeGitHubResponse" not in text

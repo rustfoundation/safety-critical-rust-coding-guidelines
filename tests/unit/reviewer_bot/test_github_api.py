@@ -4,7 +4,7 @@ import pytest
 
 from scripts.reviewer_bot_lib import automation, github_api
 from scripts.reviewer_bot_lib.config import LOCK_API_RETRY_LIMIT, GitHubApiResult
-from tests.fixtures.github import FakeGitHubResponse
+from tests.fixtures.http_responses import FakeGitHubResponse
 
 
 def _bot(**overrides):

@@ -11,4 +11,5 @@ class FakeGitHubResponse:
             raise self._payload
         return self._payload
 
+
 __all__ = ["FakeGitHubResponse"]
