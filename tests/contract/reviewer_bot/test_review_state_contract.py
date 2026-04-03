@@ -1,9 +1,18 @@
+from pathlib import Path
+
 import pytest
 
-from scripts.reviewer_bot_lib import review_state
+from scripts.reviewer_bot_lib import review_state, reviews
 from tests.fixtures.reviewer_bot import make_state
 
 pytestmark = pytest.mark.contract
+
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _read(relative_path: str) -> str:
+    return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
 def test_ensure_review_entry_initializes_tracked_review_shape():
@@ -61,3 +70,48 @@ def test_list_open_tracked_review_items_returns_only_assigned_entries():
     state["active_reviews"]["42"]["current_reviewer"] = "alice"
 
     assert review_state.list_open_tracked_review_items(state) == [42]
+
+
+def test_review_state_module_exposes_named_mutation_surface():
+    for name in [
+        "ensure_review_entry",
+        "accept_channel_event",
+        "record_reviewer_activity",
+        "record_transition_notice_sent",
+        "set_current_reviewer",
+        "update_reviewer_activity",
+        "mark_review_complete",
+        "get_current_cycle_boundary",
+    ]:
+        assert hasattr(review_state, name)
+
+
+def test_production_modules_do_not_import_mutable_review_state_api_from_reviews_module():
+    review_state_text = _read("scripts/reviewer_bot_lib/review_state.py")
+    runtime_text = _read("scripts/reviewer_bot_lib/runtime.py")
+    bootstrap_text = _read("scripts/reviewer_bot_lib/bootstrap_runtime.py")
+
+    for name in [
+        "ensure_review_entry",
+        "accept_channel_event",
+        "record_reviewer_activity",
+        "record_transition_notice_sent",
+        "set_current_reviewer",
+        "update_reviewer_activity",
+        "mark_review_complete",
+        "get_current_cycle_boundary",
+    ]:
+        assert f"def {name}(" in review_state_text
+        assert f"from .reviews import {name}" not in runtime_text
+        assert f"reviews.{name}(" not in runtime_text
+        assert f"reviews.{name}(" not in bootstrap_text
+
+
+def test_reviews_module_still_contains_known_transitional_mutation_helpers_only_as_debt_markers():
+    for name in [
+        "ensure_review_entry",
+        "set_current_reviewer",
+        "update_reviewer_activity",
+        "mark_review_complete",
+    ]:
+        assert hasattr(reviews, name)

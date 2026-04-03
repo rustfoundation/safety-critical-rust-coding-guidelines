@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures import reviewer_bot_env, reviewer_bot_recorders
+from tests.fixtures import (
+    github,
+    reviewer_bot_env,
+    reviewer_bot_fakes,
+    reviewer_bot_recorders,
+)
 
 pytestmark = pytest.mark.contract
 
@@ -17,6 +22,19 @@ def _read(relative_path: str) -> str:
 def test_support_layer_has_owned_env_and_recorder_modules():
     assert reviewer_bot_env is not None
     assert reviewer_bot_recorders is not None
+
+
+def test_transport_fake_authority_is_owned_by_reviewer_bot_fakes():
+    assert reviewer_bot_fakes.RouteGitHubApi is github.RouteGitHubApi
+    assert reviewer_bot_fakes.github_result is github.github_result
+
+
+def test_github_fixture_module_is_limited_to_transport_alias_and_low_level_response_helper():
+    github_text = _read("tests/fixtures/github.py")
+
+    assert "from .reviewer_bot_fakes import RouteGitHubApi, github_result" in github_text
+    assert "class FakeGitHubResponse:" in github_text
+    assert github.__all__ == ["FakeGitHubResponse", "RouteGitHubApi", "github_result"]
 
 
 def test_harnesses_do_not_define_local_config_bags_or_deferred_payload_loaders():
@@ -55,3 +73,11 @@ def test_no_second_fake_runtime_or_transport_home_exists():
     assert "commands_harness.py" in fixture_files
     assert "comment_routing_harness.py" in fixture_files
     assert "reconcile_harness.py" in fixture_files
+
+
+def test_support_layer_ownership_contract_targets_current_authority_hotspots_only():
+    text = _read("tests/contract/reviewer_bot/test_support_layer_ownership.py")
+
+    assert "RouteGitHubApi" in text
+    assert "github_result" in text
+    assert "FakeGitHubResponse" in text

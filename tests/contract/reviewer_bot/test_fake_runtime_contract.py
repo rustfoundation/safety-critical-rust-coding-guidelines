@@ -1,7 +1,7 @@
 import pytest
 
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
-from tests.fixtures.github import RouteGitHubApi
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 pytestmark = pytest.mark.contract
 
@@ -14,6 +14,29 @@ def test_fake_runtime_config_writes_mirror_env(monkeypatch):
     assert runtime.get_config_value("EVENT_NAME") == "issue_comment"
     assert hasattr(FakeReviewerBotRuntime, "__getattr__") is False
     assert "_module" not in vars(runtime)
+
+
+def test_fake_runtime_exposes_explicit_service_fields_and_no_omnibus_service_container(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.config is not None
+    assert runtime.outputs is not None
+    assert runtime.deferred_payloads is not None
+    assert runtime.state_store is not None
+    assert runtime.github is not None
+    assert runtime.locks is not None
+    assert runtime.handlers is not None
+    assert hasattr(runtime, "services") is False
+    assert hasattr(runtime, "components") is False
+
+
+def test_fake_runtime_module_hints_are_explicitly_limited(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    module_hints = sorted(name for name in vars(FakeReviewerBotRuntime) if name.endswith("_module"))
+
+    assert module_hints == ["review_state_module", "reviews_module"]
+    assert runtime.review_state_module is not None
+    assert runtime.reviews_module is not None
 
 
 def test_fake_runtime_output_sink_records_writes(monkeypatch):
@@ -87,6 +110,15 @@ def test_fake_runtime_uses_explicit_public_service_fields(monkeypatch):
     assert runtime.state_store is not None
     assert runtime.github is not None
     assert runtime.locks is not None
+
+
+def test_fake_runtime_mutable_review_state_gateways_delegate_to_review_state_owner(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.ensure_review_entry.__func__.__module__ == FakeReviewerBotRuntime.__module__
+    assert runtime.set_current_reviewer.__func__.__module__ == FakeReviewerBotRuntime.__module__
+    assert runtime.update_reviewer_activity.__func__.__module__ == FakeReviewerBotRuntime.__module__
+    assert runtime.mark_review_complete.__func__.__module__ == FakeReviewerBotRuntime.__module__
 
 
 def test_fake_runtime_rejects_unknown_handler_names(monkeypatch):
