@@ -5,6 +5,8 @@ import pytest
 pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import maintenance, review_state
+from scripts.reviewer_bot_lib.config import STATUS_PROJECTION_EPOCH
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -14,7 +16,7 @@ def test_execute_run_schedule_status_projection_epoch_mismatch_triggers_label_re
     harness.set_event(EVENT_NAME="schedule", EVENT_ACTION="")
     state = make_state()
     state["status_projection_epoch"] = "status_projection_v1"
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     synced_issue_numbers = []
@@ -33,14 +35,14 @@ def test_execute_run_schedule_status_projection_epoch_mismatch_triggers_label_re
 
     assert result.exit_code == 0
     assert synced_issue_numbers == [42, 99]
-    assert saved_epochs[-1] == reviewer_bot.STATUS_PROJECTION_EPOCH
+    assert saved_epochs[-1] == STATUS_PROJECTION_EPOCH
 
 def test_execute_run_schedule_status_projection_epoch_not_advanced_on_label_sync_failure(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="schedule", EVENT_ACTION="")
     state = make_state()
     state["status_projection_epoch"] = "status_projection_v1"
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     saved_epochs = []
@@ -57,12 +59,12 @@ def test_execute_run_schedule_status_projection_epoch_not_advanced_on_label_sync
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
 
     assert result.exit_code == 0
-    assert all(epoch != reviewer_bot.STATUS_PROJECTION_EPOCH for epoch in saved_epochs)
+    assert all(epoch != STATUS_PROJECTION_EPOCH for epoch in saved_epochs)
 
 def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tmp_path):
     harness = AppHarness(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     harness.set_event(
@@ -108,7 +110,7 @@ def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repai
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="schedule", EVENT_ACTION="")
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "iglesias"
     review["assigned_at"] = "2026-02-26T04:58:03Z"
@@ -123,7 +125,7 @@ def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repai
         return state
 
     def fake_sweep(bot, current):
-        bot.review_state_module.record_reviewer_activity(
+        review_state.record_reviewer_activity(
             current["active_reviews"]["42"],
             "2026-03-18T01:09:05Z",
         )
@@ -133,7 +135,7 @@ def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repai
     harness.stub_load_state(lambda *, fail_on_unavailable=False: fake_load_state())
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", fake_sweep)
+    monkeypatch.setattr(maintenance, "sweep_deferred_gaps", fake_sweep)
     harness.stub_handler("handle_scheduled_check", lambda current: False)
     harness.runtime.post_comment = lambda issue_number, body: posted_comments.append((issue_number, body)) or True
     harness.stub_save_state(

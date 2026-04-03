@@ -1,6 +1,6 @@
 import pytest
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import comment_application, reconcile
 from tests.fixtures.reconcile_harness import (
     ReconcileHarness,
     issue_comment_payload,
@@ -113,7 +113,7 @@ def test_deferred_comment_reconcile_returns_true_for_bookkeeping_only_mutations(
         author_type="User",
         author_association="MEMBER",
     )
-    monkeypatch.setattr(reviewer_bot.comment_application_module, "apply_comment_command", lambda *args, **kwargs: False)
+    monkeypatch.setattr(comment_application, "apply_comment_command", lambda *args, **kwargs: False)
 
     assert harness.run(state) is True
     assert "issue_comment:210" in review["reconciled_source_events"]
@@ -408,7 +408,7 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
         author_association="MEMBER",
     )
     monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
+        reconcile,
         "classify_comment_payload",
         lambda bot, body: {
             "comment_class": "command_only",
@@ -421,7 +421,7 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
     )
     command_calls = []
     monkeypatch.setattr(
-        reviewer_bot.comment_application_module,
+        comment_application,
         "apply_comment_command",
         lambda *args, **kwargs: command_calls.append("called") or True,
     )
@@ -502,7 +502,7 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
     harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
     claim_contexts = []
     monkeypatch.setattr(
-        reviewer_bot.comment_application_module,
+        comment_application,
         "apply_comment_command",
         lambda bot, state_obj, request, classified, classify_issue_comment_actor=None: claim_contexts.append(
             {
@@ -588,7 +588,7 @@ def test_deferred_comment_reconcile_fails_closed_when_comment_classification_dri
         author_association="CONTRIBUTOR",
     )
     monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
+        reconcile,
         "classify_comment_payload",
         lambda bot, body: {
             "comment_class": "command_plus_text",

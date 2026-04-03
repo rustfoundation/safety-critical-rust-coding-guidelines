@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import app
+from scripts.reviewer_bot_lib.context import EventContext, ExecutionResult
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_env import set_env_values
@@ -11,7 +13,7 @@ from .reviewer_bot_env import set_env_values
 @dataclass
 class MainRun:
     exit_code: int | None
-    context: reviewer_bot.EventContext | None = None
+    context: EventContext | None = None
 
 
 class AppHarness:
@@ -49,14 +51,14 @@ class AppHarness:
     def stub_sync_status_labels(self, func) -> None:
         self.runtime.stub_sync_status_labels(func)
 
-    def stub_execute_run(self, result: reviewer_bot.ExecutionResult) -> MainRun:
+    def stub_execute_run(self, result: ExecutionResult) -> MainRun:
         captured = MainRun(exit_code=None)
 
         def fake_execute_run(bot, context):
             captured.context = context
             return result
 
-        self._monkeypatch.setattr(reviewer_bot.app_module, "execute_run", fake_execute_run)
+        self._monkeypatch.setattr(app, "execute_run", fake_execute_run)
         return captured
 
     def run_execute(self):

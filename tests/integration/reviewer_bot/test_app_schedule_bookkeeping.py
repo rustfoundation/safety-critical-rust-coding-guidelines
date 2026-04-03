@@ -1,6 +1,8 @@
 import pytest
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import lifecycle, maintenance, review_state
+from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -10,7 +12,7 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="schedule", EVENT_ACTION="")
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
 
@@ -26,14 +28,14 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", fake_sweep)
-    monkeypatch.setattr(reviewer_bot.maintenance_module, "check_overdue_reviews", lambda bot, current: [])
+    monkeypatch.setattr(maintenance, "sweep_deferred_gaps", fake_sweep)
+    monkeypatch.setattr(maintenance, "check_overdue_reviews", lambda bot, current: [])
     harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
-    monkeypatch.setattr(reviewer_bot.review_state_module, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data, *, reviews=None: False)
+    monkeypatch.setattr(review_state, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data, *, reviews=None: False)
     monkeypatch.setattr(
-        reviewer_bot.maintenance_module,
+        maintenance,
         "maybe_record_head_observation_repair",
-        lambda bot, issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+        lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(
             changed=False,
             outcome="unchanged",
         ),
@@ -50,7 +52,7 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="schedule", EVENT_ACTION="")
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
@@ -73,7 +75,7 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
 
     def fake_github_api_request(method, endpoint, data=None, extra_headers=None, **kwargs):
         if endpoint == "pulls/42":
-            return reviewer_bot.GitHubApiResult(
+            return GitHubApiResult(
                 200,
                 {"state": "open", "head": {"sha": "head-1"}},
                 {},
@@ -84,7 +86,7 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
                 None,
             )
         if endpoint.startswith("pulls/42/reviews"):
-            return reviewer_bot.GitHubApiResult(
+            return GitHubApiResult(
                 200,
                 [
                     {
@@ -108,14 +110,14 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
-    monkeypatch.setattr(reviewer_bot.maintenance_module, "sweep_deferred_gaps", lambda bot, current: False)
-    monkeypatch.setattr(reviewer_bot.maintenance_module, "check_overdue_reviews", lambda bot, current: [])
+    monkeypatch.setattr(maintenance, "sweep_deferred_gaps", lambda bot, current: False)
+    monkeypatch.setattr(maintenance, "check_overdue_reviews", lambda bot, current: [])
     harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
     harness.runtime.github_api_request = fake_github_api_request
     monkeypatch.setattr(
-        reviewer_bot.maintenance_module,
+        maintenance,
         "maybe_record_head_observation_repair",
-        lambda bot, issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+        lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(
             changed=False,
             outcome="unchanged",
         ),

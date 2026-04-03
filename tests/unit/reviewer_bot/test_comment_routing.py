@@ -1,6 +1,6 @@
-import pytest
-
 from types import SimpleNamespace
+
+import pytest
 
 from scripts.reviewer_bot_lib import comment_application, comment_routing, review_state
 from scripts.reviewer_bot_lib.context import CommentEventRequest
@@ -75,7 +75,14 @@ def test_classify_issue_comment_actor(monkeypatch, env, expected):
 
 
 def test_classify_comment_payload_distinguishes_command_plus_text():
-    payload = comment_routing.classify_comment_payload(SimpleNamespace(BOT_MENTION="@guidelines-bot"), "hello\n@guidelines-bot /queue")
+    payload = comment_routing.classify_comment_payload(
+        SimpleNamespace(
+            BOT_MENTION="@guidelines-bot",
+            strip_code_blocks=lambda body: body,
+            parse_command=lambda body: ("queue", []),
+        ),
+        "hello\n@guidelines-bot /queue",
+    )
     assert payload["comment_class"] == "command_plus_text"
     assert payload["has_non_command_text"] is True
 

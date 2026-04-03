@@ -5,6 +5,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import comment_routing, review_state
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -19,7 +20,7 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
     )
 
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "bob"
     review["deferred_gaps"]["pull_request_review:11"] = {"reason": "artifact_missing"}
@@ -63,7 +64,10 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
     harness.stub_sync_members(lambda current: (current, []))
     harness.stub_handler(
         "handle_workflow_run_event",
-        lambda current: reviewer_bot.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review:11") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review:11", None) or True,
+        lambda current: harness.runtime.collect_touched_item(42)
+        or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review:11")
+        or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review:11", None)
+        or True,
     )
     harness.stub_save_state(
         lambda current: save_snapshots.append(
@@ -94,7 +98,7 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
     )
 
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["deferred_gaps"]["issue_comment:210"] = {"reason": "artifact_missing"}
@@ -115,7 +119,7 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
                 "comment_id": 210,
                 "comment_class": "command_only",
                 "has_non_command_text": False,
-                "source_body_digest": reviewer_bot.comment_routing_module._digest_body("@guidelines-bot /queue"),
+                "source_body_digest": comment_routing._digest_body("@guidelines-bot /queue"),
                 "source_created_at": "2026-03-17T10:00:00Z",
                 "actor_login": "bob",
             }
@@ -138,7 +142,10 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
     harness.stub_sync_members(lambda current: (current, []))
     harness.stub_handler(
         "handle_workflow_run_event",
-        lambda current: reviewer_bot.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("issue_comment:210") or current["active_reviews"]["42"]["deferred_gaps"].pop("issue_comment:210", None) or True,
+        lambda current: harness.runtime.collect_touched_item(42)
+        or current["active_reviews"]["42"]["reconciled_source_events"].append("issue_comment:210")
+        or current["active_reviews"]["42"]["deferred_gaps"].pop("issue_comment:210", None)
+        or True,
     )
     harness.stub_save_state(
         lambda current: save_snapshots.append(
@@ -168,7 +175,7 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
     )
 
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["deferred_gaps"]["pull_request_review_comment:310"] = {"reason": "artifact_missing"}
@@ -189,7 +196,7 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
                 "comment_id": 310,
                 "comment_class": "plain_text",
                 "has_non_command_text": True,
-                "source_body_digest": reviewer_bot.comment_routing_module._digest_body("review comment body"),
+                "source_body_digest": comment_routing._digest_body("review comment body"),
                 "source_created_at": "2026-03-17T10:00:00Z",
                 "actor_login": "alice",
             }
@@ -213,7 +220,10 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
 
     harness.stub_handler(
         "handle_workflow_run_event",
-        lambda current: reviewer_bot.collect_touched_item(42) or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review_comment:310") or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review_comment:310", None) or True,
+        lambda current: harness.runtime.collect_touched_item(42)
+        or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review_comment:310")
+        or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review_comment:310", None)
+        or True,
     )
     harness.stub_save_state(
         lambda current: save_snapshots.append(

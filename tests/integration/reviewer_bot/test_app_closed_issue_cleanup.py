@@ -1,6 +1,6 @@
 import pytest
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import review_state
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -24,7 +24,7 @@ def test_execute_run_closed_issue_comment_cleanup_persists_removed_review_entry(
     )
 
     initial_state = make_state()
-    review = reviewer_bot.ensure_review_entry(initial_state, 42, create=True)
+    review = review_state.ensure_review_entry(initial_state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     reloaded_state = make_state()

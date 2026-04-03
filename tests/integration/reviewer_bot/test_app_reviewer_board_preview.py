@@ -1,6 +1,6 @@
 import pytest
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import review_state
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state, valid_reviewer_board_metadata
 
@@ -97,7 +97,7 @@ def test_execute_run_preview_reviewer_board_is_read_only(monkeypatch, capsys):
 
     state = make_state()
     state["status_projection_epoch"] = "status_projection_v1"
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["assigned_at"] = "2026-03-20T12:34:56Z"

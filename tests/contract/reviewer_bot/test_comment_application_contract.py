@@ -1,7 +1,7 @@
 import pytest
 
-from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import comment_application
+from scripts.reviewer_bot_lib import comment_application, comment_routing, review_state
+from scripts.reviewer_bot_lib.config import FLS_AUDIT_LABEL
 from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -15,7 +15,7 @@ def test_comment_application_digest_is_stable_for_replay_identity():
 def test_comment_application_records_contributor_freshness_from_typed_request(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     request = harness.request(
         issue_number=42,
@@ -25,7 +25,7 @@ def test_comment_application_records_contributor_freshness_from_typed_request(mo
         comment_body="plain text",
     )
 
-    changed = comment_application.record_conversation_freshness(reviewer_bot, state, request)
+    changed = comment_application.record_conversation_freshness(harness.runtime, state, request)
 
     assert changed is True
     assert review["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:100"
@@ -34,7 +34,7 @@ def test_comment_application_records_contributor_freshness_from_typed_request(mo
 def test_comment_application_stores_pending_privileged_command_from_typed_request(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     request = harness.request(
         issue_number=42,
@@ -43,7 +43,7 @@ def test_comment_application_stores_pending_privileged_command_from_typed_reques
         comment_author="dana",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
-    harness.runtime.parse_issue_labels = lambda: [reviewer_bot.FLS_AUDIT_LABEL]
+    harness.runtime.parse_issue_labels = lambda: [FLS_AUDIT_LABEL]
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
     harness.runtime.post_comment = lambda issue_number, body: True
 
@@ -51,8 +51,8 @@ def test_comment_application_stores_pending_privileged_command_from_typed_reques
         harness.runtime,
         state,
         request,
-        classify_comment_payload=reviewer_bot.comment_routing_module.classify_comment_payload,
-        classify_issue_comment_actor=reviewer_bot.comment_routing_module.classify_issue_comment_actor,
+        classify_comment_payload=comment_routing.classify_comment_payload,
+        classify_issue_comment_actor=comment_routing.classify_issue_comment_actor,
     )
 
     assert changed is True

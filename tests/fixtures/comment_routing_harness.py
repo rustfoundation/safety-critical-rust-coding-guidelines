@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing, event_inputs
 from scripts.reviewer_bot_lib.context import CommentEventRequest, PrCommentTrustContext
 
@@ -16,7 +15,6 @@ class CommentRoutingHarness:
         self.github = RouteGitHubApi()
         self.runtime = FakeReviewerBotRuntime(monkeypatch, github=self.github)
         self.config = self.runtime.config
-        self._monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
 
     def wrapper_request(self, *, issue_number: int | None = None):
         return event_inputs.build_comment_event_request(issue_number=issue_number)

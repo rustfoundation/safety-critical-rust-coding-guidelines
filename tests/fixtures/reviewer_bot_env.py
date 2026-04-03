@@ -42,9 +42,13 @@ def build_test_lease_context():
     )
 
 
-def reset_reviewer_bot_process_state(monkeypatch, target_module) -> None:
+def clear_reviewer_bot_env(monkeypatch) -> None:
     for name in CLEAR_REVIEWER_BOT_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
+
+
+def reset_reviewer_bot_process_state(monkeypatch, target_module) -> None:
+    clear_reviewer_bot_env(monkeypatch)
     monkeypatch.setattr(target_module, "ACTIVE_LEASE_CONTEXT", build_test_lease_context())
     monkeypatch.setattr(target_module, "TOUCHED_ISSUE_NUMBERS", set())
     monkeypatch.setattr(target_module, "_reviewer_board_project_metadata", None, raising=False)

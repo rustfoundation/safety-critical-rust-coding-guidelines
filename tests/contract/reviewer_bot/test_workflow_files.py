@@ -1,9 +1,11 @@
 from pathlib import Path
+
 import pytest
 
 pytestmark = pytest.mark.contract
 
 import yaml
+
 
 def test_issue_comment_direct_workflow_exports_issue_state():
     workflow_text = Path(".github/workflows/reviewer-bot-issue-comment-direct.yml").read_text(
@@ -114,7 +116,8 @@ def test_workflow_summaries_and_runbook_references_exist():
     assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
 
 def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):
-    from scripts import reviewer_bot
+    from scripts.reviewer_bot_lib import comment_routing
+    from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
     monkeypatch.setenv("COMMENT_USER_TYPE", "User")
@@ -129,16 +132,17 @@ def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_obs
     monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-20T20:48:25Z")
     monkeypatch.setenv("GITHUB_RUN_ID", "999")
     monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
+    harness = CommentRoutingHarness(monkeypatch)
+    harness.github.add_api(
+        "GET",
+        "pulls/42",
+        {
             "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
             "user": {"login": "PLeVasseur"},
         },
     )
 
-    payload = reviewer_bot.build_pr_comment_observer_payload(42)
+    payload = comment_routing.build_pr_comment_observer_payload(harness.runtime, 42)
 
     assert payload["kind"] == "observer_noop"
     assert payload["reason"] == "trusted_direct_same_repo_human_comment"

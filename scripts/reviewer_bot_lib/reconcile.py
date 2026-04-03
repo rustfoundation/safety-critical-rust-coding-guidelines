@@ -342,6 +342,44 @@ def reconcile_active_review_entry(
     return f"ℹ️ Rectify checked PR #{issue_number}: {'; '.join(messages) or 'no reconciliation transitions applied'}.", True, False
 
 
+def handle_rectify_command(bot, state: dict, issue_number: int, comment_author: str) -> tuple[str, bool, bool]:
+    review_data = bot.ensure_review_entry(state, issue_number)
+    current_reviewer = review_data.get("current_reviewer") if review_data else None
+
+    is_current_reviewer = (
+        isinstance(current_reviewer, str)
+        and current_reviewer.lower() == comment_author.lower()
+    )
+
+    triage_status = "denied"
+    if not is_current_reviewer:
+        triage_status = bot.get_user_permission_status(comment_author, "triage")
+
+    if not is_current_reviewer and triage_status == "unavailable":
+        return (
+            "❌ Unable to verify triage permissions right now; refusing to continue.",
+            False,
+            False,
+        )
+
+    if not is_current_reviewer and triage_status != "granted":
+        if current_reviewer:
+            return (
+                f"❌ Only the assigned reviewer (@{current_reviewer}) or a maintainer with triage+ "
+                "permission can run `/rectify`.",
+                False,
+                False,
+            )
+        return (
+            "❌ Only maintainers with triage+ permission can run `/rectify` when no assigned "
+            "reviewer is tracked.",
+            False,
+            False,
+        )
+
+    return reconcile_active_review_entry(bot, state, issue_number)
+
+
 def _validate_deferred_comment_artifact(payload: dict) -> None:
     required = {
         "schema_version",

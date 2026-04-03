@@ -1,11 +1,47 @@
+import sys
+from types import SimpleNamespace
+
 import pytest
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import lease_lock, state_store
+from scripts.reviewer_bot_lib.config import GitHubApiResult, LeaseContext
+
+
+def _lease_bot(**overrides):
+    bot = SimpleNamespace(
+        ACTIVE_LEASE_CONTEXT=None,
+        LOCK_REF_NAME="heads/reviewer-bot-state-lock",
+        LOCK_REF_BOOTSTRAP_BRANCH="main",
+        LOCK_API_RETRY_LIMIT=3,
+        LOCK_RETRY_BASE_SECONDS=0,
+        LOCK_MAX_WAIT_SECONDS=60,
+        sys=sys,
+        github_api_request=lambda *args, **kwargs: None,
+        get_state_issue_snapshot=lambda: SimpleNamespace(html_url="https://example.com/issues/314"),
+        normalize_lock_metadata=state_store.normalize_lock_metadata,
+        parse_iso8601_timestamp=state_store.parse_iso8601_timestamp,
+    )
+    for key, value in overrides.items():
+        setattr(bot, key, value)
+    bot.clear_lock_metadata = lambda: lease_lock.clear_lock_metadata(bot)
+    bot.get_state_issue_html_url = lambda: lease_lock.get_state_issue_html_url(bot)
+    bot.get_lock_ref_display = lambda: lease_lock.get_lock_ref_display(bot)
+    bot.get_lock_ref_snapshot = lambda: lease_lock.get_lock_ref_snapshot(bot)
+    bot.build_lock_metadata = lambda *args: lease_lock.build_lock_metadata(bot, *args)
+    bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: lease_lock.create_lock_commit(
+        bot, parent_sha, tree_sha, lock_meta
+    )
+    bot.cas_update_lock_ref = lambda new_sha: lease_lock.cas_update_lock_ref(bot, new_sha)
+    bot.lock_is_currently_valid = lambda lock_meta, now=None: lease_lock.lock_is_currently_valid(
+        bot, lock_meta, now
+    )
+    return bot
 
 
 def test_acquire_lock_retries_until_expected_token_visible(monkeypatch):
+    bot = _lease_bot()
     monkeypatch.setattr(
-        reviewer_bot.lease_lock_module,
+        lease_lock,
         "get_lock_owner_context",
         lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
     )
@@ -29,33 +65,22 @@ def test_acquire_lock_retries_until_expected_token_visible(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(
-        reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})()
+    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
+    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
+    bot.get_lock_ref_snapshot = lambda: next(snapshots)
+    bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
+        201, {"sha": "commit-1"}, {}, "", True
     )
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(
-        reviewer_bot,
-        "create_lock_commit",
-        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
-            201, {"sha": "commit-1"}, {}, "", True
-        ),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "cas_update_lock_ref",
-        lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True),
-    )
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    bot.cas_update_lock_ref = lambda new_sha: GitHubApiResult(200, {}, {}, "", True)
 
-    context = reviewer_bot.acquire_state_issue_lease_lock()
+    context = lease_lock.acquire_state_issue_lease_lock(bot)
 
     assert context.lock_token == "token-123"
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is context
+    assert bot.ACTIVE_LEASE_CONTEXT is context
 
 
 def test_acquire_lock_fails_closed_on_conflicting_visible_token(monkeypatch):
+    bot = _lease_bot()
     snapshots = iter(
         [
             ("old-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
@@ -63,33 +88,22 @@ def test_acquire_lock_fails_closed_on_conflicting_visible_token(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(
-        reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})()
+    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
+    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
+    bot.get_lock_ref_snapshot = lambda: next(snapshots)
+    bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
+        201, {"sha": "commit-1"}, {}, "", True
     )
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(
-        reviewer_bot,
-        "create_lock_commit",
-        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
-            201, {"sha": "commit-1"}, {}, "", True
-        ),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "cas_update_lock_ref",
-        lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True),
-    )
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    bot.cas_update_lock_ref = lambda new_sha: GitHubApiResult(200, {}, {}, "", True)
 
     with pytest.raises(RuntimeError, match="unexpected lock state"):
-        reviewer_bot.acquire_state_issue_lease_lock()
+        lease_lock.acquire_state_issue_lease_lock(bot)
 
 
 def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypatch):
+    bot = _lease_bot()
     monkeypatch.setattr(
-        reviewer_bot.lease_lock_module,
+        lease_lock,
         "get_lock_owner_context",
         lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
     )
@@ -112,35 +126,24 @@ def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypa
         ]
     )
 
-    monkeypatch.setattr(
-        reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})()
+    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
+    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
+    bot.get_lock_ref_snapshot = lambda: next(snapshots)
+    bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
+        201, {"sha": "commit-1"}, {}, "", True
     )
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(
-        reviewer_bot,
-        "create_lock_commit",
-        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
-            201, {"sha": "commit-1"}, {}, "", True
-        ),
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "cas_update_lock_ref",
-        lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True),
-    )
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    bot.cas_update_lock_ref = lambda new_sha: GitHubApiResult(200, {}, {}, "", True)
 
-    context = reviewer_bot.acquire_state_issue_lease_lock()
+    context = lease_lock.acquire_state_issue_lease_lock(bot)
 
     assert context.lock_token == "token-123"
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is context
+    assert bot.ACTIVE_LEASE_CONTEXT is context
 
 
 def test_acquire_lock_fails_closed_when_own_token_has_mismatched_owner(monkeypatch):
+    bot = _lease_bot()
     monkeypatch.setattr(
-        reviewer_bot.lease_lock_module,
+        lease_lock,
         "get_lock_owner_context",
         lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
     )
@@ -161,20 +164,16 @@ def test_acquire_lock_fails_closed_when_own_token_has_mismatched_owner(monkeypat
         ]
     )
 
-    monkeypatch.setattr(
-        reviewer_bot.lease_lock_module.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})()
-    )
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(reviewer_bot, "get_state_issue_html_url", lambda: "https://example.com/issues/314")
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", None)
+    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
+    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
+    bot.get_lock_ref_snapshot = lambda: next(snapshots)
 
     with pytest.raises(RuntimeError, match="owner metadata drifted"):
-        reviewer_bot.acquire_state_issue_lease_lock()
+        lease_lock.acquire_state_issue_lease_lock(bot)
 
 
 def test_release_lock_retries_stale_unlocked_predecessor(monkeypatch):
-    context = reviewer_bot.LeaseContext(
+    context = LeaseContext(
         lock_token="token-123",
         lock_owner_run_id="run",
         lock_owner_workflow="workflow",
@@ -183,6 +182,7 @@ def test_release_lock_retries_stale_unlocked_predecessor(monkeypatch):
         lock_ref="refs/heads/reviewer-bot-state-lock",
         lock_expires_at="2999-01-01T00:00:00+00:00",
     )
+    bot = _lease_bot(ACTIVE_LEASE_CONTEXT=context)
     snapshots = iter(
         [
             ("stale-ref", "tree", {"lock_state": "unlocked", "lock_token": None}),
@@ -190,28 +190,19 @@ def test_release_lock_retries_stale_unlocked_predecessor(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", context)
-    monkeypatch.setattr(reviewer_bot.lease_lock_module.time, "sleep", lambda seconds: None)
-    monkeypatch.setattr(reviewer_bot, "get_lock_ref_snapshot", lambda: next(snapshots))
-    monkeypatch.setattr(
-        reviewer_bot,
-        "create_lock_commit",
-        lambda parent_sha, tree_sha, lock_meta: reviewer_bot.GitHubApiResult(
-            201, {"sha": "commit-2"}, {}, "", True
-        ),
+    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
+    bot.get_lock_ref_snapshot = lambda: next(snapshots)
+    bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
+        201, {"sha": "commit-2"}, {}, "", True
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "cas_update_lock_ref",
-        lambda new_sha: reviewer_bot.GitHubApiResult(200, {}, {}, "", True),
-    )
+    bot.cas_update_lock_ref = lambda new_sha: GitHubApiResult(200, {}, {}, "", True)
 
-    assert reviewer_bot.release_state_issue_lease_lock() is True
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is None
+    assert lease_lock.release_state_issue_lease_lock(bot) is True
+    assert bot.ACTIVE_LEASE_CONTEXT is None
 
 
 def test_release_lock_fails_closed_on_conflicting_token(monkeypatch):
-    context = reviewer_bot.LeaseContext(
+    context = LeaseContext(
         lock_token="token-123",
         lock_owner_run_id="run",
         lock_owner_workflow="workflow",
@@ -220,15 +211,15 @@ def test_release_lock_fails_closed_on_conflicting_token(monkeypatch):
         lock_ref="refs/heads/reviewer-bot-state-lock",
         lock_expires_at="2999-01-01T00:00:00+00:00",
     )
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", context)
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_lock_ref_snapshot",
-        lambda: ("new-ref", "tree", {"lock_state": "locked", "lock_token": "other-token"}),
+    bot = _lease_bot(ACTIVE_LEASE_CONTEXT=context)
+    bot.get_lock_ref_snapshot = lambda: (
+        "new-ref",
+        "tree",
+        {"lock_state": "locked", "lock_token": "other-token"},
     )
 
-    assert reviewer_bot.release_state_issue_lease_lock() is False
-    assert reviewer_bot.ACTIVE_LEASE_CONTEXT is None
+    assert lease_lock.release_state_issue_lease_lock(bot) is False
+    assert bot.ACTIVE_LEASE_CONTEXT is None
 
 
 def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
@@ -237,7 +228,7 @@ def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
     def fake_request(method, endpoint, data=None, extra_headers=None, **kwargs):
         observed.append((endpoint, kwargs.get("retry_policy")))
         if endpoint == "git/ref/heads/reviewer-bot-state-lock" and len(observed) == 1:
-            return reviewer_bot.GitHubApiResult(
+            return GitHubApiResult(
                 status_code=404,
                 payload={"message": "missing"},
                 headers={},
@@ -248,7 +239,7 @@ def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
                 transport_error=None,
             )
         if endpoint == "git/ref/heads/reviewer-bot-state-lock":
-            return reviewer_bot.GitHubApiResult(
+            return GitHubApiResult(
                 status_code=200,
                 payload={"object": {"sha": "base-sha"}},
                 headers={},
@@ -259,7 +250,7 @@ def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
                 transport_error=None,
             )
         if endpoint == "git/ref/heads/main":
-            return reviewer_bot.GitHubApiResult(
+            return GitHubApiResult(
                 status_code=200,
                 payload={"object": {"sha": "base-sha"}},
                 headers={},
@@ -270,7 +261,7 @@ def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
                 transport_error=None,
             )
         if endpoint == "git/refs":
-            return reviewer_bot.GitHubApiResult(
+            return GitHubApiResult(
                 status_code=201,
                 payload={"ref": "refs/heads/reviewer-bot-state-lock"},
                 headers={},
@@ -282,11 +273,9 @@ def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
             )
         raise AssertionError(endpoint)
 
-    monkeypatch.setattr(reviewer_bot, "github_api_request", fake_request)
-    monkeypatch.setattr(reviewer_bot, "LOCK_REF_NAME", "heads/reviewer-bot-state-lock")
-    monkeypatch.setattr(reviewer_bot, "LOCK_REF_BOOTSTRAP_BRANCH", "main")
+    bot = _lease_bot(github_api_request=fake_request)
 
-    assert reviewer_bot.ensure_lock_ref_exists() == "base-sha"
+    assert lease_lock.ensure_lock_ref_exists(bot) == "base-sha"
     assert observed[0] == ("git/ref/heads/reviewer-bot-state-lock", "idempotent_read")
     assert observed[1] == ("git/ref/heads/main", "idempotent_read")
 
@@ -294,28 +283,19 @@ def test_ensure_lock_ref_exists_uses_retry_aware_reads(monkeypatch):
 def test_ensure_lock_ref_exists_fails_closed_when_bootstrap_branch_unavailable(monkeypatch):
     responses = iter(
         [
-            reviewer_bot.GitHubApiResult(
-                404, {"message": "missing"}, {}, "missing", False, "not_found", 0, None
-            ),
-            reviewer_bot.GitHubApiResult(
-                502, {"message": "bad gateway"}, {}, "bad gateway", False, "server_error", 1, None
-            ),
+            GitHubApiResult(404, {"message": "missing"}, {}, "missing", False, "not_found", 0, None),
+            GitHubApiResult(502, {"message": "bad gateway"}, {}, "bad gateway", False, "server_error", 1, None),
         ]
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", lambda *args, **kwargs: next(responses))
-    monkeypatch.setattr(reviewer_bot, "LOCK_REF_NAME", "heads/reviewer-bot-state-lock")
-    monkeypatch.setattr(reviewer_bot, "LOCK_REF_BOOTSTRAP_BRANCH", "main")
+    bot = _lease_bot(github_api_request=lambda *args, **kwargs: next(responses))
 
     with pytest.raises(RuntimeError, match="Unable to read bootstrap branch"):
-        reviewer_bot.ensure_lock_ref_exists()
+        lease_lock.ensure_lock_ref_exists(bot)
 
 
 def test_get_lock_ref_snapshot_fails_closed_on_invalid_commit_payload(monkeypatch):
-    monkeypatch.setattr(reviewer_bot.lease_lock_module, "ensure_lock_ref_exists", lambda bot: "ref-sha")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api_request",
-        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+    bot = _lease_bot(
+        github_api_request=lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
             status_code=200,
             payload={"message": "missing tree"},
             headers={},
@@ -324,67 +304,63 @@ def test_get_lock_ref_snapshot_fails_closed_on_invalid_commit_payload(monkeypatc
             failure_kind=None,
             retry_attempts=0,
             transport_error=None,
-        ),
+        )
     )
+    monkeypatch.setattr(lease_lock, "ensure_lock_ref_exists", lambda current_bot: "ref-sha")
 
     with pytest.raises(RuntimeError, match="missing tree SHA"):
-        reviewer_bot.get_lock_ref_snapshot()
+        lease_lock.get_lock_ref_snapshot(bot)
 
 
 def test_renew_state_issue_lease_lock_fails_on_token_mismatch(monkeypatch):
-    context = reviewer_bot.LeaseContext(
+    context = LeaseContext(
         lock_token="expected-token",
         lock_owner_run_id="run-1",
         lock_owner_workflow="wf",
         lock_owner_job="job",
         state_issue_url="https://example.com/state/1",
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_lock_ref_snapshot",
-        lambda: ("ref-sha", "tree-sha", {"lock_token": "different-token", "lock_state": "locked"}),
+    bot = _lease_bot()
+    bot.get_lock_ref_snapshot = lambda: (
+        "ref-sha",
+        "tree-sha",
+        {"lock_token": "different-token", "lock_state": "locked"},
     )
 
-    assert reviewer_bot.renew_state_issue_lease_lock(context) is False
+    assert lease_lock.renew_state_issue_lease_lock(bot, context) is False
 
 
 def test_ensure_lock_ref_exists_fails_closed_when_lock_ref_read_remains_unavailable(monkeypatch):
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api_request",
-        lambda *args, **kwargs: reviewer_bot.GitHubApiResult(
+    bot = _lease_bot(
+        github_api_request=lambda *args, **kwargs: GitHubApiResult(
             502, {"message": "bad gateway"}, {}, "bad gateway", False, "server_error", 1, None
-        ),
+        )
     )
 
     with pytest.raises(RuntimeError, match="Failed to read reviewer-bot lock ref"):
-        reviewer_bot.ensure_lock_ref_exists()
+        lease_lock.ensure_lock_ref_exists(bot)
 
 
 def test_ensure_lock_ref_exists_fails_closed_when_bootstrap_branch_sha_missing(monkeypatch):
     responses = iter(
         [
-            reviewer_bot.GitHubApiResult(
-                404, {"message": "missing"}, {}, "missing", False, "not_found", 0, None
-            ),
-            reviewer_bot.GitHubApiResult(200, {"object": {}}, {}, "ok", True, None, 0, None),
+            GitHubApiResult(404, {"message": "missing"}, {}, "missing", False, "not_found", 0, None),
+            GitHubApiResult(200, {"object": {}}, {}, "ok", True, None, 0, None),
         ]
     )
-    monkeypatch.setattr(reviewer_bot, "github_api_request", lambda *args, **kwargs: next(responses))
+    bot = _lease_bot(github_api_request=lambda *args, **kwargs: next(responses))
 
     with pytest.raises(RuntimeError, match="Bootstrap branch ref did not include SHA"):
-        reviewer_bot.ensure_lock_ref_exists()
+        lease_lock.ensure_lock_ref_exists(bot)
 
 
 def test_get_lock_ref_snapshot_fails_closed_when_commit_fetch_unavailable(monkeypatch):
-    monkeypatch.setattr(reviewer_bot.lease_lock_module, "ensure_lock_ref_exists", lambda bot: "ref-sha")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api_request",
-        lambda *args, **kwargs: reviewer_bot.GitHubApiResult(
+    bot = _lease_bot(
+        github_api_request=lambda *args, **kwargs: GitHubApiResult(
             502, {"message": "bad gateway"}, {}, "bad gateway", False, "server_error", 1, None
-        ),
+        )
     )
+    monkeypatch.setattr(lease_lock, "ensure_lock_ref_exists", lambda current_bot: "ref-sha")
 
     with pytest.raises(RuntimeError, match="Failed to read lock commit"):
-        reviewer_bot.get_lock_ref_snapshot()
+        lease_lock.get_lock_ref_snapshot(bot)

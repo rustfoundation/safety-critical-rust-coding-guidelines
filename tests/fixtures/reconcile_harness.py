@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import comment_application, reconcile
+from scripts.reviewer_bot_lib import comment_application, lifecycle, reconcile
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import pull_request_payload, review_payload
@@ -126,7 +125,6 @@ class ReconcileHarness:
         self.runtime = FakeReviewerBotRuntime(self.monkeypatch, github=self.github)
         self.config = self.runtime.config
         self.runtime.stub_deferred_payload(self.payload)
-        self.monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
         self.set_trigger_from_payload(self.payload)
 
     def handle_workflow_run_event(self, state: dict) -> bool:
@@ -270,14 +268,14 @@ class ReconcileHarness:
         )
 
     def stub_head_repair(self, *, changed: bool = False, outcome: str = "unchanged") -> None:
-        self.runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
+        self.runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(
             changed=changed,
             outcome=outcome,
         )
 
     def stub_review_rebuild(self, *, changed: bool = False) -> None:
         self.monkeypatch.setattr(
-            reviewer_bot.reconcile_module,
+            reconcile,
             "_record_review_rebuild",
             lambda bot, state_obj, issue_number, review_data: changed,
         )

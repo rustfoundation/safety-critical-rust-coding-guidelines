@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import subprocess
 
-from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import automation as automation_module
 from scripts.reviewer_bot_lib import commands as commands_module
 from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
 from scripts.reviewer_bot_lib import event_inputs
+from scripts.reviewer_bot_lib import maintenance as maintenance_module
+from scripts.reviewer_bot_lib import reconcile as reconcile_module
+from scripts.reviewer_bot_lib.config import AssignmentAttempt
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_env import set_env_values
@@ -35,7 +37,6 @@ class CommandHarness:
         self._monkeypatch = monkeypatch
         self.runtime = FakeReviewerBotRuntime(monkeypatch)
         self.config = self.runtime.config
-        self._monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
 
     def set_comment_command(
         self,
@@ -98,7 +99,7 @@ class CommandHarness:
         self.runtime.get_issue_assignees = lambda issue_number: assignees
 
     def stub_assignment(self, *, success: bool = True, status_code: int = 201):
-        self.runtime.request_reviewer_assignment = lambda issue_number, username: reviewer_bot.AssignmentAttempt(
+        self.runtime.request_reviewer_assignment = lambda issue_number, username: AssignmentAttempt(
             success=success, status_code=status_code
         )
 
@@ -152,6 +153,43 @@ class CommandHarness:
             request=self.assignment_request(issue_number=issue_number),
         )
 
+    def handle_pass_until(self, state: dict, issue_number: int, comment_author: str, return_date: str, reason: str | None):
+        return commands_module.handle_pass_until_command(
+            self.runtime,
+            state,
+            issue_number,
+            comment_author,
+            return_date,
+            reason,
+            request=self.assignment_request(issue_number=issue_number),
+        )
+
+    def handle_release(self, state: dict, issue_number: int, comment_author: str, args=None):
+        return commands_module.handle_release_command(
+            self.runtime,
+            state,
+            issue_number,
+            comment_author,
+            args,
+            request=self.assignment_request(issue_number=issue_number),
+        )
+
+    def handle_assign_from_queue(self, state: dict, issue_number: int):
+        return commands_module.handle_assign_from_queue_command(
+            self.runtime,
+            state,
+            issue_number,
+            request=self.assignment_request(issue_number=issue_number),
+        )
+
+    def handle_rectify(self, state: dict, issue_number: int, comment_author: str):
+        return reconcile_module.handle_rectify_command(
+            self.runtime,
+            state,
+            issue_number,
+            comment_author,
+        )
+
     def handle_accept_no_fls_changes(self, issue_number: int, comment_author: str):
         return automation_module.handle_accept_no_fls_changes_command(
             self.runtime,
@@ -167,3 +205,6 @@ class CommandHarness:
             event_inputs.build_comment_event_request(),
             event_inputs.build_pr_comment_trust_context(),
         )
+
+    def handle_manual_dispatch(self, state: dict):
+        return maintenance_module.handle_manual_dispatch(self.runtime, state)

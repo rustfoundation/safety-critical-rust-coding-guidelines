@@ -1,6 +1,6 @@
 import pytest
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib.context import LeaseContext
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -53,7 +53,7 @@ def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
 
     def fake_acquire():
         acquire_called["value"] = True
-        return reviewer_bot.LeaseContext(
+        return LeaseContext(
             lock_token="token",
             lock_owner_run_id="run",
             lock_owner_workflow="workflow",
@@ -69,9 +69,10 @@ def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
     harness.stub_sync_members(lambda state: (state, []))
     harness.stub_handler("handle_workflow_run_event", lambda state: False)
 
-    harness.run_execute()
+    result = harness.run_execute()
 
     assert acquire_called["value"] is True
+    assert result.exit_code == 0
 
 def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeypatch):
     harness = AppHarness(monkeypatch)
@@ -81,7 +82,7 @@ def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeyp
 
     def fake_acquire():
         acquire_called["value"] = True
-        return reviewer_bot.LeaseContext(
+        return LeaseContext(
             lock_token="token",
             lock_owner_run_id="run",
             lock_owner_workflow="workflow",
@@ -97,6 +98,7 @@ def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeyp
     harness.stub_sync_members(lambda state: (state, []))
     harness.stub_handler("handle_workflow_run_event", lambda state: False)
 
-    harness.run_execute()
+    result = harness.run_execute()
 
     assert acquire_called["value"] is True
+    assert result.exit_code == 0

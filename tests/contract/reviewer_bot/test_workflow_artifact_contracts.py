@@ -1,10 +1,11 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 pytestmark = pytest.mark.contract
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import reconcile
 
 
 @pytest.mark.parametrize(
@@ -100,12 +101,12 @@ def test_deferred_workflow_identity_helpers_match_expected_contract(
     artifact_name,
     payload_name,
 ):
-    assert reviewer_bot.reconcile_module._expected_observer_identity(payload) == (
+    assert reconcile._expected_observer_identity(payload) == (
         workflow_name,
         workflow_file,
     )
-    assert reviewer_bot.reconcile_module._artifact_expected_name(payload) == artifact_name
-    assert reviewer_bot.reconcile_module._artifact_expected_payload_name(payload) == payload_name
+    assert reconcile._artifact_expected_name(payload) == artifact_name
+    assert reconcile._artifact_expected_payload_name(payload) == payload_name
 
 def test_validate_workflow_run_artifact_identity_rejects_triggering_name_mismatch(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Wrong Workflow")
@@ -119,8 +120,10 @@ def test_validate_workflow_run_artifact_identity_rejects_triggering_name_mismatc
         "source_run_attempt": 1,
     }
 
+    bot = SimpleNamespace(get_config_value=lambda name, default="": __import__("os").environ.get(name, default))
+
     with pytest.raises(RuntimeError, match="Triggering workflow name mismatch"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(reviewer_bot, payload)
+        reconcile._validate_workflow_run_artifact_identity(bot, payload)
 
 def test_validate_workflow_run_artifact_identity_rejects_run_attempt_mismatch(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
@@ -135,8 +138,10 @@ def test_validate_workflow_run_artifact_identity_rejects_run_attempt_mismatch(mo
         "source_run_attempt": 1,
     }
 
+    bot = SimpleNamespace(get_config_value=lambda name, default="": __import__("os").environ.get(name, default))
+
     with pytest.raises(RuntimeError, match="run_attempt mismatch"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(reviewer_bot, payload)
+        reconcile._validate_workflow_run_artifact_identity(bot, payload)
 
 def test_validate_workflow_run_artifact_identity_requires_successful_conclusion(monkeypatch):
     monkeypatch.setenv("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
@@ -150,5 +155,7 @@ def test_validate_workflow_run_artifact_identity_requires_successful_conclusion(
         "source_run_attempt": 1,
     }
 
+    bot = SimpleNamespace(get_config_value=lambda name, default="": __import__("os").environ.get(name, default))
+
     with pytest.raises(RuntimeError, match="did not conclude successfully"):
-        reviewer_bot.reconcile_module._validate_workflow_run_artifact_identity(reviewer_bot, payload)
+        reconcile._validate_workflow_run_artifact_identity(bot, payload)

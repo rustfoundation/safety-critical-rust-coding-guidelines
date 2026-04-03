@@ -380,3 +380,12 @@ class ReviewerBotRuntime:
         result = self.adapters.release_state_issue_lease_lock()
         self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
         return result
+
+    def process_pass_until_expirations(self, state: dict):
+        return self.adapters.process_pass_until_expirations(state)
+
+    def sync_members_with_queue(self, state: dict):
+        return self.adapters.sync_members_with_queue(state)
+
+    def sync_status_labels_for_items(self, state: dict, issue_numbers):
+        return self.adapters.sync_status_labels_for_items(state, issue_numbers)
