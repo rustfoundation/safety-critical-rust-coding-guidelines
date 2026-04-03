@@ -32,6 +32,7 @@ from scripts.reviewer_bot_lib.config import (
     STATUS_PROJECTION_EPOCH,
     TRANSITION_PERIOD_DAYS,
     AssignmentAttempt,
+    GitHubApiResult,
 )
 from scripts.reviewer_bot_lib.context import LeaseContext
 
@@ -177,6 +178,7 @@ class FakeReviewerBotRuntime:
     REVIEW_FRESHNESS_RUNBOOK_PATH = REVIEW_FRESHNESS_RUNBOOK_PATH
     REVIEW_DEADLINE_DAYS = 14
     TRANSITION_PERIOD_DAYS = TRANSITION_PERIOD_DAYS
+    GitHubApiResult = GitHubApiResult
     AssignmentAttempt = AssignmentAttempt
     reviews_module = reviews_module
     review_state_module = review_state_module
