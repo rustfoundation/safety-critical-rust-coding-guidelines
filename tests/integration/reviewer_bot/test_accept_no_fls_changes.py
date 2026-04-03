@@ -30,10 +30,13 @@ def test_list_changed_files_reports_tracked_changes_only(monkeypatch, tmp_path):
 
 def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp_path):
     harness = CommandHarness(monkeypatch)
-    harness.set_privileged_context(
-        labels=[FLS_AUDIT_LABEL],
+    request = harness.typed_privileged_request(
+        issue_number=42,
+        actor="alice",
+        command_name="accept-no-fls-changes",
         is_pull_request=False,
-        target_repo_root=tmp_path,
+        issue_labels=(FLS_AUDIT_LABEL,),
+        target_repo_root=str(tmp_path),
     )
     harness.stub_permission("granted")
     observed = {"cwd": None}
@@ -44,17 +47,20 @@ def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp
 
     harness.runtime.list_changed_files = fake_list_changed_files
 
-    message, success = harness.handle_accept_no_fls_changes(42, "alice")
+    message, success = harness.handle_accept_no_fls_changes(42, "alice", request=request)
 
     assert (message, success) == ("❌ Working tree is not clean; refusing to update spec.lock.", False)
     assert observed["cwd"] == tmp_path
 
 def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_path):
     harness = CommandHarness(monkeypatch)
-    harness.set_privileged_context(
-        labels=[FLS_AUDIT_LABEL],
+    request = harness.typed_privileged_request(
+        issue_number=42,
+        actor="alice",
+        command_name="accept-no-fls-changes",
         is_pull_request=False,
-        target_repo_root=tmp_path,
+        issue_labels=(FLS_AUDIT_LABEL,),
+        target_repo_root=str(tmp_path),
     )
     harness.stub_permission("granted")
     list_calls = {"count": 0}
@@ -70,7 +76,7 @@ def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_p
 
     harness.runtime.list_changed_files = fake_list_changed_files
 
-    message, success = harness.handle_accept_no_fls_changes(42, "alice")
+    message, success = harness.handle_accept_no_fls_changes(42, "alice", request=request)
 
     assert (message, success) == ("✅ `src/spec.lock` is already up to date; no PR needed.", True)
     assert list_calls["count"] == 2
@@ -81,10 +87,13 @@ def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_p
 
 def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, tmp_path):
     harness = CommandHarness(monkeypatch)
-    harness.set_privileged_context(
-        labels=[FLS_AUDIT_LABEL],
+    request = harness.typed_privileged_request(
+        issue_number=42,
+        actor="alice",
+        command_name="accept-no-fls-changes",
         is_pull_request=False,
-        target_repo_root=tmp_path,
+        issue_labels=(FLS_AUDIT_LABEL,),
+        target_repo_root=str(tmp_path),
     )
     harness.stub_permission("granted")
     harness.runtime.list_changed_files = lambda repo_root: []
@@ -95,7 +104,7 @@ def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, t
         stderr="error: lockfile at uv.lock needs to be updated, but --locked was provided",
     )
 
-    message, success = harness.handle_accept_no_fls_changes(42, "alice")
+    message, success = harness.handle_accept_no_fls_changes(42, "alice", request=request)
 
     assert success is False
     assert "Audit command failed." in message

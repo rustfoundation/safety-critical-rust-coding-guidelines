@@ -19,7 +19,7 @@ def test_label_signoff_create_pr_marks_issue_review_complete_without_inline_stat
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    harness.set_comment_command(
+    request = harness.typed_comment_request(
         issue_number=42,
         actor="alice",
         body="@guidelines-bot /label +sign-off: create pr",
@@ -34,7 +34,7 @@ def test_label_signoff_create_pr_marks_issue_review_complete_without_inline_stat
     harness.runtime.add_reaction = lambda *args, **kwargs: True
     posted = harness.capture_posted_comments()
 
-    assert harness.handle_comment_event(state) is True
+    assert harness.handle_comment_event(state, request=request) is True
     assert review["review_completion_source"] == "issue_label: sign-off: create pr"
     assert review["current_cycle_completion"]["completed"] is True
     assert posted == [(42, "✅ Added label `sign-off: create pr`")]
@@ -46,12 +46,14 @@ def test_label_signoff_create_pr_on_pr_does_not_mark_issue_complete(monkeypatch)
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    harness.set_comment_command(
+    request = harness.typed_comment_request(
         issue_number=42,
         actor="alice",
         body="@guidelines-bot /label +sign-off: create pr",
         issue_author="dana",
         is_pull_request=True,
+    )
+    trust_context = harness.typed_trust_context(
         author_association="MEMBER",
         workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
         repository="rustfoundation/safety-critical-rust-coding-guidelines",
@@ -60,6 +62,7 @@ def test_label_signoff_create_pr_on_pr_does_not_mark_issue_complete(monkeypatch)
     harness.runtime.github_api = lambda method, endpoint, data=None: {
         "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
         "user": {"login": "dana"},
+        "pull_request": {},
     }
     harness.runtime.get_repo_labels = lambda: ["sign-off: create pr"]
     harness.runtime.add_label = lambda issue_number, label: True
@@ -69,7 +72,7 @@ def test_label_signoff_create_pr_on_pr_does_not_mark_issue_complete(monkeypatch)
     harness.runtime.add_reaction = lambda *args, **kwargs: True
     harness.runtime.post_comment = lambda *args, **kwargs: True
 
-    assert harness.handle_comment_event(state) is False
+    assert harness.handle_comment_event(state, request=request, trust_context=trust_context) is False
     assert review["review_completion_source"] is None
 
 
@@ -101,13 +104,13 @@ def test_assign_command_posts_pr_guidance_on_success(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
-    harness.set_assignment_context(issue_author="PLeVasseur", is_pull_request=True)
+    request = harness.typed_assignment_request(issue_number=42, issue_author="PLeVasseur", is_pull_request=True)
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
     harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
-    response, success = harness.handle_assign(state, 42, "@felix91gr")
+    response, success = harness.handle_assign(state, 42, "@felix91gr", request=request)
 
     assert success is True
     assert response == "✅ @felix91gr has been assigned as reviewer."
@@ -118,13 +121,13 @@ def test_claim_command_posts_pr_guidance_on_success(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
-    harness.set_assignment_context(issue_author="PLeVasseur", is_pull_request=True)
+    request = harness.typed_assignment_request(issue_number=42, issue_author="PLeVasseur", is_pull_request=True)
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
     harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
-    response, success = harness.handle_claim(state, 42, "felix91gr")
+    response, success = harness.handle_claim(state, 42, "felix91gr", request=request)
 
     assert success is True
     assert response == "✅ @felix91gr has claimed this review."
@@ -141,14 +144,14 @@ def test_pass_command_posts_pr_guidance_for_new_reviewer(monkeypatch):
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    harness.set_assignment_context(issue_author="PLeVasseur", is_pull_request=True)
+    request = harness.typed_assignment_request(issue_number=42, issue_author="PLeVasseur", is_pull_request=True)
     harness.stub_assignees(["alice"])
     harness.stub_assignment()
     harness.runtime.unassign_reviewer = lambda issue_number, username: True
     posted = []
     harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
-    response, success = harness.handle_pass(state, 42, "alice", None)
+    response, success = harness.handle_pass(state, 42, "alice", None, request=request)
 
     assert success is True
     assert "@felix91gr is now assigned as the reviewer." in response
@@ -159,13 +162,13 @@ def test_assign_from_queue_posts_guidance_only_once(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
-    harness.set_assignment_context(issue_author="PLeVasseur", is_pull_request=True)
+    request = harness.typed_assignment_request(issue_number=42, issue_author="PLeVasseur", is_pull_request=True)
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
     harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
 
-    response, success = harness.handle_assign_from_queue(state, 42)
+    response, success = harness.handle_assign_from_queue(state, 42, request=request)
 
     assert success is True
     assert response == "✅ @felix91gr (next in queue) has been assigned as reviewer."
@@ -174,10 +177,16 @@ def test_assign_from_queue_posts_guidance_only_once(monkeypatch):
 
 def test_handle_accept_no_fls_changes_command_fails_closed_when_permission_unavailable(monkeypatch):
     harness = CommandHarness(monkeypatch)
-    harness.set_privileged_context(labels=[FLS_AUDIT_LABEL], is_pull_request=False)
+    request = harness.typed_privileged_request(
+        issue_number=42,
+        actor="alice",
+        command_name="accept-no-fls-changes",
+        is_pull_request=False,
+        issue_labels=(FLS_AUDIT_LABEL,),
+    )
     harness.stub_permission("unavailable")
 
-    message, success = harness.handle_accept_no_fls_changes(42, "alice")
+    message, success = harness.handle_accept_no_fls_changes(42, "alice", request=request)
 
     assert success is False
     assert "Unable to verify triage permissions right now" in message

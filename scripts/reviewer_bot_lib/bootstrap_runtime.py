@@ -100,34 +100,34 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
         handle_transition_notice=lambda current_state, issue_number, reviewer: lifecycle.handle_transition_notice(
             runtime, current_state, issue_number, reviewer
         ),
-        handle_pass_command=lambda current_state, issue_number, comment_author, reason: commands.handle_pass_command(
-            runtime, current_state, issue_number, comment_author, reason
+        handle_pass_command=lambda current_state, issue_number, comment_author, reason, request=None: commands.handle_pass_command(
+            runtime, current_state, issue_number, comment_author, reason, request=request
         ),
-        handle_pass_until_command=lambda current_state, issue_number, comment_author, return_date, reason: commands.handle_pass_until_command(
-            runtime, current_state, issue_number, comment_author, return_date, reason
+        handle_pass_until_command=lambda current_state, issue_number, comment_author, return_date, reason, request=None: commands.handle_pass_until_command(
+            runtime, current_state, issue_number, comment_author, return_date, reason, request=request
         ),
-        handle_label_command=lambda current_state, issue_number, label_string: commands.handle_label_command(
-            runtime, current_state, issue_number, label_string
+        handle_label_command=lambda current_state, issue_number, label_string, request=None: commands.handle_label_command(
+            runtime, current_state, issue_number, label_string, request=request
         ),
         handle_sync_members_command=lambda current_state: commands.handle_sync_members_command(
             runtime, current_state
         ),
         handle_queue_command=lambda current_state: commands.handle_queue_command(runtime, current_state),
         handle_commands_command=lambda: commands.handle_commands_command(runtime),
-        handle_claim_command=lambda current_state, issue_number, comment_author: commands.handle_claim_command(
-            runtime, current_state, issue_number, comment_author
+        handle_claim_command=lambda current_state, issue_number, comment_author, request=None: commands.handle_claim_command(
+            runtime, current_state, issue_number, comment_author, request=request
         ),
-        handle_release_command=lambda current_state, issue_number, comment_author, args=None: commands.handle_release_command(
-            runtime, current_state, issue_number, comment_author, args
+        handle_release_command=lambda current_state, issue_number, comment_author, args=None, request=None: commands.handle_release_command(
+            runtime, current_state, issue_number, comment_author, args, request=request
         ),
         handle_rectify_command=lambda current_state, issue_number, comment_author: reconcile.handle_rectify_command(
             runtime, current_state, issue_number, comment_author
         ),
-        handle_assign_command=lambda current_state, issue_number, username: commands.handle_assign_command(
-            runtime, current_state, issue_number, username
+        handle_assign_command=lambda current_state, issue_number, username, request=None: commands.handle_assign_command(
+            runtime, current_state, issue_number, username, request=request
         ),
-        handle_assign_from_queue_command=lambda current_state, issue_number: commands.handle_assign_from_queue_command(
-            runtime, current_state, issue_number
+        handle_assign_from_queue_command=lambda current_state, issue_number, request=None: commands.handle_assign_from_queue_command(
+            runtime, current_state, issue_number, request=request
         ),
         handle_accept_no_fls_changes_command=lambda issue_number, comment_author: automation.handle_accept_no_fls_changes_command(
             runtime, issue_number, comment_author

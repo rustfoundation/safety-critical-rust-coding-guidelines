@@ -431,14 +431,14 @@ class FakeReviewerBotRuntime:
     def handle_transition_notice(self, state: dict, issue_number: int, reviewer: str) -> bool:
         return lifecycle_module.handle_transition_notice(self, state, issue_number, reviewer)
 
-    def handle_pass_command(self, state: dict, issue_number: int, comment_author: str, reason: str | None):
-        return commands_module.handle_pass_command(self, state, issue_number, comment_author, reason)
+    def handle_pass_command(self, state: dict, issue_number: int, comment_author: str, reason: str | None, request=None):
+        return commands_module.handle_pass_command(self, state, issue_number, comment_author, reason, request=request)
 
-    def handle_pass_until_command(self, state: dict, issue_number: int, comment_author: str, return_date: str, reason: str | None):
-        return commands_module.handle_pass_until_command(self, state, issue_number, comment_author, return_date, reason)
+    def handle_pass_until_command(self, state: dict, issue_number: int, comment_author: str, return_date: str, reason: str | None, request=None):
+        return commands_module.handle_pass_until_command(self, state, issue_number, comment_author, return_date, reason, request=request)
 
-    def handle_label_command(self, state: dict, issue_number: int, label_string: str):
-        return commands_module.handle_label_command(self, state, issue_number, label_string)
+    def handle_label_command(self, state: dict, issue_number: int, label_string: str, request=None):
+        return commands_module.handle_label_command(self, state, issue_number, label_string, request=request)
 
     def handle_sync_members_command(self, state: dict):
         return commands_module.handle_sync_members_command(self, state)
@@ -449,17 +449,17 @@ class FakeReviewerBotRuntime:
     def handle_commands_command(self):
         return commands_module.handle_commands_command(self)
 
-    def handle_claim_command(self, state: dict, issue_number: int, comment_author: str):
-        return commands_module.handle_claim_command(self, state, issue_number, comment_author)
+    def handle_claim_command(self, state: dict, issue_number: int, comment_author: str, request=None):
+        return commands_module.handle_claim_command(self, state, issue_number, comment_author, request=request)
 
-    def handle_release_command(self, state: dict, issue_number: int, comment_author: str, args=None):
-        return commands_module.handle_release_command(self, state, issue_number, comment_author, args)
+    def handle_release_command(self, state: dict, issue_number: int, comment_author: str, args=None, request=None):
+        return commands_module.handle_release_command(self, state, issue_number, comment_author, args, request=request)
 
-    def handle_assign_command(self, state: dict, issue_number: int, username: str):
-        return commands_module.handle_assign_command(self, state, issue_number, username)
+    def handle_assign_command(self, state: dict, issue_number: int, username: str, request=None):
+        return commands_module.handle_assign_command(self, state, issue_number, username, request=request)
 
-    def handle_assign_from_queue_command(self, state: dict, issue_number: int):
-        return commands_module.handle_assign_from_queue_command(self, state, issue_number)
+    def handle_assign_from_queue_command(self, state: dict, issue_number: int, request=None):
+        return commands_module.handle_assign_from_queue_command(self, state, issue_number, request=request)
 
     def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str):
         return automation_module.handle_accept_no_fls_changes_command(self, issue_number, comment_author)

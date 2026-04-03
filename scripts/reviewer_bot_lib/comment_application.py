@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from .context import CommentEventRequest
+from .context import AssignmentRequest, CommentEventRequest
 from .review_state import (
     accept_channel_event,
     ensure_review_entry,
@@ -85,6 +85,14 @@ def store_pending_privileged_command(review_data: dict, issue_number: int, sourc
     return True
 
 
+def build_assignment_request_from_comment(request: CommentEventRequest) -> AssignmentRequest:
+    return AssignmentRequest(
+        issue_number=request.issue_number,
+        issue_author=request.issue_author,
+        is_pull_request=request.is_pull_request,
+    )
+
+
 def validate_accept_no_fls_changes_handoff(
     bot,
     request: CommentEventRequest,
@@ -153,17 +161,36 @@ def apply_comment_command(
     response = ""
     success = False
     state_changed = False
+    assignment_request = build_assignment_request_from_comment(request)
     if command == "pass":
-        response, success = bot.handle_pass_command(state, issue_number, comment_author, " ".join(args) if args else None)
+        response, success = bot.handle_pass_command(
+            state,
+            issue_number,
+            comment_author,
+            " ".join(args) if args else None,
+            request=assignment_request,
+        )
         state_changed = success
     elif command == "away":
         if args:
-            response, success = bot.handle_pass_until_command(state, issue_number, comment_author, args[0], " ".join(args[1:]) if len(args) > 1 else None)
+            response, success = bot.handle_pass_until_command(
+                state,
+                issue_number,
+                comment_author,
+                args[0],
+                " ".join(args[1:]) if len(args) > 1 else None,
+                request=assignment_request,
+            )
             state_changed = success
         else:
             response = f"❌ Missing date. Usage: `{bot.BOT_MENTION} /away YYYY-MM-DD [reason]`"
     elif command == "label":
-        response, success, state_changed = bot.handle_label_command(state, issue_number, " ".join(args))
+        response, success, state_changed = bot.handle_label_command(
+            state,
+            issue_number,
+            " ".join(args),
+            request=assignment_request,
+        )
     elif command == "sync-members":
         response, success = bot.handle_sync_members_command(state)
         state_changed = success
@@ -172,18 +199,38 @@ def apply_comment_command(
     elif command == "commands":
         response, success = bot.handle_commands_command()
     elif command == "claim":
-        response, success = bot.handle_claim_command(state, issue_number, comment_author)
+        response, success = bot.handle_claim_command(
+            state,
+            issue_number,
+            comment_author,
+            request=assignment_request,
+        )
         state_changed = success
     elif command == "release":
-        response, success = bot.handle_release_command(state, issue_number, comment_author, list(args))
+        response, success = bot.handle_release_command(
+            state,
+            issue_number,
+            comment_author,
+            list(args),
+            request=assignment_request,
+        )
         state_changed = success
     elif command == "rectify":
         response, success, state_changed = bot.handle_rectify_command(state, issue_number, comment_author)
     elif command == "r?-user":
-        response, success = bot.handle_assign_command(state, issue_number, args[0] if args else "")
+        response, success = bot.handle_assign_command(
+            state,
+            issue_number,
+            args[0] if args else "",
+            request=assignment_request,
+        )
         state_changed = success
     elif command == "assign-from-queue":
-        response, success = bot.handle_assign_from_queue_command(state, issue_number)
+        response, success = bot.handle_assign_from_queue_command(
+            state,
+            issue_number,
+            request=assignment_request,
+        )
         state_changed = success
     elif command == "r?":
         response = f"❌ Missing target. Usage:\n- `{bot.BOT_MENTION} /r? @username` - Assign a specific reviewer\n- `{bot.BOT_MENTION} /r? producers` - Assign next reviewer from queue"

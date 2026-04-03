@@ -9,10 +9,13 @@ from scripts.reviewer_bot_lib import event_inputs
 from scripts.reviewer_bot_lib import maintenance as maintenance_module
 from scripts.reviewer_bot_lib import reconcile as reconcile_module
 from scripts.reviewer_bot_lib.config import AssignmentAttempt
+from scripts.reviewer_bot_lib.context import CommentEventRequest, PrCommentTrustContext
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import (
     build_assignment_request,
+    build_comment_event_request,
+    build_pr_comment_trust_context,
     build_privileged_command_request,
 )
 from .reviewer_bot_env import set_env_values
@@ -42,7 +45,7 @@ class CommandHarness:
         self.runtime = FakeReviewerBotRuntime(monkeypatch)
         self.config = self.runtime.config
 
-    def set_comment_command(
+    def wrapper_set_comment_command(
         self,
         *,
         issue_number: int,
@@ -56,7 +59,7 @@ class CommandHarness:
         ref: str = "",
         comment_id: int = 100,
         created_at: str = "2026-03-17T10:00:00Z",
-    ) -> None:
+        ) -> None:
         values = {
             "ISSUE_NUMBER": issue_number,
             "IS_PULL_REQUEST": str(is_pull_request).lower(),
@@ -77,10 +80,10 @@ class CommandHarness:
             values["GITHUB_REF"] = ref
         set_env_values(self.config, **values)
 
-    def set_assignment_context(self, *, issue_author: str, is_pull_request: bool) -> None:
+    def wrapper_set_assignment_context(self, *, issue_author: str, is_pull_request: bool) -> None:
         set_env_values(self.config, ISSUE_AUTHOR=issue_author, IS_PULL_REQUEST=str(is_pull_request).lower())
 
-    def set_privileged_context(
+    def wrapper_set_privileged_context(
         self,
         *,
         labels: list[str],
@@ -93,8 +96,13 @@ class CommandHarness:
         if target_repo_root is not None:
             self.config.set("REVIEWER_BOT_TARGET_REPO_ROOT", target_repo_root)
 
-    def set_manual_dispatch(self, *, source_event_key: str) -> None:
+    def wrapper_set_manual_dispatch(self, *, source_event_key: str) -> None:
         set_env_values(self.config, MANUAL_ACTION="execute-pending-privileged-command", PRIVILEGED_SOURCE_EVENT_KEY=source_event_key)
+
+    set_comment_command = wrapper_set_comment_command
+    set_assignment_context = wrapper_set_assignment_context
+    set_privileged_context = wrapper_set_privileged_context
+    set_manual_dispatch = wrapper_set_manual_dispatch
 
     def capture_posted_comments(self):
         return record_comments(self.runtime)
@@ -130,6 +138,25 @@ class CommandHarness:
             repo_name=self.config.get("REPO_NAME", ""),
         )
 
+    def typed_assignment_request(
+        self,
+        *,
+        issue_number: int,
+        issue_author: str = "",
+        is_pull_request: bool = False,
+        issue_labels: tuple[str, ...] = (),
+        repo_owner: str = "",
+        repo_name: str = "",
+    ):
+        return build_assignment_request(
+            issue_number=issue_number,
+            issue_author=issue_author,
+            is_pull_request=is_pull_request,
+            issue_labels=issue_labels,
+            repo_owner=repo_owner,
+            repo_name=repo_name,
+        )
+
     def privileged_request(self, *, issue_number: int, actor: str = "", command_name: str = ""):
         labels = tuple(event_inputs.parse_issue_labels_env())
         return build_privileged_command_request(
@@ -148,35 +175,101 @@ class CommandHarness:
             workflow_run_head_sha=self.config.get("WORKFLOW_RUN_HEAD_SHA", ""),
         )
 
-    def handle_assign(self, state: dict, issue_number: int, username: str):
+    def typed_privileged_request(
+        self,
+        *,
+        issue_number: int,
+        actor: str = "",
+        command_name: str = "",
+        is_pull_request: bool = False,
+        issue_labels: tuple[str, ...] = (),
+        target_repo_root: str = "",
+        workflow_run_reconcile_pr_number: int | None = None,
+        workflow_run_reconcile_head_sha: str = "",
+        workflow_run_head_sha: str = "",
+    ):
+        return build_privileged_command_request(
+            issue_number=issue_number,
+            actor=actor,
+            command_name=command_name,
+            is_pull_request=is_pull_request,
+            issue_labels=issue_labels,
+            target_repo_root=target_repo_root,
+            workflow_run_reconcile_pr_number=workflow_run_reconcile_pr_number,
+            workflow_run_reconcile_head_sha=workflow_run_reconcile_head_sha,
+            workflow_run_head_sha=workflow_run_head_sha,
+        )
+
+    def typed_comment_request(
+        self,
+        *,
+        issue_number: int,
+        actor: str,
+        body: str,
+        issue_author: str,
+        is_pull_request: bool = False,
+        comment_id: int = 100,
+        created_at: str = "2026-03-17T10:00:00Z",
+    ) -> CommentEventRequest:
+        return build_comment_event_request(
+            issue_number=issue_number,
+            is_pull_request=is_pull_request,
+            issue_author=issue_author,
+            comment_id=comment_id,
+            comment_author=actor,
+            comment_body=body,
+            comment_created_at=created_at,
+            comment_user_type="User",
+        )
+
+    def typed_trust_context(
+        self,
+        *,
+        author_association: str = "",
+        workflow_file: str = "",
+        repository: str = "",
+        ref: str = "",
+        run_id: int = 0,
+        run_attempt: int = 0,
+    ) -> PrCommentTrustContext:
+        return build_pr_comment_trust_context(
+            github_repository=repository,
+            comment_author_association=author_association,
+            current_workflow_file=workflow_file,
+            github_ref=ref,
+            github_run_id=run_id,
+            github_run_attempt=run_attempt,
+        )
+
+    def handle_assign(self, state: dict, issue_number: int, username: str, *, request=None):
         return commands_module.handle_assign_command(
             self.runtime,
             state,
             issue_number,
             username,
-            request=self.assignment_request(issue_number=issue_number),
+            request=request or self.assignment_request(issue_number=issue_number),
         )
 
-    def handle_claim(self, state: dict, issue_number: int, comment_author: str):
+    def handle_claim(self, state: dict, issue_number: int, comment_author: str, *, request=None):
         return commands_module.handle_claim_command(
             self.runtime,
             state,
             issue_number,
             comment_author,
-            request=self.assignment_request(issue_number=issue_number),
+            request=request or self.assignment_request(issue_number=issue_number),
         )
 
-    def handle_pass(self, state: dict, issue_number: int, comment_author: str, reason: str | None):
+    def handle_pass(self, state: dict, issue_number: int, comment_author: str, reason: str | None, *, request=None):
         return commands_module.handle_pass_command(
             self.runtime,
             state,
             issue_number,
             comment_author,
             reason,
-            request=self.assignment_request(issue_number=issue_number),
+            request=request or self.assignment_request(issue_number=issue_number),
         )
 
-    def handle_pass_until(self, state: dict, issue_number: int, comment_author: str, return_date: str, reason: str | None):
+    def handle_pass_until(self, state: dict, issue_number: int, comment_author: str, return_date: str, reason: str | None, *, request=None):
         return commands_module.handle_pass_until_command(
             self.runtime,
             state,
@@ -184,25 +277,25 @@ class CommandHarness:
             comment_author,
             return_date,
             reason,
-            request=self.assignment_request(issue_number=issue_number),
+            request=request or self.assignment_request(issue_number=issue_number),
         )
 
-    def handle_release(self, state: dict, issue_number: int, comment_author: str, args=None):
+    def handle_release(self, state: dict, issue_number: int, comment_author: str, args=None, *, request=None):
         return commands_module.handle_release_command(
             self.runtime,
             state,
             issue_number,
             comment_author,
             args,
-            request=self.assignment_request(issue_number=issue_number),
+            request=request or self.assignment_request(issue_number=issue_number),
         )
 
-    def handle_assign_from_queue(self, state: dict, issue_number: int):
+    def handle_assign_from_queue(self, state: dict, issue_number: int, *, request=None):
         return commands_module.handle_assign_from_queue_command(
             self.runtime,
             state,
             issue_number,
-            request=self.assignment_request(issue_number=issue_number),
+            request=request or self.assignment_request(issue_number=issue_number),
         )
 
     def handle_rectify(self, state: dict, issue_number: int, comment_author: str):
@@ -213,20 +306,20 @@ class CommandHarness:
             comment_author,
         )
 
-    def handle_accept_no_fls_changes(self, issue_number: int, comment_author: str):
+    def handle_accept_no_fls_changes(self, issue_number: int, comment_author: str, *, request=None):
         return automation_module.handle_accept_no_fls_changes_command(
             self.runtime,
             issue_number,
             comment_author,
-            request=self.privileged_request(issue_number=issue_number, actor=comment_author, command_name="accept-no-fls-changes"),
+            request=request or self.privileged_request(issue_number=issue_number, actor=comment_author, command_name="accept-no-fls-changes"),
         )
 
-    def handle_comment_event(self, state: dict):
+    def handle_comment_event(self, state: dict, *, request: CommentEventRequest | None = None, trust_context: PrCommentTrustContext | None = None):
         return comment_routing_module.handle_comment_event(
             self.runtime,
             state,
-            event_inputs.build_comment_event_request(),
-            event_inputs.build_pr_comment_trust_context(),
+            request or event_inputs.build_comment_event_request(),
+            trust_context or event_inputs.build_pr_comment_trust_context(),
         )
 
     def handle_manual_dispatch(self, state: dict):
