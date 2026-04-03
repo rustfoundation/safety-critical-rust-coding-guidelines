@@ -3,8 +3,8 @@ from types import SimpleNamespace
 from scripts.reviewer_bot_lib import state_store
 from scripts.reviewer_bot_lib.config import (
     FRESHNESS_RUNTIME_EPOCH_LEGACY,
-    GitHubApiResult,
     STATE_SCHEMA_VERSION,
+    GitHubApiResult,
     StateIssueSnapshot,
 )
 from tests.fixtures.reviewer_bot import make_state
