@@ -1,6 +1,6 @@
 import pytest
 
-from tests.fixtures.github import RouteGitHubApi, github_result
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
 pytestmark = pytest.mark.contract
 

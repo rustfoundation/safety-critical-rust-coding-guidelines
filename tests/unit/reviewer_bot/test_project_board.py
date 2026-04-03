@@ -6,7 +6,6 @@ from scripts.reviewer_bot_lib.config import (
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
 )
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
-from tests.fixtures.github import RouteGitHubApi
 from tests.fixtures.reviewer_bot import (
     accept_reviewer_comment,
     accept_reviewer_review,
@@ -17,6 +16,7 @@ from tests.fixtures.reviewer_bot import (
     review_payload,
     valid_reviewer_board_metadata,
 )
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 
 def _runtime(monkeypatch, routes=None):

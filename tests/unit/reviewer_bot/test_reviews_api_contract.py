@@ -2,7 +2,7 @@ import pytest
 
 from scripts.reviewer_bot_lib import reviews
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
-from tests.fixtures.github import RouteGitHubApi, github_result
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
 
 def test_list_open_items_with_status_labels_fails_closed_on_unavailable(monkeypatch):

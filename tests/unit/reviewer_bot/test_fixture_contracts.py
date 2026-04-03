@@ -1,4 +1,4 @@
-from tests.fixtures.github import RouteGitHubApi, github_result
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
 
 def test_shared_github_fixture_exports_core_transport_helpers():

@@ -2,7 +2,6 @@ from datetime import timedelta
 
 from scripts.reviewer_bot_lib import maintenance, review_state, reviews
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
-from tests.fixtures.github import RouteGitHubApi
 from tests.fixtures.reviewer_bot import (
     accept_contributor_comment,
     accept_contributor_revision,
@@ -14,6 +13,7 @@ from tests.fixtures.reviewer_bot import (
     pull_request_payload,
     review_payload,
 )
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 
 def _runtime(monkeypatch, routes=None):

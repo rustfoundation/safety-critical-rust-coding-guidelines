@@ -25,16 +25,17 @@ def test_support_layer_has_owned_env_and_recorder_modules():
 
 
 def test_transport_fake_authority_is_owned_by_reviewer_bot_fakes():
-    assert reviewer_bot_fakes.RouteGitHubApi is github.RouteGitHubApi
-    assert reviewer_bot_fakes.github_result is github.github_result
+    assert reviewer_bot_fakes.RouteGitHubApi is not None
+    assert reviewer_bot_fakes.github_result is not None
 
 
-def test_github_fixture_module_is_limited_to_transport_alias_and_low_level_response_helper():
+def test_github_fixture_module_is_limited_to_low_level_response_helper_only():
     github_text = _read("tests/fixtures/github.py")
 
-    assert "from .reviewer_bot_fakes import RouteGitHubApi, github_result" in github_text
     assert "class FakeGitHubResponse:" in github_text
-    assert github.__all__ == ["FakeGitHubResponse", "RouteGitHubApi", "github_result"]
+    assert "RouteGitHubApi" not in github_text
+    assert "github_result" not in github_text
+    assert github.__all__ == ["FakeGitHubResponse"]
 
 
 def test_harnesses_do_not_define_local_config_bags_or_deferred_payload_loaders():
@@ -81,3 +82,12 @@ def test_support_layer_ownership_contract_targets_current_authority_hotspots_onl
     assert "RouteGitHubApi" in text
     assert "github_result" in text
     assert "FakeGitHubResponse" in text
+
+
+def test_transport_fakes_are_not_imported_from_github_helper_module_anywhere_in_tests():
+    for path in ROOT.glob("tests/**/*.py"):
+        if path.name == "github.py" or path.name == "test_support_layer_ownership.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "from tests.fixtures.github import RouteGitHubApi" not in text
+        assert "from tests.fixtures.github import github_result" not in text

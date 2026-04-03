@@ -2,8 +2,8 @@ import pytest
 
 from scripts.reviewer_bot_lib import review_state, sweeper
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
-from tests.fixtures.github import RouteGitHubApi
 from tests.fixtures.reviewer_bot import make_state
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 from tests.fixtures.reviewer_bot_sweeper_builders import (
     artifact_payload,
     issue_comment_event,

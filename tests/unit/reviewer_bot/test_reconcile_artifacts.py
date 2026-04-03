@@ -1,8 +1,8 @@
 from scripts.reviewer_bot_lib import reconcile, review_state
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
-from tests.fixtures.github import RouteGitHubApi
 from tests.fixtures.reconcile_harness import review_comment_payload
 from tests.fixtures.reviewer_bot import make_state
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 
 def test_review_comment_artifact_identity_validation(monkeypatch):
