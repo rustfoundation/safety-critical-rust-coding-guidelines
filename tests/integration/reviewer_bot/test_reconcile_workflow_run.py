@@ -1,6 +1,5 @@
 import pytest
 
-from scripts.reviewer_bot_lib import comment_application, reconcile
 from tests.fixtures.reconcile_harness import (
     ReconcileHarness,
     issue_comment_payload,
@@ -113,7 +112,7 @@ def test_deferred_comment_reconcile_returns_true_for_bookkeeping_only_mutations(
         author_type="User",
         author_association="MEMBER",
     )
-    monkeypatch.setattr(comment_application, "apply_comment_command", lambda *args, **kwargs: False)
+    harness.stub_apply_comment_command(False)
 
     assert harness.run(state) is True
     assert "issue_comment:210" in review["reconciled_source_events"]
@@ -407,24 +406,18 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
         author_type="User",
         author_association="MEMBER",
     )
-    monkeypatch.setattr(
-        reconcile,
-        "classify_comment_payload",
-        lambda bot, body: {
+    harness.stub_comment_classification(
+        {
             "comment_class": "command_only",
             "has_non_command_text": False,
             "command_count": 2,
             "command": None,
             "args": [],
-            "normalized_body": body,
-        },
+            "normalized_body": live_body,
+        }
     )
     command_calls = []
-    monkeypatch.setattr(
-        comment_application,
-        "apply_comment_command",
-        lambda *args, **kwargs: command_calls.append("called") or True,
-    )
+    harness.stub_apply_comment_command(func=lambda *args, **kwargs: command_calls.append("called") or True)
 
     assert harness.run(state) is True
     assert command_calls == []
@@ -501,17 +494,17 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
     )
     harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
     claim_contexts = []
-    monkeypatch.setattr(
-        comment_application,
-        "apply_comment_command",
-        lambda bot, state_obj, request, classified, classify_issue_comment_actor=None: claim_contexts.append(
+    harness.stub_apply_comment_command(
+        func=lambda bot, state_obj, request, classified, classify_issue_comment_actor=None: claim_contexts.append(
             {
                 "issue_number": request.issue_number,
                 "username": request.comment_author,
                 "is_pull_request": request.is_pull_request,
                 "issue_author": request.issue_author,
             }
-        ) or state_obj["active_reviews"][str(request.issue_number)].__setitem__("current_reviewer", request.comment_author) or True,
+        )
+        or state_obj["active_reviews"][str(request.issue_number)].__setitem__("current_reviewer", request.comment_author)
+        or True
     )
     harness.runtime.add_reaction = lambda *args, **kwargs: True
 
@@ -587,17 +580,15 @@ def test_deferred_comment_reconcile_fails_closed_when_comment_classification_dri
         author_type="User",
         author_association="CONTRIBUTOR",
     )
-    monkeypatch.setattr(
-        reconcile,
-        "classify_comment_payload",
-        lambda bot, body: {
+    harness.stub_comment_classification(
+        {
             "comment_class": "command_plus_text",
             "has_non_command_text": True,
             "command_count": 1,
             "command": "claim",
             "args": [],
-            "normalized_body": body,
-        },
+            "normalized_body": live_body,
+        }
     )
 
     assert harness.run(state) is True

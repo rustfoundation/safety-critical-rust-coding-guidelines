@@ -282,5 +282,21 @@ class ReconcileHarness:
             lambda bot, state_obj, issue_number, review_data: changed,
         )
 
+    def stub_comment_classification(self, classified: dict | None = None, *, func=None) -> None:
+        if func is None:
+            def default_func(bot, body):
+                return classified
+
+            func = default_func
+        self.monkeypatch.setattr(reconcile, "classify_comment_payload", func)
+
+    def stub_apply_comment_command(self, result: bool | None = None, *, func=None) -> None:
+        if func is None:
+            def default_func(*args, **kwargs):
+                return result
+
+            func = default_func
+        self.monkeypatch.setattr(comment_application, "apply_comment_command", func)
+
     def run(self, state: dict) -> bool:
         return self.handle_workflow_run_event(state)
