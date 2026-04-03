@@ -90,6 +90,9 @@ def test_production_modules_do_not_import_mutable_review_state_api_from_reviews_
     review_state_text = _read("scripts/reviewer_bot_lib/review_state.py")
     runtime_text = _read("scripts/reviewer_bot_lib/runtime.py")
     bootstrap_text = _read("scripts/reviewer_bot_lib/bootstrap_runtime.py")
+    commands_text = _read("scripts/reviewer_bot_lib/commands.py")
+    reconcile_text = _read("scripts/reviewer_bot_lib/reconcile.py")
+    reviews_text = _read("scripts/reviewer_bot_lib/reviews.py")
 
     for name in [
         "ensure_review_entry",
@@ -105,13 +108,20 @@ def test_production_modules_do_not_import_mutable_review_state_api_from_reviews_
         assert f"from .reviews import {name}" not in runtime_text
         assert f"reviews.{name}(" not in runtime_text
         assert f"reviews.{name}(" not in bootstrap_text
+        assert f"bot.{name}(" not in commands_text
+        assert f"bot.{name}(" not in reconcile_text
+        assert f"bot.{name}(" not in reviews_text
 
 
-def test_reviews_module_still_contains_known_transitional_mutation_helpers_only_as_debt_markers():
+def test_reviews_module_no_longer_exposes_public_mutation_helpers():
     for name in [
         "ensure_review_entry",
+        "accept_channel_event",
+        "record_reviewer_activity",
+        "record_transition_notice_sent",
         "set_current_reviewer",
         "update_reviewer_activity",
         "mark_review_complete",
+        "get_current_cycle_boundary",
     ]:
-        assert hasattr(reviews, name)
+        assert hasattr(reviews, name) is False

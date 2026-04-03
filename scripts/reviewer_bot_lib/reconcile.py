@@ -12,7 +12,11 @@ from .comment_application import (
 )
 from .comment_routing import classify_comment_payload, classify_issue_comment_actor
 from .context import CommentEventRequest
-from .review_state import accept_channel_event, record_reviewer_activity
+from .review_state import (
+    accept_channel_event,
+    ensure_review_entry,
+    record_reviewer_activity,
+)
 from .reviews import (
     find_triage_approval_after,
     rebuild_pr_approval_state_result,
@@ -298,7 +302,7 @@ def reconcile_active_review_entry(
     require_pull_request_context: bool = True,
     completion_source: str = "rectify:reconcile-pr-review",
 ) -> tuple[str, bool, bool]:
-    review_data = bot.ensure_review_entry(state, issue_number)
+    review_data = ensure_review_entry(state, issue_number)
     if review_data is None:
         return f"ℹ️ No active review entry exists for #{issue_number}; nothing to rectify.", True, False
     assigned_reviewer = review_data.get("current_reviewer")
@@ -343,7 +347,7 @@ def reconcile_active_review_entry(
 
 
 def handle_rectify_command(bot, state: dict, issue_number: int, comment_author: str) -> tuple[str, bool, bool]:
-    review_data = bot.ensure_review_entry(state, issue_number)
+    review_data = ensure_review_entry(state, issue_number)
     current_reviewer = review_data.get("current_reviewer") if review_data else None
 
     is_current_reviewer = (
@@ -875,7 +879,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
     if pr_number <= 0:
         raise RuntimeError("Deferred context is missing a valid PR number")
     bot.collect_touched_item(pr_number)
-    review_data = bot.ensure_review_entry(state, pr_number, create=True)
+    review_data = ensure_review_entry(state, pr_number, create=True)
     if review_data is None:
         raise RuntimeError(f"No review entry available for PR #{pr_number}")
     event_name = parsed_payload.identity.source_event_name

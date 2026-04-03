@@ -3,6 +3,7 @@
 import re
 from datetime import datetime, timezone
 
+from . import review_state
 from .automation import bot_parse_issue_labels
 from .automation import (
     find_open_pr_for_branch_status as automation_find_open_pr_for_branch_status,
@@ -107,7 +108,7 @@ def _apply_assignment_side_effects(
 ) -> tuple[AssignmentAttempt, str | None]:
     issue_number = request.issue_number
     assignment_attempt = bot.request_reviewer_assignment(issue_number, reviewer)
-    bot.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
+    review_state.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
     bot.record_assignment(state, reviewer, issue_number, "pr" if request.is_pull_request else "issue")
     failure_comment = bot.get_assignment_failure_comment(reviewer, assignment_attempt)
     if failure_comment:
@@ -142,7 +143,7 @@ def handle_pass_command(
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
     assignment_request = request or build_assignment_request(issue_number=issue_number)
-    issue_data = bot.ensure_review_entry(state, issue_number, create=True)
+    issue_data = review_state.ensure_review_entry(state, issue_number, create=True)
     if issue_data is None:
         return "❌ Unable to load review state.", False
     passed_reviewer = issue_data.get("current_reviewer")
@@ -295,9 +296,9 @@ def handle_label_command(
             elif bot.add_label(issue_number, label):
                 results.append(f"✅ Added label `{label}`")
                 if label == "sign-off: create pr" and not assignment_request.is_pull_request:
-                    review_data = bot.ensure_review_entry(state, issue_number)
+                    review_data = review_state.ensure_review_entry(state, issue_number)
                     reviewer = review_data.get("current_reviewer") if review_data else None
-                    completion_changed = bot.mark_review_complete(
+                    completion_changed = review_state.mark_review_complete(
                         state, issue_number, reviewer, "issue_label: sign-off: create pr"
                     )
                     state_changed = completion_changed or state_changed
