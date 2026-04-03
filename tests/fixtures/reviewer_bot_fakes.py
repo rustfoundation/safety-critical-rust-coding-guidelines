@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib.config import GitHubApiResult
 
 
 def github_result(
@@ -16,7 +16,7 @@ def github_result(
     failure_kind: str | None = None,
     retry_attempts: int = 0,
     transport_error: str | None = None,
-) -> reviewer_bot.GitHubApiResult:
+) -> GitHubApiResult:
     normalized_headers = {
         key.lower(): value for key, value in (headers or {}).items()
     }
@@ -39,7 +39,7 @@ def github_result(
             resolved_text = ""
         else:
             resolved_text = "ok" if resolved_ok else "error"
-    return reviewer_bot.GitHubApiResult(
+    return GitHubApiResult(
         status_code=status_code,
         payload=payload,
         headers=normalized_headers,
@@ -62,7 +62,7 @@ class GitHubCall:
 
 class RouteGitHubApi:
     def __init__(self):
-        self._request_routes: dict[tuple[str, str], reviewer_bot.GitHubApiResult] = {}
+        self._request_routes: dict[tuple[str, str], GitHubApiResult] = {}
         self._api_routes: dict[tuple[str, str], Any] = {}
         self._raise_system_exit_on_request = False
         self.request_calls: list[GitHubCall] = []
@@ -72,7 +72,7 @@ class RouteGitHubApi:
         self,
         method: str,
         endpoint: str,
-        result: reviewer_bot.GitHubApiResult | None = None,
+        result: GitHubApiResult | None = None,
         **result_kwargs,
     ) -> "RouteGitHubApi":
         self._request_routes[(method, endpoint)] = result or github_result(**result_kwargs)
@@ -115,7 +115,7 @@ class RouteGitHubApi:
         data: dict | None = None,
         extra_headers: dict[str, str] | None = None,
         **kwargs,
-    ) -> reviewer_bot.GitHubApiResult:
+    ) -> GitHubApiResult:
         self.request_calls.append(
             GitHubCall(
                 method=method,

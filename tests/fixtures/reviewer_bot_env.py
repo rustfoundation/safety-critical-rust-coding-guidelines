@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib.context import LeaseContext
 
 CLEAR_REVIEWER_BOT_ENV_VARS = {
     "ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE",
@@ -33,7 +33,7 @@ CLEAR_REVIEWER_BOT_ENV_VARS = {
 
 
 def build_test_lease_context():
-    return reviewer_bot.LeaseContext(
+    return LeaseContext(
         lock_token="test-lock-token",
         lock_owner_run_id="test-run",
         lock_owner_workflow="test-workflow",
@@ -42,12 +42,12 @@ def build_test_lease_context():
     )
 
 
-def reset_reviewer_bot_process_state(monkeypatch) -> None:
+def reset_reviewer_bot_process_state(monkeypatch, target_module) -> None:
     for name in CLEAR_REVIEWER_BOT_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(reviewer_bot, "ACTIVE_LEASE_CONTEXT", build_test_lease_context())
-    monkeypatch.setattr(reviewer_bot, "TOUCHED_ISSUE_NUMBERS", set())
-    monkeypatch.setattr(reviewer_bot, "_reviewer_board_project_metadata", None, raising=False)
+    monkeypatch.setattr(target_module, "ACTIVE_LEASE_CONTEXT", build_test_lease_context())
+    monkeypatch.setattr(target_module, "TOUCHED_ISSUE_NUMBERS", set())
+    monkeypatch.setattr(target_module, "_reviewer_board_project_metadata", None, raising=False)
 
 
 def set_env_values(config, **values) -> None:

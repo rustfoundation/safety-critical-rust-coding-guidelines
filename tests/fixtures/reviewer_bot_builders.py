@@ -1,4 +1,4 @@
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import review_state
 
 
 def make_tracked_review_state(
@@ -10,7 +10,7 @@ def make_tracked_review_state(
     active_cycle_started_at: str | None = None,
     repair_needed: dict | None = None,
 ):
-    review = reviewer_bot.ensure_review_entry(state, issue_number, create=True)
+    review = review_state.ensure_review_entry(state, issue_number, create=True)
     if review is None:
         raise AssertionError(f"Unable to create review entry for #{issue_number}")
     if reviewer is not None:
@@ -81,7 +81,7 @@ def accept_reviewer_comment(
     timestamp: str,
     actor: str,
 ) -> bool:
-    return reviewer_bot.reviews_module.accept_channel_event(
+    return review_state.accept_channel_event(
         review_data,
         "reviewer_comment",
         semantic_key=semantic_key,
@@ -99,7 +99,7 @@ def accept_reviewer_review(
     reviewed_head_sha: str,
     source_precedence: int = 1,
 ) -> bool:
-    return reviewer_bot.reviews_module.accept_channel_event(
+    return review_state.accept_channel_event(
         review_data,
         "reviewer_review",
         semantic_key=semantic_key,
@@ -117,7 +117,7 @@ def accept_contributor_comment(
     timestamp: str,
     actor: str,
 ) -> bool:
-    return reviewer_bot.reviews_module.accept_channel_event(
+    return review_state.accept_channel_event(
         review_data,
         "contributor_comment",
         semantic_key=semantic_key,
@@ -134,7 +134,7 @@ def accept_contributor_revision(
     actor: str,
     head_sha: str,
 ) -> bool:
-    return reviewer_bot.reviews_module.accept_channel_event(
+    return review_state.accept_channel_event(
         review_data,
         "contributor_revision",
         semantic_key=semantic_key,

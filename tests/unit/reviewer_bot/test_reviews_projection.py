@@ -1,7 +1,8 @@
 import json
+from types import SimpleNamespace
 
-from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import reviews_projection
+from scripts.reviewer_bot_lib import reviews, reviews_projection
+from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.reviewer_bot import (
     make_state,
     make_tracked_review_state,
@@ -10,7 +11,23 @@ from tests.fixtures.reviewer_bot import (
 )
 
 
-def test_compute_reviewer_response_state_is_pure_for_pr_projection(monkeypatch):
+def _bot(**overrides):
+    bot = SimpleNamespace(
+        github_api_request=lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(200, {}, {}, "ok", True, None, 0, None),
+        github_api=lambda method, endpoint, data=None: {},
+        get_pull_request_reviews=lambda issue_number: [],
+        get_issue_or_pr_snapshot=lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
+        get_user_permission_status=lambda username, required_permission="push": "granted",
+        parse_github_timestamp=reviews.parse_github_timestamp,
+        parse_iso8601_timestamp=reviews.parse_github_timestamp,
+        ensure_review_entry=lambda state, issue_number, create=False: None,
+    )
+    for key, value in overrides.items():
+        setattr(bot, key, value)
+    return bot
+
+
+def test_compute_reviewer_response_state_is_pure_for_pr_projection():
     state = make_state()
     review = make_tracked_review_state(
         state,
@@ -19,15 +36,8 @@ def test_compute_reviewer_response_state_is_pure_for_pr_projection(monkeypatch):
         active_cycle_started_at="2026-03-17T09:00:00Z",
     )
     before = json.loads(json.dumps(review))
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_issue_or_pr_snapshot",
-        lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
-    )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api_request",
-        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+    bot = _bot(
+        github_api_request=lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
             200,
             pull_request_payload(42, head_sha="head-1") if endpoint == "pulls/42" else [],
             {},
@@ -36,16 +46,16 @@ def test_compute_reviewer_response_state_is_pure_for_pr_projection(monkeypatch):
             None,
             0,
             None,
-        ),
+        )
     )
 
-    response_state = reviewer_bot.compute_reviewer_response_state(42, review)
+    response_state = reviews.compute_reviewer_response_state(bot, 42, review)
 
     assert response_state["state"] == "awaiting_reviewer_response"
     assert review == before
 
 
-def test_compute_pr_approval_state_result_is_pure(monkeypatch):
+def test_compute_pr_approval_state_result_is_pure():
     review = make_tracked_review_state(
         make_state(),
         42,
@@ -53,10 +63,8 @@ def test_compute_pr_approval_state_result_is_pure(monkeypatch):
         active_cycle_started_at="2026-03-17T09:00:00Z",
     )
     before = json.loads(json.dumps(review))
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api_request",
-        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
+    bot = _bot(
+        github_api_request=lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
             200,
             pull_request_payload(42, head_sha="head-1")
             if endpoint == "pulls/42"
@@ -75,11 +83,10 @@ def test_compute_pr_approval_state_result_is_pure(monkeypatch):
             None,
             0,
             None,
-        ),
+        )
     )
-    monkeypatch.setattr(reviewer_bot, "get_user_permission_status", lambda username, required_permission="push": "granted")
 
-    result = reviewer_bot.reviews_module.compute_pr_approval_state_result(reviewer_bot, 42, review)
+    result = reviews.compute_pr_approval_state_result(bot, 42, review)
 
     assert result["ok"] is True
     assert result["completion"]["completed"] is True
@@ -87,10 +94,9 @@ def test_compute_pr_approval_state_result_is_pure(monkeypatch):
 
 
 def test_apply_pr_approval_state_mutates_expected_fields():
-    review = reviewer_bot.ensure_review_entry(make_state(), 42, create=True)
-    assert review is not None
+    review = make_tracked_review_state(make_state(), 42)
 
-    reviewer_bot.reviews_module.apply_pr_approval_state(
+    reviews.apply_pr_approval_state(
         review,
         completion={"completed": True, "current_head_sha": "head-1", "qualifying_review_ids": [10]},
         write_approval={"has_write_approval": True, "write_approvers": ["alice"], "current_head_sha": "head-1"},
@@ -108,7 +114,7 @@ def test_compute_pr_approval_state_from_reviews_is_pure():
         "alice": {
             "id": 10,
             "state": "APPROVED",
-            "submitted_at": reviewer_bot.parse_github_timestamp("2026-03-17T10:01:00Z"),
+            "submitted_at": reviews.parse_github_timestamp("2026-03-17T10:01:00Z"),
             "commit_id": "head-1",
             "user": {"login": "alice"},
         }
@@ -127,7 +133,7 @@ def test_compute_pr_approval_state_from_reviews_is_pure():
 
 
 def test_normalize_reviews_with_parsed_timestamps_is_pure():
-    reviews = [
+    review_items = [
         {
             "id": 10,
             "state": "APPROVED",
@@ -136,15 +142,15 @@ def test_normalize_reviews_with_parsed_timestamps_is_pure():
             "user": {"login": "alice"},
         }
     ]
-    before = json.loads(json.dumps(reviews))
+    before = json.loads(json.dumps(review_items))
 
     normalized = reviews_projection.normalize_reviews_with_parsed_timestamps(
-        reviews,
-        parse_timestamp=reviewer_bot.parse_github_timestamp,
+        review_items,
+        parse_timestamp=reviews.parse_github_timestamp,
     )
 
-    assert normalized[0]["submitted_at"] == reviewer_bot.parse_github_timestamp("2026-03-17T10:01:00Z")
-    assert reviews == before
+    assert normalized[0]["submitted_at"] == reviews.parse_github_timestamp("2026-03-17T10:01:00Z")
+    assert review_items == before
 
 
 def test_collect_permission_statuses_deduplicates_authors():

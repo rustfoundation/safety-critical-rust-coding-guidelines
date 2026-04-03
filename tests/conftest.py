@@ -1,6 +1,7 @@
 import pytest
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib.config import AssignmentAttempt, GitHubApiResult
 from tests.fixtures.reviewer_bot_env import (
     build_test_lease_context,
     reset_reviewer_bot_process_state,
@@ -14,7 +15,7 @@ from tests.fixtures.reviewer_bot_recorders import (
 @pytest.fixture(autouse=True)
 def reset_reviewer_bot_process_state_fixture():
     with pytest.MonkeyPatch().context() as monkeypatch:
-        reset_reviewer_bot_process_state(monkeypatch)
+        reset_reviewer_bot_process_state(monkeypatch, reviewer_bot)
         yield
 
 
@@ -43,7 +44,7 @@ def stub_api(monkeypatch):
     monkeypatch.setattr(
         reviewer_bot,
         "github_api_request",
-        lambda *args, **kwargs: reviewer_bot.GitHubApiResult(
+        lambda *args, **kwargs: GitHubApiResult(
             status_code=200,
             payload={},
             headers={},
@@ -57,7 +58,7 @@ def stub_api(monkeypatch):
     monkeypatch.setattr(
         reviewer_bot,
         "request_reviewer_assignment",
-        lambda *args, **kwargs: reviewer_bot.AssignmentAttempt(success=True, status_code=201),
+        lambda *args, **kwargs: AssignmentAttempt(success=True, status_code=201),
     )
     monkeypatch.setattr(reviewer_bot, "unassign_reviewer", lambda *args, **kwargs: True)
     monkeypatch.setattr(reviewer_bot, "remove_pr_reviewer", lambda *args, **kwargs: True)

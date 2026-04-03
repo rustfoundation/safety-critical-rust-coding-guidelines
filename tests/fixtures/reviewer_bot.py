@@ -2,7 +2,11 @@ import io
 import json
 import zipfile
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib.config import (
+    FRESHNESS_RUNTIME_EPOCH_V18,
+    STATE_SCHEMA_VERSION,
+    STATUS_PROJECTION_EPOCH,
+)
 
 from .reviewer_bot_builders import (
     accept_contributor_comment as accept_contributor_comment,
@@ -51,9 +55,9 @@ __all__ = [
 
 def make_state(epoch: str | None = None):
     state = {
-        "schema_version": reviewer_bot.STATE_SCHEMA_VERSION,
-        "freshness_runtime_epoch": epoch or reviewer_bot.FRESHNESS_RUNTIME_EPOCH_V18,
-        "status_projection_epoch": reviewer_bot.STATUS_PROJECTION_EPOCH,
+        "schema_version": STATE_SCHEMA_VERSION,
+        "freshness_runtime_epoch": epoch or FRESHNESS_RUNTIME_EPOCH_V18,
+        "status_projection_epoch": STATUS_PROJECTION_EPOCH,
         "last_updated": None,
         "current_index": 0,
         "queue": [
