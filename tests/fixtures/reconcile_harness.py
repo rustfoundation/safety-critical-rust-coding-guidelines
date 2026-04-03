@@ -125,7 +125,7 @@ class ReconcileHarness:
         self.runtime = FakeReviewerBotRuntime(self.monkeypatch, github=self.github)
         self.config = self.runtime.config
         self.runtime.stub_deferred_payload(self.payload)
-        self.set_trigger_from_payload(self.payload)
+        self.wrapper_set_trigger_from_payload(self.payload)
 
     def handle_workflow_run_event(self, state: dict) -> bool:
         return reconcile.handle_workflow_run_event(self.runtime, state)
@@ -133,10 +133,10 @@ class ReconcileHarness:
     def set_payload(self, payload: dict) -> dict:
         self.payload = payload
         self.runtime.stub_deferred_payload(payload)
-        self.set_trigger_from_payload(payload)
+        self.wrapper_set_trigger_from_payload(payload)
         return payload
 
-    def set_trigger_from_payload(self, payload: dict, *, conclusion: str = "success") -> None:
+    def wrapper_set_trigger_from_payload(self, payload: dict, *, conclusion: str = "success") -> None:
         set_env_values(
             self.config,
             WORKFLOW_RUN_TRIGGERING_NAME=payload["source_workflow_name"],
@@ -144,6 +144,8 @@ class ReconcileHarness:
             WORKFLOW_RUN_TRIGGERING_ATTEMPT=payload["source_run_attempt"],
             WORKFLOW_RUN_TRIGGERING_CONCLUSION=conclusion,
         )
+
+    set_trigger_from_payload = wrapper_set_trigger_from_payload
 
     def add_pull_request(
         self,

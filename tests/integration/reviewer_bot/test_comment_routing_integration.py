@@ -111,7 +111,7 @@ def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    harness.apply_wrapper_inputs(
+    request = harness.request(
         issue_number=42,
         is_pull_request=False,
         issue_state="open",
@@ -120,7 +120,7 @@ def test_open_non_pr_plain_text_comment_still_updates_freshness(monkeypatch):
         comment_body="reviewer-bot validation: contributor plain text comment",
     )
 
-    assert harness.handle_comment_event(state) is True
+    assert harness.handle_comment_event(state, request=request) is True
     accepted = state["active_reviews"]["42"]["contributor_comment"]["accepted"]
     assert accepted["semantic_key"] == "issue_comment:100"
 

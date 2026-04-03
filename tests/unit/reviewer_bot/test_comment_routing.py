@@ -137,7 +137,7 @@ def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypa
 
 def test_build_pr_comment_observer_payload_wrapper_uses_explicit_env_facts(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
-    harness.apply_wrapper_inputs(
+    harness.wrapper_apply_inputs(
         issue_number=42,
         is_pull_request=True,
         issue_author="dana",

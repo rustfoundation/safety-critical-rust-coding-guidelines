@@ -20,17 +20,20 @@ class CommentRoutingHarness:
         self.runtime = FakeReviewerBotRuntime(monkeypatch, github=self.github)
         self.config = self.runtime.config
 
-    def wrapper_request(self, *, issue_number: int | None = None):
+    def env_build_request(self, *, issue_number: int | None = None):
         return event_inputs.build_comment_event_request(issue_number=issue_number)
 
-    def wrapper_trust_context(self):
+    def env_build_trust_context(self):
         return event_inputs.build_pr_comment_trust_context()
+
+    wrapper_request = env_build_request
+    wrapper_trust_context = env_build_trust_context
 
     def handle_comment_event(self, state: dict, request: CommentEventRequest | None = None, trust_context: PrCommentTrustContext | None = None):
         return comment_routing.handle_comment_event(
             self.runtime,
             state,
-            request or self.wrapper_request(),
+            request or self.env_build_request(),
             trust_context,
         )
 
@@ -38,8 +41,8 @@ class CommentRoutingHarness:
         return comment_routing.build_pr_comment_observer_payload(
             self.runtime,
             issue_number,
-            request or self.wrapper_request(issue_number=issue_number),
-            trust_context or self.wrapper_trust_context(),
+            request or self.env_build_request(issue_number=issue_number),
+            trust_context or self.env_build_trust_context(),
         )
 
     def request(
@@ -112,7 +115,7 @@ class CommentRoutingHarness:
     def capture_comment_side_effects(self):
         return record_comment_side_effects(self.runtime)
 
-    def apply_wrapper_inputs(
+    def wrapper_apply_inputs(
         self,
         *,
         issue_number: int,
@@ -149,3 +152,5 @@ class CommentRoutingHarness:
         if github_ref:
             values["GITHUB_REF"] = github_ref
         set_env_values(self.config, **values)
+
+    apply_wrapper_inputs = wrapper_apply_inputs
