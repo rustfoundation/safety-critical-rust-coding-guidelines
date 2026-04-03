@@ -345,18 +345,6 @@ class FakeReviewerBotRuntime:
     def update_reviewer_activity(self, state: dict, issue_number: int, reviewer: str) -> bool:
         return review_state_module.update_reviewer_activity(state, issue_number, reviewer)
 
-    def record_transition_notice_sent(self, review_data: dict, timestamp: str) -> None:
-        return review_state_module.record_transition_notice_sent(review_data, timestamp)
-
-    def accept_channel_event(self, review_data: dict, channel_name: str, **kwargs) -> bool:
-        return review_state_module.accept_channel_event(review_data, channel_name, **kwargs)
-
-    def record_reviewer_activity(self, review_data: dict, timestamp: str) -> bool:
-        return review_state_module.record_reviewer_activity(review_data, timestamp)
-
-    def get_current_cycle_boundary(self, review_data: dict):
-        return review_state_module.get_current_cycle_boundary(self, review_data)
-
     def accept_reviewer_review_from_live_review(self, review_data: dict, review: dict, *, actor: str | None = None) -> bool:
         return review_state_module.accept_reviewer_review_from_live_review(review_data, review, actor=actor)
 

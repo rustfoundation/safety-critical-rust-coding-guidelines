@@ -123,6 +123,28 @@ def test_fake_runtime_mutable_review_state_gateways_delegate_to_review_state_own
     assert runtime.mark_review_complete.__func__.__module__ == FakeReviewerBotRuntime.__module__
 
 
+def test_fake_runtime_closed_mutable_review_state_compatibility_surface(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    allowed = {
+        "ensure_review_entry",
+        "set_current_reviewer",
+        "update_reviewer_activity",
+        "mark_review_complete",
+    }
+    removed = {
+        "record_transition_notice_sent",
+        "accept_channel_event",
+        "record_reviewer_activity",
+        "get_current_cycle_boundary",
+    }
+
+    for name in allowed:
+        assert hasattr(runtime, name)
+    for name in removed:
+        assert hasattr(runtime, name) is False
+
+
 def test_fake_runtime_rejects_unknown_handler_names(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
 

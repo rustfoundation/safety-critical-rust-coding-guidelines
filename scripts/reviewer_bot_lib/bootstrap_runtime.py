@@ -133,6 +133,7 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
             runtime, issue_number, comment_author
         ),
         get_commands_help=config.get_commands_help,
+        # Adapter-only mutable review-state compatibility surface.
         ensure_review_entry=lambda current_state, issue_number, create=False: review_state.ensure_review_entry(
             current_state, issue_number, create=create
         ),

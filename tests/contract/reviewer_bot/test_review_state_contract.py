@@ -113,6 +113,35 @@ def test_production_modules_do_not_import_mutable_review_state_api_from_reviews_
         assert f"bot.{name}(" not in reviews_text
 
 
+def test_runtime_and_bootstrap_forwarders_are_explicit_adapter_compatibility_surface_only():
+    runtime_text = _read("scripts/reviewer_bot_lib/runtime.py")
+    bootstrap_text = _read("scripts/reviewer_bot_lib/bootstrap_runtime.py")
+
+    assert "Adapter-only mutable review-state compatibility surface." in runtime_text
+    assert "Adapter-only mutable review-state compatibility surface." in bootstrap_text
+    assert "review_state.ensure_review_entry(" in bootstrap_text
+    assert "review_state.set_current_reviewer(" in bootstrap_text
+    assert "review_state.update_reviewer_activity(" in bootstrap_text
+    assert "review_state.mark_review_complete(" in bootstrap_text
+    assert "record_transition_notice_sent" not in runtime_text
+    assert "accept_channel_event" not in runtime_text
+    assert "get_current_cycle_boundary" not in runtime_text
+    assert "record_transition_notice_sent" not in bootstrap_text
+    assert "accept_channel_event" not in bootstrap_text
+    assert "get_current_cycle_boundary" not in bootstrap_text
+
+
+def test_tests_do_not_rely_on_runtime_mutable_review_state_forwarders_outside_contract_surface():
+    for path in ROOT.glob("tests/**/*.py"):
+        if path.name in {"test_fake_runtime_contract.py", "test_adapter_contract.py", "test_review_state_contract.py"}:
+            continue
+        text = path.read_text(encoding="utf-8")
+        assert "runtime.ensure_review_entry" not in text
+        assert "runtime.set_current_reviewer" not in text
+        assert "runtime.update_reviewer_activity" not in text
+        assert "runtime.mark_review_complete" not in text
+
+
 def test_reviews_module_no_longer_exposes_public_mutation_helpers():
     for name in [
         "ensure_review_entry",

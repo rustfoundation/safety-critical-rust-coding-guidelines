@@ -310,6 +310,9 @@ class ReviewerBotRuntime:
     def get_commands_help(self) -> str:
         return self.adapters.get_commands_help()
 
+    # Adapter-only mutable review-state compatibility surface.
+    # Ownership lives in review_state.py; these methods remain so runtime-oriented
+    # callers and test doubles can delegate through one adapter seam.
     def ensure_review_entry(self, state: dict, issue_number: int, create: bool = False):
         return self.adapters.ensure_review_entry(state, issue_number, create=create)
 

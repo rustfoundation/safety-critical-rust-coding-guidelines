@@ -5,6 +5,7 @@ from scripts.reviewer_bot_lib import (
     automation,
     comment_application,
     guidance,
+    reconcile,
     review_state,
 )
 from scripts.reviewer_bot_lib.config import FLS_AUDIT_LABEL
@@ -269,7 +270,7 @@ def test_assign_from_queue_command_fails_closed_when_assignees_unavailable(monke
 def test_handle_rectify_command_reports_permission_unavailable(monkeypatch):
     state = make_state()
     harness = CommandHarness(monkeypatch)
-    harness.runtime.ensure_review_entry = lambda current, issue_number, create=False: None
+    monkeypatch.setattr(reconcile, "ensure_review_entry", lambda current, issue_number, create=False: None)
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     message, success, changed = harness.handle_rectify(state, 42, "alice")
@@ -282,7 +283,7 @@ def test_handle_rectify_command_reports_permission_unavailable(monkeypatch):
 def test_handle_rectify_command_reports_permission_denied(monkeypatch):
     state = make_state()
     harness = CommandHarness(monkeypatch)
-    harness.runtime.ensure_review_entry = lambda current, issue_number, create=False: None
+    monkeypatch.setattr(reconcile, "ensure_review_entry", lambda current, issue_number, create=False: None)
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "denied"
 
     message, success, changed = harness.handle_rectify(state, 42, "alice")
