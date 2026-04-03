@@ -1,7 +1,8 @@
 import pytest
 
-from scripts.reviewer_bot_lib import commands, lifecycle, reconcile, review_state
+from scripts.reviewer_bot_lib import commands, reconcile, review_state
 from scripts.reviewer_bot_lib.config import GitHubApiResult
+from scripts.reviewer_bot_lib import lifecycle
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
 
@@ -115,7 +116,11 @@ def test_build_deferred_comment_replay_context_rejects_mismatched_source_event_k
     )
 
     with pytest.raises(RuntimeError, match="source_event_key mismatch"):
-        reconcile.build_deferred_comment_replay_context(payload, expected_event_name="issue_comment", live_comment_endpoint="issues/comments/210")
+        reconcile.build_deferred_comment_replay_context(
+            payload,
+            expected_event_name="issue_comment",
+            live_comment_endpoint="issues/comments/210",
+        )
 
 
 def test_build_deferred_review_replay_context_returns_typed_context():
@@ -139,7 +144,10 @@ def test_build_deferred_review_replay_context_returns_typed_context():
         raw_payload={"source_event_key": "pull_request_review:11"},
     )
 
-    context = reconcile.build_deferred_review_replay_context(payload, expected_event_action="submitted")
+    context = reconcile.build_deferred_review_replay_context(
+        payload,
+        expected_event_action="submitted",
+    )
 
     assert isinstance(context, reconcile.DeferredReviewReplayContext)
     assert context.review_id == 11
@@ -169,7 +177,10 @@ def test_build_deferred_review_replay_context_rejects_mismatched_source_event_ke
     )
 
     with pytest.raises(RuntimeError, match="source_event_key mismatch"):
-        reconcile.build_deferred_review_replay_context(payload, expected_event_action="submitted")
+        reconcile.build_deferred_review_replay_context(
+            payload,
+            expected_event_action="submitted",
+        )
 
 
 def test_parse_deferred_context_payload_returns_typed_observer_noop_payload():
