@@ -1,6 +1,8 @@
 import pytest
 
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import commands, lifecycle, reconcile, review_state
+from scripts.reviewer_bot_lib.config import GitHubApiResult
+from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
 
 
@@ -22,9 +24,9 @@ def test_parse_deferred_context_payload_returns_typed_review_payload():
         "actor_login": "alice",
     }
 
-    parsed = reviewer_bot.reconcile_module.parse_deferred_context_payload(payload)
+    parsed = reconcile.parse_deferred_context_payload(payload)
 
-    assert isinstance(parsed, reviewer_bot.reconcile_module.DeferredReviewPayload)
+    assert isinstance(parsed, reconcile.DeferredReviewPayload)
     assert parsed.identity.source_event_name == "pull_request_review"
     assert parsed.review_id == 11
     assert parsed.pr_number == 42
@@ -49,16 +51,16 @@ def test_parse_deferred_context_payload_returns_typed_comment_payload():
         "actor_login": "bob",
     }
 
-    parsed = reviewer_bot.reconcile_module.parse_deferred_context_payload(payload)
+    parsed = reconcile.parse_deferred_context_payload(payload)
 
-    assert isinstance(parsed, reviewer_bot.reconcile_module.DeferredCommentPayload)
+    assert isinstance(parsed, reconcile.DeferredCommentPayload)
     assert parsed.identity.source_event_key == "issue_comment:210"
     assert parsed.comment_id == 210
 
 
 def test_build_deferred_comment_replay_context_returns_typed_context():
-    payload = reviewer_bot.reconcile_module.DeferredCommentPayload(
-        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+    payload = reconcile.DeferredCommentPayload(
+        identity=reconcile.DeferredArtifactIdentity(
             schema_version=2,
             source_workflow_name="Reviewer Bot PR Comment Observer",
             source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
@@ -78,21 +80,21 @@ def test_build_deferred_comment_replay_context_returns_typed_context():
         raw_payload={"source_event_key": "issue_comment:210"},
     )
 
-    context = reviewer_bot.reconcile_module.build_deferred_comment_replay_context(
+    context = reconcile.build_deferred_comment_replay_context(
         payload,
         expected_event_name="issue_comment",
         live_comment_endpoint="issues/comments/210",
     )
 
-    assert isinstance(context, reviewer_bot.reconcile_module.DeferredCommentReplayContext)
+    assert isinstance(context, reconcile.DeferredCommentReplayContext)
     assert context.comment_id == 210
     assert context.pr_number == 42
     assert context.source_freshness_eligible is True
 
 
 def test_build_deferred_comment_replay_context_rejects_mismatched_source_event_key():
-    payload = reviewer_bot.reconcile_module.DeferredCommentPayload(
-        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+    payload = reconcile.DeferredCommentPayload(
+        identity=reconcile.DeferredArtifactIdentity(
             schema_version=2,
             source_workflow_name="Reviewer Bot PR Comment Observer",
             source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
@@ -113,16 +115,12 @@ def test_build_deferred_comment_replay_context_rejects_mismatched_source_event_k
     )
 
     with pytest.raises(RuntimeError, match="source_event_key mismatch"):
-        reviewer_bot.reconcile_module.build_deferred_comment_replay_context(
-            payload,
-            expected_event_name="issue_comment",
-            live_comment_endpoint="issues/comments/210",
-        )
+        reconcile.build_deferred_comment_replay_context(payload, expected_event_name="issue_comment", live_comment_endpoint="issues/comments/210")
 
 
 def test_build_deferred_review_replay_context_returns_typed_context():
-    payload = reviewer_bot.reconcile_module.DeferredReviewPayload(
-        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+    payload = reconcile.DeferredReviewPayload(
+        identity=reconcile.DeferredArtifactIdentity(
             schema_version=2,
             source_workflow_name="Reviewer Bot PR Review Submitted Observer",
             source_workflow_file=".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
@@ -141,20 +139,17 @@ def test_build_deferred_review_replay_context_returns_typed_context():
         raw_payload={"source_event_key": "pull_request_review:11"},
     )
 
-    context = reviewer_bot.reconcile_module.build_deferred_review_replay_context(
-        payload,
-        expected_event_action="submitted",
-    )
+    context = reconcile.build_deferred_review_replay_context(payload, expected_event_action="submitted")
 
-    assert isinstance(context, reviewer_bot.reconcile_module.DeferredReviewReplayContext)
+    assert isinstance(context, reconcile.DeferredReviewReplayContext)
     assert context.review_id == 11
     assert context.pr_number == 42
     assert context.actor_login == "alice"
 
 
 def test_build_deferred_review_replay_context_rejects_mismatched_source_event_key():
-    payload = reviewer_bot.reconcile_module.DeferredReviewPayload(
-        identity=reviewer_bot.reconcile_module.DeferredArtifactIdentity(
+    payload = reconcile.DeferredReviewPayload(
+        identity=reconcile.DeferredArtifactIdentity(
             schema_version=2,
             source_workflow_name="Reviewer Bot PR Review Submitted Observer",
             source_workflow_file=".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
@@ -174,10 +169,7 @@ def test_build_deferred_review_replay_context_rejects_mismatched_source_event_ke
     )
 
     with pytest.raises(RuntimeError, match="source_event_key mismatch"):
-        reviewer_bot.reconcile_module.build_deferred_review_replay_context(
-            payload,
-            expected_event_action="submitted",
-        )
+        reconcile.build_deferred_review_replay_context(payload, expected_event_action="submitted")
 
 
 def test_parse_deferred_context_payload_returns_typed_observer_noop_payload():
@@ -195,46 +187,26 @@ def test_parse_deferred_context_payload_returns_typed_observer_noop_payload():
         "pr_number": 42,
     }
 
-    parsed = reviewer_bot.reconcile_module.parse_deferred_context_payload(payload)
+    parsed = reconcile.parse_deferred_context_payload(payload)
 
-    assert isinstance(parsed, reviewer_bot.reconcile_module.ObserverNoopPayload)
+    assert isinstance(parsed, reconcile.ObserverNoopPayload)
     assert parsed.reason == "not a command"
     assert parsed.pr_number == 42
 
 
 def test_reconcile_active_review_entry_uses_explicit_head_repair_changed_field(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("IS_PULL_REQUEST", "true")
+    runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(changed=False, outcome="unchanged")
+    runtime.get_pull_request_reviews = lambda issue_number: []
+    monkeypatch.setattr(reconcile, "refresh_reviewer_review_from_live_preferred_review", lambda bot, issue_number, review_data, **kwargs: (False, None))
+    monkeypatch.setattr(reconcile, "_record_review_rebuild", lambda bot, state_obj, issue_number, review_data: False)
 
-    monkeypatch.setenv("IS_PULL_REQUEST", "true")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "maybe_record_head_observation_repair",
-        lambda issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
-            changed=False,
-            outcome="unchanged",
-        ),
-    )
-    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
-    monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "refresh_reviewer_review_from_live_preferred_review",
-        lambda bot, issue_number, review_data, **kwargs: (False, None),
-    )
-    monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "_record_review_rebuild",
-        lambda bot, state_obj, issue_number, review_data: False,
-    )
-
-    message, success, changed = reviewer_bot.reconcile_module.reconcile_active_review_entry(
-        reviewer_bot,
-        state,
-        42,
-        require_pull_request_context=True,
-    )
+    message, success, changed = reconcile.reconcile_active_review_entry(runtime, state, 42, require_pull_request_context=True)
 
     assert success is True
     assert changed is False
@@ -243,11 +215,11 @@ def test_reconcile_active_review_entry_uses_explicit_head_repair_changed_field(m
 
 def test_parse_deferred_context_payload_rejects_unsupported_payload():
     with pytest.raises(RuntimeError, match="Unsupported deferred workflow_run payload"):
-        reviewer_bot.reconcile_module.parse_deferred_context_payload({"schema_version": 2})
+        reconcile.parse_deferred_context_payload({"schema_version": 2})
 
 
 def test_validate_live_comment_replay_contract_reports_changed_for_command_ambiguity(monkeypatch):
-    review = reviewer_bot.ensure_review_entry(make_state(), 42, create=True)
+    review = review_state.ensure_review_entry(make_state(), 42, create=True)
     assert review is not None
     payload = {
         "comment_id": 201,
@@ -264,7 +236,7 @@ def test_validate_live_comment_replay_contract_reports_changed_for_command_ambig
         "source_artifact_name": "reviewer-bot-comment-context-603-attempt-1",
     }
     monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
+        reconcile,
         "classify_comment_payload",
         lambda bot, body: {
             "comment_class": "command_only",
@@ -276,8 +248,8 @@ def test_validate_live_comment_replay_contract_reports_changed_for_command_ambig
         },
     )
 
-    result = reviewer_bot.reconcile_module._validate_live_comment_replay_contract(
-        reviewer_bot,
+    result = reconcile._validate_live_comment_replay_contract(
+        FakeReviewerBotRuntime(monkeypatch),
         review,
         payload,
         "@guidelines-bot /claim",
@@ -290,23 +262,20 @@ def test_validate_live_comment_replay_contract_reports_changed_for_command_ambig
 
 
 def test_resolve_workflow_run_pr_number_fails_closed_when_pr_unavailable(monkeypatch):
-    monkeypatch.setenv("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "42")
-    monkeypatch.setenv("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "head-1")
-    monkeypatch.setenv("WORKFLOW_RUN_HEAD_SHA", "head-1")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api_request",
-        lambda method, endpoint, data=None, extra_headers=None, **kwargs: reviewer_bot.GitHubApiResult(
-            status_code=502,
-            payload={"message": "bad gateway"},
-            headers={},
-            text="bad gateway",
-            ok=False,
-            failure_kind="server_error",
-            retry_attempts=1,
-            transport_error=None,
-        ),
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "42")
+    runtime.set_config_value("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "head-1")
+    runtime.set_config_value("WORKFLOW_RUN_HEAD_SHA", "head-1")
+    runtime.github_api_request = lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
+        status_code=502,
+        payload={"message": "bad gateway"},
+        headers={},
+        text="bad gateway",
+        ok=False,
+        failure_kind="server_error",
+        retry_attempts=1,
+        transport_error=None,
     )
 
     with pytest.raises(RuntimeError, match="Failed to fetch pull request #42 during workflow_run reconcile"):
-        reviewer_bot.resolve_workflow_run_pr_number()
+        commands.resolve_workflow_run_pr_number(runtime)
