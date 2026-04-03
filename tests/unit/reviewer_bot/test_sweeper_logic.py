@@ -1,7 +1,8 @@
 import pytest
 
-from scripts import reviewer_bot
-from scripts.reviewer_bot_lib import sweeper
+from scripts.reviewer_bot_lib import review_state, sweeper
+from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+from tests.fixtures.github import RouteGitHubApi
 from tests.fixtures.reviewer_bot import make_state
 from tests.fixtures.reviewer_bot_sweeper_builders import (
     artifact_payload,
@@ -15,39 +16,59 @@ from tests.fixtures.reviewer_bot_sweeper_builders import (
 @pytest.fixture
 def freeze_sweeper_now(monkeypatch):
     def apply(timestamp: str) -> None:
-        monkeypatch.setattr(
-            sweeper,
-            "_now",
-            lambda: reviewer_bot.parse_github_timestamp(timestamp),
-        )
+        monkeypatch.setattr(sweeper, "_now", lambda: sweeper.parse_timestamp(timestamp))
 
     return apply
 
 
+def _runtime(monkeypatch):
+    return FakeReviewerBotRuntime(monkeypatch)
+
+
 def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_dismissals(monkeypatch, freeze_sweeper_now):
     freeze_sweeper_now("2026-03-25T12:30:00Z")
+    runtime = _runtime(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
-            "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
-            "issues/42/comments?per_page=100&page=1": [issue_comment_event(101, created_at="2026-03-25T10:00:00Z")],
-        }.get(endpoint),
+    routes = (
+        RouteGitHubApi()
+        .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "pulls/42", status_code=200, payload={"state": "open", "head": {"sha": "head-1"}})
+        .add_request(
+            "GET",
+            "issues/42/comments?per_page=100&page=1",
+            status_code=200,
+            payload=[issue_comment_event(101, created_at="2026-03-25T10:00:00Z")],
+        )
+        .add_request(
+            "GET",
+            "actions/workflows/.github%2Fworkflows%2Freviewer-bot-pr-review-submitted-observer.yml/runs?event=pull_request_review&per_page=100&page=1",
+            status_code=200,
+            payload={"workflow_runs": []},
+        )
+        .add_request(
+            "GET",
+            "actions/workflows/.github%2Fworkflows%2Freviewer-bot-pr-comment-observer.yml/runs?event=issue_comment&per_page=100&page=1",
+            status_code=200,
+            payload={"workflow_runs": []},
+        )
+        .add_request(
+            "GET",
+            "actions/workflows/.github%2Fworkflows%2Freviewer-bot-pr-review-dismissed-observer.yml/runs?event=pull_request_review&per_page=100&page=1",
+            status_code=200,
+            payload={"workflow_runs": []},
+        )
+        .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [
-            pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="APPROVED"),
-            pull_request_review_event(303, submitted_at="2026-03-25T09:00:00Z", updated_at="2026-03-25T12:00:00Z", state="DISMISSED"),
-        ],
-    )
+    runtime.stub_github(routes)
+    runtime.get_pull_request_reviews = lambda issue_number: [
+        pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="APPROVED"),
+        pull_request_review_event(303, submitted_at="2026-03-25T09:00:00Z", updated_at="2026-03-25T12:00:00Z", state="DISMISSED"),
+    ]
 
-    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
+    assert sweeper.sweep_deferred_gaps(runtime, state) is True
     gaps = state["active_reviews"]["42"]["deferred_gaps"]
     assert "issue_comment:101" in gaps
     assert "pull_request_review:202" in gaps
@@ -57,26 +78,39 @@ def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_di
 
 def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypatch, freeze_sweeper_now):
     freeze_sweeper_now("2026-03-25T12:30:00Z")
+    runtime = _runtime(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
+    routes = (
+        RouteGitHubApi()
+        .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "pulls/42", status_code=200, payload={"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "issues/42/comments?per_page=100&page=1", status_code=200, payload=[])
+        .add_request(
+            "GET",
+            "issues/42/comments?per_page=100&page=2",
+            status_code=200,
+            payload=[],
+        )
+        .add_request(
+            "GET",
+            "pulls/42/comments?per_page=100",
+            status_code=200,
+            payload=[review_comment_event(404, created_at="2026-03-25T10:30:00Z", login="dana")],
+        )
+        .add_request(
+            "GET",
+            "actions/workflows/.github%2Fworkflows%2Freviewer-bot-pr-review-comment-observer.yml/runs?event=pull_request_review_comment&per_page=100&page=1",
+            status_code=200,
+            payload={"workflow_runs": []},
+        )
+    )
+    runtime.stub_github(routes)
+    runtime.get_pull_request_reviews = lambda issue_number: []
 
-    def fake_github_api(method, endpoint, data=None):
-        if endpoint == "pulls/42":
-            return {"state": "open", "head": {"sha": "head-1"}}
-        if endpoint == "issues/42/comments?per_page=100&page=1":
-            return []
-        if endpoint == "pulls/42/comments?per_page=100":
-            return [review_comment_event(404, created_at="2026-03-25T10:30:00Z", login="dana")]
-        if endpoint.startswith("actions/workflows/"):
-            return {"workflow_runs": []}
-        return None
-
-    monkeypatch.setattr(reviewer_bot, "github_api", fake_github_api)
-    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
-
-    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
+    assert sweeper.sweep_deferred_gaps(runtime, state) is True
     gaps = state["active_reviews"]["42"]["deferred_gaps"]
     assert "pull_request_review_comment:404" in gaps
     assert gaps["pull_request_review_comment:404"]["source_workflow_file"] == ".github/workflows/reviewer-bot-pr-review-comment-observer.yml"
@@ -84,69 +118,80 @@ def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypa
 
 def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(monkeypatch, freeze_sweeper_now):
     freeze_sweeper_now("2026-03-17T12:30:00Z")
+    runtime = _runtime(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["reconciled_source_events"] = ["pull_request_review_dismissed:303"]
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
-            "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
-            "issues/42/comments?per_page=100&page=1": [],
-        }.get(endpoint),
+    routes = (
+        RouteGitHubApi()
+        .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "pulls/42", status_code=200, payload={"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "issues/42/comments?per_page=100&page=1", status_code=200, payload=[])
+        .add_request("GET", "issues/42/comments?per_page=100&page=2", status_code=200, payload=[])
+        .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [pull_request_review_event(303, submitted_at="2026-03-17T09:00:00Z", updated_at="2026-03-17T12:00:00Z", state="DISMISSED")],
-    )
+    runtime.stub_github(routes)
+    runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(303, submitted_at="2026-03-17T09:00:00Z", updated_at="2026-03-17T12:00:00Z", state="DISMISSED")]
 
-    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is False
+    assert sweeper.sweep_deferred_gaps(runtime, state) is False
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
 def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch, freeze_sweeper_now):
     freeze_sweeper_now("2026-03-17T12:30:00Z")
+    runtime = _runtime(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["reconciled_source_events"] = ["issue_comment:101", "pull_request_review:202"]
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {
-            "pulls/42": {"state": "open", "head": {"sha": "head-1"}},
-            "issues/42/comments?per_page=100&page=1": [issue_comment_event(101, created_at="2026-03-17T10:00:00Z")],
-        }.get(endpoint),
+    routes = (
+        RouteGitHubApi()
+        .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "pulls/42", status_code=200, payload={"state": "open", "head": {"sha": "head-1"}})
+        .add_request(
+            "GET",
+            "issues/42/comments?per_page=100&page=1",
+            status_code=200,
+            payload=[issue_comment_event(101, created_at="2026-03-17T10:00:00Z")],
+        )
+        .add_request("GET", "issues/42/comments?per_page=100&page=2", status_code=200, payload=[])
+        .add_request(
+            "GET",
+            "actions/workflows/.github%2Fworkflows%2Freviewer-bot-pr-review-submitted-observer.yml/runs?event=pull_request_review&per_page=100&page=1",
+            status_code=200,
+            payload={"workflow_runs": []},
+        )
+        .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-17T11:00:00Z", state="APPROVED")],
-    )
+    runtime.stub_github(routes)
+    runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-17T11:00:00Z", state="APPROVED")]
 
-    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is False
+    assert sweeper.sweep_deferred_gaps(runtime, state) is False
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
 
 
 def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(monkeypatch, freeze_sweeper_now):
     freeze_sweeper_now("2026-03-25T12:30:00Z")
+    runtime = _runtime(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: [
+    routes = RouteGitHubApi().add_request(
+        "GET",
+        "issues/42/comments?per_page=100&page=1",
+        status_code=200,
+        payload=[
             issue_comment_event(100, created_at="2026-03-25T10:00:00Z", login="github-actions[bot]", user_type="Bot"),
             issue_comment_event(101, created_at="2026-03-25T11:00:00Z", login="alice"),
         ],
     )
+    routes.add_request("GET", "issues/42/comments?per_page=100&page=2", status_code=200, payload=[])
+    runtime.stub_github(routes)
 
-    discovered, complete = sweeper._discover_visible_comment_events(reviewer_bot, 42, review)
+    discovered, complete = sweeper._discover_visible_comment_events(runtime, 42, review)
 
     assert complete is True
     assert [item["source_event_key"] for item in discovered] == ["issue_comment:101"]
@@ -154,28 +199,33 @@ def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(m
 
 def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_without_artifact(monkeypatch, freeze_sweeper_now):
     freeze_sweeper_now("2026-03-25T12:30:00Z")
+    runtime = _runtime(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
     review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
     review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
     review["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {"state": "open", "head": {"sha": "head-1"}}
-        if endpoint == "pulls/42"
-        else {"workflow_runs": []},
+    routes = (
+        RouteGitHubApi()
+        .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "pulls/42", status_code=200, payload={"state": "open", "head": {"sha": "head-1"}})
+        .add_request(
+            "GET",
+            "actions/workflows/.github%2Fworkflows%2Freviewer-bot-pr-review-submitted-observer.yml/runs?event=pull_request_review&per_page=100&page=1",
+            status_code=200,
+            payload={"workflow_runs": []},
+        )
+        .add_request("GET", "issues/42/comments?per_page=100&page=1", status_code=200, payload=[])
+        .add_request("GET", "pulls/42/reviews?per_page=100&page=1", status_code=200, payload=[])
+        .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")],
-    )
+    runtime.stub_github(routes)
+    runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")]
 
-    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
+    assert sweeper.sweep_deferred_gaps(runtime, state) is True
     assert review["last_reviewer_activity"] == "2026-03-25T11:00:00Z"
     assert review["transition_warning_sent"] is None
     assert review["transition_notice_sent_at"] is None
@@ -185,8 +235,9 @@ def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_witho
 
 def test_visible_review_repair_does_not_clear_transition_warning_for_stale_replayed_review(monkeypatch, freeze_sweeper_now):
     freeze_sweeper_now("2026-03-25T12:30:00Z")
+    runtime = _runtime(monkeypatch)
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
@@ -194,49 +245,42 @@ def test_visible_review_repair_does_not_clear_transition_warning_for_stale_repla
     review["transition_warning_sent"] = "2026-04-01T12:12:04Z"
     review["transition_notice_sent_at"] = "2026-04-15T12:12:04Z"
     review["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
-    monkeypatch.setattr(
-        reviewer_bot,
-        "github_api",
-        lambda method, endpoint, data=None: {"state": "open", "head": {"sha": "head-1"}}
-        if endpoint == "pulls/42"
-        else {"workflow_runs": []},
+    routes = (
+        RouteGitHubApi()
+        .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
+        .add_request("GET", "pulls/42", status_code=200, payload={"state": "open", "head": {"sha": "head-1"}})
+        .add_request(
+            "GET",
+            "actions/workflows/.github%2Fworkflows%2Freviewer-bot-pr-review-submitted-observer.yml/runs?event=pull_request_review&per_page=100&page=1",
+            status_code=200,
+            payload={"workflow_runs": []},
+        )
+        .add_request("GET", "issues/42/comments?per_page=100&page=1", status_code=200, payload=[])
+        .add_request("GET", "pulls/42/reviews?per_page=100&page=1", status_code=200, payload=[])
+        .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    monkeypatch.setattr(
-        reviewer_bot,
-        "get_pull_request_reviews",
-        lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")],
-    )
+    runtime.stub_github(routes)
+    runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")]
 
-    assert sweeper.sweep_deferred_gaps(reviewer_bot, state) is True
+    assert sweeper.sweep_deferred_gaps(runtime, state) is True
     assert review["last_reviewer_activity"] == "2026-03-25T11:00:00Z"
     assert review["transition_warning_sent"] == "2026-04-01T12:12:04Z"
     assert review["transition_notice_sent_at"] == "2026-04-15T12:12:04Z"
 
 
 def test_repair_visible_review_gap_returns_true_for_bookkeeping_only_mutations(monkeypatch):
-    review = reviewer_bot.ensure_review_entry(make_state(), 42, create=True)
+    runtime = _runtime(monkeypatch)
+    review = review_state.ensure_review_entry(make_state(), 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
     review["deferred_gaps"]["pull_request_review:303"] = {"reason": "artifact_missing"}
-    monkeypatch.setattr(
-        reviewer_bot.sweeper_module,
-        "accept_reviewer_review_from_live_review",
-        lambda review_data, live_review, actor=None: False,
-    )
-    monkeypatch.setattr(
-        reviewer_bot.sweeper_module,
-        "refresh_reviewer_review_from_live_preferred_review",
-        lambda bot, issue_number, review_data, actor=None: (False, None),
-    )
-    monkeypatch.setattr(
-        reviewer_bot.sweeper_module,
-        "rebuild_pr_approval_state",
-        lambda bot, issue_number, review_data: (None, None),
-    )
+    monkeypatch.setattr(sweeper, "accept_reviewer_review_from_live_review", lambda review_data, live_review, actor=None: False)
+    monkeypatch.setattr(sweeper, "refresh_reviewer_review_from_live_preferred_review", lambda bot, issue_number, review_data, actor=None: (False, None))
+    monkeypatch.setattr(sweeper, "rebuild_pr_approval_state", lambda bot, issue_number, review_data: (None, None))
 
     changed = sweeper._repair_visible_review_gap(
-        reviewer_bot,
+        runtime,
         review,
         42,
         "pull_request_review:303",
@@ -250,20 +294,8 @@ def test_repair_visible_review_gap_returns_true_for_bookkeeping_only_mutations(m
 
 def test_observer_run_reason_mapping_and_near_miss_signature():
     signature = {"status": "waiting", "conclusion": None, "name": "approval_pending"}
-    assert (
-        sweeper.observer_run_reason_from_details(
-            {"status": "waiting", "conclusion": None, "name": "approval_pending"},
-            signature,
-        )
-        == "awaiting_observer_approval"
-    )
-    assert (
-        sweeper.observer_run_reason_from_details(
-            {"status": "waiting", "conclusion": None, "name": "almost"},
-            signature,
-        )
-        == "observer_state_unknown"
-    )
+    assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"
+    assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "almost"}, signature) == "observer_state_unknown"
 
 
 def test_negative_missing_run_requires_full_scan_and_recheck():
@@ -364,33 +396,16 @@ def test_evaluate_gap_state_completed_success_with_expired_artifact_marks_artifa
 
 
 def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention():
-    expired = {
-        "artifact_seen_at": "2026-03-10T00:00:00Z",
-        "run_created_at": "2026-03-10T00:00:00Z",
-    }
+    expired = {"artifact_seen_at": "2026-03-10T00:00:00Z", "run_created_at": "2026-03-10T00:00:00Z"}
     assert sweeper.classify_artifact_gap_reason(expired) == "artifact_expired"
-    missing = {
-        "artifact_inspection_complete": True,
-        "run_created_at": "2026-03-17T00:00:00Z",
-    }
+    missing = {"artifact_inspection_complete": True, "run_created_at": "2026-03-17T00:00:00Z"}
     assert sweeper.classify_artifact_gap_reason(missing) == "artifact_missing"
 
 
 def test_sweeper_fetches_single_candidate_run_detail_without_exact_artifact_match(monkeypatch):
-    run_correlation = {
-        "candidate_run_ids": [123],
-        "correlated_run": None,
-        "correlated_run_found": False,
-    }
-    monkeypatch.setattr(
-        sweeper,
-        "_fetch_run_detail",
-        lambda bot, run_id: {"id": run_id, "status": "completed", "conclusion": "action_required"},
-    )
-    detail = sweeper._maybe_fetch_single_candidate_run_detail(
-        reviewer_bot,
-        run_correlation,
-        {"status": "no_exact_artifact_match"},
-    )
+    runtime = _runtime(monkeypatch)
+    run_correlation = {"candidate_run_ids": [123], "correlated_run": None, "correlated_run_found": False}
+    monkeypatch.setattr(sweeper, "_fetch_run_detail", lambda bot, run_id: {"id": run_id, "status": "completed", "conclusion": "action_required"})
+    detail = sweeper._maybe_fetch_single_candidate_run_detail(runtime, run_correlation, {"status": "no_exact_artifact_match"})
     assert detail == {"id": 123, "status": "completed", "conclusion": "action_required"}
     assert run_correlation["correlated_run"] == 123

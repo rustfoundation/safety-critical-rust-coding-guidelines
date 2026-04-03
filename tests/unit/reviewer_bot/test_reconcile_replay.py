@@ -1,36 +1,26 @@
-from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import lifecycle, reconcile, review_state
+from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
 
 
 def test_reconcile_active_review_entry_uses_explicit_head_repair_changed_field(monkeypatch):
     state = make_state()
-    review = reviewer_bot.ensure_review_entry(state, 42, create=True)
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
 
-    monkeypatch.setenv("IS_PULL_REQUEST", "true")
-    monkeypatch.setattr(
-        reviewer_bot,
-        "maybe_record_head_observation_repair",
-        lambda issue_number, review_data: reviewer_bot.lifecycle_module.HeadObservationRepairResult(
-            changed=False,
-            outcome="unchanged",
-        ),
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("IS_PULL_REQUEST", "true")
+    runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(
+        changed=False,
+        outcome="unchanged",
     )
-    monkeypatch.setattr(reviewer_bot, "get_pull_request_reviews", lambda issue_number: [])
-    monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "refresh_reviewer_review_from_live_preferred_review",
-        lambda bot, issue_number, review_data, **kwargs: (False, None),
-    )
-    monkeypatch.setattr(
-        reviewer_bot.reconcile_module,
-        "_record_review_rebuild",
-        lambda bot, state_obj, issue_number, review_data: False,
-    )
+    runtime.get_pull_request_reviews = lambda issue_number: []
+    monkeypatch.setattr(reconcile, "refresh_reviewer_review_from_live_preferred_review", lambda bot, issue_number, review_data, **kwargs: (False, None))
+    monkeypatch.setattr(reconcile, "_record_review_rebuild", lambda bot, state_obj, issue_number, review_data: False)
 
-    message, success, changed = reviewer_bot.reconcile_module.reconcile_active_review_entry(
-        reviewer_bot,
+    message, success, changed = reconcile.reconcile_active_review_entry(
+        runtime,
         state,
         42,
         require_pull_request_context=True,
