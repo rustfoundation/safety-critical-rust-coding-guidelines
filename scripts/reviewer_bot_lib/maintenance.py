@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
-
 import yaml
 
 from .context import PrivilegedCommandRequest
+from .event_inputs import build_manual_dispatch_request
 from .lifecycle import maybe_record_head_observation_repair
 from .overdue import (
     backfill_transition_notice_if_present,
@@ -107,7 +106,8 @@ def collect_status_projection_repair_items(bot, state: dict) -> list[int]:
 
 
 def handle_manual_dispatch(bot, state: dict) -> bool:
-    action = os.environ.get("MANUAL_ACTION", "")
+    request = build_manual_dispatch_request(bot)
+    action = request.action
     if action == "show-state":
         print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
         return False
@@ -121,10 +121,9 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 "Reviewer board preview preflight failed: " + "; ".join(preflight.errors)
             )
 
-        issue_number_raw = os.environ.get("ISSUE_NUMBER", "").strip()
         issue_numbers: list[int] = []
-        if issue_number_raw:
-            issue_numbers = [int(issue_number_raw)]
+        if request.issue_number:
+            issue_numbers = [request.issue_number]
         else:
             active_reviews = state.get("active_reviews")
             if isinstance(active_reviews, dict):
@@ -160,7 +159,7 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
     if action == "check-overdue":
         return bot.handle_scheduled_check(state)
     if action == "execute-pending-privileged-command":
-        source_event_key = os.environ.get("PRIVILEGED_SOURCE_EVENT_KEY", "").strip()
+        source_event_key = request.privileged_source_event_key
         if not source_event_key:
             raise RuntimeError("Missing PRIVILEGED_SOURCE_EVENT_KEY for privileged command execution")
         for issue_key, review_data in (state.get("active_reviews") or {}).items():

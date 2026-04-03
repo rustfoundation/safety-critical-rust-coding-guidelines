@@ -11,8 +11,12 @@ from .context import (
     AssignmentRequest,
     CommentEventRequest,
     EventContext,
+    IssueLifecycleRequest,
+    LabelEventRequest,
+    ManualDispatchRequest,
     PrCommentTrustContext,
     PrivilegedCommandRequest,
+    PullRequestSyncRequest,
 )
 
 
@@ -143,4 +147,45 @@ def build_privileged_command_request(*, issue_number: int, actor: str = "", comm
         workflow_run_reconcile_pr_number=int(workflow_run_reconcile_pr_number) if workflow_run_reconcile_pr_number else None,
         workflow_run_reconcile_head_sha=os.environ.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip(),
         workflow_run_head_sha=os.environ.get("WORKFLOW_RUN_HEAD_SHA", "").strip(),
+    )
+
+
+def build_manual_dispatch_request(bot: AppEventContextRuntime) -> ManualDispatchRequest:
+    return ManualDispatchRequest(
+        action=bot.get_config_value("MANUAL_ACTION").strip(),
+        issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")),
+        privileged_source_event_key=bot.get_config_value("PRIVILEGED_SOURCE_EVENT_KEY").strip(),
+    )
+
+
+def build_issue_lifecycle_request(bot: AppEventContextRuntime) -> IssueLifecycleRequest:
+    return IssueLifecycleRequest(
+        issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0,
+        is_pull_request=bool(_parse_optional_bool(bot.get_config_value("IS_PULL_REQUEST"))),
+        issue_labels=_parse_labels(bot.get_config_value("ISSUE_LABELS")),
+        issue_author=bot.get_config_value("ISSUE_AUTHOR").strip(),
+        sender_login=bot.get_config_value("SENDER_LOGIN").strip(),
+        updated_at=bot.get_config_value("ISSUE_UPDATED_AT").strip(),
+        issue_title=bot.get_config_value("ISSUE_TITLE"),
+        issue_body=bot.get_config_value("ISSUE_BODY"),
+        previous_title=bot.get_config_value("ISSUE_CHANGES_TITLE_FROM"),
+        previous_body=bot.get_config_value("ISSUE_CHANGES_BODY_FROM"),
+        pr_head_sha=bot.get_config_value("PR_HEAD_SHA").strip(),
+        event_created_at=bot.get_config_value("EVENT_CREATED_AT").strip(),
+    )
+
+
+def build_label_event_request(bot: AppEventContextRuntime) -> LabelEventRequest:
+    return LabelEventRequest(
+        issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0,
+        is_pull_request=bool(_parse_optional_bool(bot.get_config_value("IS_PULL_REQUEST"))),
+        label_name=bot.get_config_value("LABEL_NAME"),
+    )
+
+
+def build_pull_request_sync_request(bot: AppEventContextRuntime) -> PullRequestSyncRequest:
+    return PullRequestSyncRequest(
+        issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0,
+        head_sha=bot.get_config_value("PR_HEAD_SHA").strip(),
+        event_created_at=bot.get_config_value("EVENT_CREATED_AT").strip(),
     )

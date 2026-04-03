@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
-import os
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -37,10 +35,6 @@ def _now_iso() -> str:
 
 def _runtime_epoch(state: dict) -> str:
     return str(state.get("freshness_runtime_epoch", "")).strip() or "legacy_v14"
-
-
-def _is_pr_event() -> bool:
-    return os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
 
 
 def _normalize_comment_body(body: str) -> str:
@@ -77,7 +71,10 @@ _If you believe this is in error or have extenuating circumstances, please reach
 
 def handle_issue_or_pr_opened(bot, state: dict) -> bool:
     bot.assert_lock_held("handle_issue_or_pr_opened")
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    from .event_inputs import build_issue_lifecycle_request
+
+    request = build_issue_lifecycle_request(bot)
+    issue_number = request.issue_number
     if not issue_number:
         return False
     bot.collect_touched_item(issue_number)
@@ -94,24 +91,20 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
         raise RuntimeError(f"Unable to determine assignees for #{issue_number}")
     if current_assignees:
         return False
-    labels_json = os.environ.get("ISSUE_LABELS", "[]")
-    try:
-        labels = json.loads(labels_json)
-    except json.JSONDecodeError:
-        labels = []
+    labels = list(request.issue_labels)
     if not any(label in bot.REVIEW_LABELS for label in labels):
         return False
-    issue_author = os.environ.get("ISSUE_AUTHOR", "")
+    issue_author = request.issue_author
     reviewer = bot.get_next_reviewer(state, skip_usernames={issue_author} if issue_author else set())
     if not reviewer:
         bot.post_comment(issue_number, f"⚠️ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue.")
         return False
-    is_pr = _is_pr_event()
+    is_pr = request.is_pull_request
     assignment_attempt = bot.request_reviewer_assignment(issue_number, reviewer)
     set_current_reviewer(state, issue_number, reviewer)
     review_data = ensure_review_entry(state, issue_number, create=True)
     if is_pr and isinstance(review_data, dict):
-        head_sha = os.environ.get("PR_HEAD_SHA", "").strip()
+        head_sha = request.pr_head_sha
         if head_sha:
             review_data["active_head_sha"] = head_sha
     bot.record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
@@ -128,24 +121,27 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
 
 def handle_issue_edited_event(bot, state: dict) -> bool:
     bot.assert_lock_held("handle_issue_edited_event")
-    if _is_pr_event():
+    from .event_inputs import build_issue_lifecycle_request
+
+    request = build_issue_lifecycle_request(bot)
+    if request.is_pull_request:
         return False
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    issue_number = request.issue_number
     if not issue_number:
         return False
     bot.collect_touched_item(issue_number)
-    issue_author = os.environ.get("ISSUE_AUTHOR", "").strip()
-    editor = os.environ.get("SENDER_LOGIN", "").strip() or issue_author
+    issue_author = request.issue_author
+    editor = request.sender_login or issue_author
     if not issue_author or editor.lower() != issue_author.lower():
         return False
     review_data = ensure_review_entry(state, issue_number)
     if review_data is None:
         return False
-    updated_at = os.environ.get("ISSUE_UPDATED_AT", "").strip() or _now_iso()
-    current_title = os.environ.get("ISSUE_TITLE", "")
-    current_body = os.environ.get("ISSUE_BODY", "")
-    previous_title = os.environ.get("ISSUE_CHANGES_TITLE_FROM", "")
-    previous_body = os.environ.get("ISSUE_CHANGES_BODY_FROM", "")
+    updated_at = request.updated_at or _now_iso()
+    current_title = request.issue_title
+    current_body = request.issue_body
+    previous_title = request.previous_title
+    previous_body = request.previous_body
     title_changed = _normalize_comment_body(current_title) != _normalize_comment_body(previous_title)
     body_changed = _normalize_comment_body(current_body) != _normalize_comment_body(previous_body)
     if not title_changed and not body_changed:
@@ -168,11 +164,14 @@ def handle_issue_edited_event(bot, state: dict) -> bool:
 
 def handle_labeled_event(bot, state: dict) -> bool:
     bot.assert_lock_held("handle_labeled_event")
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    from .event_inputs import build_label_event_request
+
+    request = build_label_event_request(bot)
+    issue_number = request.issue_number
     if not issue_number:
         return False
-    label_name = os.environ.get("LABEL_NAME", "")
-    is_pr = _is_pr_event()
+    label_name = request.label_name
+    is_pr = request.is_pull_request
     bot.collect_touched_item(issue_number)
     if label_name == "sign-off: create pr":
         if is_pr:
@@ -187,16 +186,19 @@ def handle_labeled_event(bot, state: dict) -> bool:
 
 def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     bot.assert_lock_held("handle_pull_request_target_synchronize")
+    from .event_inputs import build_pull_request_sync_request
+
     if _runtime_epoch(state) != "freshness_v15":
         print("V18 synchronize repair safe-noop before epoch flip")
         return False
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    request = build_pull_request_sync_request(bot)
+    issue_number = request.issue_number
     if not issue_number:
         return False
     review_data = ensure_review_entry(state, issue_number)
     if review_data is None or not review_data.get("current_reviewer"):
         return False
-    head_sha = os.environ.get("PR_HEAD_SHA", "").strip()
+    head_sha = request.head_sha
     if not head_sha:
         raise RuntimeError("Missing PR_HEAD_SHA for synchronize event")
     bot.collect_touched_item(issue_number)
@@ -207,7 +209,7 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     previous_review_completed_by = review_data.get("review_completed_by")
     previous_review_completion_source = review_data.get("review_completion_source")
     review_data["active_head_sha"] = head_sha
-    timestamp = os.environ.get("EVENT_CREATED_AT", "") or _now_iso()
+    timestamp = request.event_created_at or _now_iso()
     changed = accept_channel_event(
         review_data,
         "contributor_revision",
@@ -309,7 +311,10 @@ def maybe_record_head_observation_repair(bot, issue_number: int, review_data: di
 
 def handle_closed_event(bot, state: dict) -> bool:
     bot.assert_lock_held("handle_closed_event")
-    issue_number = int(os.environ.get("ISSUE_NUMBER", 0))
+    from .event_inputs import build_issue_lifecycle_request
+
+    request = build_issue_lifecycle_request(bot)
+    issue_number = request.issue_number
     if not issue_number:
         return False
     bot.collect_touched_item(issue_number)

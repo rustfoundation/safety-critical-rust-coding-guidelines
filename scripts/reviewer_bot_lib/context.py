@@ -96,6 +96,43 @@ class PrivilegedCommandRequest:
     workflow_run_head_sha: str = ""
 
 
+@dataclass(frozen=True)
+class ManualDispatchRequest:
+    action: str = ""
+    issue_number: int | None = None
+    privileged_source_event_key: str = ""
+
+
+@dataclass(frozen=True)
+class IssueLifecycleRequest:
+    issue_number: int = 0
+    is_pull_request: bool = False
+    issue_labels: tuple[str, ...] = ()
+    issue_author: str = ""
+    sender_login: str = ""
+    updated_at: str = ""
+    issue_title: str = ""
+    issue_body: str = ""
+    previous_title: str = ""
+    previous_body: str = ""
+    pr_head_sha: str = ""
+    event_created_at: str = ""
+
+
+@dataclass(frozen=True)
+class LabelEventRequest:
+    issue_number: int = 0
+    is_pull_request: bool = False
+    label_name: str = ""
+
+
+@dataclass(frozen=True)
+class PullRequestSyncRequest:
+    issue_number: int = 0
+    head_sha: str = ""
+    event_created_at: str = ""
+
+
 @runtime_checkable
 class AppEventContextRuntime(Protocol):
     EVENT_INTENT_MUTATING: str
