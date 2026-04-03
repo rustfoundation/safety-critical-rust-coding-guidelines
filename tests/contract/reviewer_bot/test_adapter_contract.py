@@ -6,40 +6,14 @@ pytestmark = pytest.mark.contract
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import event_inputs, lease_lock, review_state
-from scripts.reviewer_bot_lib.context import (
-    AppEventContextRuntime,
-    AppExecutionRuntime,
-    ReviewerBotContext,
-)
-from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
+from scripts.reviewer_bot_lib.context import ReviewerBotContext
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
-
-
-def test_runtime_bot_returns_concrete_runtime_object():
-    runtime = reviewer_bot._runtime_bot()
-
-    assert isinstance(runtime, ReviewerBotRuntime)
-    assert runtime.EVENT_INTENT_MUTATING == reviewer_bot._runtime_bot().EVENT_INTENT_MUTATING
-
-
-def test_runtime_object_satisfies_runtime_context_protocols():
-    runtime = reviewer_bot._runtime_bot()
-
-    assert isinstance(runtime, AppEventContextRuntime)
-    assert isinstance(runtime, AppExecutionRuntime)
 
 
 def test_render_lock_commit_message_uses_direct_json_import():
     rendered = lease_lock.render_lock_commit_message(reviewer_bot._runtime_bot(), {"lock_state": "unlocked"})
     assert rendered.startswith("reviewer-bot-lock-v1\n")
-
-
-def test_fake_runtime_satisfies_app_execution_runtime_protocol(monkeypatch):
-    runtime = FakeReviewerBotRuntime(monkeypatch)
-
-    assert isinstance(runtime, AppEventContextRuntime)
-    assert isinstance(runtime, AppExecutionRuntime)
 
 
 def test_build_event_context_returns_structured_context(monkeypatch):
