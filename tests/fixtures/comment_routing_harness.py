@@ -4,6 +4,10 @@ from scripts.reviewer_bot_lib import comment_routing, event_inputs
 from scripts.reviewer_bot_lib.context import CommentEventRequest, PrCommentTrustContext
 
 from .fake_runtime import FakeReviewerBotRuntime
+from .reviewer_bot_builders import (
+    build_comment_event_request,
+    build_pr_comment_trust_context,
+)
 from .reviewer_bot_env import set_env_values
 from .reviewer_bot_fakes import RouteGitHubApi
 from .reviewer_bot_recorders import record_comment_side_effects
@@ -52,7 +56,7 @@ class CommentRoutingHarness:
         comment_source_event_key: str = "",
         comment_user_type: str = "User",
     ) -> CommentEventRequest:
-        return CommentEventRequest(
+        return build_comment_event_request(
             issue_number=issue_number,
             is_pull_request=is_pull_request,
             issue_state=issue_state,
@@ -63,6 +67,9 @@ class CommentRoutingHarness:
             comment_created_at=comment_created_at,
             comment_source_event_key=comment_source_event_key,
             comment_user_type=comment_user_type,
+            comment_sender_type="",
+            comment_installation_id="",
+            comment_performed_via_github_app=False,
         )
 
     def trust_context(
@@ -75,7 +82,7 @@ class CommentRoutingHarness:
         github_run_id: int = 0,
         github_run_attempt: int = 0,
     ) -> PrCommentTrustContext:
-        return PrCommentTrustContext(
+        return build_pr_comment_trust_context(
             github_repository=github_repository,
             comment_author_association=comment_author_association,
             current_workflow_file=current_workflow_file,

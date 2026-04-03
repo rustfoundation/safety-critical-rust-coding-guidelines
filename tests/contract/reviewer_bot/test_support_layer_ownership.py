@@ -24,6 +24,15 @@ def test_support_layer_has_owned_env_and_recorder_modules():
     assert reviewer_bot_recorders is not None
 
 
+def test_support_layer_has_owned_typed_builder_home():
+    builders_text = _read("tests/fixtures/reviewer_bot_builders.py")
+
+    assert "def build_assignment_request(" in builders_text
+    assert "def build_privileged_command_request(" in builders_text
+    assert "def build_comment_event_request(" in builders_text
+    assert "def build_pr_comment_trust_context(" in builders_text
+
+
 def test_transport_fake_authority_is_owned_by_reviewer_bot_fakes():
     assert reviewer_bot_fakes.RouteGitHubApi is not None
     assert reviewer_bot_fakes.github_result is not None

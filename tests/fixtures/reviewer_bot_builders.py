@@ -1,4 +1,108 @@
 from scripts.reviewer_bot_lib import review_state
+from scripts.reviewer_bot_lib.context import (
+    AssignmentRequest,
+    CommentEventRequest,
+    PrCommentTrustContext,
+    PrivilegedCommandRequest,
+)
+
+
+def build_assignment_request(
+    *,
+    issue_number: int,
+    issue_author: str = "",
+    is_pull_request: bool = False,
+    issue_labels: tuple[str, ...] = (),
+    repo_owner: str = "",
+    repo_name: str = "",
+) -> AssignmentRequest:
+    return AssignmentRequest(
+        issue_number=issue_number,
+        issue_author=issue_author,
+        is_pull_request=is_pull_request,
+        issue_labels=issue_labels,
+        repo_owner=repo_owner,
+        repo_name=repo_name,
+    )
+
+
+def build_privileged_command_request(
+    *,
+    issue_number: int,
+    actor: str = "",
+    command_name: str = "",
+    is_pull_request: bool = False,
+    issue_labels: tuple[str, ...] = (),
+    target_repo_root: str = "",
+    workflow_run_reconcile_pr_number: int | None = None,
+    workflow_run_reconcile_head_sha: str = "",
+    workflow_run_head_sha: str = "",
+) -> PrivilegedCommandRequest:
+    return PrivilegedCommandRequest(
+        issue_number=issue_number,
+        actor=actor,
+        command_name=command_name,
+        is_pull_request=is_pull_request,
+        issue_labels=issue_labels,
+        target_repo_root=target_repo_root,
+        workflow_run_reconcile_pr_number=workflow_run_reconcile_pr_number,
+        workflow_run_reconcile_head_sha=workflow_run_reconcile_head_sha,
+        workflow_run_head_sha=workflow_run_head_sha,
+    )
+
+
+def build_comment_event_request(
+    *,
+    issue_number: int,
+    is_pull_request: bool,
+    issue_state: str = "",
+    issue_author: str = "",
+    comment_id: int = 0,
+    comment_author: str = "",
+    comment_author_id: int = 0,
+    comment_body: str = "",
+    comment_created_at: str = "",
+    comment_source_event_key: str = "",
+    comment_user_type: str = "",
+    comment_sender_type: str = "",
+    comment_installation_id: str = "",
+    comment_performed_via_github_app: bool = False,
+) -> CommentEventRequest:
+    return CommentEventRequest(
+        issue_number=issue_number,
+        is_pull_request=is_pull_request,
+        issue_state=issue_state,
+        issue_author=issue_author,
+        comment_id=comment_id,
+        comment_author=comment_author,
+        comment_author_id=comment_author_id,
+        comment_body=comment_body,
+        comment_created_at=comment_created_at,
+        comment_source_event_key=comment_source_event_key,
+        comment_user_type=comment_user_type,
+        comment_sender_type=comment_sender_type,
+        comment_installation_id=comment_installation_id,
+        comment_performed_via_github_app=comment_performed_via_github_app,
+    )
+
+
+def build_pr_comment_trust_context(
+    *,
+    github_repository: str = "",
+    comment_author_association: str = "",
+    current_workflow_file: str = "",
+    github_ref: str = "",
+    github_run_id: int = 0,
+    github_run_attempt: int = 0,
+) -> PrCommentTrustContext:
+    return PrCommentTrustContext(
+        github_repository=github_repository,
+        comment_author_association=comment_author_association,
+        current_workflow_file=current_workflow_file,
+        github_ref=github_ref,
+        github_run_id=github_run_id,
+        github_run_attempt=github_run_attempt,
+    )
 
 
 def make_tracked_review_state(
