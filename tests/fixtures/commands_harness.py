@@ -128,15 +128,7 @@ class CommandHarness:
         return runner
 
     def assignment_request(self, *, issue_number: int):
-        labels = tuple(event_inputs.parse_issue_labels(self.runtime))
-        return build_assignment_request(
-            issue_number=issue_number,
-            issue_author=self.config.get("ISSUE_AUTHOR", ""),
-            is_pull_request=self.config.get("IS_PULL_REQUEST", "false").lower() == "true",
-            issue_labels=labels,
-            repo_owner=self.config.get("REPO_OWNER", ""),
-            repo_name=self.config.get("REPO_NAME", ""),
-        )
+        return event_inputs.build_assignment_request(self.runtime, issue_number=issue_number)
 
     def typed_assignment_request(
         self,
@@ -158,21 +150,11 @@ class CommandHarness:
         )
 
     def privileged_request(self, *, issue_number: int, actor: str = "", command_name: str = ""):
-        labels = tuple(event_inputs.parse_issue_labels(self.runtime))
-        return build_privileged_command_request(
+        return event_inputs.build_privileged_command_request(
+            self.runtime,
             issue_number=issue_number,
             actor=actor,
             command_name=command_name,
-            is_pull_request=self.config.get("IS_PULL_REQUEST", "false").lower() == "true",
-            issue_labels=labels,
-            target_repo_root=self.config.get("REVIEWER_BOT_TARGET_REPO_ROOT", ""),
-            workflow_run_reconcile_pr_number=(
-                int(self.config.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "0") or 0)
-                if self.config.get("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
-                else None
-            ),
-            workflow_run_reconcile_head_sha=self.config.get("WORKFLOW_RUN_RECONCILE_HEAD_SHA", ""),
-            workflow_run_head_sha=self.config.get("WORKFLOW_RUN_HEAD_SHA", ""),
         )
 
     def typed_privileged_request(
