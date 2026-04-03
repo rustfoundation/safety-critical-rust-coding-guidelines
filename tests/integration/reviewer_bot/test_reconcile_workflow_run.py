@@ -417,7 +417,12 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
         }
     )
     command_calls = []
-    harness.stub_apply_comment_command(func=lambda *args, **kwargs: command_calls.append("called") or True)
+
+    def record_command_call(*args, **kwargs):
+        command_calls.append("called")
+        return True
+
+    harness.stub_apply_comment_command(func=record_command_call)
 
     assert harness.run(state) is True
     assert command_calls == []
@@ -494,8 +499,9 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
     )
     harness.runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
     claim_contexts = []
-    harness.stub_apply_comment_command(
-        func=lambda bot, state_obj, request, classified, classify_issue_comment_actor=None: claim_contexts.append(
+
+    def apply_claim_command(bot, state_obj, request, classified, classify_issue_comment_actor=None):
+        claim_contexts.append(
             {
                 "issue_number": request.issue_number,
                 "username": request.comment_author,
@@ -503,9 +509,10 @@ def test_deferred_comment_reconcile_uses_pr_assignment_semantics_for_claim(monke
                 "issue_author": request.issue_author,
             }
         )
-        or state_obj["active_reviews"][str(request.issue_number)].__setitem__("current_reviewer", request.comment_author)
-        or True
-    )
+        state_obj["active_reviews"][str(request.issue_number)]["current_reviewer"] = request.comment_author
+        return True
+
+    harness.stub_apply_comment_command(func=apply_claim_command)
     harness.runtime.add_reaction = lambda *args, **kwargs: True
 
     assert harness.run(state) is True
