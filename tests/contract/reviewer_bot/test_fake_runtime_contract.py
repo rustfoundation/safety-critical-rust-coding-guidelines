@@ -26,17 +26,18 @@ def test_fake_runtime_exposes_explicit_service_fields_and_no_omnibus_service_con
     assert runtime.github is not None
     assert runtime.locks is not None
     assert runtime.handlers is not None
+    assert runtime.touch_tracker is not None
     assert hasattr(runtime, "services") is False
     assert hasattr(runtime, "components") is False
 
 
-def test_fake_runtime_module_hints_are_explicitly_limited(monkeypatch):
+def test_fake_runtime_exposes_no_class_level_module_authority_hints(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     module_hints = sorted(name for name in vars(FakeReviewerBotRuntime) if name.endswith("_module"))
 
-    assert module_hints == ["review_state_module", "reviews_module"]
-    assert runtime.review_state_module is not None
-    assert runtime.reviews_module is not None
+    assert module_hints == []
+    assert hasattr(runtime, "review_state_module") is False
+    assert hasattr(runtime, "reviews_module") is False
 
 
 def test_fake_runtime_output_sink_records_writes(monkeypatch):
@@ -110,6 +111,7 @@ def test_fake_runtime_uses_explicit_public_service_fields(monkeypatch):
     assert runtime.state_store is not None
     assert runtime.github is not None
     assert runtime.locks is not None
+    assert runtime.touch_tracker is not None
 
 
 def test_fake_runtime_mutable_review_state_gateways_delegate_to_review_state_owner(monkeypatch):
@@ -125,7 +127,7 @@ def test_fake_runtime_rejects_unknown_handler_names(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
 
     with pytest.raises(AssertionError, match="Unsupported runtime handler override"):
-        runtime.stub_handler("handle_everything", lambda state: False)
+        runtime.handlers.stub("handle_everything", lambda state: False)
 
 
 def test_fake_runtime_github_transport_delegates_to_shared_route_fake(monkeypatch):

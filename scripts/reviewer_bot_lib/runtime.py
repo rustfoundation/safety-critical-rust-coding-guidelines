@@ -253,6 +253,61 @@ class ReviewerBotRuntime:
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
         return self.adapters.maybe_record_head_observation_repair(issue_number, review_data)
 
+    def handle_transition_notice(self, state: dict, issue_number: int, reviewer: str) -> bool:
+        return self.adapters.handle_transition_notice(state, issue_number, reviewer)
+
+    def handle_pass_command(self, state: dict, issue_number: int, comment_author: str, reason: str | None):
+        return self.adapters.handle_pass_command(state, issue_number, comment_author, reason)
+
+    def handle_pass_until_command(
+        self,
+        state: dict,
+        issue_number: int,
+        comment_author: str,
+        return_date: str,
+        reason: str | None,
+    ):
+        return self.adapters.handle_pass_until_command(
+            state,
+            issue_number,
+            comment_author,
+            return_date,
+            reason,
+        )
+
+    def handle_label_command(self, state: dict, issue_number: int, label_string: str):
+        return self.adapters.handle_label_command(state, issue_number, label_string)
+
+    def handle_sync_members_command(self, state: dict):
+        return self.adapters.handle_sync_members_command(state)
+
+    def handle_queue_command(self, state: dict):
+        return self.adapters.handle_queue_command(state)
+
+    def handle_commands_command(self):
+        return self.adapters.handle_commands_command()
+
+    def handle_claim_command(self, state: dict, issue_number: int, comment_author: str):
+        return self.adapters.handle_claim_command(state, issue_number, comment_author)
+
+    def handle_release_command(self, state: dict, issue_number: int, comment_author: str, args=None):
+        return self.adapters.handle_release_command(state, issue_number, comment_author, args)
+
+    def handle_rectify_command(self, state: dict, issue_number: int, comment_author: str):
+        return self.adapters.handle_rectify_command(state, issue_number, comment_author)
+
+    def handle_assign_command(self, state: dict, issue_number: int, username: str):
+        return self.adapters.handle_assign_command(state, issue_number, username)
+
+    def handle_assign_from_queue_command(self, state: dict, issue_number: int):
+        return self.adapters.handle_assign_from_queue_command(state, issue_number)
+
+    def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str):
+        return self.adapters.handle_accept_no_fls_changes_command(issue_number, comment_author)
+
+    def get_commands_help(self) -> str:
+        return self.adapters.get_commands_help()
+
     def ensure_review_entry(self, state: dict, issue_number: int, create: bool = False):
         return self.adapters.ensure_review_entry(state, issue_number, create=create)
 

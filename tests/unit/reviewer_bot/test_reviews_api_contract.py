@@ -12,7 +12,7 @@ def test_list_open_items_with_status_labels_fails_closed_on_unavailable(monkeypa
         "issues?state=open&labels=status%3A%20awaiting%20contributor%20response&per_page=100&page=1",
         result=github_result(502, {"message": "bad gateway"}, retry_attempts=1),
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
 
     with pytest.raises(RuntimeError, match="server_error"):
         reviews.list_open_items_with_status_labels(runtime)
@@ -35,7 +35,7 @@ def test_get_pull_request_reviews_result_paginates(monkeypatch):
             payload=[{"id": 100}],
         )
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
 
     result = reviews.get_pull_request_reviews_result(runtime, 42)
 
@@ -50,7 +50,7 @@ def test_get_pull_request_reviews_result_uses_fallback_loader_after_system_exit(
         "pulls/42/reviews?per_page=100&page=1",
         [{"id": 10}],
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: [{"id": 10}]
 
     result = reviews.get_pull_request_reviews_result(runtime, 42)
@@ -66,7 +66,7 @@ def test_get_pull_request_reviews_result_reports_invalid_payload(monkeypatch):
         status_code=200,
         payload={"not": "a list"},
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
 
     result = reviews.get_pull_request_reviews_result(runtime, 42)
 
@@ -80,7 +80,7 @@ def test_pull_request_read_result_reports_not_found(monkeypatch):
         "pulls/42",
         result=github_result(404, {"message": "missing"}),
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
 
     result = reviews._pull_request_read_result(runtime, 42)
 
@@ -95,7 +95,7 @@ def test_pull_request_read_result_reports_invalid_payload(monkeypatch):
         status_code=200,
         payload=["not", "a", "dict"],
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
 
     result = reviews._pull_request_read_result(runtime, 42)
 

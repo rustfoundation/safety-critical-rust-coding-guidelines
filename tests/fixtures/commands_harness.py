@@ -107,7 +107,7 @@ class CommandHarness:
         self.runtime.get_user_permission_status = lambda username, required_permission="triage": status
 
     def stub_handler(self, name: str, func) -> None:
-        self.runtime.stub_handler(name, func)
+        self.runtime.handlers.stub(name, func)
 
     def automation_runner(self) -> AutomationRunner:
         runner = AutomationRunner()

@@ -31,16 +31,16 @@ class AppHarness:
         self.runtime.stub_state_sequence(*states)
 
     def stub_load_state(self, func) -> None:
-        self.runtime.stub_load_state(func)
+        self.runtime.state_store.stub_load(func)
 
     def stub_save_state(self, func) -> None:
-        self.runtime.stub_save_state(func)
+        self.runtime.state_store.stub_save(func)
 
     def stub_lock(self, *, acquire=None, release=None, refresh=None) -> None:
         self.runtime.stub_lock(acquire=acquire, release=release, refresh=refresh)
 
     def stub_handler(self, name: str, func) -> None:
-        self.runtime.stub_handler(name, func)
+        self.runtime.handlers.stub(name, func)
 
     def stub_pass_until(self, func) -> None:
         self.runtime.stub_pass_until(func)

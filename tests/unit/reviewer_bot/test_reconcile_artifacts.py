@@ -49,6 +49,6 @@ def test_review_comment_artifact_identity_validation(monkeypatch):
             },
         )
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
 
     assert reconcile.handle_workflow_run_event(runtime, state) is True

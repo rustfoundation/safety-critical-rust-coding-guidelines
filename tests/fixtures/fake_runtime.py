@@ -11,6 +11,7 @@ from typing import Any, Callable
 from scripts.reviewer_bot_lib import automation as automation_module
 from scripts.reviewer_bot_lib import commands as commands_module
 from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
+from scripts.reviewer_bot_lib import config as config_module
 from scripts.reviewer_bot_lib import github_api as github_api_module
 from scripts.reviewer_bot_lib import lifecycle as lifecycle_module
 from scripts.reviewer_bot_lib import maintenance as maintenance_module
@@ -171,6 +172,20 @@ class HandlerStub:
         return self._handlers[name](state)
 
 
+class TouchTrackerStub:
+    def __init__(self):
+        self._touched: list[int] = []
+
+    def collect(self, issue_number: int | None) -> None:
+        if isinstance(issue_number, int) and issue_number not in self._touched:
+            self._touched.append(issue_number)
+
+    def drain(self) -> list[int]:
+        items = list(self._touched)
+        self._touched.clear()
+        return items
+
+
 class FakeReviewerBotRuntime:
     BOT_NAME = BOT_NAME
     BOT_MENTION = BOT_MENTION
@@ -184,8 +199,6 @@ class FakeReviewerBotRuntime:
     DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS = DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS
     GitHubApiResult = GitHubApiResult
     AssignmentAttempt = AssignmentAttempt
-    reviews_module = reviews_module
-    review_state_module = review_state_module
     EVENT_INTENT_MUTATING = EVENT_INTENT_MUTATING
     EVENT_INTENT_NON_MUTATING_DEFER = EVENT_INTENT_NON_MUTATING_DEFER
     EVENT_INTENT_NON_MUTATING_READONLY = EVENT_INTENT_NON_MUTATING_READONLY
@@ -224,7 +237,7 @@ class FakeReviewerBotRuntime:
                 "handle_workflow_run_event": lambda state: reconcile_module.handle_workflow_run_event(self, state),
             }
         )
-        self._touched_items: list[int] = []
+        self.touch_tracker = TouchTrackerStub()
         self._process_pass_until: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_members: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_status_labels: Callable[[dict, Any], bool] = lambda state, issue_numbers: False
@@ -451,6 +464,12 @@ class FakeReviewerBotRuntime:
     def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str):
         return automation_module.handle_accept_no_fls_changes_command(self, issue_number, comment_author)
 
+    def handle_rectify_command(self, state: dict, issue_number: int, comment_author: str):
+        return reconcile_module.handle_rectify_command(self, state, issue_number, comment_author)
+
+    def get_commands_help(self) -> str:
+        return config_module.get_commands_help()
+
     def parse_issue_labels(self) -> list[str]:
         return automation_module.bot_parse_issue_labels()
 
@@ -515,28 +534,13 @@ class FakeReviewerBotRuntime:
         )
 
     def collect_touched_item(self, issue_number: int) -> None:
-        if issue_number not in self._touched_items:
-            self._touched_items.append(issue_number)
+        self.touch_tracker.collect(issue_number)
 
     def drain_touched_items(self) -> list[int]:
-        items = list(self._touched_items)
-        self._touched_items.clear()
-        return items
-
-    def stub_load_state(self, func: Callable[..., dict]) -> None:
-        self.state_store.stub_load(func)
-
-    def stub_save_state(self, func: Callable[[dict], bool]) -> None:
-        self.state_store.stub_save(func)
+        return self.touch_tracker.drain()
 
     def stub_lock(self, *, acquire=None, release=None, refresh=None) -> None:
         self.locks.stub(acquire=acquire, release=release, refresh=refresh)
-
-    def stub_github(self, github) -> None:
-        self.github.stub(github)
-
-    def stub_handler(self, name: str, func: Callable[[dict], bool]) -> None:
-        self.handlers.stub(name, func)
 
     def stub_deferred_payload(self, payload: dict) -> None:
         self.deferred_payloads.set_payload(payload)
@@ -551,21 +555,21 @@ class FakeReviewerBotRuntime:
                 return state_queue[0]
             return state_queue.pop(0)
 
-        self.stub_load_state(fake_load_state)
+        self.state_store.stub_load(fake_load_state)
 
     def stub_state_unavailable(self, message: str = "state unavailable") -> None:
         def fake_load_state(*, fail_on_unavailable: bool = False):
             assert fail_on_unavailable is True
             raise RuntimeError(message)
 
-        self.stub_load_state(fake_load_state)
+        self.state_store.stub_load(fake_load_state)
 
     def record_saves(self, snapshots: list) -> None:
         def fake_save_state(state: dict) -> bool:
             snapshots.append(json.loads(json.dumps(state)))
             return True
 
-        self.stub_save_state(fake_save_state)
+        self.state_store.stub_save(fake_save_state)
 
     def stub_pass_until(self, func: Callable[[dict], tuple[dict, list[str]]]) -> None:
         self._process_pass_until = func

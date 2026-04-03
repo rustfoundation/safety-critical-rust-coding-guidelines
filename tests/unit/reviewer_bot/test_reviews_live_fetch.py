@@ -24,7 +24,7 @@ def _runtime(monkeypatch, routes=None):
     runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
     runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
     if routes is not None:
-        runtime.stub_github(routes)
+        runtime.github.stub(routes)
     return runtime
 
 

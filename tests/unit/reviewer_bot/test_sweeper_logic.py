@@ -62,7 +62,7 @@ def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_di
         )
         .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: [
         pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="APPROVED"),
         pull_request_review_event(303, submitted_at="2026-03-25T09:00:00Z", updated_at="2026-03-25T12:00:00Z", state="DISMISSED"),
@@ -107,7 +107,7 @@ def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypa
             payload={"workflow_runs": []},
         )
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: []
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is True
@@ -132,7 +132,7 @@ def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(
         .add_request("GET", "issues/42/comments?per_page=100&page=2", status_code=200, payload=[])
         .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(303, submitted_at="2026-03-17T09:00:00Z", updated_at="2026-03-17T12:00:00Z", state="DISMISSED")]
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is False
@@ -166,7 +166,7 @@ def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch
         )
         .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-17T11:00:00Z", state="APPROVED")]
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is False
@@ -189,7 +189,7 @@ def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(m
         ],
     )
     routes.add_request("GET", "issues/42/comments?per_page=100&page=2", status_code=200, payload=[])
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
 
     discovered, complete = sweeper._discover_visible_comment_events(runtime, 42, review)
 
@@ -222,7 +222,7 @@ def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_witho
         .add_request("GET", "pulls/42/reviews?per_page=100&page=1", status_code=200, payload=[])
         .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")]
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is True
@@ -259,7 +259,7 @@ def test_visible_review_repair_does_not_clear_transition_warning_for_stale_repla
         .add_request("GET", "pulls/42/reviews?per_page=100&page=1", status_code=200, payload=[])
         .add_request("GET", "pulls/42/comments?per_page=100", status_code=200, payload=[])
     )
-    runtime.stub_github(routes)
+    runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-25T11:00:00Z", state="COMMENTED", commit_id="head-1")]
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is True

@@ -8,6 +8,7 @@ from . import (
     automation,
     commands,
     comment_routing,
+    config,
     events,
     github_api,
     lease_lock,
@@ -96,6 +97,42 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
         maybe_record_head_observation_repair=lambda issue_number, review_data: lifecycle.maybe_record_head_observation_repair(
             runtime, issue_number, review_data
         ),
+        handle_transition_notice=lambda current_state, issue_number, reviewer: lifecycle.handle_transition_notice(
+            runtime, current_state, issue_number, reviewer
+        ),
+        handle_pass_command=lambda current_state, issue_number, comment_author, reason: commands.handle_pass_command(
+            runtime, current_state, issue_number, comment_author, reason
+        ),
+        handle_pass_until_command=lambda current_state, issue_number, comment_author, return_date, reason: commands.handle_pass_until_command(
+            runtime, current_state, issue_number, comment_author, return_date, reason
+        ),
+        handle_label_command=lambda current_state, issue_number, label_string: commands.handle_label_command(
+            runtime, current_state, issue_number, label_string
+        ),
+        handle_sync_members_command=lambda current_state: commands.handle_sync_members_command(
+            runtime, current_state
+        ),
+        handle_queue_command=lambda current_state: commands.handle_queue_command(runtime, current_state),
+        handle_commands_command=lambda: commands.handle_commands_command(runtime),
+        handle_claim_command=lambda current_state, issue_number, comment_author: commands.handle_claim_command(
+            runtime, current_state, issue_number, comment_author
+        ),
+        handle_release_command=lambda current_state, issue_number, comment_author, args=None: commands.handle_release_command(
+            runtime, current_state, issue_number, comment_author, args
+        ),
+        handle_rectify_command=lambda current_state, issue_number, comment_author: reconcile.handle_rectify_command(
+            runtime, current_state, issue_number, comment_author
+        ),
+        handle_assign_command=lambda current_state, issue_number, username: commands.handle_assign_command(
+            runtime, current_state, issue_number, username
+        ),
+        handle_assign_from_queue_command=lambda current_state, issue_number: commands.handle_assign_from_queue_command(
+            runtime, current_state, issue_number
+        ),
+        handle_accept_no_fls_changes_command=lambda issue_number, comment_author: automation.handle_accept_no_fls_changes_command(
+            runtime, issue_number, comment_author
+        ),
+        get_commands_help=config.get_commands_help,
         ensure_review_entry=lambda current_state, issue_number, create=False: review_state.ensure_review_entry(
             current_state, issue_number, create=create
         ),

@@ -22,7 +22,7 @@ from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 def _runtime(monkeypatch, routes=None):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     if routes is not None:
-        runtime.stub_github(routes)
+        runtime.github.stub(routes)
     return runtime
 
 
