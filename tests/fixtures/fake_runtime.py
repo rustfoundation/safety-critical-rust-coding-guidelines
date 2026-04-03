@@ -30,6 +30,7 @@ from scripts.reviewer_bot_lib.config import (
     REVIEW_FRESHNESS_RUNBOOK_PATH,
     REVIEWER_REQUEST_422_TEMPLATE,
     STATUS_PROJECTION_EPOCH,
+    TRANSITION_PERIOD_DAYS,
     AssignmentAttempt,
 )
 from scripts.reviewer_bot_lib.context import LeaseContext
@@ -175,6 +176,7 @@ class FakeReviewerBotRuntime:
     REVIEWER_REQUEST_422_TEMPLATE = REVIEWER_REQUEST_422_TEMPLATE
     REVIEW_FRESHNESS_RUNBOOK_PATH = REVIEW_FRESHNESS_RUNBOOK_PATH
     REVIEW_DEADLINE_DAYS = 14
+    TRANSITION_PERIOD_DAYS = TRANSITION_PERIOD_DAYS
     AssignmentAttempt = AssignmentAttempt
     reviews_module = reviews_module
     review_state_module = review_state_module
