@@ -379,7 +379,13 @@ class FakeReviewerBotRuntime:
     def compute_reviewer_response_state(self, issue_number: int, state: dict, *, issue_snapshot=None):
         return reviews_module.compute_reviewer_response_state(self, issue_number, state, issue_snapshot=issue_snapshot)
 
-    def rebuild_pr_approval_state(self, issue_number: int, review_data: dict, *, pull_request=None, reviews=None):
+    def rebuild_pr_approval_state(self, *args, pull_request=None, reviews=None):
+        if len(args) == 2:
+            issue_number, review_data = args
+        elif len(args) == 3:
+            _bot, issue_number, review_data = args
+        else:
+            raise TypeError("unexpected rebuild_pr_approval_state args")
         return reviews_module.rebuild_pr_approval_state(
             self,
             issue_number,

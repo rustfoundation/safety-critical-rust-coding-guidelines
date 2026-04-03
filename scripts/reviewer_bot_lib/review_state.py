@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .reviews import (
+    _pull_request_read_result,
     build_reviewer_review_record_from_live_review,
     get_preferred_current_reviewer_review_for_cycle,
     parse_github_timestamp,
@@ -288,6 +289,11 @@ def refresh_reviewer_review_from_live_preferred_review(
     reviews: list[dict] | None = None,
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
+    if pull_request is None:
+        pull_request_result = _pull_request_read_result(bot, issue_number)
+        if not pull_request_result.get("ok"):
+            return False, None
+        pull_request = pull_request_result["pull_request"]
     preferred_review = get_preferred_current_reviewer_review_for_cycle(
         bot,
         issue_number,

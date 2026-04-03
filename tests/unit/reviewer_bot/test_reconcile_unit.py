@@ -1,8 +1,7 @@
 import pytest
 
-from scripts.reviewer_bot_lib import commands, reconcile, review_state
+from scripts.reviewer_bot_lib import commands, lifecycle, reconcile, review_state
 from scripts.reviewer_bot_lib.config import GitHubApiResult
-from scripts.reviewer_bot_lib import lifecycle
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
 
