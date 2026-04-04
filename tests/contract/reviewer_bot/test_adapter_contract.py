@@ -207,3 +207,24 @@ def test_event_inputs_build_label_and_sync_requests_from_runtime_config(monkeypa
     assert sync_request.issue_number == 42
     assert sync_request.head_sha == "head-2"
     assert sync_request.event_created_at == "2026-03-17T10:05:00Z"
+
+
+def test_runtime_typed_config_accessors_read_runtime_config(monkeypatch):
+    runtime = reviewer_bot._runtime_bot()
+    monkeypatch.setenv("STATE_ISSUE_NUMBER", "77")
+    monkeypatch.setenv("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "9")
+    monkeypatch.setenv("REVIEWER_BOT_LOCK_RETRY_SECONDS", "3.5")
+    monkeypatch.setenv("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "180")
+    monkeypatch.setenv("REVIEWER_BOT_LOCK_TTL_SECONDS", "600")
+    monkeypatch.setenv("REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS", "90")
+    monkeypatch.setenv("REVIEWER_BOT_LOCK_REF_NAME", "heads/test-lock")
+    monkeypatch.setenv("REVIEWER_BOT_LOCK_BOOTSTRAP_BRANCH", "develop")
+
+    assert runtime.state_issue_number() == 77
+    assert runtime.lock_api_retry_limit() == 9
+    assert runtime.lock_retry_base_seconds() == 3.5
+    assert runtime.lock_max_wait_seconds() == 180
+    assert runtime.lock_lease_ttl_seconds() == 600
+    assert runtime.lock_renewal_window_seconds() == 90
+    assert runtime.lock_ref_name() == "heads/test-lock"
+    assert runtime.lock_ref_bootstrap_branch() == "develop"

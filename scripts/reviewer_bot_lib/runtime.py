@@ -19,10 +19,18 @@ from .config import (
     EVENT_INTENT_NON_MUTATING_DEFER,
     EVENT_INTENT_NON_MUTATING_READONLY,
     FLS_AUDIT_LABEL,
+    LOCK_API_RETRY_LIMIT,
+    LOCK_LEASE_TTL_SECONDS,
+    LOCK_MAX_WAIT_SECONDS,
+    LOCK_REF_BOOTSTRAP_BRANCH,
+    LOCK_REF_NAME,
+    LOCK_RENEWAL_WINDOW_SECONDS,
+    LOCK_RETRY_BASE_SECONDS,
     REVIEW_DEADLINE_DAYS,
     REVIEW_FRESHNESS_RUNBOOK_PATH,
     REVIEW_LABELS,
     REVIEWER_REQUEST_422_TEMPLATE,
+    STATE_ISSUE_NUMBER,
     STATUS_PROJECTION_EPOCH,
     TRANSITION_PERIOD_DAYS,
 )
@@ -135,6 +143,36 @@ class ReviewerBotRuntime:
 
     def set_config_value(self, name: str, value: Any) -> None:
         self.config.set(name, value)
+
+    def state_issue_number(self) -> int:
+        return int(self.get_config_value("STATE_ISSUE_NUMBER", str(STATE_ISSUE_NUMBER or 0)) or 0)
+
+    def lock_api_retry_limit(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", str(LOCK_API_RETRY_LIMIT)) or 0)
+
+    def lock_retry_base_seconds(self) -> float:
+        return float(self.get_config_value("REVIEWER_BOT_LOCK_RETRY_SECONDS", str(LOCK_RETRY_BASE_SECONDS)) or 0.0)
+
+    def lock_max_wait_seconds(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", str(LOCK_MAX_WAIT_SECONDS)) or 0)
+
+    def lock_lease_ttl_seconds(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_LOCK_TTL_SECONDS", str(LOCK_LEASE_TTL_SECONDS)) or 0)
+
+    def lock_renewal_window_seconds(self) -> int:
+        return int(
+            self.get_config_value(
+                "REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS",
+                str(LOCK_RENEWAL_WINDOW_SECONDS),
+            )
+            or 0
+        )
+
+    def lock_ref_name(self) -> str:
+        return self.get_config_value("REVIEWER_BOT_LOCK_REF_NAME", LOCK_REF_NAME)
+
+    def lock_ref_bootstrap_branch(self) -> str:
+        return self.get_config_value("REVIEWER_BOT_LOCK_BOOTSTRAP_BRANCH", LOCK_REF_BOOTSTRAP_BRANCH)
 
     def write_output(self, name: str, value: str) -> None:
         self.outputs.write(name, value)
