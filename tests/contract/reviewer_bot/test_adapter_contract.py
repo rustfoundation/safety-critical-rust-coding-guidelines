@@ -43,6 +43,18 @@ def test_execute_run_returns_execution_result(monkeypatch):
     assert result.exit_code == 0
 
 
+def test_entrypoint_helpers_accept_explicit_runtime(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("EVENT_NAME", "issue_comment")
+    runtime.set_config_value("EVENT_ACTION", "created")
+
+    context = reviewer_bot.build_event_context(runtime)
+    result = reviewer_bot.execute_run(context, runtime)
+
+    assert context.event_name == "issue_comment"
+    assert result.exit_code == 0
+
+
 def test_review_state_owner_exports_mutation_helper():
     hints = get_type_hints(review_state.ensure_review_entry)
 

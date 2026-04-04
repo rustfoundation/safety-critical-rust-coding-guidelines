@@ -82,3 +82,23 @@ def test_main_exits_with_nonzero_execution_result(monkeypatch):
     assert captured.context is not None
     assert captured.context.event_name == "issue_comment"
     assert captured.context.event_action == "created"
+
+
+def test_main_accepts_explicit_runtime_argument(monkeypatch):
+    harness = AppHarness(monkeypatch)
+    harness.set_event(
+        EVENT_NAME="issue_comment",
+        EVENT_ACTION="created",
+    )
+    captured = harness.stub_execute_run(
+        reviewer_bot.ExecutionResult(exit_code=0, state_changed=False)
+    )
+
+    try:
+        reviewer_bot.main(harness.runtime)
+    except SystemExit as exc:  # pragma: no cover - defensive
+        pytest.fail(f"unexpected SystemExit: {exc.code}")
+
+    assert captured.context is not None
+    assert captured.context.event_name == "issue_comment"
+    assert captured.context.event_action == "created"
