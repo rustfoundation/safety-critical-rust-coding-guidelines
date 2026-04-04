@@ -119,20 +119,20 @@ def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_obs
     from scripts.reviewer_bot_lib import comment_routing
     from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 
-    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
-    monkeypatch.setenv("COMMENT_USER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_AUTHOR", "PLeVasseur")
-    monkeypatch.setenv("COMMENT_AUTHOR_ASSOCIATION", "COLLABORATOR")
-    monkeypatch.setenv("COMMENT_SENDER_TYPE", "User")
-    monkeypatch.setenv("COMMENT_INSTALLATION_ID", "")
-    monkeypatch.setenv("COMMENT_PERFORMED_VIA_GITHUB_APP", "false")
-    monkeypatch.setenv("COMMENT_BODY", "@guidelines-bot /r? @felix91gr")
-    monkeypatch.setenv("COMMENT_ID", "100")
-    monkeypatch.setenv("COMMENT_AUTHOR_ID", "123")
-    monkeypatch.setenv("COMMENT_CREATED_AT", "2026-03-20T20:48:25Z")
-    monkeypatch.setenv("GITHUB_RUN_ID", "999")
-    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
     harness = CommentRoutingHarness(monkeypatch)
+    harness.config.set("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    harness.config.set("COMMENT_USER_TYPE", "User")
+    harness.config.set("COMMENT_AUTHOR", "PLeVasseur")
+    harness.config.set("COMMENT_AUTHOR_ASSOCIATION", "COLLABORATOR")
+    harness.config.set("COMMENT_SENDER_TYPE", "User")
+    harness.config.set("COMMENT_INSTALLATION_ID", "")
+    harness.config.set("COMMENT_PERFORMED_VIA_GITHUB_APP", "false")
+    harness.config.set("COMMENT_BODY", "@guidelines-bot /r? @felix91gr")
+    harness.config.set("COMMENT_ID", "100")
+    harness.config.set("COMMENT_AUTHOR_ID", "123")
+    harness.config.set("COMMENT_CREATED_AT", "2026-03-20T20:48:25Z")
+    harness.config.set("GITHUB_RUN_ID", "999")
+    harness.config.set("GITHUB_RUN_ATTEMPT", "1")
     harness.github.add_api(
         "GET",
         "pulls/42",

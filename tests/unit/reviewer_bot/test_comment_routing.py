@@ -163,3 +163,37 @@ def test_build_pr_comment_observer_payload_wrapper_uses_explicit_env_facts(monke
     assert payload["source_run_id"] == 777
     assert payload["source_run_attempt"] == 2
     assert payload["pr_number"] == 42
+
+
+def test_build_pr_comment_observer_payload_uses_same_comment_classification_as_payload_parser(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=True,
+        issue_author="dana",
+        comment_author="alice",
+        comment_body="hello\n@guidelines-bot /queue",
+    )
+    trust_context = harness.trust_context(
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
+        comment_author_association="MEMBER",
+        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
+        github_ref="refs/heads/main",
+        github_run_id=777,
+        github_run_attempt=2,
+    )
+    harness.add_pull_request_metadata(
+        issue_number=42,
+        head_repo_full_name="fork/example",
+        pr_author="dana",
+    )
+
+    payload = comment_routing.build_pr_comment_observer_payload(
+        harness.runtime,
+        42,
+        request,
+        trust_context,
+    )
+
+    assert payload["comment_class"] == "command_plus_text"
+    assert payload["has_non_command_text"] is True

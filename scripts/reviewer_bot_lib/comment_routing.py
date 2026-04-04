@@ -40,6 +40,14 @@ def build_pr_comment_trust_context(bot) -> PrCommentTrustContext:
     return decode_pr_comment_trust_context(bot)
 
 
+def _resolve_comment_request(bot, request: CommentEventRequest | None, *, issue_number: int | None = None) -> CommentEventRequest:
+    return request or build_comment_event_request(bot, issue_number=issue_number)
+
+
+def _resolve_trust_context(bot, trust_context: PrCommentTrustContext | None) -> PrCommentTrustContext:
+    return trust_context or build_pr_comment_trust_context(bot)
+
+
 def _require_v18_for_pr(state: dict, request: CommentEventRequest, context: str) -> bool:
     if not request.is_pull_request:
         return True
@@ -170,11 +178,11 @@ def classify_pr_comment_processing_target(
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
 ) -> str:
-    comment_request = request or build_comment_event_request(bot, issue_number=issue_number)
+    comment_request = _resolve_comment_request(bot, request, issue_number=issue_number)
     return _classify_pr_comment_processing_target(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(bot),
+        _resolve_trust_context(bot, trust_context),
     )
 
 
@@ -201,11 +209,11 @@ def route_issue_comment_trust(
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
 ) -> str:
-    comment_request = request or build_comment_event_request(bot, issue_number=issue_number)
+    comment_request = _resolve_comment_request(bot, request, issue_number=issue_number)
     return _route_issue_comment_trust(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(bot),
+        _resolve_trust_context(bot, trust_context),
     )
 
 
@@ -242,25 +250,13 @@ def _build_pr_comment_observer_payload(
             **base_payload,
         }
     body = request.comment_body
-    normalized = _normalize_comment_body(body)
-    command_pattern = re.compile(r"^@guidelines\-bot\s+/[A-Za-z0-9?_\-]+(?:\s+.*)?$")
-    lines = [line for line in normalized.splitlines() if line.strip()]
-    command_lines = [line for line in lines if command_pattern.match(line.strip())]
-    non_command_lines = [line for line in lines if not command_pattern.match(line.strip())]
-    if not normalized:
-        comment_class = "empty_or_whitespace"
-    elif command_lines and not non_command_lines:
-        comment_class = "command_only"
-    elif command_lines and non_command_lines:
-        comment_class = "command_plus_text"
-    else:
-        comment_class = "plain_text"
+    payload_classification = classify_comment_payload(bot, body)
     return {
         "schema_version": 2,
         **base_payload,
         "comment_id": comment_id,
-        "comment_class": comment_class,
-        "has_non_command_text": bool(non_command_lines),
+        "comment_class": payload_classification["comment_class"],
+        "has_non_command_text": payload_classification["has_non_command_text"],
         "source_body_digest": _digest_body(body),
         "source_created_at": request.comment_created_at,
         "actor_login": request.comment_author,
@@ -279,11 +275,11 @@ def build_pr_comment_observer_payload(
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
 ) -> dict:
-    comment_request = request or build_comment_event_request(bot, issue_number=issue_number)
+    comment_request = _resolve_comment_request(bot, request, issue_number=issue_number)
     return _build_pr_comment_observer_payload(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(bot),
+        _resolve_trust_context(bot, trust_context),
     )
 
 
@@ -304,7 +300,7 @@ def handle_comment_event(
     trust_context: PrCommentTrustContext | None = None,
 ) -> bool:
     bot.assert_lock_held("handle_comment_event")
-    comment_request = request or build_comment_event_request(bot)
+    comment_request = _resolve_comment_request(bot, request)
     issue_number = comment_request.issue_number
     if not issue_number:
         return False
@@ -312,7 +308,7 @@ def handle_comment_event(
     route = _route_issue_comment_trust(
         bot,
         comment_request,
-        trust_context or build_pr_comment_trust_context(bot),
+        _resolve_trust_context(bot, trust_context),
     )
     if route == "safe_noop":
         return False
