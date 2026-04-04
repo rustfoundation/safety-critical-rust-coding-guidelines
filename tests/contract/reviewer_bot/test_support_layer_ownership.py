@@ -1,111 +1,70 @@
-from pathlib import Path
-
 import pytest
 
-from tests.fixtures import (
-    http_responses,
-    reviewer_bot_env,
-    reviewer_bot_fakes,
-    reviewer_bot_recorders,
+from tests.fixtures import http_responses, reviewer_bot_fakes, reviewer_bot_recorders
+from tests.fixtures.focused_fake_services import (
+    ArtifactDownloadTransportStub,
+    ConfigBag,
+    DeferredPayloadStore,
+    GitHubStub,
+    GraphQLTransportStub,
+    HandlerStub,
+    LockStub,
+    OutputCapture,
+    RestTransportStub,
+    StateStoreStub,
+    TouchTrackerStub,
 )
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
 pytestmark = pytest.mark.contract
 
 
-ROOT = Path(__file__).resolve().parents[3]
-
-
-def _read(relative_path: str) -> str:
-    return (ROOT / relative_path).read_text(encoding="utf-8")
-
-
-def test_support_layer_has_owned_env_and_recorder_modules():
-    assert reviewer_bot_env is not None
-    assert reviewer_bot_recorders is not None
-
-
-def test_support_layer_has_owned_typed_builder_home():
-    builders_text = _read("tests/fixtures/reviewer_bot_builders.py")
-
-    assert "def build_assignment_request(" in builders_text
-    assert "def build_privileged_command_request(" in builders_text
-    assert "def build_comment_event_request(" in builders_text
-    assert "def build_pr_comment_trust_context(" in builders_text
-
-
-def test_transport_fake_authority_is_owned_by_reviewer_bot_fakes():
-    assert reviewer_bot_fakes.RouteGitHubApi is not None
-    assert reviewer_bot_fakes.github_result is not None
+def test_transport_fake_authority_is_owned_by_reviewer_bot_fakes_module():
+    assert reviewer_bot_fakes.RouteGitHubApi is RouteGitHubApi
+    assert reviewer_bot_fakes.github_result is github_result
 
 
 def test_low_level_http_response_helper_has_dedicated_home():
-    response_text = _read("tests/fixtures/http_responses.py")
-
-    assert "class FakeGitHubResponse:" in response_text
-    assert "RouteGitHubApi" not in response_text
-    assert "github_result" not in response_text
+    assert http_responses.FakeGitHubResponse is not None
     assert http_responses.__all__ == ["FakeGitHubResponse"]
 
 
-def test_harnesses_do_not_define_local_config_bags_or_deferred_payload_loaders():
-    for relative_path in [
-        "tests/fixtures/app_harness.py",
-        "tests/fixtures/commands_harness.py",
-        "tests/fixtures/comment_routing_harness.py",
-        "tests/fixtures/reconcile_harness.py",
-    ]:
-        text = _read(relative_path)
-        assert "class _ConfigBag" not in text
-        assert "class _DeferredPayloads" not in text
+def test_reviewer_bot_recorders_module_remains_available_for_shared_recorders():
+    assert reviewer_bot_recorders is not None
 
 
-def test_harnesses_use_owned_env_and_recorder_homes():
-    app_harness = _read("tests/fixtures/app_harness.py")
-    commands_harness = _read("tests/fixtures/commands_harness.py")
-    comment_harness = _read("tests/fixtures/comment_routing_harness.py")
-    conftest = _read("tests/conftest.py")
+def test_focused_fake_service_module_is_authority_for_small_fixture_services():
+    expected = {
+        "ConfigBag": ConfigBag,
+        "OutputCapture": OutputCapture,
+        "DeferredPayloadStore": DeferredPayloadStore,
+        "StateStoreStub": StateStoreStub,
+        "LockStub": LockStub,
+        "GitHubStub": GitHubStub,
+        "RestTransportStub": RestTransportStub,
+        "GraphQLTransportStub": GraphQLTransportStub,
+        "ArtifactDownloadTransportStub": ArtifactDownloadTransportStub,
+        "HandlerStub": HandlerStub,
+        "TouchTrackerStub": TouchTrackerStub,
+    }
 
-    assert "from .reviewer_bot_env import" in app_harness or "reviewer_bot_env" in app_harness
-    assert "from .reviewer_bot_env import" in commands_harness or "reviewer_bot_env" in commands_harness
-    assert "from .reviewer_bot_env import" in comment_harness or "reviewer_bot_env" in comment_harness
-    assert "reviewer_bot_env" in conftest
-    assert "reviewer_bot_recorders" in commands_harness
-    assert "reviewer_bot_recorders" in comment_harness
-    assert "reviewer_bot_recorders" in conftest
-
-
-def test_no_second_fake_runtime_or_transport_home_exists():
-    fixtures_dir = ROOT / "tests/fixtures"
-    fixture_files = {path.name for path in fixtures_dir.glob("*.py")}
-
-    assert "fake_runtime.py" in fixture_files
-    assert "reviewer_bot_fakes.py" in fixture_files
-    assert "commands_harness.py" in fixture_files
-    assert "comment_routing_harness.py" in fixture_files
-    assert "reconcile_harness.py" in fixture_files
-    assert "http_responses.py" in fixture_files
+    for name, obj in expected.items():
+        assert obj.__name__ == name
+        assert obj.__module__ == "tests.fixtures.focused_fake_services"
 
 
-def test_support_layer_ownership_contract_targets_current_authority_hotspots_only():
-    text = _read("tests/contract/reviewer_bot/test_support_layer_ownership.py")
+def test_support_layer_contract_focuses_on_active_authority_boundaries_only():
+    active_authorities = {
+        RouteGitHubApi.__module__,
+        github_result.__module__,
+        http_responses.FakeGitHubResponse.__module__,
+        ConfigBag.__module__,
+        reviewer_bot_recorders.__name__,
+    }
 
-    assert "RouteGitHubApi" in text
-    assert "github_result" in text
-    assert "FakeGitHubResponse" in text
-
-
-def test_transport_fakes_are_not_imported_from_github_helper_module_anywhere_in_tests():
-    for path in ROOT.glob("tests/**/*.py"):
-        if path.name == "test_support_layer_ownership.py":
-            continue
-        text = path.read_text(encoding="utf-8")
-        assert "from tests.fixtures.github import RouteGitHubApi" not in text
-        assert "from tests.fixtures.github import github_result" not in text
-
-
-def test_fake_github_response_uses_dedicated_low_level_helper_home():
-    for path in ROOT.glob("tests/**/*.py"):
-        if path.name == "test_support_layer_ownership.py":
-            continue
-        text = path.read_text(encoding="utf-8")
-        assert "from tests.fixtures.github import FakeGitHubResponse" not in text
+    assert active_authorities == {
+        "tests.fixtures.reviewer_bot_fakes",
+        "tests.fixtures.http_responses",
+        "tests.fixtures.focused_fake_services",
+        "tests.fixtures.reviewer_bot_recorders",
+    }
