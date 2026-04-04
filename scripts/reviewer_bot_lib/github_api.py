@@ -1,7 +1,6 @@
 """GitHub transport and issue/PR mutation helpers."""
 
 import json
-import os
 import random
 import sys
 import time
@@ -50,6 +49,10 @@ def _retry_delay(bot: GitHubApiContext, base_seconds: float, retry_attempt: int)
         retry_attempt,
         jitter=getattr(bot, "jitter", None) or _RandomJitter(),
     )
+
+
+def _is_pull_request(bot: GitHubApiContext) -> bool:
+    return bot.get_config_value("IS_PULL_REQUEST", "false").lower() == "true"
 
 
 def _should_retry_status(status_code: int | None) -> bool:
@@ -473,7 +476,7 @@ def ensure_label_exists(
 
 
 def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, username: str):
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    is_pr = _is_pull_request(bot)
     if is_pr:
         endpoint = f"pulls/{issue_number}/requested_reviewers"
         payload = {"reviewers": [username]}
@@ -535,7 +538,7 @@ def assign_reviewer(bot: GitHubTransportContext, issue_number: int, username: st
 
 
 def get_assignment_failure_comment(bot: GitHubTransportContext, reviewer: str, attempt) -> str | None:
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    is_pr = _is_pull_request(bot)
     if attempt.status_code == 422:
         if is_pr:
             return bot.REVIEWER_REQUEST_422_TEMPLATE.format(reviewer=reviewer)
@@ -554,7 +557,7 @@ def get_assignment_failure_comment(bot: GitHubTransportContext, reviewer: str, a
 
 
 def get_issue_assignees(bot: GitHubTransportContext, issue_number: int) -> list[str] | None:
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    is_pr = _is_pull_request(bot)
     if is_pr:
         try:
             response = bot.github_api_request("GET", f"pulls/{issue_number}", retry_policy=RETRY_POLICY_IDEMPOTENT_READ)
@@ -604,7 +607,7 @@ def remove_pr_reviewer(bot: GitHubTransportContext, issue_number: int, username:
 
 
 def unassign_reviewer(bot: GitHubTransportContext, issue_number: int, username: str) -> bool:
-    is_pr = os.environ.get("IS_PULL_REQUEST", "false").lower() == "true"
+    is_pr = _is_pull_request(bot)
     if is_pr:
         bot.remove_pr_reviewer(issue_number, username)
     return bot.remove_assignee(issue_number, username)

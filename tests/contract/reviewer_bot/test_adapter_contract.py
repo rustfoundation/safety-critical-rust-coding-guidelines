@@ -164,6 +164,30 @@ def test_event_inputs_build_assignment_and_privileged_requests_from_runtime_conf
     assert privileged_request.workflow_run_head_sha == "head-1"
 
 
+def test_github_api_assignment_helpers_use_runtime_config_for_pr_vs_issue(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    recorded = []
+
+    def fake_request(method, endpoint, data=None, suppress_error_log=True, **kwargs):
+        recorded.append((method, endpoint, data))
+        return runtime.GitHubApiResult(201, {}, {}, "ok", True, None, 0, None)
+
+    runtime.github_api_request = fake_request
+
+    runtime.set_config_value("IS_PULL_REQUEST", "true")
+    github_pr_attempt = reviewer_bot._runtime_bot(runtime).request_reviewer_assignment(42, "alice")
+
+    runtime.set_config_value("IS_PULL_REQUEST", "false")
+    github_issue_attempt = reviewer_bot._runtime_bot(runtime).request_reviewer_assignment(42, "alice")
+
+    assert github_pr_attempt.success is True
+    assert github_issue_attempt.success is True
+    assert recorded == [
+        ("POST", "pulls/42/requested_reviewers", {"reviewers": ["alice"]}),
+        ("POST", "issues/42/assignees", {"assignees": ["alice"]}),
+    ]
+
+
 def test_event_inputs_parse_labels_and_target_repo_root_from_runtime_config(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("ISSUE_LABELS", '["coding guideline", "fls-audit"]')

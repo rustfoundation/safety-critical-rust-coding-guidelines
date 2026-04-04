@@ -189,6 +189,64 @@ def test_get_issue_assignees_returns_none_when_fetch_unavailable(monkeypatch):
     assert github_api.get_issue_assignees(bot, 42) is None
 
 
+def test_request_reviewer_assignment_uses_runtime_config_for_pr_target(monkeypatch):
+    recorded = {}
+
+    def fake_request(method, endpoint, data=None, suppress_error_log=True, **kwargs):
+        recorded.update({"method": method, "endpoint": endpoint, "data": data})
+        return GitHubApiResult(201, {}, {}, "ok", True, None, 0, None)
+
+    bot = _bot(monkeypatch, config={"IS_PULL_REQUEST": "true"}, github_api_request=fake_request)
+
+    result = github_api.request_reviewer_assignment(bot, 42, "alice")
+
+    assert result.success is True
+    assert recorded == {
+        "method": "POST",
+        "endpoint": "pulls/42/requested_reviewers",
+        "data": {"reviewers": ["alice"]},
+    }
+
+
+def test_request_reviewer_assignment_uses_runtime_config_for_issue_target(monkeypatch):
+    recorded = {}
+
+    def fake_request(method, endpoint, data=None, suppress_error_log=True, **kwargs):
+        recorded.update({"method": method, "endpoint": endpoint, "data": data})
+        return GitHubApiResult(201, {}, {}, "ok", True, None, 0, None)
+
+    bot = _bot(monkeypatch, config={"IS_PULL_REQUEST": "false"}, github_api_request=fake_request)
+
+    result = github_api.request_reviewer_assignment(bot, 42, "alice")
+
+    assert result.success is True
+    assert recorded == {
+        "method": "POST",
+        "endpoint": "issues/42/assignees",
+        "data": {"assignees": ["alice"]},
+    }
+
+
+def test_get_assignment_failure_comment_uses_runtime_config_for_pr_message(monkeypatch):
+    bot = _bot(monkeypatch, config={"IS_PULL_REQUEST": "true"})
+    failed = bot.AssignmentAttempt(success=False, status_code=422)
+
+    assert "PR Reviewers" in github_api.get_assignment_failure_comment(bot, "alice", failed)
+
+
+def test_unassign_reviewer_uses_runtime_config_to_remove_pr_reviewer(monkeypatch):
+    calls = []
+    bot = _bot(
+        monkeypatch,
+        config={"IS_PULL_REQUEST": "true"},
+        remove_pr_reviewer=lambda issue_number, username: calls.append(("pr", issue_number, username)) or True,
+        remove_assignee=lambda issue_number, username: calls.append(("issue", issue_number, username)) or True,
+    )
+
+    assert github_api.unassign_reviewer(bot, 42, "alice") is True
+    assert calls == [("pr", 42, "alice"), ("issue", 42, "alice")]
+
+
 def test_find_open_pr_for_branch_status_reports_unavailable_for_malformed_payload(monkeypatch):
     bot = _bot(monkeypatch, github_api_request=lambda *args, **kwargs: GitHubApiResult(status_code=200, payload={"not": "a list"}, headers={}, text="ok", ok=True, failure_kind=None, retry_attempts=0, transport_error=None))
 
