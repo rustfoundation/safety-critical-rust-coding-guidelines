@@ -120,6 +120,22 @@ class StdErrLogger:
         self._sys.stderr.write(f"[{level}] {message}{suffix}\n")
 
 
+class RequestsRestTransport:
+    def __init__(self, requests_module: Any):
+        self._requests = requests_module
+
+    def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        json_data: dict[str, Any] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> Any:
+        return self._requests.request(method, url, headers=headers, json=json_data, timeout=timeout_seconds)
+
+
 class ReviewerBotRuntime:
     """Runtime object built from explicit services and named adapters."""
 
@@ -152,6 +168,7 @@ class ReviewerBotRuntime:
         config: Any | None = None,
         outputs: Any | None = None,
         deferred_payloads: Any | None = None,
+        rest_transport: Any | None = None,
         clock: Any | None = None,
         sleeper: Any | None = None,
         jitter: Any | None = None,
@@ -172,6 +189,7 @@ class ReviewerBotRuntime:
         self.config = config or _EnvConfig()
         self.outputs = outputs or _FileOutputSink(self.config)
         self.deferred_payloads = deferred_payloads or _JsonDeferredPayloadLoader(self.config)
+        self.rest_transport = rest_transport or RequestsRestTransport(requests)
         self.clock = clock or SystemClock()
         self.sleeper = sleeper or SystemSleeper(time)
         self.jitter = jitter or RandomJitterSource(random)

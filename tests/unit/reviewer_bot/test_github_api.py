@@ -7,12 +7,34 @@ from scripts.reviewer_bot_lib.config import LOCK_API_RETRY_LIMIT, GitHubApiResul
 from tests.fixtures.http_responses import FakeGitHubResponse
 
 
+class RecordingRestTransport:
+    def __init__(self, responses=None):
+        self._responses = iter(responses or [])
+        self.calls = []
+
+    def request(self, method, url, *, headers=None, json_data=None, timeout_seconds=None):
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": headers,
+                "json_data": json_data,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        response = next(self._responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 def _bot(**overrides):
     bot = SimpleNamespace(
         GitHubApiResult=GitHubApiResult,
         get_github_token=lambda: "token",
         get_github_graphql_token=lambda prefer_board_token=False: "token",
         get_config_value=lambda name, default="": __import__("os").environ.get(name, default),
+        rest_transport=RecordingRestTransport(),
         STATE_ISSUE_NUMBER=1,
     )
     for key, value in overrides.items():
@@ -23,16 +45,15 @@ def _bot(**overrides):
 def test_github_api_request_retries_idempotent_get_on_502(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    responses = iter(
+    transport = RecordingRestTransport(
         [
             FakeGitHubResponse(502, {"message": "bad gateway"}, "bad gateway"),
             FakeGitHubResponse(200, {"ok": True}, "ok"),
         ]
     )
-    monkeypatch.setattr(github_api.requests, "request", lambda *args, **kwargs: next(responses))
     monkeypatch.setattr(github_api.time, "sleep", lambda *_args, **_kwargs: None)
 
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read")
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read")
 
     assert result.ok is True
     assert result.payload == {"ok": True}
@@ -43,18 +64,12 @@ def test_github_api_request_retries_idempotent_get_on_502(monkeypatch):
 def test_github_api_request_retries_transport_exception_for_idempotent_get(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    calls = {"count": 0}
-
-    def fake_request(*args, **kwargs):
-        calls["count"] += 1
-        if calls["count"] == 1:
-            raise github_api.requests.RequestException("timeout")
-        return FakeGitHubResponse(200, {"ok": True}, "ok")
-
-    monkeypatch.setattr(github_api.requests, "request", fake_request)
+    transport = RecordingRestTransport(
+        [github_api.requests.RequestException("timeout"), FakeGitHubResponse(200, {"ok": True}, "ok")]
+    )
     monkeypatch.setattr(github_api.time, "sleep", lambda *_args, **_kwargs: None)
 
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read")
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read")
 
     assert result.ok is True
     assert result.payload == {"ok": True}
@@ -64,39 +79,27 @@ def test_github_api_request_retries_transport_exception_for_idempotent_get(monke
 def test_github_api_request_classifies_not_found_without_retry(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    calls = {"count": 0}
+    transport = RecordingRestTransport([FakeGitHubResponse(404, {"message": "missing"}, "missing")])
 
-    def fake_request(*args, **kwargs):
-        calls["count"] += 1
-        return FakeGitHubResponse(404, {"message": "missing"}, "missing")
-
-    monkeypatch.setattr(github_api.requests, "request", fake_request)
-
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
 
     assert result.ok is False
     assert result.failure_kind == "not_found"
     assert result.retry_attempts == 0
-    assert calls["count"] == 1
+    assert len(transport.calls) == 1
 
 
 def test_github_api_request_classifies_forbidden_without_retry(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    calls = {"count": 0}
+    transport = RecordingRestTransport([FakeGitHubResponse(403, {"message": "forbidden"}, "forbidden")])
 
-    def fake_request(*args, **kwargs):
-        calls["count"] += 1
-        return FakeGitHubResponse(403, {"message": "forbidden"}, "forbidden")
-
-    monkeypatch.setattr(github_api.requests, "request", fake_request)
-
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
 
     assert result.ok is False
     assert result.failure_kind == "forbidden"
     assert result.retry_attempts == 0
-    assert calls["count"] == 1
+    assert len(transport.calls) == 1
 
 
 def test_github_graphql_request_retries_idempotent_query_on_502(monkeypatch):
@@ -119,16 +122,15 @@ def test_github_graphql_request_retries_idempotent_query_on_502(monkeypatch):
 def test_github_api_request_retries_rate_limit_then_succeeds(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    responses = iter(
+    transport = RecordingRestTransport(
         [
             FakeGitHubResponse(429, {"message": "slow down"}, "slow down"),
             FakeGitHubResponse(200, {"ok": True}, "ok"),
         ]
     )
-    monkeypatch.setattr(github_api.requests, "request", lambda *args, **kwargs: next(responses))
     monkeypatch.setattr(github_api.time, "sleep", lambda *_args, **_kwargs: None)
 
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read")
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read")
 
     assert result.ok is True
     assert result.retry_attempts == 1
@@ -137,10 +139,10 @@ def test_github_api_request_retries_rate_limit_then_succeeds(monkeypatch):
 def test_github_api_request_reports_retry_exhaustion_on_repeated_429(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    monkeypatch.setattr(github_api.requests, "request", lambda *args, **kwargs: FakeGitHubResponse(429, {"message": "slow down"}, "slow down"))
+    transport = RecordingRestTransport([FakeGitHubResponse(429, {"message": "slow down"}, "slow down")] * (LOCK_API_RETRY_LIMIT + 1))
     monkeypatch.setattr(github_api.time, "sleep", lambda *_args, **_kwargs: None)
 
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
 
     assert result.ok is False
     assert result.failure_kind == "rate_limited"
@@ -168,18 +170,12 @@ def test_github_graphql_request_reports_graphql_errors(monkeypatch):
 def test_github_api_request_passes_timeout(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    observed = {}
+    transport = RecordingRestTransport([FakeGitHubResponse(200, {"ok": True}, "ok")])
 
-    def fake_request(method, url, headers=None, json=None, timeout=None):
-        observed["timeout"] = timeout
-        return FakeGitHubResponse(200, {"ok": True}, "ok")
-
-    monkeypatch.setattr(github_api.requests, "request", fake_request)
-
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", timeout_seconds=12.5)
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", timeout_seconds=12.5)
 
     assert result.ok is True
-    assert observed["timeout"] == 12.5
+    assert transport.calls[0]["timeout_seconds"] == 12.5
 
 
 def test_github_api_request_rejects_idempotent_retry_for_non_get():
@@ -233,9 +229,9 @@ def test_find_open_pr_for_branch_status_reports_unavailable_on_transport_failure
 def test_github_api_request_reports_invalid_payload_for_malformed_json(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    monkeypatch.setattr(github_api.requests, "request", lambda *args, **kwargs: FakeGitHubResponse(200, ValueError("bad json"), "bad json"))
+    transport = RecordingRestTransport([FakeGitHubResponse(200, ValueError("bad json"), "bad json")])
 
-    result = github_api.github_api_request(_bot(), "GET", "issues/42")
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42")
 
     assert result.ok is False
     assert result.failure_kind == "invalid_payload"
@@ -244,10 +240,10 @@ def test_github_api_request_reports_invalid_payload_for_malformed_json(monkeypat
 def test_github_api_request_reports_retry_exhaustion_on_repeated_502(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-    monkeypatch.setattr(github_api.requests, "request", lambda *args, **kwargs: FakeGitHubResponse(502, {"message": "bad gateway"}, "bad gateway"))
+    transport = RecordingRestTransport([FakeGitHubResponse(502, {"message": "bad gateway"}, "bad gateway")] * (LOCK_API_RETRY_LIMIT + 1))
     monkeypatch.setattr(github_api.time, "sleep", lambda *_args, **_kwargs: None)
 
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
 
     assert result.ok is False
     assert result.failure_kind == "server_error"
@@ -257,14 +253,10 @@ def test_github_api_request_reports_retry_exhaustion_on_repeated_502(monkeypatch
 def test_github_api_request_reports_transport_retry_exhaustion(monkeypatch):
     monkeypatch.setenv("REPO_OWNER", "rustfoundation")
     monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
-
-    def always_fail(*args, **kwargs):
-        raise github_api.requests.RequestException("timeout")
-
-    monkeypatch.setattr(github_api.requests, "request", always_fail)
+    transport = RecordingRestTransport([github_api.requests.RequestException("timeout")] * (LOCK_API_RETRY_LIMIT + 1))
     monkeypatch.setattr(github_api.time, "sleep", lambda *_args, **_kwargs: None)
 
-    result = github_api.github_api_request(_bot(), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
+    result = github_api.github_api_request(_bot(rest_transport=transport), "GET", "issues/42", retry_policy="idempotent_read", suppress_error_log=True)
 
     assert result.ok is False
     assert result.failure_kind == "transport_error"

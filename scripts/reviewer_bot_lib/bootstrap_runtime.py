@@ -61,7 +61,7 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
     )
     adapters = SimpleNamespace(
         assert_lock_held=lambda context: state_store.assert_lock_held(runtime, context),
-        get_github_token=github_api.get_github_token,
+        get_github_token=lambda: github_api.get_github_token(runtime),
         get_github_graphql_token=lambda *, prefer_board_token=False: github_api.get_github_graphql_token(
             runtime, prefer_board_token=prefer_board_token
         ),

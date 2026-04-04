@@ -93,8 +93,8 @@ def _build_result(
     )
 
 
-def get_github_token() -> str:
-    token = os.environ.get("GITHUB_TOKEN")
+def get_github_token(bot: GitHubTransportContext) -> str:
+    token = bot.get_config_value("GITHUB_TOKEN")
     if not token:
         print("ERROR: GITHUB_TOKEN not set", file=sys.stderr)
         raise SystemExit(1)
@@ -103,7 +103,7 @@ def get_github_token() -> str:
 
 def get_github_graphql_token(bot: GitHubTransportContext, *, prefer_board_token: bool = False) -> str:
     if prefer_board_token:
-        token = os.environ.get(REVIEWER_BOARD_TOKEN_ENV)
+        token = bot.get_config_value(REVIEWER_BOARD_TOKEN_ENV)
         if not token:
             raise RuntimeError(f"{REVIEWER_BOARD_TOKEN_ENV} not set")
         return token
@@ -123,7 +123,7 @@ def github_api_request(
 ):
     _validate_rest_retry_policy(method, retry_policy)
     token = bot.get_github_token()
-    repo = f"{os.environ['REPO_OWNER']}/{os.environ['REPO_NAME']}"
+    repo = f"{bot.get_config_value('REPO_OWNER')}/{bot.get_config_value('REPO_NAME')}"
     url = f"https://api.github.com/repos/{repo}/{endpoint}"
 
     headers = {
@@ -138,7 +138,13 @@ def github_api_request(
     max_attempts = 1 + (LOCK_API_RETRY_LIMIT if retry_policy == RETRY_POLICY_IDEMPOTENT_READ else 0)
     for attempt in range(1, max_attempts + 1):
         try:
-            response = requests.request(method, url, headers=headers, json=data, timeout=timeout_seconds)
+            response = bot.rest_transport.request(
+                method,
+                url,
+                headers=headers,
+                json_data=data,
+                timeout_seconds=timeout_seconds,
+            )
         except requests.RequestException as exc:
             failure_kind = _classify_failure(None, transport_error=True)
             if retry_policy == RETRY_POLICY_IDEMPOTENT_READ and attempt < max_attempts:
