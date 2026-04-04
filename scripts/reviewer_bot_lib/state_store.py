@@ -7,6 +7,7 @@ from typing import Any
 
 import yaml
 
+from . import retrying
 from .config import (
     FRESHNESS_RUNTIME_EPOCH_LEGACY,
     LOCK_API_RETRY_LIMIT,
@@ -52,6 +53,18 @@ def _jitter(bot: StateStoreContext, lower: float, upper: float) -> float:
     if jitter is not None and hasattr(jitter, "uniform"):
         return jitter.uniform(lower, upper)
     return __import__("random").uniform(lower, upper)
+
+
+def _retry_delay(bot: StateStoreContext, base_seconds: float, retry_attempt: int) -> float:
+    class _BotJitter:
+        def uniform(self, lower: float, upper: float) -> float:
+            return _jitter(bot, lower, upper)
+
+    return retrying.bounded_exponential_delay(
+        base_seconds,
+        retry_attempt,
+        jitter=_BotJitter(),
+    )
 
 
 def _now_iso(bot: StateStoreContext) -> str:
@@ -117,9 +130,9 @@ def get_state_issue(bot: StateStoreContext) -> dict | None:
             )
             return None
 
-        if response.status_code == 429 or response.status_code >= 500:
+        if retrying.is_retryable_status(response.status_code):
             if attempt < state_read_retry_limit:
-                delay = state_read_retry_base_seconds + _jitter(bot, 0, state_read_retry_base_seconds)
+                delay = _retry_delay(bot, state_read_retry_base_seconds, attempt)
                 _log(
                     bot,
                     "warning",
@@ -470,7 +483,7 @@ def save_state(bot: StateStoreContext, state: dict) -> bool:
                 status_code=response.status_code,
                 retry_attempt=attempt,
             )
-            delay = lock_retry_base_seconds + _jitter(bot, 0, lock_retry_base_seconds)
+            delay = _retry_delay(bot, lock_retry_base_seconds, attempt)
             _sleep(bot, delay)
             continue
 
@@ -488,9 +501,9 @@ def save_state(bot: StateStoreContext, state: dict) -> bool:
             )
             return False
 
-        if response.status_code == 429 or response.status_code >= 500:
+        if retrying.is_retryable_status(response.status_code):
             if attempt < lock_api_retry_limit:
-                delay = lock_retry_base_seconds + _jitter(bot, 0, lock_retry_base_seconds)
+                delay = _retry_delay(bot, lock_retry_base_seconds, attempt)
                 _log(
                     bot,
                     "warning",
