@@ -4,7 +4,6 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import comment_routing, review_state
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
@@ -80,7 +79,7 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
     )
     harness.stub_sync_status_labels(lambda current, issue_numbers: synced_issue_numbers.extend(issue_numbers) or True)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert save_snapshots == [{"reconciled": ["pull_request_review:11"], "gap_present": False}]
@@ -158,7 +157,7 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
     )
     harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert save_snapshots == [{"reconciled": ["issue_comment:210"], "gap_present": False}]
@@ -237,7 +236,7 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
     )
     harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert save_snapshots == [

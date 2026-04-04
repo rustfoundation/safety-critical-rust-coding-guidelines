@@ -38,7 +38,7 @@ def test_execute_run_returns_execution_result(monkeypatch):
     monkeypatch.setattr(runtime.state_store, "load_state", lambda *, fail_on_unavailable=False: {"active_reviews": {}})
     monkeypatch.setattr(runtime.handlers, "handle_pull_request_review_event", lambda state: False)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = reviewer_bot.execute_run(reviewer_bot.build_event_context(runtime), runtime)
 
     assert result.exit_code == 0
 

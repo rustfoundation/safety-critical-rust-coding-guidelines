@@ -1,6 +1,5 @@
 import pytest
 
-from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import lifecycle, maintenance, review_state
 from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.app_harness import AppHarness
@@ -43,7 +42,7 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
     harness.stub_save_state(lambda current: save_calls.append(list(current["active_reviews"]["42"]["reconciled_source_events"])) or True)
     harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert save_calls == [["pull_request_review:500"]]
@@ -134,7 +133,7 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
     )
     harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert save_calls == [

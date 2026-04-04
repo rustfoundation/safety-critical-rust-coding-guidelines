@@ -216,6 +216,7 @@ class _BootstrapAdapterServices:
     def get_commands_help(self):
         return config.get_commands_help()
 
+    # Adapter-only mutable review-state compatibility surface.
     def ensure_review_entry(self, current_state, issue_number, create=False):
         return review_state.ensure_review_entry(current_state, issue_number, create=create)
 
