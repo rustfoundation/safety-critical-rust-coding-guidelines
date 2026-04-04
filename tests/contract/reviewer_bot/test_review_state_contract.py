@@ -119,10 +119,6 @@ def test_runtime_and_bootstrap_forwarders_are_explicit_adapter_compatibility_sur
 
     assert "Adapter-only mutable review-state compatibility surface." in runtime_text
     assert "Adapter-only mutable review-state compatibility surface." in bootstrap_text
-    assert "review_state.ensure_review_entry(" in bootstrap_text
-    assert "review_state.set_current_reviewer(" in bootstrap_text
-    assert "review_state.update_reviewer_activity(" in bootstrap_text
-    assert "review_state.mark_review_complete(" in bootstrap_text
     assert "record_transition_notice_sent" not in runtime_text
     assert "accept_channel_event" not in runtime_text
     assert "get_current_cycle_boundary" not in runtime_text

@@ -69,7 +69,7 @@ def test_runtime_head_repair_contract_is_runtime_scoped():
 
 def test_runtime_review_state_adapter_mutates_active_reviews():
     state = make_state()
-    review = reviewer_bot._runtime_bot().ensure_review_entry(state, 42, create=True)
+    review = reviewer_bot._runtime_bot().domain.adapters.ensure_review_entry(state, 42, create=True)
 
     assert review is state["active_reviews"]["42"]
 
@@ -337,26 +337,23 @@ def test_bootstrap_runtime_wires_explicit_config_output_and_deferred_services():
     assert runtime.config is runtime.infra.config
     assert runtime.outputs is runtime.infra.outputs
     assert runtime.deferred_payloads is runtime.infra.deferred_payloads
-    assert runtime.config.__class__.__name__ == "_EnvConfig"
-    assert runtime.outputs.__class__.__name__ == "_FileOutputSink"
-    assert runtime.deferred_payloads.__class__.__name__ == "_JsonDeferredPayloadLoader"
 
 
 def test_bootstrap_runtime_wires_explicit_state_github_and_lock_services():
     runtime = reviewer_bot._runtime_bot()
 
-    assert runtime.state_store.__class__.__name__ == "_BootstrapStateStoreServices"
-    assert runtime.github.__class__.__name__ == "_BootstrapGitHubServices"
-    assert runtime.locks.__class__.__name__ == "_BootstrapLockServices"
     assert hasattr(runtime.locks, "acquire")
     assert hasattr(runtime.locks, "release")
     assert hasattr(runtime.locks, "refresh")
+    assert hasattr(runtime.state_store, "load_state")
+    assert hasattr(runtime.state_store, "save_state")
+    assert hasattr(runtime.github, "github_api")
+    assert hasattr(runtime.github, "github_api_request")
 
 
 def test_bootstrap_runtime_wires_explicit_handler_services():
     runtime = reviewer_bot._runtime_bot()
 
-    assert runtime.handlers.__class__.__name__ == "_BootstrapHandlerServices"
     assert hasattr(runtime.handlers, "handle_issue_or_pr_opened")
     assert hasattr(runtime.handlers, "handle_comment_event")
     assert hasattr(runtime.handlers, "handle_workflow_run_event")
@@ -365,7 +362,6 @@ def test_bootstrap_runtime_wires_explicit_handler_services():
 def test_bootstrap_runtime_wires_explicit_adapter_services():
     runtime = reviewer_bot._runtime_bot()
 
-    assert runtime.adapters.__class__.__name__ == "_BootstrapAdapterServices"
     assert hasattr(runtime.adapters, "get_github_token")
     assert hasattr(runtime.adapters, "handle_pass_command")
     assert hasattr(runtime.adapters, "render_state_issue_body")

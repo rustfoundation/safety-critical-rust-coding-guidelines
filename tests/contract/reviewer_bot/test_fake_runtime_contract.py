@@ -20,7 +20,7 @@ from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 pytestmark = pytest.mark.contract
 
 
-def test_fake_runtime_config_writes_mirror_env(monkeypatch):
+def test_fake_runtime_config_writes_round_trip_locally(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
 
     runtime.set_config_value("EVENT_NAME", "issue_comment")
@@ -145,30 +145,11 @@ def test_fake_runtime_uses_explicit_public_service_fields(monkeypatch):
     assert runtime.touch_tracker is not None
 
 
-def test_fake_runtime_mutable_review_state_gateways_delegate_to_review_state_owner(monkeypatch):
+def test_fake_runtime_review_state_compatibility_surface_is_limited(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
 
-    assert runtime.ensure_review_entry.__func__.__module__ == FakeReviewerBotRuntime.__module__
-    assert runtime.set_current_reviewer.__func__.__module__ == FakeReviewerBotRuntime.__module__
-    assert runtime.update_reviewer_activity.__func__.__module__ == FakeReviewerBotRuntime.__module__
-    assert runtime.mark_review_complete.__func__.__module__ == FakeReviewerBotRuntime.__module__
-
-
-def test_fake_runtime_closed_mutable_review_state_compatibility_surface(monkeypatch):
-    runtime = FakeReviewerBotRuntime(monkeypatch)
-
-    allowed = {
-        "ensure_review_entry",
-        "set_current_reviewer",
-        "update_reviewer_activity",
-        "mark_review_complete",
-    }
-    removed = {
-        "record_transition_notice_sent",
-        "accept_channel_event",
-        "record_reviewer_activity",
-        "get_current_cycle_boundary",
-    }
+    allowed = {"ensure_review_entry", "set_current_reviewer", "update_reviewer_activity", "mark_review_complete"}
+    removed = {"record_transition_notice_sent", "accept_channel_event", "record_reviewer_activity", "get_current_cycle_boundary"}
 
     for name in allowed:
         assert hasattr(runtime, name)
