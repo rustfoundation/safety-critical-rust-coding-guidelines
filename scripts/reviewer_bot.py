@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Bootstrap entrypoint for reviewer-bot."""
 
+import random
 import sys
+import time
 
-from scripts.reviewer_bot_lib import github_api, lease_lock
+from scripts.reviewer_bot_lib import github_api
 from scripts.reviewer_bot_lib.app import build_event_context as build_app_event_context
 from scripts.reviewer_bot_lib.app import execute_run as execute_app_run
 from scripts.reviewer_bot_lib.app import main as run_app_main
@@ -40,8 +42,8 @@ def _build_runtime() -> ReviewerBotRuntime:
     return build_bootstrap_runtime(
         requests=github_api.requests,
         sys=sys,
-        random=lease_lock.random,
-        time=lease_lock.time,
+        random=random,
+        time=time,
         active_lease_context=ACTIVE_LEASE_CONTEXT,
     )
 

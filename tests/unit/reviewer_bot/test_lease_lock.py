@@ -5,6 +5,11 @@ import pytest
 
 from scripts.reviewer_bot_lib import lease_lock, state_store
 from scripts.reviewer_bot_lib.config import GitHubApiResult, LeaseContext
+from tests.fixtures.fake_clock import FakeClock
+from tests.fixtures.fake_jitter import DeterministicJitter
+from tests.fixtures.fake_sleeper import RecordingSleeper
+from tests.fixtures.fake_uuid import FixedUuidSource
+from tests.fixtures.recording_logger import RecordingLogger
 
 
 def _lease_bot(**overrides):
@@ -15,9 +20,17 @@ def _lease_bot(**overrides):
         LOCK_API_RETRY_LIMIT=3,
         LOCK_RETRY_BASE_SECONDS=0,
         LOCK_MAX_WAIT_SECONDS=60,
+        LOCK_RENEWAL_WINDOW_SECONDS=60,
         sys=sys,
+        time=SimpleNamespace(monotonic=lambda: 0.0),
+        clock=FakeClock(),
+        sleeper=RecordingSleeper(),
+        jitter=DeterministicJitter(0.0),
+        uuid_source=FixedUuidSource("token-123"),
+        logger=RecordingLogger(),
         github_api_request=lambda *args, **kwargs: None,
         get_state_issue_snapshot=lambda: SimpleNamespace(html_url="https://example.com/issues/314"),
+        get_config_value=lambda name, default="": default,
         normalize_lock_metadata=state_store.normalize_lock_metadata,
         parse_iso8601_timestamp=state_store.parse_iso8601_timestamp,
     )
@@ -43,7 +56,7 @@ def test_acquire_lock_retries_until_expected_token_visible(monkeypatch):
     monkeypatch.setattr(
         lease_lock,
         "get_lock_owner_context",
-        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
+        lambda current_bot: ("local-run", "reviewer-bot", "reviewer-bot"),
     )
     snapshots = iter(
         [
@@ -65,8 +78,6 @@ def test_acquire_lock_retries_until_expected_token_visible(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
     bot.get_lock_ref_snapshot = lambda: next(snapshots)
     bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
         201, {"sha": "commit-1"}, {}, "", True
@@ -88,8 +99,6 @@ def test_acquire_lock_fails_closed_on_conflicting_visible_token(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
     bot.get_lock_ref_snapshot = lambda: next(snapshots)
     bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
         201, {"sha": "commit-1"}, {}, "", True
@@ -105,7 +114,7 @@ def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypa
     monkeypatch.setattr(
         lease_lock,
         "get_lock_owner_context",
-        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
+        lambda current_bot: ("local-run", "reviewer-bot", "reviewer-bot"),
     )
     snapshots = iter(
         [
@@ -126,8 +135,6 @@ def test_acquire_lock_succeeds_when_later_loop_observes_own_valid_token(monkeypa
         ]
     )
 
-    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
     bot.get_lock_ref_snapshot = lambda: next(snapshots)
     bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
         201, {"sha": "commit-1"}, {}, "", True
@@ -145,7 +152,7 @@ def test_acquire_lock_fails_closed_when_own_token_has_mismatched_owner(monkeypat
     monkeypatch.setattr(
         lease_lock,
         "get_lock_owner_context",
-        lambda: ("local-run", "reviewer-bot", "reviewer-bot"),
+        lambda current_bot: ("local-run", "reviewer-bot", "reviewer-bot"),
     )
     snapshots = iter(
         [
@@ -164,8 +171,6 @@ def test_acquire_lock_fails_closed_when_own_token_has_mismatched_owner(monkeypat
         ]
     )
 
-    monkeypatch.setattr(lease_lock.uuid, "uuid4", lambda: type("U", (), {"hex": "token-123"})())
-    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
     bot.get_lock_ref_snapshot = lambda: next(snapshots)
 
     with pytest.raises(RuntimeError, match="owner metadata drifted"):
@@ -190,7 +195,6 @@ def test_release_lock_retries_stale_unlocked_predecessor(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr(lease_lock.time, "sleep", lambda seconds: None)
     bot.get_lock_ref_snapshot = lambda: next(snapshots)
     bot.create_lock_commit = lambda parent_sha, tree_sha, lock_meta: GitHubApiResult(
         201, {"sha": "commit-2"}, {}, "", True
