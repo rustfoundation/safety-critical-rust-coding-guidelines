@@ -18,6 +18,10 @@ from .review_state import (
 from .reviews import rebuild_pr_approval_state
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
+
 @dataclass(frozen=True)
 class HeadObservationRepairResult:
     changed: bool
@@ -189,7 +193,7 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     from .event_inputs import build_pull_request_sync_request
 
     if _runtime_epoch(state) != "freshness_v15":
-        print("V18 synchronize repair safe-noop before epoch flip")
+        _log(bot, "info", "V18 synchronize repair safe-noop before epoch flip")
         return False
     request = build_pull_request_sync_request(bot)
     issue_number = request.issue_number

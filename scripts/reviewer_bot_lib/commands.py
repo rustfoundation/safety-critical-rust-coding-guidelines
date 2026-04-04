@@ -16,6 +16,10 @@ from .event_inputs import (
 )
 from .guidance import get_issue_guidance, get_pr_guidance
 
+
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
 _CONVERSATIONAL_WORDS = {
     "i",
     "we",
@@ -387,7 +391,7 @@ def resolve_workflow_run_pr_number(
         raise RuntimeError(f"Pull request #{pr_number} is missing a valid head SHA")
     if pull_request_head_sha != reconcile_head_sha:
         raise RuntimeError(f"Pull request #{pr_number} head SHA does not match workflow_run reconcile context")
-    print(f"Resolved workflow_run PR from reconcile context: #{pr_number}")
+    _log(bot, "info", f"Resolved workflow_run PR from reconcile context: #{pr_number}", pr_number=pr_number)
     return pr_number
 
 

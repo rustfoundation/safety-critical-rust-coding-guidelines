@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
+
 def check_overdue_reviews(bot, state: dict) -> list[dict]:
     """Check all active reviews for overdue ones."""
     if "active_reviews" not in state:
@@ -28,7 +32,7 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
         issue_number = int(issue_key)
         issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
         if not isinstance(issue_snapshot, dict):
-            print(f"WARNING: Skipping overdue evaluation for #{issue_number}; issue/PR snapshot unavailable")
+            _log(bot, "warning", f"Skipping overdue evaluation for #{issue_number}; issue/PR snapshot unavailable", issue_number=issue_number)
             continue
         if isinstance(issue_snapshot.get("pull_request"), dict):
             response_state = bot.compute_reviewer_response_state(
@@ -175,5 +179,5 @@ _Life happens! If you're dealing with something, just let us know._"""
     now = bot.datetime.now(bot.timezone.utc).isoformat()
     review_data["transition_warning_sent"] = now
 
-    print(f"Posted overdue warning for #{issue_number} to @{reviewer}")
+    _log(bot, "info", f"Posted overdue warning for #{issue_number} to @{reviewer}", issue_number=issue_number, reviewer=reviewer)
     return True

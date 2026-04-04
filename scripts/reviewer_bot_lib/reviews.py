@@ -22,6 +22,10 @@ from .reviews_projection import (
 )
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
+
 def _mark_canonical(func):
     setattr(func, "_reviewer_bot_canonical", True)
     return func
@@ -743,7 +747,7 @@ def trigger_mandatory_approver_escalation(bot, state: dict, issue_number: int) -
                     review_data["mandatory_approver_label_applied_at"] = now
                     state_changed = True
         except RuntimeError as exc:
-            print(f"WARNING: Unable to apply escalation label on #{issue_number}: {exc}", file=bot.sys.stderr)
+            _log(bot, "warning", f"Unable to apply escalation label on #{issue_number}: {exc}", issue_number=issue_number, error=str(exc))
     if review_data.get("mandatory_approver_pinged_at") is None:
         if bot.post_comment(issue_number, MANDATORY_TRIAGE_ESCALATION_TEMPLATE):
             review_data["mandatory_approver_pinged_at"] = now
@@ -764,7 +768,7 @@ def satisfy_mandatory_approver_requirement(bot, state: dict, issue_number: int, 
     try:
         bot.remove_label_with_status(issue_number, MANDATORY_TRIAGE_APPROVER_LABEL)
     except RuntimeError as exc:
-        print(f"WARNING: Unable to remove escalation label on #{issue_number}: {exc}", file=bot.sys.stderr)
+        _log(bot, "warning", f"Unable to remove escalation label on #{issue_number}: {exc}", issue_number=issue_number, error=str(exc))
     bot.post_comment(issue_number, MANDATORY_TRIAGE_SATISFIED_TEMPLATE.format(approver=approver))
     return True
 
