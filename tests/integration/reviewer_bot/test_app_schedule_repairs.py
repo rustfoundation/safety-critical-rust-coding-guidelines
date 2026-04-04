@@ -4,7 +4,6 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import maintenance, review_state
 from scripts.reviewer_bot_lib.config import STATUS_PROJECTION_EPOCH
 from tests.fixtures.app_harness import AppHarness
@@ -31,7 +30,7 @@ def test_execute_run_schedule_status_projection_epoch_mismatch_triggers_label_re
     harness.stub_sync_status_labels(lambda current, issue_numbers: synced_issue_numbers.extend(issue_numbers) or True)
     harness.stub_save_state(lambda current: saved_epochs.append(current.get("status_projection_epoch")) or True)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert synced_issue_numbers == [42, 99]
@@ -56,7 +55,7 @@ def test_execute_run_schedule_status_projection_epoch_not_advanced_on_label_sync
     harness.stub_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(RuntimeError("projection exploded")))
     harness.stub_save_state(lambda current: saved_epochs.append(current.get("status_projection_epoch")) or True)
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert all(epoch != STATUS_PROJECTION_EPOCH for epoch in saved_epochs)
@@ -100,7 +99,7 @@ def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tm
     output_path = tmp_path / "github-output.txt"
     monkeypatch.setenv("GITHUB_OUTPUT", str(output_path))
 
-    result = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    result = harness.run_execute()
 
     assert result.exit_code == 0
     assert state["active_reviews"]["42"]["repair_needed"]["kind"] == "projection_failure"
@@ -143,8 +142,8 @@ def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repai
     )
     harness.stub_sync_status_labels(lambda current, issue_numbers: False)
 
-    first = reviewer_bot.execute_run(reviewer_bot.build_event_context())
-    second = reviewer_bot.execute_run(reviewer_bot.build_event_context())
+    first = harness.run_execute()
+    second = harness.run_execute()
 
     assert first.exit_code == 0
     assert second.exit_code == 0
