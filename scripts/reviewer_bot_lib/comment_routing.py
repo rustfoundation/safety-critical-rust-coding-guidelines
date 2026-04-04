@@ -20,6 +20,15 @@ from .event_inputs import (
 )
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    logger = getattr(bot, "logger", None)
+    if logger is not None and hasattr(logger, "event"):
+        logger.event(level, message, **fields)
+        return
+    stream = __import__("sys").stderr if level in {"warning", "error"} else __import__("sys").stdout
+    print(message, file=stream)
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -48,12 +57,18 @@ def _resolve_trust_context(bot, trust_context: PrCommentTrustContext | None) -> 
     return trust_context or build_pr_comment_trust_context(bot)
 
 
-def _require_v18_for_pr(state: dict, request: CommentEventRequest, context: str) -> bool:
+def _require_v18_for_pr(bot, state: dict, request: CommentEventRequest, context: str) -> bool:
     if not request.is_pull_request:
         return True
     epoch = _runtime_epoch(state)
     if epoch != "freshness_v15":
-        print(f"V18 PR freshness path safe-noop for {context}; epoch is {epoch}")
+        _log(
+            bot,
+            "info",
+            f"V18 PR freshness path safe-noop for {context}; epoch is {epoch}",
+            context=context,
+            runtime_epoch=epoch,
+        )
         return False
     return True
 
@@ -315,11 +330,17 @@ def handle_comment_event(
     if route == "issue_direct":
         if comment_request.issue_state == "closed":
             removed = state.get("active_reviews", {}).pop(str(issue_number), None)
-            print(f"Ignoring direct comment on closed issue #{issue_number}")
+            _log(
+                bot,
+                "info",
+                f"Ignoring direct comment on closed issue #{issue_number}",
+                issue_number=issue_number,
+                issue_state=comment_request.issue_state,
+            )
             return removed is not None
         return _process_comment_event(bot, state, comment_request)
     if route == "pr_trusted_direct":
-        if not _require_v18_for_pr(state, comment_request, "pr_trusted_direct_comment"):
+        if not _require_v18_for_pr(bot, state, comment_request, "pr_trusted_direct_comment"):
             return False
         return _process_comment_event(bot, state, comment_request)
     raise RuntimeError("Deferred PR comment events must not mutate directly in trusted workflows")
