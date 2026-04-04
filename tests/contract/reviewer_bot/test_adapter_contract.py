@@ -255,6 +255,8 @@ def test_runtime_typed_config_accessors_read_runtime_config(monkeypatch):
     monkeypatch.setenv("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "180")
     monkeypatch.setenv("REVIEWER_BOT_LOCK_TTL_SECONDS", "600")
     monkeypatch.setenv("REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS", "90")
+    monkeypatch.setenv("REVIEWER_BOT_STATE_READ_RETRY_LIMIT", "8")
+    monkeypatch.setenv("REVIEWER_BOT_STATE_READ_RETRY_SECONDS", "1.5")
     monkeypatch.setenv("REVIEWER_BOT_LOCK_REF_NAME", "heads/test-lock")
     monkeypatch.setenv("REVIEWER_BOT_LOCK_BOOTSTRAP_BRANCH", "develop")
 
@@ -264,6 +266,8 @@ def test_runtime_typed_config_accessors_read_runtime_config(monkeypatch):
     assert runtime.lock_max_wait_seconds() == 180
     assert runtime.lock_lease_ttl_seconds() == 600
     assert runtime.lock_renewal_window_seconds() == 90
+    assert runtime.state_read_retry_limit() == 8
+    assert runtime.state_read_retry_base_seconds() == 1.5
     assert runtime.lock_ref_name() == "heads/test-lock"
     assert runtime.lock_ref_bootstrap_branch() == "develop"
 

@@ -97,13 +97,25 @@ def _lock_retry_base_seconds(bot: StateStoreRuntimeContext) -> float:
     return getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
 
 
+def _state_read_retry_limit(bot: StateStoreRuntimeContext) -> int:
+    accessor = getattr(bot, "state_read_retry_limit", None)
+    if callable(accessor):
+        return accessor()
+    return getattr(bot, "STATE_READ_RETRY_LIMIT", STATE_READ_RETRY_LIMIT)
+
+
+def _state_read_retry_base_seconds(bot: StateStoreRuntimeContext) -> float:
+    accessor = getattr(bot, "state_read_retry_base_seconds", None)
+    if callable(accessor):
+        return accessor()
+    return getattr(bot, "STATE_READ_RETRY_BASE_SECONDS", STATE_READ_RETRY_BASE_SECONDS)
+
+
 def get_state_issue(bot: StateStoreContext) -> dict | None:
     """Fetch the state issue from GitHub with retry for transient failures."""
     state_issue_number = _state_issue_number(bot)
-    state_read_retry_limit = getattr(bot, "STATE_READ_RETRY_LIMIT", STATE_READ_RETRY_LIMIT)
-    state_read_retry_base_seconds = getattr(
-        bot, "STATE_READ_RETRY_BASE_SECONDS", STATE_READ_RETRY_BASE_SECONDS
-    )
+    state_read_retry_limit = _state_read_retry_limit(bot)
+    state_read_retry_base_seconds = _state_read_retry_base_seconds(bot)
 
     if not state_issue_number:
         _log(bot, "error", "STATE_ISSUE_NUMBER not set")
