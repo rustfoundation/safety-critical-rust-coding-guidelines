@@ -41,6 +41,8 @@ def test_fake_runtime_exposes_explicit_service_fields_and_no_omnibus_service_con
     assert runtime.locks is not None
     assert runtime.handlers is not None
     assert runtime.touch_tracker is not None
+    assert runtime.infra is not None
+    assert runtime.domain is not None
     assert hasattr(runtime, "services") is False
     assert hasattr(runtime, "components") is False
 
@@ -211,3 +213,20 @@ def test_focused_fake_service_types_are_exposed_for_direct_fixture_composition(m
     assert isinstance(runtime.artifact_download_transport, ArtifactDownloadTransportStub)
     assert isinstance(runtime.handlers, HandlerStub)
     assert isinstance(runtime.touch_tracker, TouchTrackerStub)
+
+
+def test_fake_runtime_groups_focused_services_into_infra_and_domain_shells(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.infra.config is runtime.config
+    assert runtime.infra.outputs is runtime.outputs
+    assert runtime.infra.deferred_payloads is runtime.deferred_payloads
+    assert runtime.infra.logger is runtime.logger
+    assert runtime.infra.rest_transport is runtime.rest_transport
+    assert runtime.infra.graphql_transport is runtime.graphql_transport
+    assert runtime.infra.artifact_download_transport is runtime.artifact_download_transport
+    assert runtime.infra.touch_tracker is runtime.touch_tracker
+    assert runtime.domain.state_store is runtime.state_store
+    assert runtime.domain.github is runtime.github
+    assert runtime.domain.locks is runtime.locks
+    assert runtime.domain.handlers is runtime.handlers

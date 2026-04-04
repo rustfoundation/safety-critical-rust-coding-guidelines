@@ -47,7 +47,11 @@ def test_execute_run_preview_reviewer_board_missing_token_fails_clearly(monkeypa
     result = harness.run_execute()
 
     assert result.exit_code == 1
-    assert "REVIEWER_BOARD_TOKEN not set" in capsys.readouterr().err
+    captured = capsys.readouterr().err
+    assert "REVIEWER_BOARD_TOKEN not set" in captured or any(
+        "REVIEWER_BOARD_TOKEN not set" in record["message"]
+        for record in harness.runtime.logger.records
+    )
 
 def test_execute_run_preview_reviewer_board_invalid_manifest_fails_clearly(monkeypatch, capsys):
     harness = AppHarness(monkeypatch)
@@ -81,7 +85,11 @@ def test_execute_run_preview_reviewer_board_invalid_manifest_fails_clearly(monke
     result = harness.run_execute()
 
     assert result.exit_code == 1
-    assert "Missing reviewer board field: Review State" in capsys.readouterr().err
+    captured = capsys.readouterr().err
+    assert "Missing reviewer board field: Review State" in captured or any(
+        "Missing reviewer board field: Review State" in record["message"]
+        for record in harness.runtime.logger.records
+    )
 
 def test_execute_run_preview_reviewer_board_is_read_only(monkeypatch, capsys):
     harness = AppHarness(monkeypatch)

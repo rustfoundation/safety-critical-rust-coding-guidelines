@@ -54,6 +54,26 @@ from tests.fixtures.focused_fake_services import (
 from tests.fixtures.recording_logger import RecordingLogger
 
 
+class FakeRuntimeInfraServices:
+    def __init__(self, *, config, outputs, deferred_payloads, logger, rest_transport, graphql_transport, artifact_download_transport, touch_tracker):
+        self.config = config
+        self.outputs = outputs
+        self.deferred_payloads = deferred_payloads
+        self.logger = logger
+        self.rest_transport = rest_transport
+        self.graphql_transport = graphql_transport
+        self.artifact_download_transport = artifact_download_transport
+        self.touch_tracker = touch_tracker
+
+
+class FakeRuntimeDomainServices:
+    def __init__(self, *, state_store, github, locks, handlers):
+        self.state_store = state_store
+        self.github = github
+        self.locks = locks
+        self.handlers = handlers
+
+
 class FakeReviewerBotRuntime:
     BOT_NAME = BOT_NAME
     BOT_MENTION = BOT_MENTION
@@ -89,12 +109,13 @@ class FakeReviewerBotRuntime:
         self.config = ConfigBag(monkeypatch)
         self.outputs = OutputCapture()
         self.deferred_payloads = DeferredPayloadStore()
-        self.state_store = StateStoreStub()
-        self.locks = LockStub()
-        self.github = GitHubStub(github)
         self.rest_transport = RestTransportStub(self)
         self.graphql_transport = GraphQLTransportStub()
         self.artifact_download_transport = ArtifactDownloadTransportStub()
+        self.touch_tracker = TouchTrackerStub()
+        self.state_store = StateStoreStub()
+        self.locks = LockStub()
+        self.github = GitHubStub(github)
         self.handlers = HandlerStub(
             {
                 "handle_issue_or_pr_opened": lambda state: lifecycle_module.handle_issue_or_pr_opened(self, state),
@@ -109,7 +130,22 @@ class FakeReviewerBotRuntime:
                 "handle_workflow_run_event": lambda state: reconcile_module.handle_workflow_run_event(self, state),
             }
         )
-        self.touch_tracker = TouchTrackerStub()
+        self.infra = FakeRuntimeInfraServices(
+            config=self.config,
+            outputs=self.outputs,
+            deferred_payloads=self.deferred_payloads,
+            logger=self.logger,
+            rest_transport=self.rest_transport,
+            graphql_transport=self.graphql_transport,
+            artifact_download_transport=self.artifact_download_transport,
+            touch_tracker=self.touch_tracker,
+        )
+        self.domain = FakeRuntimeDomainServices(
+            state_store=self.state_store,
+            github=self.github,
+            locks=self.locks,
+            handlers=self.handlers,
+        )
         self._process_pass_until: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_members: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_status_labels: Callable[[dict, Any], bool] = lambda state, issue_numbers: False
