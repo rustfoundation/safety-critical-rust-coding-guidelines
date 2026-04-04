@@ -27,6 +27,15 @@ class _RandomJitter:
         return __import__("random").uniform(lower, upper)
 
 
+def _log(bot: GitHubTransportContext, level: str, message: str, **fields) -> None:
+    logger = getattr(bot, "logger", None)
+    if logger is not None and hasattr(logger, "event"):
+        logger.event(level, message, **fields)
+        return
+    stream = sys.stderr if level in {"warning", "error"} else sys.stdout
+    print(message, file=stream)
+
+
 def _should_retry_status(status_code: int | None) -> bool:
     return retrying.is_retryable_status(status_code)
 
@@ -103,7 +112,7 @@ def _build_result(
 def get_github_token(bot: GitHubTransportContext) -> str:
     token = bot.get_config_value("GITHUB_TOKEN")
     if not token:
-        print("ERROR: GITHUB_TOKEN not set", file=sys.stderr)
+        _log(bot, "error", "GITHUB_TOKEN not set")
         raise SystemExit(1)
     return token
 
@@ -159,7 +168,7 @@ def github_api_request(
                 time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
                 continue
             if not suppress_error_log:
-                print(f"GitHub API transport error: {exc}", file=sys.stderr)
+                _log(bot, "error", f"GitHub API transport error: {exc}", transport_error=str(exc))
             return _build_result(
                 bot,
                 status_code=None,
@@ -201,7 +210,13 @@ def github_api_request(
             continue
 
         if not suppress_error_log:
-            print(f"GitHub API error: {response.status_code} - {response.text}", file=sys.stderr)
+            _log(
+                bot,
+                "error",
+                f"GitHub API error: {response.status_code} - {response.text}",
+                status_code=response.status_code,
+                failure_kind=failure_kind,
+            )
         return _build_result(
             bot,
             status_code=response.status_code,
@@ -261,7 +276,7 @@ def github_graphql_request(
                 time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
                 continue
             if not suppress_error_log:
-                print(f"GitHub GraphQL transport error: {exc}", file=sys.stderr)
+                _log(bot, "error", f"GitHub GraphQL transport error: {exc}", transport_error=str(exc))
             return _build_result(
                 bot,
                 status_code=None,
@@ -310,7 +325,13 @@ def github_graphql_request(
             details = response.text
             if graphql_errors:
                 details = json.dumps(graphql_errors, sort_keys=True)
-            print(f"GitHub GraphQL error: {response.status_code} - {details}", file=sys.stderr)
+            _log(
+                bot,
+                "error",
+                f"GitHub GraphQL error: {response.status_code} - {details}",
+                status_code=response.status_code,
+                failure_kind=failure_kind,
+            )
         return _build_result(
             bot,
             status_code=response.status_code,
@@ -377,10 +398,13 @@ def add_label_with_status(bot: GitHubTransportContext, issue_number: int, label:
         raise RuntimeError(
             f"Permission denied adding label '{label}' to #{issue_number}: {response.text}"
         )
-    print(
-        f"WARNING: Failed to add label '{label}' to #{issue_number} "
-        f"(status {response.status_code}): {response.text}",
-        file=sys.stderr,
+    _log(
+        bot,
+        "warning",
+        f"Failed to add label '{label}' to #{issue_number} (status {response.status_code}): {response.text}",
+        issue_number=issue_number,
+        label=label,
+        status_code=response.status_code,
     )
     return False
 
@@ -397,10 +421,13 @@ def remove_label_with_status(bot: GitHubTransportContext, issue_number: int, lab
         raise RuntimeError(
             f"Permission denied removing label '{label}' from #{issue_number}: {response.text}"
         )
-    print(
-        f"WARNING: Failed to remove label '{label}' from #{issue_number} "
-        f"(status {response.status_code}): {response.text}",
-        file=sys.stderr,
+    _log(
+        bot,
+        "warning",
+        f"Failed to remove label '{label}' from #{issue_number} (status {response.status_code}): {response.text}",
+        issue_number=issue_number,
+        label=label,
+        status_code=response.status_code,
     )
     return False
 
@@ -427,10 +454,12 @@ def ensure_label_exists(
     if response.status_code in {201, 422}:
         return True
 
-    print(
-        f"WARNING: Failed to ensure label '{label}' exists (status {response.status_code}): "
-        f"{response.text}",
-        file=sys.stderr,
+    _log(
+        bot,
+        "warning",
+        f"Failed to ensure label '{label}' exists (status {response.status_code}): {response.text}",
+        label=label,
+        status_code=response.status_code,
     )
     return False
 
@@ -463,9 +492,14 @@ def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, 
         if response.status_code == 429 or response.status_code >= 500:
             if attempt < lock_api_retry_limit:
                 delay = lock_retry_base_seconds + random.uniform(0, lock_retry_base_seconds)
-                print(
-                    f"Retryable {assignment_target} API failure for @{username} on #{issue_number} "
-                    f"(status {response.status_code}); retrying ({attempt}/{lock_api_retry_limit})"
+                _log(
+                    bot,
+                    "warning",
+                    f"Retryable {assignment_target} API failure for @{username} on #{issue_number} (status {response.status_code}); retrying ({attempt}/{lock_api_retry_limit})",
+                    issue_number=issue_number,
+                    username=username,
+                    status_code=response.status_code,
+                    retry_attempt=attempt,
                 )
                 time.sleep(delay)
                 continue
@@ -475,10 +509,13 @@ def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, 
                 exhausted_retryable_failure=True,
             )
 
-        print(
-            f"WARNING: Unexpected {assignment_target} API status {response.status_code} "
-            f"for @{username} on #{issue_number}: {response.text}",
-            file=sys.stderr,
+        _log(
+            bot,
+            "warning",
+            f"Unexpected {assignment_target} API status {response.status_code} for @{username} on #{issue_number}: {response.text}",
+            issue_number=issue_number,
+            username=username,
+            status_code=response.status_code,
         )
         return bot.AssignmentAttempt(success=False, status_code=response.status_code)
 

@@ -5,6 +5,7 @@ import pytest
 from scripts.reviewer_bot_lib import automation, github_api
 from scripts.reviewer_bot_lib.config import LOCK_API_RETRY_LIMIT, GitHubApiResult
 from tests.fixtures.http_responses import FakeGitHubResponse
+from tests.fixtures.recording_logger import RecordingLogger
 
 
 class RecordingRestTransport:
@@ -57,6 +58,7 @@ def _bot(**overrides):
         get_config_value=lambda name, default="": __import__("os").environ.get(name, default),
         rest_transport=RecordingRestTransport(),
         graphql_transport=RecordingGraphQLTransport(),
+        logger=RecordingLogger(),
         STATE_ISSUE_NUMBER=1,
     )
     for key, value in overrides.items():
@@ -287,6 +289,32 @@ def test_github_api_request_reports_transport_retry_exhaustion(monkeypatch):
     assert result.failure_kind == "transport_error"
     assert result.retry_attempts == LOCK_API_RETRY_LIMIT
     assert "timeout" in str(result.transport_error)
+
+
+def test_github_api_request_logs_transport_error_to_recording_logger(monkeypatch):
+    monkeypatch.setenv("REPO_OWNER", "rustfoundation")
+    monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
+    transport = RecordingRestTransport([github_api.requests.RequestException("timeout")])
+    bot = _bot(rest_transport=transport)
+
+    result = github_api.github_api_request(bot, "GET", "issues/42", suppress_error_log=False)
+
+    assert result.ok is False
+    assert bot.logger.records[-1]["level"] == "error"
+    assert "transport error" in bot.logger.records[-1]["message"]
+
+
+def test_github_api_request_logs_error_response_to_recording_logger(monkeypatch):
+    monkeypatch.setenv("REPO_OWNER", "rustfoundation")
+    monkeypatch.setenv("REPO_NAME", "safety-critical-rust-coding-guidelines")
+    transport = RecordingRestTransport([FakeGitHubResponse(403, {"message": "forbidden"}, "forbidden")])
+    bot = _bot(rest_transport=transport)
+
+    result = github_api.github_api_request(bot, "GET", "issues/42", suppress_error_log=False)
+
+    assert result.ok is False
+    assert bot.logger.records[-1]["level"] == "error"
+    assert bot.logger.records[-1]["fields"]["status_code"] == 403
 
 
 def test_github_graphql_request_passes_timeout(monkeypatch):
