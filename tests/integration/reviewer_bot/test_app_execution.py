@@ -6,6 +6,15 @@ from tests.fixtures.reviewer_bot import make_state
 pytestmark = pytest.mark.integration
 
 
+def test_app_harness_exposes_focused_runtime_services(monkeypatch):
+    harness = AppHarness(monkeypatch)
+
+    assert harness.state_store is harness.runtime.state_store
+    assert harness.locks is harness.runtime.locks
+    assert harness.handlers is harness.runtime.handlers
+    assert harness.touch_tracker is harness.runtime.touch_tracker
+
+
 def test_execute_run_reloads_state_before_syncing_status_labels(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")
