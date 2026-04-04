@@ -289,3 +289,27 @@ def test_resolve_workflow_run_pr_number_fails_closed_when_pr_unavailable(monkeyp
 
     with pytest.raises(RuntimeError, match="Failed to fetch pull request #42 during workflow_run reconcile"):
         commands.resolve_workflow_run_pr_number(runtime)
+
+
+def test_read_reconcile_reviews_rejects_non_list_payload(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.get_pull_request_reviews = lambda issue_number: {"unexpected": True}
+
+    with pytest.raises(reconcile.ReconcileReadError, match="payload invalid"):
+        reconcile._read_reconcile_reviews(runtime, 42)
+
+
+def test_read_optional_reconcile_object_returns_none_for_not_found(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.github_api_request = lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
+        status_code=404,
+        payload={"message": "missing"},
+        headers={},
+        text="missing",
+        ok=False,
+        failure_kind="not_found",
+        retry_attempts=0,
+        transport_error=None,
+    )
+
+    assert reconcile._read_optional_reconcile_object(runtime, "pulls/42/reviews/11", label="live review #11") is None

@@ -217,6 +217,24 @@ def _read_reconcile_object(bot, endpoint: str, *, label: str) -> dict:
     return response.payload
 
 
+def _read_optional_reconcile_object(bot, endpoint: str, *, label: str) -> dict | None:
+    try:
+        return _read_reconcile_object(bot, endpoint, label=label)
+    except ReconcileReadError as exc:
+        if exc.failure_kind == "not_found":
+            return None
+        raise
+
+
+def _read_reconcile_reviews(bot, issue_number: int) -> list[dict]:
+    reviews = bot.get_pull_request_reviews(issue_number)
+    if reviews is None:
+        raise ReconcileReadError(f"live reviews for PR #{issue_number} unavailable", failure_kind="unavailable")
+    if not isinstance(reviews, list):
+        raise ReconcileReadError(f"live reviews for PR #{issue_number} payload invalid", failure_kind="invalid_payload")
+    return reviews
+
+
 def _ensure_source_event_key(review_data: dict, source_event_key: str, payload: dict | None = None) -> None:
     review_data.setdefault("deferred_gaps", {})
     if payload is None:
@@ -249,9 +267,7 @@ def _was_reconciled_source_event(review_data: dict, source_event_key: str) -> bo
 
 def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dict) -> bool:
     pull_request = _read_reconcile_object(bot, f"pulls/{issue_number}", label=f"pull request #{issue_number}")
-    reviews = bot.get_pull_request_reviews(issue_number)
-    if reviews is None:
-        raise ReconcileReadError(f"live reviews for PR #{issue_number} unavailable", failure_kind="unavailable")
+    reviews = _read_reconcile_reviews(bot, issue_number)
     before = {
         "reviewer_review": deepcopy(review_data.get("reviewer_review")),
         "active_head_sha": review_data.get("active_head_sha"),
@@ -314,8 +330,9 @@ def reconcile_active_review_entry(
         return "ℹ️ PR review freshness rectify is epoch-gated and currently inactive.", True, False
     head_repair_result = bot.maybe_record_head_observation_repair(issue_number, review_data)
     state_changed = head_repair_result.changed
-    reviews = bot.get_pull_request_reviews(issue_number)
-    if reviews is None:
+    try:
+        reviews = _read_reconcile_reviews(bot, issue_number)
+    except ReconcileReadError:
         return f"❌ Failed to fetch reviews for PR #{issue_number}; cannot run `/rectify`.", False, False
     messages: list[str] = []
     refreshed, latest_review = refresh_reviewer_review_from_live_preferred_review(
@@ -929,13 +946,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 expected_event_action="submitted",
             )
             review_id = context.review_id
-            try:
-                live_review = _read_reconcile_object(bot, f"pulls/{pr_number}/reviews/{review_id}", label=f"live review #{review_id}")
-            except ReconcileReadError as exc:
-                if exc.failure_kind == "not_found":
-                    live_review = None
-                else:
-                    raise
+            live_review = _read_optional_reconcile_object(bot, f"pulls/{pr_number}/reviews/{review_id}", label=f"live review #{review_id}")
             _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number}")
             live_commit_id = None
             live_submitted_at = parsed_payload.source_submitted_at
