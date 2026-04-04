@@ -26,11 +26,19 @@ from .queue import (
     reposition_member_as_next,
     sync_members_with_queue,
 )
-from .runtime import ReviewerBotRuntime
+from .runtime import (
+    ReviewerBotRuntime,
+    _EnvConfig,
+    _FileOutputSink,
+    _JsonDeferredPayloadLoader,
+)
 
 
 def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> ReviewerBotRuntime:
     runtime: ReviewerBotRuntime | None = None
+    config_service = _EnvConfig()
+    output_sink = _FileOutputSink(config_service)
+    deferred_payload_loader = _JsonDeferredPayloadLoader(config_service)
 
     state_store_services = SimpleNamespace(
         load_state=lambda *, fail_on_unavailable=False: state_store.load_state(
@@ -211,6 +219,9 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
         sys=sys,
         random=random,
         time=time,
+        config=config_service,
+        outputs=output_sink,
+        deferred_payloads=deferred_payload_loader,
         state_store=state_store_services,
         github=github_services,
         locks=lock_services,

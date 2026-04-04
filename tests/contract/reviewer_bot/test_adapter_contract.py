@@ -291,6 +291,17 @@ def test_runtime_exposes_explicit_infra_and_domain_service_groups():
     assert runtime.domain.adapters is runtime.adapters
 
 
+def test_bootstrap_runtime_wires_explicit_config_output_and_deferred_services():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert runtime.config is runtime.infra.config
+    assert runtime.outputs is runtime.infra.outputs
+    assert runtime.deferred_payloads is runtime.infra.deferred_payloads
+    assert runtime.config.__class__.__name__ == "_EnvConfig"
+    assert runtime.outputs.__class__.__name__ == "_FileOutputSink"
+    assert runtime.deferred_payloads.__class__.__name__ == "_JsonDeferredPayloadLoader"
+
+
 def test_default_stderr_logger_renders_message_and_sorted_fields():
     writes = []
     logger = StdErrLogger(SimpleNamespace(stderr=SimpleNamespace(write=lambda text: writes.append(text))))
