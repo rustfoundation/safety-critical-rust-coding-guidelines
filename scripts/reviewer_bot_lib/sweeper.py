@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import json
-import os
 import time
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -36,6 +35,14 @@ def _now() -> datetime:
 
 def _now_iso() -> str:
     return _now().isoformat()
+
+
+def _retention_days(bot) -> int:
+    return int(bot.get_config_value("DEFERRED_ARTIFACT_RETENTION_DAYS", "7") or 7)
+
+
+def _github_repository(bot) -> str:
+    return bot.get_config_value("GITHUB_REPOSITORY", "")
 
 
 def _approval_pending_signature_from_runbook() -> dict | None:
@@ -101,9 +108,8 @@ def can_mark_observer_run_missing(gap: dict, now: datetime | None = None) -> boo
     return bool(gap.get("full_scan_complete") and gap.get("later_recheck_complete") and not gap.get("correlated_run_found") and not gap.get("approval_pending_evidence_retained"))
 
 
-def classify_artifact_gap_reason(gap: dict, now: datetime | None = None) -> str:
+def classify_artifact_gap_reason(gap: dict, now: datetime | None = None, *, retention_days: int = 7) -> str:
     now = now or _now()
-    retention_days = int(os.environ.get("DEFERRED_ARTIFACT_RETENTION_DAYS", "7"))
     run_created_at = parse_timestamp(gap.get("run_created_at"))
     if gap.get("artifact_seen_at") or gap.get("artifact_last_downloadable_at"):
         return "artifact_expired"
@@ -115,6 +121,7 @@ def classify_artifact_gap_reason(gap: dict, now: datetime | None = None) -> str:
 
 
 def correlate_candidate_observer_runs(
+    bot,
     source_event_key: str,
     *,
     source_event_kind: str,
@@ -174,7 +181,7 @@ def correlate_candidate_observer_runs(
         repo = run.get("repository")
         if isinstance(repo, dict):
             full_name = repo.get("full_name")
-            if isinstance(full_name, str) and full_name != os.environ.get("GITHUB_REPOSITORY", ""):
+            if isinstance(full_name, str) and full_name != _github_repository(bot):
                 continue
         prs = run.get("pull_requests")
         if isinstance(prs, list) and prs:
@@ -838,6 +845,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 workflow_file = ".github/workflows/reviewer-bot-pr-comment-observer.yml"
                 workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "issue_comment")
                 run_correlation = correlate_candidate_observer_runs(
+                    bot,
                     source_event_key,
                     source_event_kind="issue_comment:created",
                     source_event_created_at=created_at,
@@ -905,6 +913,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 workflow_file = ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml"
                 workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "pull_request_review")
                 run_correlation = correlate_candidate_observer_runs(
+                    bot,
                     source_event_key,
                     source_event_kind="pull_request_review:submitted",
                     source_event_created_at=submitted_at,
@@ -981,6 +990,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 workflow_file = ".github/workflows/reviewer-bot-pr-review-comment-observer.yml"
                 workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "pull_request_review_comment")
                 run_correlation = correlate_candidate_observer_runs(
+                    bot,
                     source_event_key,
                     source_event_kind="pull_request_review_comment:created",
                     source_event_created_at=created_at,
@@ -1048,6 +1058,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 workflow_file = ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml"
                 workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "pull_request_review")
                 run_correlation = correlate_candidate_observer_runs(
+                    bot,
                     source_event_key,
                     source_event_kind="pull_request_review:dismissed",
                     source_event_created_at=dismissed_at,

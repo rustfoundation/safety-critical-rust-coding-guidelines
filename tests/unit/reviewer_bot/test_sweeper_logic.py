@@ -312,8 +312,10 @@ def test_negative_missing_run_requires_full_scan_and_recheck():
 
 
 def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_window(monkeypatch):
-    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    runtime = _runtime(monkeypatch)
+    runtime.set_config_value("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
     result = sweeper.correlate_candidate_observer_runs(
+        runtime,
         "issue_comment:101",
         source_event_kind="issue_comment:created",
         source_event_created_at="2026-03-17T10:00:00Z",
@@ -400,6 +402,19 @@ def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention()
     assert sweeper.classify_artifact_gap_reason(expired) == "artifact_expired"
     missing = {"artifact_inspection_complete": True, "run_created_at": "2026-03-17T00:00:00Z"}
     assert sweeper.classify_artifact_gap_reason(missing) == "artifact_missing"
+
+
+def test_artifact_gap_reason_uses_passed_retention_days():
+    gap = {
+        "run_created_at": "2026-03-01T00:00:00Z",
+        "retention_window_documented": True,
+    }
+
+    assert sweeper.classify_artifact_gap_reason(
+        gap,
+        now=sweeper.parse_timestamp("2026-03-05T00:00:00Z"),
+        retention_days=3,
+    ) == "artifact_expired"
 
 
 def test_sweeper_fetches_single_candidate_run_detail_without_exact_artifact_match(monkeypatch):
