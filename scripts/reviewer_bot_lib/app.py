@@ -190,11 +190,11 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
         loaded_epoch = state.get("freshness_runtime_epoch") if isinstance(state.get("freshness_runtime_epoch"), str) else None
 
         if lock_required:
-            state, restored = bot.adapters.process_pass_until_expirations(state)
+            state, restored = bot.adapters.workflow.process_pass_until_expirations(state)
             if restored:
                 _log(bot, "info", f"Restored from pass-until: {restored}", restored=restored)
 
-            state, sync_changes = bot.adapters.sync_members_with_queue(state)
+            state, sync_changes = bot.adapters.workflow.sync_members_with_queue(state)
             if sync_changes:
                 _log(bot, "info", f"Members sync changes: {sync_changes}", sync_changes=sync_changes)
 
@@ -299,7 +299,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 )
             _revalidate_epoch(bot, loaded_epoch, "status-label projection")
             try:
-                    status_labels_changed = bot.adapters.sync_status_labels_for_items(state, touched_items)
+                    status_labels_changed = bot.adapters.workflow.sync_status_labels_for_items(state, touched_items)
             except RuntimeError as exc:
                 projection_failure = exc
                 _log(

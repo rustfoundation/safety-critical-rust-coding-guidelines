@@ -78,6 +78,7 @@ class FakeRuntimeDomainServices:
 class FakeRuntimeAdapterServices:
     def __init__(self, runtime: "FakeReviewerBotRuntime"):
         self._runtime = runtime
+        self.workflow = runtime.workflow
 
     def process_pass_until_expirations(self, state: dict):
         return self._runtime.workflow.process_pass_until_expirations(state)

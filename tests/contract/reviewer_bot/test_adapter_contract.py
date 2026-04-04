@@ -69,7 +69,7 @@ def test_runtime_head_repair_contract_is_runtime_scoped():
 
 def test_runtime_review_state_adapter_mutates_active_reviews():
     state = make_state()
-    review = reviewer_bot._runtime_bot().domain.adapters.ensure_review_entry(state, 42, create=True)
+    review = reviewer_bot._runtime_bot().adapters.review.ensure_review_entry(state, 42, create=True)
 
     assert review is state["active_reviews"]["42"]
 
@@ -328,7 +328,6 @@ def test_runtime_exposes_explicit_infra_and_domain_service_groups():
     assert runtime.domain.github is runtime.github
     assert runtime.domain.locks is runtime.locks
     assert runtime.domain.handlers is runtime.handlers
-    assert runtime.domain.adapters is runtime.adapters
 
 
 def test_bootstrap_runtime_wires_explicit_config_output_and_deferred_services():
@@ -362,9 +361,14 @@ def test_bootstrap_runtime_wires_explicit_handler_services():
 def test_bootstrap_runtime_wires_explicit_adapter_services():
     runtime = reviewer_bot._runtime_bot()
 
-    assert hasattr(runtime.adapters, "get_github_token")
-    assert hasattr(runtime.adapters, "handle_pass_command")
-    assert hasattr(runtime.adapters, "render_state_issue_body")
+    assert hasattr(runtime.adapters, "github")
+    assert hasattr(runtime.adapters, "review")
+    assert hasattr(runtime.adapters, "workflow")
+    assert hasattr(runtime.adapters, "automation")
+    assert hasattr(runtime.adapters, "state_lock")
+    assert hasattr(runtime.adapters.github, "get_github_token")
+    assert hasattr(runtime.adapters.review, "handle_pass_command")
+    assert hasattr(runtime.adapters.state_lock, "render_state_issue_body")
 
 
 def test_default_stderr_logger_renders_message_and_sorted_fields():

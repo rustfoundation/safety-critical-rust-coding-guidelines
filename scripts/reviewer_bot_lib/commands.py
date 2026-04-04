@@ -396,7 +396,7 @@ def resolve_workflow_run_pr_number(
 
 
 def handle_sync_members_command(bot, state: dict) -> tuple[str, bool]:
-    state, changes = bot.adapters.sync_members_with_queue(state)
+    state, changes = bot.adapters.workflow.sync_members_with_queue(state)
     if changes:
         changes_text = "\n".join(f"- {change}" for change in changes)
         return f"✅ Queue synced with members.md:\n\n{changes_text}", True

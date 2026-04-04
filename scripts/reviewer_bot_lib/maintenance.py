@@ -155,7 +155,7 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
         return False
     bot.assert_lock_held("handle_manual_dispatch")
     if action == "sync-members":
-        _, changes = bot.adapters.sync_members_with_queue(state)
+        _, changes = bot.adapters.workflow.sync_members_with_queue(state)
         return bool(changes)
     if action == "repair-review-status-labels":
         for issue_number in bot.list_open_items_with_status_labels():

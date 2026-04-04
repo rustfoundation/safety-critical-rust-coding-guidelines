@@ -372,133 +372,130 @@ class ReviewerBotRuntime:
         return self.touch_tracker.drain()
 
     def assert_lock_held(self, context: str) -> None:
-        return self.adapters.assert_lock_held(context)
+        return self.adapters.state_lock.assert_lock_held(context)
 
     def get_github_token(self) -> str:
-        return self.adapters.get_github_token()
+        return self.adapters.github.get_github_token()
 
     def get_github_graphql_token(self, *, prefer_board_token: bool = False) -> str:
-        return self.adapters.get_github_graphql_token(prefer_board_token=prefer_board_token)
+        return self.adapters.github.get_github_graphql_token(prefer_board_token=prefer_board_token)
 
     def github_graphql(self, query: str, variables=None, *, token=None):
-        return self.adapters.github_graphql(query, variables, token=token)
+        return self.adapters.github.github_graphql(query, variables, token=token)
 
     def post_comment(self, issue_number: int, body: str) -> bool:
-        return self.adapters.post_comment(issue_number, body)
+        return self.adapters.github.post_comment(issue_number, body)
 
     def get_repo_labels(self):
-        return self.adapters.get_repo_labels()
+        return self.adapters.github.get_repo_labels()
 
     def add_label(self, issue_number: int, label: str) -> bool:
-        return self.adapters.add_label(issue_number, label)
+        return self.adapters.github.add_label(issue_number, label)
 
     def remove_label(self, issue_number: int, label: str) -> bool:
-        return self.adapters.remove_label(issue_number, label)
+        return self.adapters.github.remove_label(issue_number, label)
 
     def ensure_label_exists(self, label: str, *, color: str | None = None, description: str | None = None) -> bool:
-        return self.adapters.ensure_label_exists(label, color=color, description=description)
+        return self.adapters.github.ensure_label_exists(label, color=color, description=description)
 
     def get_issue_assignees(self, issue_number: int):
-        return self.adapters.get_issue_assignees(issue_number)
+        return self.adapters.github.get_issue_assignees(issue_number)
 
     def request_reviewer_assignment(self, issue_number: int, username: str):
-        return self.adapters.request_reviewer_assignment(issue_number, username)
+        return self.adapters.github.request_reviewer_assignment(issue_number, username)
 
     def get_assignment_failure_comment(self, reviewer: str, attempt):
-        return self.adapters.get_assignment_failure_comment(reviewer, attempt)
+        return self.adapters.github.get_assignment_failure_comment(reviewer, attempt)
 
     def add_reaction(self, comment_id: int, reaction: str) -> bool:
-        return self.adapters.add_reaction(comment_id, reaction)
+        return self.adapters.github.add_reaction(comment_id, reaction)
 
     def remove_assignee(self, issue_number: int, username: str) -> bool:
-        return self.adapters.remove_assignee(issue_number, username)
+        return self.adapters.github.remove_assignee(issue_number, username)
 
     def remove_pr_reviewer(self, issue_number: int, username: str) -> bool:
-        return self.adapters.remove_pr_reviewer(issue_number, username)
+        return self.adapters.github.remove_pr_reviewer(issue_number, username)
 
     def unassign_reviewer(self, issue_number: int, username: str) -> bool:
-        return self.adapters.unassign_reviewer(issue_number, username)
+        return self.adapters.github.unassign_reviewer(issue_number, username)
 
     def get_user_permission_status(self, username: str, required_permission: str = "triage") -> str:
-        return self.adapters.get_user_permission_status(username, required_permission)
+        return self.adapters.github.get_user_permission_status(username, required_permission)
 
     def check_user_permission(self, username: str, required_permission: str = "triage"):
-        return self.adapters.check_user_permission(username, required_permission)
+        return self.adapters.github.check_user_permission(username, required_permission)
 
     def get_issue_or_pr_snapshot(self, issue_number: int):
-        return self.adapters.get_issue_or_pr_snapshot(issue_number)
+        return self.adapters.github.get_issue_or_pr_snapshot(issue_number)
 
     def get_pull_request_reviews(self, issue_number: int):
-        return self.adapters.get_pull_request_reviews(issue_number)
+        return self.adapters.github.get_pull_request_reviews(issue_number)
 
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
-        return self.adapters.maybe_record_head_observation_repair(issue_number, review_data)
+        return self.adapters.review.maybe_record_head_observation_repair(issue_number, review_data)
 
-    # Adapter-only mutable review-state compatibility surface.
-    # Ownership lives in review_state.py; these methods remain so runtime-oriented
-    # callers and test doubles can delegate through one adapter seam.
     def get_next_reviewer(self, state: dict, skip_usernames=None):
-        return self.adapters.get_next_reviewer(state, skip_usernames)
+        return self.adapters.review.get_next_reviewer(state, skip_usernames)
 
     def strip_code_blocks(self, comment_body: str) -> str:
-        return self.adapters.strip_code_blocks(comment_body)
+        return self.adapters.review.strip_code_blocks(comment_body)
 
     def parse_command(self, comment_body: str):
-        return self.adapters.parse_command(comment_body)
+        return self.adapters.review.parse_command(comment_body)
 
     def record_assignment(self, state: dict, github: str, issue_number: int, kind: str) -> None:
-        return self.adapters.record_assignment(state, github, issue_number, kind)
+        return self.adapters.review.record_assignment(state, github, issue_number, kind)
 
     def reposition_member_as_next(self, state: dict, username: str) -> bool:
-        return self.adapters.reposition_member_as_next(state, username)
+        return self.adapters.review.reposition_member_as_next(state, username)
 
     def parse_iso8601_timestamp(self, value: Any):
-        return self.adapters.parse_iso8601_timestamp(value)
+        return self.adapters.state_lock.parse_iso8601_timestamp(value)
 
     def compute_reviewer_response_state(self, issue_number: int, review_data: dict, *, issue_snapshot=None):
-        return self.adapters.compute_reviewer_response_state(issue_number, review_data, issue_snapshot=issue_snapshot)
+        return self.adapters.review.compute_reviewer_response_state(issue_number, review_data, issue_snapshot=issue_snapshot)
 
     def run_command(self, command, cwd, check=False):
-        return self.adapters.run_command(command, cwd, check)
+        return self.adapters.automation.run_command(command, cwd, check)
 
     def summarize_output(self, result, limit: int = 20) -> str:
-        return self.adapters.summarize_output(result, limit)
+        return self.adapters.automation.summarize_output(result, limit)
 
     def list_changed_files(self, repo_root):
-        return self.adapters.list_changed_files(repo_root)
+        return self.adapters.automation.list_changed_files(repo_root)
 
     def get_default_branch(self) -> str:
-        return self.adapters.get_default_branch()
+        return self.adapters.automation.get_default_branch()
 
     def find_open_pr_for_branch_status(self, branch: str):
-        return self.adapters.find_open_pr_for_branch_status(branch)
+        return self.adapters.automation.find_open_pr_for_branch_status(branch)
 
     def create_pull_request(self, branch: str, base: str, issue_number: int):
-        return self.adapters.create_pull_request(branch, base, issue_number)
+        return self.adapters.automation.create_pull_request(branch, base, issue_number)
 
     def parse_issue_labels(self) -> list[str]:
-        return self.adapters.parse_issue_labels()
+        return self.adapters.automation.parse_issue_labels()
 
     def normalize_lock_metadata(self, lock_meta: dict | None):
-        return self.adapters.normalize_lock_metadata(lock_meta)
+        return self.adapters.state_lock.normalize_lock_metadata(lock_meta)
 
     def get_state_issue(self):
-        return self.adapters.get_state_issue()
+        return self.adapters.state_lock.get_state_issue()
 
     def clear_lock_metadata(self):
-        return self.adapters.clear_lock_metadata()
+        return self.adapters.state_lock.clear_lock_metadata()
 
     def get_state_issue_snapshot(self):
-        return self.adapters.get_state_issue_snapshot()
+        return self.adapters.state_lock.get_state_issue_snapshot()
 
     def conditional_patch_state_issue(self, body: str, etag: str | None = None):
-        return self.adapters.conditional_patch_state_issue(body, etag)
+        return self.adapters.state_lock.conditional_patch_state_issue(body, etag)
 
     def parse_lock_metadata_from_issue_body(self, body: str):
-        return self.adapters.parse_lock_metadata_from_issue_body(body)
+        return self.adapters.state_lock.parse_lock_metadata_from_issue_body(body)
 
     def render_state_issue_body(self, state: dict, lock_meta: dict, base_body: str | None = None, *, preserve_state_block: bool = False):
-        return self.adapters.render_state_issue_body(
+        return self.adapters.state_lock.render_state_issue_body(
             state,
             lock_meta,
             base_body,
@@ -506,42 +503,42 @@ class ReviewerBotRuntime:
         )
 
     def get_state_issue_html_url(self):
-        return self.adapters.get_state_issue_html_url()
+        return self.adapters.state_lock.get_state_issue_html_url()
 
     def get_lock_ref_display(self):
-        return self.adapters.get_lock_ref_display()
+        return self.adapters.state_lock.get_lock_ref_display()
 
     def get_lock_ref_snapshot(self):
-        return self.adapters.get_lock_ref_snapshot()
+        return self.adapters.state_lock.get_lock_ref_snapshot()
 
     def build_lock_metadata(self, *args, **kwargs):
-        return self.adapters.build_lock_metadata(*args, **kwargs)
+        return self.adapters.state_lock.build_lock_metadata(*args, **kwargs)
 
     def create_lock_commit(self, parent_sha: str, tree_sha: str, lock_meta: dict):
-        return self.adapters.create_lock_commit(parent_sha, tree_sha, lock_meta)
+        return self.adapters.state_lock.create_lock_commit(parent_sha, tree_sha, lock_meta)
 
     def cas_update_lock_ref(self, new_sha: str):
-        return self.adapters.cas_update_lock_ref(new_sha)
+        return self.adapters.state_lock.cas_update_lock_ref(new_sha)
 
     def lock_is_currently_valid(self, lock_meta: dict, now: datetime | None = None):
-        return self.adapters.lock_is_currently_valid(lock_meta, now)
+        return self.adapters.state_lock.lock_is_currently_valid(lock_meta, now)
 
     def renew_state_issue_lease_lock(self, context):
-        result = self.adapters.renew_state_issue_lease_lock(context)
-        self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
+        result = self.adapters.state_lock.renew_state_issue_lease_lock(context)
+        self.ACTIVE_LEASE_CONTEXT = self.adapters.state_lock.get_active_lease_context()
         return result
 
     def ensure_state_issue_lease_lock_fresh(self) -> bool:
-        return self.adapters.ensure_state_issue_lease_lock_fresh()
+        return self.adapters.state_lock.ensure_state_issue_lease_lock_fresh()
 
     def acquire_state_issue_lease_lock(self):
-        context = self.adapters.acquire_state_issue_lease_lock()
-        self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
+        context = self.adapters.state_lock.acquire_state_issue_lease_lock()
+        self.ACTIVE_LEASE_CONTEXT = self.adapters.state_lock.get_active_lease_context()
         return context
 
     def release_state_issue_lease_lock(self) -> bool:
-        result = self.adapters.release_state_issue_lease_lock()
-        self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
+        result = self.adapters.state_lock.release_state_issue_lease_lock()
+        self.ACTIVE_LEASE_CONTEXT = self.adapters.state_lock.get_active_lease_context()
         return result
 
     def fetch_members(self):

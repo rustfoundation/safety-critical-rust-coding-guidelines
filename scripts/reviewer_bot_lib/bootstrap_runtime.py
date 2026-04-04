@@ -104,7 +104,7 @@ class _BootstrapHandlerServices:
         return reconcile.handle_workflow_run_event(self._runtime_getter(), current_state)
 
 
-class _BootstrapAdapterServices:
+class _BootstrapGitHubAdapterServices:
     def __init__(self, runtime_getter):
         self._runtime_getter = runtime_getter
 
@@ -170,6 +170,14 @@ class _BootstrapAdapterServices:
 
     def get_pull_request_reviews(self, issue_number):
         return reviews.get_pull_request_reviews(self._runtime(), issue_number)
+
+
+class _BootstrapReviewAdapterServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def _runtime(self):
+        return self._runtime_getter()
 
     def maybe_record_head_observation_repair(self, issue_number, review_data):
         return lifecycle.maybe_record_head_observation_repair(self._runtime(), issue_number, review_data)
@@ -253,23 +261,36 @@ class _BootstrapAdapterServices:
     def reposition_member_as_next(self, state, username):
         return reposition_member_as_next(state, username)
 
+    def compute_reviewer_response_state(self, issue_number, review_data, *, issue_snapshot=None):
+        return reviews.compute_reviewer_response_state(self._runtime(), issue_number, review_data, issue_snapshot=issue_snapshot)
+
+
+class _BootstrapWorkflowAdapterServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def _runtime(self):
+        return self._runtime_getter()
+
     def process_pass_until_expirations(self, state):
         return process_pass_until_expirations(state)
 
     def sync_members_with_queue(self, current_state):
         return sync_members_with_queue(self._runtime(), current_state)
 
+    def sync_status_labels_for_items(self, current_state, issue_numbers):
+        return reviews.sync_status_labels_for_items(self._runtime(), current_state, issue_numbers)
+
     def fetch_members(self):
         return members.fetch_members(self._runtime())
 
-    def parse_iso8601_timestamp(self, value):
-        return state_store.parse_iso8601_timestamp(value)
 
-    def compute_reviewer_response_state(self, issue_number, review_data, *, issue_snapshot=None):
-        return reviews.compute_reviewer_response_state(self._runtime(), issue_number, review_data, issue_snapshot=issue_snapshot)
+class _BootstrapAutomationAdapterServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
 
-    def sync_status_labels_for_items(self, current_state, issue_numbers):
-        return reviews.sync_status_labels_for_items(self._runtime(), current_state, issue_numbers)
+    def _runtime(self):
+        return self._runtime_getter()
 
     def run_command(self, command, cwd=None, check=True):
         return automation.run_command(command, cwd, check)
@@ -292,8 +313,19 @@ class _BootstrapAdapterServices:
     def parse_issue_labels(self):
         return automation.bot_parse_issue_labels(self._runtime())
 
+
+class _BootstrapStateLockAdapterServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def _runtime(self):
+        return self._runtime_getter()
+
     def normalize_lock_metadata(self, lock_meta):
         return state_store.normalize_lock_metadata(lock_meta)
+
+    def parse_iso8601_timestamp(self, value):
+        return state_store.parse_iso8601_timestamp(value)
 
     def get_state_issue(self):
         return state_store.get_state_issue(self._runtime())
@@ -350,6 +382,15 @@ class _BootstrapAdapterServices:
         return self._runtime().ACTIVE_LEASE_CONTEXT
 
 
+class _BootstrapAdapterGroups:
+    def __init__(self, *, github, review, workflow, automation, state_lock):
+        self.github = github
+        self.review = review
+        self.workflow = workflow
+        self.automation = automation
+        self.state_lock = state_lock
+
+
 def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> ReviewerBotRuntime:
     runtime: ReviewerBotRuntime | None = None
 
@@ -365,7 +406,13 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
     github_services = _BootstrapGitHubServices(runtime_getter)
     lock_services = _BootstrapLockServices(runtime_getter)
     handlers = _BootstrapHandlerServices(runtime_getter)
-    adapters = _BootstrapAdapterServices(runtime_getter)
+    adapters = _BootstrapAdapterGroups(
+        github=_BootstrapGitHubAdapterServices(runtime_getter),
+        review=_BootstrapReviewAdapterServices(runtime_getter),
+        workflow=_BootstrapWorkflowAdapterServices(runtime_getter),
+        automation=_BootstrapAutomationAdapterServices(runtime_getter),
+        state_lock=_BootstrapStateLockAdapterServices(runtime_getter),
+    )
 
     runtime = ReviewerBotRuntime(
         requests=requests,
