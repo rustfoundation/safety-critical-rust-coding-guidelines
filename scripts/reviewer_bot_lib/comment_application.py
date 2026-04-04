@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 
 from . import commands as commands_module
 from . import config as config_module
-from . import reconcile as reconcile_module
 from .context import AssignmentRequest, CommentEventRequest
 from .review_state import (
     accept_channel_event,
@@ -224,6 +223,8 @@ def apply_comment_command(
         )
         state_changed = success
     elif command == "rectify":
+        from . import reconcile as reconcile_module
+
         response, success, state_changed = reconcile_module.handle_rectify_command(bot, state, issue_number, comment_author)
     elif command == "r?-user":
         response, success = commands_module.handle_assign_command(

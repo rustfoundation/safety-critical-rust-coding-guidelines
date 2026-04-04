@@ -298,7 +298,7 @@ def test_handle_rectify_command_reports_permission_denied(monkeypatch):
 
 def test_validate_accept_no_fls_changes_handoff_distinguishes_permission_unavailable(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
-    harness.runtime.parse_issue_labels = lambda: [FLS_AUDIT_LABEL]
+    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
     request = harness.request(
         issue_number=42,
