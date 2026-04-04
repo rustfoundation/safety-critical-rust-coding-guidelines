@@ -107,9 +107,18 @@ class GitHubStub:
 class RestTransportStub:
     def __init__(self, runtime):
         self._runtime = runtime
+        self.calls: list[dict[str, Any]] = []
 
     def request(self, method: str, url: str, *, headers=None, json_data=None, timeout_seconds=None):
-        del headers, timeout_seconds
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": headers,
+                "json_data": json_data,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
         parsed = urlparse(url)
         parts = parsed.path.strip("/").split("/")
         if len(parts) >= 4 and parts[0] == "repos":
@@ -123,8 +132,13 @@ class RestTransportStub:
                 self.status_code = api_result.status_code or 0
                 self.headers = api_result.headers
                 self.text = api_result.text
-                self.content = b"" if api_result.payload is None else json.dumps(api_result.payload).encode("utf-8")
                 self._payload = api_result.payload
+                if api_result.payload is None:
+                    self.content = b""
+                elif isinstance(api_result.payload, Exception):
+                    self.content = b"invalid-json"
+                else:
+                    self.content = json.dumps(api_result.payload).encode("utf-8")
 
             def json(self):
                 if isinstance(self._payload, Exception):
@@ -137,11 +151,21 @@ class RestTransportStub:
 class GraphQLTransportStub:
     def __init__(self):
         self._query: Callable[..., Any] = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No GraphQL stub configured"))
+        self.calls: list[dict[str, Any]] = []
 
     def stub(self, func: Callable[..., Any]) -> None:
         self._query = func
 
     def query(self, url: str, *, headers=None, query: str, variables=None, timeout_seconds=None):
+        self.calls.append(
+            {
+                "url": url,
+                "headers": headers,
+                "query": query,
+                "variables": variables,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
         return self._query(url=url, headers=headers, query=query, variables=variables, timeout_seconds=timeout_seconds)
 
 
