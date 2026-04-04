@@ -105,6 +105,6 @@ def test_main_accepts_explicit_runtime_argument(monkeypatch):
 
 
 def test_app_harness_no_longer_requires_singleton_runtime_patch(monkeypatch):
-    harness = AppHarness(monkeypatch)
+    AppHarness(monkeypatch)
 
-    assert harness.runtime is not reviewer_bot.RUNTIME
+    assert hasattr(reviewer_bot, "RUNTIME") is False

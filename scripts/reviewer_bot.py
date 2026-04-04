@@ -15,17 +15,11 @@ from scripts.reviewer_bot_lib.bootstrap_runtime import (
 from scripts.reviewer_bot_lib.context import EventContext, ExecutionResult
 from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 
-ACTIVE_LEASE_CONTEXT = None
-TOUCHED_ISSUE_NUMBERS: set[int] = set()
-RUNTIME: ReviewerBotRuntime | None = None
-
 
 def _runtime_bot(runtime: ReviewerBotRuntime | None = None) -> ReviewerBotRuntime:
     if runtime is not None:
         return runtime
-    if RUNTIME is None:
-        raise RuntimeError("ReviewerBotRuntime not initialized")
-    return RUNTIME
+    return build_runtime()
 
 
 def build_event_context(runtime: ReviewerBotRuntime | None = None) -> EventContext:
@@ -45,7 +39,7 @@ def main(
     *,
     runtime_factory=build_runtime,
 ) -> None:
-    resolved_runtime = runtime or RUNTIME or runtime_factory()
+    resolved_runtime = runtime or runtime_factory()
     run_app_main(_runtime_bot(resolved_runtime))
 
 
@@ -55,11 +49,8 @@ def _build_runtime() -> ReviewerBotRuntime:
         sys=sys,
         random=random,
         time=time,
-        active_lease_context=ACTIVE_LEASE_CONTEXT,
+        active_lease_context=None,
     )
-
-
-RUNTIME = _build_runtime()
 
 
 if __name__ == "__main__":
