@@ -23,6 +23,7 @@ def _assert_core_runtime_surface(runtime) -> None:
     assert hasattr(runtime, "graphql_transport")
     assert hasattr(runtime, "artifact_download_transport")
     assert hasattr(runtime, "logger")
+    assert hasattr(runtime, "fetch_members")
     assert hasattr(runtime, "state_issue_number")
     assert hasattr(runtime, "lock_api_retry_limit")
     assert hasattr(runtime, "lock_retry_base_seconds")

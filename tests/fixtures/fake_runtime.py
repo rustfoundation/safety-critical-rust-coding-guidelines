@@ -117,6 +117,7 @@ class FakeReviewerBotRuntime:
         self.locks = LockStub()
         self.github = GitHubStub(github)
         self.workflow = WorkflowBehaviorStub()
+        self._fetch_members = lambda: []
         self.handlers = HandlerStub(
             {
                 "handle_issue_or_pr_opened": lambda state: lifecycle_module.handle_issue_or_pr_opened(self, state),
@@ -398,6 +399,9 @@ class FakeReviewerBotRuntime:
     def parse_issue_labels(self) -> list[str]:
         return automation_module.bot_parse_issue_labels(self)
 
+    def fetch_members(self):
+        return self._fetch_members()
+
     def run_command(self, command, cwd, check=False):
         return automation_module.run_command(command, cwd=cwd, check=check)
 
@@ -487,3 +491,6 @@ class FakeReviewerBotRuntime:
 
     def stub_sync_status_labels(self, func: Callable[[dict, Any], bool]) -> None:
         self.workflow.stub_sync_status_labels(func)
+
+    def stub_fetch_members(self, func: Callable[[], list[dict]]) -> None:
+        self._fetch_members = func

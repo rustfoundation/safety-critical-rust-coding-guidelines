@@ -12,6 +12,7 @@ from . import (
     lease_lock,
     lifecycle,
     maintenance,
+    members,
     reconcile,
     review_state,
     reviews,
@@ -256,6 +257,9 @@ class _BootstrapAdapterServices:
 
     def sync_members_with_queue(self, current_state):
         return sync_members_with_queue(self._runtime(), current_state)
+
+    def fetch_members(self):
+        return members.fetch_members(self._runtime())
 
     def parse_iso8601_timestamp(self, value):
         return state_store.parse_iso8601_timestamp(value)

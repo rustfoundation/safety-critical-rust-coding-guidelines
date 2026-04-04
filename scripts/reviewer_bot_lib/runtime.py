@@ -630,3 +630,8 @@ class ReviewerBotRuntime:
 
     def sync_status_labels_for_items(self, state: dict, issue_numbers):
         return self.adapters.sync_status_labels_for_items(state, issue_numbers)
+
+    def fetch_members(self):
+        from . import members as members_module
+
+        return members_module.fetch_members(self)

@@ -1,20 +1,21 @@
 """Reviewer queue membership helpers."""
 
-import sys
-
-import requests
-
 from .config import MEMBERS_URL
 
 
-def fetch_members() -> list[dict]:
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
+
+def fetch_members(bot) -> list[dict]:
     """Fetch and parse members.md from the consortium repo to extract Producers."""
     try:
-        response = requests.get(MEMBERS_URL, timeout=10)
-        response.raise_for_status()
+        response = bot.rest_transport.request("GET", MEMBERS_URL, timeout_seconds=10)
+        if getattr(response, "status_code", 0) >= 400:
+            raise RuntimeError(f"status {response.status_code}")
         content = response.text
-    except requests.RequestException as exc:
-        print(f"WARNING: Failed to fetch members file from {MEMBERS_URL}: {exc}", file=sys.stderr)
+    except Exception as exc:
+        _log(bot, "warning", f"Failed to fetch members file from {MEMBERS_URL}: {exc}", url=MEMBERS_URL, error=str(exc))
         return []
 
     producers = []
