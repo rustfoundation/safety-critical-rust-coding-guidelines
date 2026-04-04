@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 import requests
 
+from . import retrying
 from .config import (
     LOCK_API_RETRY_LIMIT,
     LOCK_RETRY_BASE_SECONDS,
@@ -17,12 +18,17 @@ from .config import (
 )
 from .context import GitHubTransportContext
 
-RETRY_POLICY_NONE = "none"
-RETRY_POLICY_IDEMPOTENT_READ = "idempotent_read"
+RETRY_POLICY_NONE = retrying.RETRY_POLICY_NONE
+RETRY_POLICY_IDEMPOTENT_READ = retrying.RETRY_POLICY_IDEMPOTENT_READ
+
+
+class _RandomJitter:
+    def uniform(self, lower: float, upper: float) -> float:
+        return __import__("random").uniform(lower, upper)
 
 
 def _should_retry_status(status_code: int | None) -> bool:
-    return status_code == 429 or (status_code is not None and status_code >= 500)
+    return retrying.is_retryable_status(status_code)
 
 
 def _classify_failure(status_code: int | None, *, invalid_payload: bool = False, transport_error: bool = False) -> str | None:
@@ -46,24 +52,25 @@ def _classify_failure(status_code: int | None, *, invalid_payload: bool = False,
 
 
 def _retry_delay(base_seconds: float, retry_attempt: int) -> float:
-    bounded_base = min(base_seconds * (2 ** max(retry_attempt - 1, 0)), 8.0)
-    return bounded_base + random.uniform(0, bounded_base)
+    return retrying.bounded_exponential_delay(
+        base_seconds,
+        retry_attempt,
+        jitter=_RandomJitter(),
+    )
 
 
 def _validate_rest_retry_policy(method: str, retry_policy: str) -> None:
+    retrying.additional_attempts_for_policy(retry_policy, LOCK_API_RETRY_LIMIT)
     if retry_policy == RETRY_POLICY_NONE:
         return
-    if retry_policy != RETRY_POLICY_IDEMPOTENT_READ:
-        raise ValueError(f"Unsupported retry policy: {retry_policy}")
     if method.upper() != "GET":
         raise ValueError("idempotent_read retry policy is only valid for REST GET requests")
 
 
 def _validate_graphql_retry_policy(query: str, retry_policy: str) -> None:
+    retrying.additional_attempts_for_policy(retry_policy, LOCK_API_RETRY_LIMIT)
     if retry_policy == RETRY_POLICY_NONE:
         return
-    if retry_policy != RETRY_POLICY_IDEMPOTENT_READ:
-        raise ValueError(f"Unsupported retry policy: {retry_policy}")
     stripped = query.lstrip()
     if stripped.startswith("mutation"):
         raise ValueError("idempotent_read retry policy is only valid for GraphQL queries")
@@ -135,7 +142,7 @@ def github_api_request(
         headers.update(extra_headers)
 
     retry_attempts = 0
-    max_attempts = 1 + (LOCK_API_RETRY_LIMIT if retry_policy == RETRY_POLICY_IDEMPOTENT_READ else 0)
+    max_attempts = retrying.max_attempts_for_policy(retry_policy, LOCK_API_RETRY_LIMIT)
     for attempt in range(1, max_attempts + 1):
         try:
             response = bot.rest_transport.request(
@@ -237,7 +244,7 @@ def github_graphql_request(
     }
 
     retry_attempts = 0
-    max_attempts = 1 + (LOCK_API_RETRY_LIMIT if retry_policy == RETRY_POLICY_IDEMPOTENT_READ else 0)
+    max_attempts = retrying.max_attempts_for_policy(retry_policy, LOCK_API_RETRY_LIMIT)
     for attempt in range(1, max_attempts + 1):
         try:
             response = bot.graphql_transport.query(
