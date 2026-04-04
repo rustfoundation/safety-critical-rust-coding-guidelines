@@ -15,6 +15,15 @@ from .maintenance import (
 )
 
 
+def _log(bot: AppExecutionRuntime, level: str, message: str, **fields) -> None:
+    logger = getattr(bot, "logger", None)
+    if logger is not None and hasattr(logger, "event"):
+        logger.event(level, message, **fields)
+        return
+    stream = sys.stderr if level in {"warning", "error"} else sys.stdout
+    stream.write(f"{message}\n")
+
+
 def _revalidate_epoch(bot: AppExecutionRuntime, expected_epoch: str | None, phase: str) -> None:
     if expected_epoch is None:
         return
@@ -145,9 +154,14 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
     event_action = context.event_action
     event_intent = _classify_event_intent_from_context(bot, context)
     lock_required = event_intent == bot.EVENT_INTENT_MUTATING
-    print(
-        f"Event: {event_name}, Action: {event_action}, Intent: {event_intent}, "
-        f"Lock Required: {lock_required}"
+    _log(
+        bot,
+        "info",
+        f"Event: {event_name}, Action: {event_action}, Intent: {event_intent}, Lock Required: {lock_required}",
+        event_name=event_name,
+        event_action=event_action,
+        event_intent=event_intent,
+        lock_required=lock_required,
     )
 
     lock_acquired = False
@@ -178,11 +192,11 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
         if lock_required:
             state, restored = bot.process_pass_until_expirations(state)
             if restored:
-                print(f"Restored from pass-until: {restored}")
+                _log(bot, "info", f"Restored from pass-until: {restored}", restored=restored)
 
             state, sync_changes = bot.sync_members_with_queue(state)
             if sync_changes:
-                print(f"Members sync changes: {sync_changes}")
+                _log(bot, "info", f"Members sync changes: {sync_changes}", sync_changes=sync_changes)
 
         if event_name == "issues":
             if event_action == "opened":
@@ -223,9 +237,11 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 if context.workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
                     state_changed = bot.handle_workflow_run_event(state)
                 else:
-                    print(
-                        "Ignoring workflow_run event with unsupported source event: "
-                        f"{context.workflow_run_event or '<missing>'}"
+                    _log(
+                        bot,
+                        "info",
+                        f"Ignoring workflow_run event with unsupported source event: {context.workflow_run_event or '<missing>'}",
+                        workflow_run_event=context.workflow_run_event or "<missing>",
                     )
 
         touched_items = bot.drain_touched_items()
@@ -264,7 +280,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                         "to 0. Set ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE=true to override."
                     )
 
-            print("State updates detected; attempting to persist reviewer-bot state.")
+            _log(bot, "info", "State updates detected; attempting to persist reviewer-bot state.")
             _revalidate_epoch(bot, loaded_epoch, "authoritative save")
             if not bot.save_state(state):
                 raise RuntimeError(
@@ -286,9 +302,11 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 status_labels_changed = bot.sync_status_labels_for_items(state, touched_items)
             except RuntimeError as exc:
                 projection_failure = exc
-                print(
-                    f"WARNING: Authoritative state is persisted but status-label projection failed: {exc}",
-                    file=sys.stderr,
+                _log(
+                    bot,
+                    "warning",
+                    f"Authoritative state is persisted but status-label projection failed: {exc}",
+                    projection_error=str(exc),
                 )
                 if _mark_projection_repair_needed(bot, state, touched_items, str(exc)):
                     _revalidate_epoch(bot, loaded_epoch, "projection-failure repair marker save")
@@ -312,16 +330,17 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             "true" if execution_state_changed else "false",
         )
         if projection_failure is not None:
-            print(
+            _log(
+                bot,
+                "warning",
                 "PROJECTION_REPAIR_REQUIRED: labels remain unchanged until a trusted repair path succeeds.",
-                file=sys.stderr,
             )
 
     except RuntimeError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        _log(bot, "error", f"ERROR: {exc}", error=str(exc))
         exit_code = 1
     except Exception as exc:  # pragma: no cover - defensive hard-fail path
-        print(f"ERROR: Unexpected reviewer-bot failure: {exc}", file=sys.stderr)
+        _log(bot, "error", f"ERROR: Unexpected reviewer-bot failure: {exc}", error=str(exc))
         exit_code = 1
     finally:
         if lock_acquired:
@@ -329,10 +348,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 release_failed = True
 
     if release_failed:
-        print(
-            "ERROR: Failed to release reviewer-bot lease lock after processing event.",
-            file=sys.stderr,
-        )
+        _log(bot, "error", "ERROR: Failed to release reviewer-bot lease lock after processing event.")
         exit_code = 1
 
     return ExecutionResult(
