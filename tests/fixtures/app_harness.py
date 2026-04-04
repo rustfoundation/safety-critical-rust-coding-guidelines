@@ -26,7 +26,6 @@ class AppHarness:
         self.locks = self.runtime.locks
         self.handlers = self.runtime.handlers
         self.touch_tracker = self.runtime.touch_tracker
-        self._monkeypatch.setattr(reviewer_bot, "RUNTIME", self.runtime)
 
     def set_event(self, **values) -> None:
         set_env_values(self.config, **values)
@@ -66,11 +65,11 @@ class AppHarness:
         return captured
 
     def run_execute(self):
-        return reviewer_bot.execute_run(reviewer_bot.build_event_context())
+        return reviewer_bot.execute_run(reviewer_bot.build_event_context(self.runtime), self.runtime)
 
     def run_main(self) -> MainRun:
         try:
-            reviewer_bot.main()
+            reviewer_bot.main(self.runtime)
         except SystemExit as exc:
             code = exc.code if isinstance(exc.code, int) else 1
             return MainRun(exit_code=code)
