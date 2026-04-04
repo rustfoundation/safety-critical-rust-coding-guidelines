@@ -154,7 +154,7 @@ def github_api_request(
             )
         except requests.RequestException as exc:
             failure_kind = _classify_failure(None, transport_error=True)
-            if retry_policy == RETRY_POLICY_IDEMPOTENT_READ and attempt < max_attempts:
+            if attempt < max_attempts:
                 retry_attempts += 1
                 time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
                 continue
@@ -301,7 +301,7 @@ def github_graphql_request(
             response.status_code,
             invalid_payload=invalid_payload or bool(graphql_errors),
         )
-        if retry_policy == RETRY_POLICY_IDEMPOTENT_READ and _should_retry_status(response.status_code) and attempt < max_attempts:
+        if _should_retry_status(response.status_code) and attempt < max_attempts:
             retry_attempts += 1
             time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
             continue
