@@ -362,6 +362,15 @@ def test_bootstrap_runtime_wires_explicit_handler_services():
     assert hasattr(runtime.handlers, "handle_workflow_run_event")
 
 
+def test_bootstrap_runtime_wires_explicit_adapter_services():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert runtime.adapters.__class__.__name__ == "_BootstrapAdapterServices"
+    assert hasattr(runtime.adapters, "get_github_token")
+    assert hasattr(runtime.adapters, "handle_pass_command")
+    assert hasattr(runtime.adapters, "render_state_issue_body")
+
+
 def test_default_stderr_logger_renders_message_and_sorted_fields():
     writes = []
     logger = StdErrLogger(SimpleNamespace(stderr=SimpleNamespace(write=lambda text: writes.append(text))))

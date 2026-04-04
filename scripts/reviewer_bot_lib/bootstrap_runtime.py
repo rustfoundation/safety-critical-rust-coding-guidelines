@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from . import (
     automation,
     commands,
@@ -105,6 +103,248 @@ class _BootstrapHandlerServices:
         return reconcile.handle_workflow_run_event(self._runtime_getter(), current_state)
 
 
+class _BootstrapAdapterServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def _runtime(self):
+        return self._runtime_getter()
+
+    def assert_lock_held(self, context):
+        return state_store.assert_lock_held(self._runtime(), context)
+
+    def get_github_token(self):
+        return github_api.get_github_token(self._runtime())
+
+    def get_github_graphql_token(self, *, prefer_board_token=False):
+        return github_api.get_github_graphql_token(self._runtime(), prefer_board_token=prefer_board_token)
+
+    def github_graphql(self, query, variables=None, *, token=None):
+        return github_api.github_graphql(self._runtime(), query, variables, token=token)
+
+    def post_comment(self, issue_number, body):
+        return github_api.post_comment(self._runtime(), issue_number, body)
+
+    def get_repo_labels(self):
+        return github_api.get_repo_labels(self._runtime())
+
+    def add_label(self, issue_number, label):
+        return github_api.add_label(self._runtime(), issue_number, label)
+
+    def remove_label(self, issue_number, label):
+        return github_api.remove_label(self._runtime(), issue_number, label)
+
+    def ensure_label_exists(self, label, *, color=None, description=None):
+        return github_api.ensure_label_exists(self._runtime(), label, color=color, description=description)
+
+    def get_issue_assignees(self, issue_number):
+        return github_api.get_issue_assignees(self._runtime(), issue_number)
+
+    def request_reviewer_assignment(self, issue_number, username):
+        return github_api.request_reviewer_assignment(self._runtime(), issue_number, username)
+
+    def get_assignment_failure_comment(self, reviewer, attempt):
+        return github_api.get_assignment_failure_comment(self._runtime(), reviewer, attempt)
+
+    def add_reaction(self, comment_id, reaction):
+        return github_api.add_reaction(self._runtime(), comment_id, reaction)
+
+    def remove_assignee(self, issue_number, username):
+        return github_api.remove_assignee(self._runtime(), issue_number, username)
+
+    def remove_pr_reviewer(self, issue_number, username):
+        return github_api.remove_pr_reviewer(self._runtime(), issue_number, username)
+
+    def unassign_reviewer(self, issue_number, username):
+        return github_api.unassign_reviewer(self._runtime(), issue_number, username)
+
+    def get_user_permission_status(self, username, required_permission="triage"):
+        return github_api.get_user_permission_status(self._runtime(), username, required_permission)
+
+    def check_user_permission(self, username, required_permission="triage"):
+        return github_api.check_user_permission(self._runtime(), username, required_permission)
+
+    def get_issue_or_pr_snapshot(self, issue_number):
+        return github_api.github_api(self._runtime(), "GET", f"issues/{issue_number}")
+
+    def get_pull_request_reviews(self, issue_number):
+        return reviews.get_pull_request_reviews(self._runtime(), issue_number)
+
+    def maybe_record_head_observation_repair(self, issue_number, review_data):
+        return lifecycle.maybe_record_head_observation_repair(self._runtime(), issue_number, review_data)
+
+    def handle_transition_notice(self, current_state, issue_number, reviewer):
+        return lifecycle.handle_transition_notice(self._runtime(), current_state, issue_number, reviewer)
+
+    def handle_pass_command(self, current_state, issue_number, comment_author, reason, request=None):
+        return commands.handle_pass_command(self._runtime(), current_state, issue_number, comment_author, reason, request=request)
+
+    def handle_pass_until_command(self, current_state, issue_number, comment_author, return_date, reason, request=None):
+        return commands.handle_pass_until_command(self._runtime(), current_state, issue_number, comment_author, return_date, reason, request=request)
+
+    def handle_label_command(self, current_state, issue_number, label_string, request=None):
+        return commands.handle_label_command(self._runtime(), current_state, issue_number, label_string, request=request)
+
+    def handle_sync_members_command(self, current_state):
+        return commands.handle_sync_members_command(self._runtime(), current_state)
+
+    def handle_queue_command(self, current_state):
+        return commands.handle_queue_command(self._runtime(), current_state)
+
+    def handle_commands_command(self):
+        return commands.handle_commands_command(self._runtime())
+
+    def handle_claim_command(self, current_state, issue_number, comment_author, request=None):
+        return commands.handle_claim_command(self._runtime(), current_state, issue_number, comment_author, request=request)
+
+    def handle_release_command(self, current_state, issue_number, comment_author, args=None, request=None):
+        return commands.handle_release_command(self._runtime(), current_state, issue_number, comment_author, args, request=request)
+
+    def handle_rectify_command(self, current_state, issue_number, comment_author):
+        return reconcile.handle_rectify_command(self._runtime(), current_state, issue_number, comment_author)
+
+    def handle_assign_command(self, current_state, issue_number, username, request=None):
+        return commands.handle_assign_command(self._runtime(), current_state, issue_number, username, request=request)
+
+    def handle_assign_from_queue_command(self, current_state, issue_number, request=None):
+        return commands.handle_assign_from_queue_command(self._runtime(), current_state, issue_number, request=request)
+
+    def handle_accept_no_fls_changes_command(self, issue_number, comment_author, request=None):
+        return automation.handle_accept_no_fls_changes_command(self._runtime(), issue_number, comment_author, request=request)
+
+    def get_commands_help(self):
+        return config.get_commands_help()
+
+    def ensure_review_entry(self, current_state, issue_number, create=False):
+        return review_state.ensure_review_entry(current_state, issue_number, create=create)
+
+    def set_current_reviewer(self, current_state, issue_number, reviewer, assignment_method="round-robin"):
+        return review_state.set_current_reviewer(current_state, issue_number, reviewer, assignment_method=assignment_method)
+
+    def update_reviewer_activity(self, current_state, issue_number, reviewer):
+        return review_state.update_reviewer_activity(current_state, issue_number, reviewer)
+
+    def mark_review_complete(self, current_state, issue_number, reviewer, source):
+        return review_state.mark_review_complete(current_state, issue_number, reviewer, source)
+
+    def is_triage_or_higher(self, username):
+        return reviews.is_triage_or_higher(self._runtime(), username)
+
+    def trigger_mandatory_approver_escalation(self, current_state, issue_number):
+        return reviews.trigger_mandatory_approver_escalation(self._runtime(), current_state, issue_number)
+
+    def satisfy_mandatory_approver_requirement(self, current_state, issue_number, approver):
+        return reviews.satisfy_mandatory_approver_requirement(self._runtime(), current_state, issue_number, approver)
+
+    def get_next_reviewer(self, state, skip_usernames=None):
+        return get_next_reviewer(state, skip_usernames)
+
+    def strip_code_blocks(self, comment_body):
+        return commands.strip_code_blocks(comment_body)
+
+    def parse_command(self, comment_body):
+        return commands.parse_command(self._runtime(), comment_body)
+
+    def record_assignment(self, state, github, issue_number, kind):
+        return record_assignment(state, github, issue_number, kind)
+
+    def reposition_member_as_next(self, state, username):
+        return reposition_member_as_next(state, username)
+
+    def process_pass_until_expirations(self, state):
+        return process_pass_until_expirations(state)
+
+    def sync_members_with_queue(self, current_state):
+        return sync_members_with_queue(self._runtime(), current_state)
+
+    def parse_iso8601_timestamp(self, value):
+        return state_store.parse_iso8601_timestamp(value)
+
+    def compute_reviewer_response_state(self, issue_number, review_data, *, issue_snapshot=None):
+        return reviews.compute_reviewer_response_state(self._runtime(), issue_number, review_data, issue_snapshot=issue_snapshot)
+
+    def sync_status_labels_for_items(self, current_state, issue_numbers):
+        return reviews.sync_status_labels_for_items(self._runtime(), current_state, issue_numbers)
+
+    def run_command(self, command, cwd=None, check=True):
+        return automation.run_command(command, cwd, check)
+
+    def summarize_output(self, result, limit=20):
+        return automation.summarize_output(result, limit)
+
+    def list_changed_files(self, repo_root):
+        return automation.list_changed_files(repo_root)
+
+    def get_default_branch(self):
+        return automation.get_default_branch(self._runtime())
+
+    def find_open_pr_for_branch_status(self, branch):
+        return automation.find_open_pr_for_branch_status(self._runtime(), branch)
+
+    def create_pull_request(self, branch, base, issue_number):
+        return automation.create_pull_request(self._runtime(), branch, base, issue_number)
+
+    def parse_issue_labels(self):
+        return automation.bot_parse_issue_labels(self._runtime())
+
+    def normalize_lock_metadata(self, lock_meta):
+        return state_store.normalize_lock_metadata(lock_meta)
+
+    def get_state_issue(self):
+        return state_store.get_state_issue(self._runtime())
+
+    def clear_lock_metadata(self):
+        return lease_lock.clear_lock_metadata(self._runtime())
+
+    def get_state_issue_snapshot(self):
+        return state_store.get_state_issue_snapshot(self._runtime())
+
+    def conditional_patch_state_issue(self, body, etag=None):
+        return state_store.conditional_patch_state_issue(self._runtime(), body, etag)
+
+    def parse_lock_metadata_from_issue_body(self, body):
+        return state_store.parse_lock_metadata_from_issue_body(body)
+
+    def render_state_issue_body(self, current_state, lock_meta, base_body=None, *, preserve_state_block=False):
+        return state_store.render_state_issue_body(current_state, lock_meta, base_body, preserve_state_block=preserve_state_block)
+
+    def get_state_issue_html_url(self):
+        return lease_lock.get_state_issue_html_url(self._runtime())
+
+    def get_lock_ref_display(self):
+        return lease_lock.get_lock_ref_display(self._runtime())
+
+    def get_lock_ref_snapshot(self):
+        return lease_lock.get_lock_ref_snapshot(self._runtime())
+
+    def build_lock_metadata(self, *args, **kwargs):
+        return lease_lock.build_lock_metadata(self._runtime(), *args, **kwargs)
+
+    def create_lock_commit(self, parent_sha, tree_sha, lock_meta):
+        return lease_lock.create_lock_commit(self._runtime(), parent_sha, tree_sha, lock_meta)
+
+    def cas_update_lock_ref(self, new_sha):
+        return lease_lock.cas_update_lock_ref(self._runtime(), new_sha)
+
+    def lock_is_currently_valid(self, lock_meta, now=None):
+        return lease_lock.lock_is_currently_valid(self._runtime(), lock_meta, now)
+
+    def renew_state_issue_lease_lock(self, context):
+        return lease_lock.renew_state_issue_lease_lock(self._runtime(), context)
+
+    def ensure_state_issue_lease_lock_fresh(self):
+        return lease_lock.ensure_state_issue_lease_lock_fresh(self._runtime())
+
+    def acquire_state_issue_lease_lock(self):
+        return lease_lock.acquire_state_issue_lease_lock(self._runtime())
+
+    def release_state_issue_lease_lock(self):
+        return lease_lock.release_state_issue_lease_lock(self._runtime())
+
+    def get_active_lease_context(self):
+        return self._runtime().ACTIVE_LEASE_CONTEXT
+
+
 def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> ReviewerBotRuntime:
     runtime: ReviewerBotRuntime | None = None
 
@@ -120,152 +360,7 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
     github_services = _BootstrapGitHubServices(runtime_getter)
     lock_services = _BootstrapLockServices(runtime_getter)
     handlers = _BootstrapHandlerServices(runtime_getter)
-    adapters = SimpleNamespace(
-        assert_lock_held=lambda context: state_store.assert_lock_held(runtime, context),
-        get_github_token=lambda: github_api.get_github_token(runtime),
-        get_github_graphql_token=lambda *, prefer_board_token=False: github_api.get_github_graphql_token(
-            runtime, prefer_board_token=prefer_board_token
-        ),
-        github_graphql=lambda query, variables=None, *, token=None: github_api.github_graphql(
-            runtime, query, variables, token=token
-        ),
-        post_comment=lambda issue_number, body: github_api.post_comment(runtime, issue_number, body),
-        get_repo_labels=lambda: github_api.get_repo_labels(runtime),
-        add_label=lambda issue_number, label: github_api.add_label(runtime, issue_number, label),
-        remove_label=lambda issue_number, label: github_api.remove_label(runtime, issue_number, label),
-        ensure_label_exists=lambda label, *, color=None, description=None: github_api.ensure_label_exists(
-            runtime, label, color=color, description=description
-        ),
-        get_issue_assignees=lambda issue_number: github_api.get_issue_assignees(runtime, issue_number),
-        request_reviewer_assignment=lambda issue_number, username: github_api.request_reviewer_assignment(
-            runtime, issue_number, username
-        ),
-        get_assignment_failure_comment=lambda reviewer, attempt: github_api.get_assignment_failure_comment(
-            runtime, reviewer, attempt
-        ),
-        add_reaction=lambda comment_id, reaction: github_api.add_reaction(runtime, comment_id, reaction),
-        remove_assignee=lambda issue_number, username: github_api.remove_assignee(runtime, issue_number, username),
-        remove_pr_reviewer=lambda issue_number, username: github_api.remove_pr_reviewer(runtime, issue_number, username),
-        unassign_reviewer=lambda issue_number, username: github_api.unassign_reviewer(runtime, issue_number, username),
-        get_user_permission_status=lambda username, required_permission="triage": github_api.get_user_permission_status(
-            runtime, username, required_permission
-        ),
-        check_user_permission=lambda username, required_permission="triage": github_api.check_user_permission(
-            runtime, username, required_permission
-        ),
-        get_issue_or_pr_snapshot=lambda issue_number: github_api.github_api(runtime, "GET", f"issues/{issue_number}"),
-        get_pull_request_reviews=lambda issue_number: reviews.get_pull_request_reviews(runtime, issue_number),
-        maybe_record_head_observation_repair=lambda issue_number, review_data: lifecycle.maybe_record_head_observation_repair(
-            runtime, issue_number, review_data
-        ),
-        handle_transition_notice=lambda current_state, issue_number, reviewer: lifecycle.handle_transition_notice(
-            runtime, current_state, issue_number, reviewer
-        ),
-        handle_pass_command=lambda current_state, issue_number, comment_author, reason, request=None: commands.handle_pass_command(
-            runtime, current_state, issue_number, comment_author, reason, request=request
-        ),
-        handle_pass_until_command=lambda current_state, issue_number, comment_author, return_date, reason, request=None: commands.handle_pass_until_command(
-            runtime, current_state, issue_number, comment_author, return_date, reason, request=request
-        ),
-        handle_label_command=lambda current_state, issue_number, label_string, request=None: commands.handle_label_command(
-            runtime, current_state, issue_number, label_string, request=request
-        ),
-        handle_sync_members_command=lambda current_state: commands.handle_sync_members_command(
-            runtime, current_state
-        ),
-        handle_queue_command=lambda current_state: commands.handle_queue_command(runtime, current_state),
-        handle_commands_command=lambda: commands.handle_commands_command(runtime),
-        handle_claim_command=lambda current_state, issue_number, comment_author, request=None: commands.handle_claim_command(
-            runtime, current_state, issue_number, comment_author, request=request
-        ),
-        handle_release_command=lambda current_state, issue_number, comment_author, args=None, request=None: commands.handle_release_command(
-            runtime, current_state, issue_number, comment_author, args, request=request
-        ),
-        handle_rectify_command=lambda current_state, issue_number, comment_author: reconcile.handle_rectify_command(
-            runtime, current_state, issue_number, comment_author
-        ),
-        handle_assign_command=lambda current_state, issue_number, username, request=None: commands.handle_assign_command(
-            runtime, current_state, issue_number, username, request=request
-        ),
-        handle_assign_from_queue_command=lambda current_state, issue_number, request=None: commands.handle_assign_from_queue_command(
-            runtime, current_state, issue_number, request=request
-        ),
-        handle_accept_no_fls_changes_command=lambda issue_number, comment_author, request=None: automation.handle_accept_no_fls_changes_command(
-            runtime, issue_number, comment_author, request=request
-        ),
-        get_commands_help=config.get_commands_help,
-        # Adapter-only mutable review-state compatibility surface.
-        ensure_review_entry=lambda current_state, issue_number, create=False: review_state.ensure_review_entry(
-            current_state, issue_number, create=create
-        ),
-        set_current_reviewer=lambda current_state, issue_number, reviewer, assignment_method="round-robin": review_state.set_current_reviewer(
-            current_state, issue_number, reviewer, assignment_method=assignment_method
-        ),
-        update_reviewer_activity=lambda current_state, issue_number, reviewer: review_state.update_reviewer_activity(
-            current_state, issue_number, reviewer
-        ),
-        mark_review_complete=lambda current_state, issue_number, reviewer, source: review_state.mark_review_complete(
-            current_state, issue_number, reviewer, source
-        ),
-        is_triage_or_higher=lambda username: reviews.is_triage_or_higher(runtime, username),
-        trigger_mandatory_approver_escalation=lambda current_state, issue_number: reviews.trigger_mandatory_approver_escalation(
-            runtime, current_state, issue_number
-        ),
-        satisfy_mandatory_approver_requirement=lambda current_state, issue_number, approver: reviews.satisfy_mandatory_approver_requirement(
-            runtime, current_state, issue_number, approver
-        ),
-        get_next_reviewer=get_next_reviewer,
-        strip_code_blocks=commands.strip_code_blocks,
-        parse_command=lambda comment_body: commands.parse_command(runtime, comment_body),
-        record_assignment=record_assignment,
-        reposition_member_as_next=reposition_member_as_next,
-        process_pass_until_expirations=process_pass_until_expirations,
-        sync_members_with_queue=lambda current_state: sync_members_with_queue(runtime, current_state),
-        parse_iso8601_timestamp=state_store.parse_iso8601_timestamp,
-        compute_reviewer_response_state=lambda issue_number, review_data, *, issue_snapshot=None: reviews.compute_reviewer_response_state(
-            runtime, issue_number, review_data, issue_snapshot=issue_snapshot
-        ),
-        sync_status_labels_for_items=lambda current_state, issue_numbers: reviews.sync_status_labels_for_items(
-            runtime, current_state, issue_numbers
-        ),
-        run_command=automation.run_command,
-        summarize_output=automation.summarize_output,
-        list_changed_files=automation.list_changed_files,
-        get_default_branch=lambda: automation.get_default_branch(runtime),
-        find_open_pr_for_branch_status=lambda branch: automation.find_open_pr_for_branch_status(runtime, branch),
-        create_pull_request=lambda branch, base, issue_number: automation.create_pull_request(
-            runtime, branch, base, issue_number
-        ),
-        parse_issue_labels=lambda: automation.bot_parse_issue_labels(runtime),
-        normalize_lock_metadata=state_store.normalize_lock_metadata,
-        get_state_issue=lambda: state_store.get_state_issue(runtime),
-        clear_lock_metadata=lambda: lease_lock.clear_lock_metadata(runtime),
-        get_state_issue_snapshot=lambda: state_store.get_state_issue_snapshot(runtime),
-        conditional_patch_state_issue=lambda body, etag=None: state_store.conditional_patch_state_issue(
-            runtime, body, etag
-        ),
-        parse_lock_metadata_from_issue_body=state_store.parse_lock_metadata_from_issue_body,
-        render_state_issue_body=lambda current_state, lock_meta, base_body=None, *, preserve_state_block=False: state_store.render_state_issue_body(
-            current_state,
-            lock_meta,
-            base_body,
-            preserve_state_block=preserve_state_block,
-        ),
-        get_state_issue_html_url=lambda: lease_lock.get_state_issue_html_url(runtime),
-        get_lock_ref_display=lambda: lease_lock.get_lock_ref_display(runtime),
-        get_lock_ref_snapshot=lambda: lease_lock.get_lock_ref_snapshot(runtime),
-        build_lock_metadata=lambda *args, **kwargs: lease_lock.build_lock_metadata(runtime, *args, **kwargs),
-        create_lock_commit=lambda parent_sha, tree_sha, lock_meta: lease_lock.create_lock_commit(
-            runtime, parent_sha, tree_sha, lock_meta
-        ),
-        cas_update_lock_ref=lambda new_sha: lease_lock.cas_update_lock_ref(runtime, new_sha),
-        lock_is_currently_valid=lambda lock_meta, now=None: lease_lock.lock_is_currently_valid(runtime, lock_meta, now),
-        renew_state_issue_lease_lock=lambda context: lease_lock.renew_state_issue_lease_lock(runtime, context),
-        ensure_state_issue_lease_lock_fresh=lambda: lease_lock.ensure_state_issue_lease_lock_fresh(runtime),
-        acquire_state_issue_lease_lock=lambda: lease_lock.acquire_state_issue_lease_lock(runtime),
-        release_state_issue_lease_lock=lambda: lease_lock.release_state_issue_lease_lock(runtime),
-        get_active_lease_context=lambda: runtime.ACTIVE_LEASE_CONTEXT,
-    )
+    adapters = _BootstrapAdapterServices(runtime_getter)
 
     runtime = ReviewerBotRuntime(
         requests=requests,
