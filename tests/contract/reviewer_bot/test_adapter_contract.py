@@ -302,6 +302,17 @@ def test_bootstrap_runtime_wires_explicit_config_output_and_deferred_services():
     assert runtime.deferred_payloads.__class__.__name__ == "_JsonDeferredPayloadLoader"
 
 
+def test_bootstrap_runtime_wires_explicit_state_github_and_lock_services():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert runtime.state_store.__class__.__name__ == "_BootstrapStateStoreServices"
+    assert runtime.github.__class__.__name__ == "_BootstrapGitHubServices"
+    assert runtime.locks.__class__.__name__ == "_BootstrapLockServices"
+    assert hasattr(runtime.locks, "acquire")
+    assert hasattr(runtime.locks, "release")
+    assert hasattr(runtime.locks, "refresh")
+
+
 def test_default_stderr_logger_renders_message_and_sorted_fields():
     writes = []
     logger = StdErrLogger(SimpleNamespace(stderr=SimpleNamespace(write=lambda text: writes.append(text))))

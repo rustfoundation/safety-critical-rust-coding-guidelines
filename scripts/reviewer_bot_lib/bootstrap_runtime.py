@@ -34,25 +34,56 @@ from .runtime import (
 )
 
 
+class _BootstrapStateStoreServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def load_state(self, *, fail_on_unavailable: bool = False):
+        return state_store.load_state(self._runtime_getter(), fail_on_unavailable=fail_on_unavailable)
+
+    def save_state(self, current_state):
+        return state_store.save_state(self._runtime_getter(), current_state)
+
+
+class _BootstrapGitHubServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def github_api_request(self, *args, **kwargs):
+        return github_api.github_api_request(self._runtime_getter(), *args, **kwargs)
+
+    def github_api(self, *args, **kwargs):
+        return github_api.github_api(self._runtime_getter(), *args, **kwargs)
+
+
+class _BootstrapLockServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def acquire(self):
+        return lease_lock.acquire_state_issue_lease_lock(self._runtime_getter())
+
+    def release(self) -> bool:
+        return lease_lock.release_state_issue_lease_lock(self._runtime_getter())
+
+    def refresh(self) -> bool:
+        return lease_lock.ensure_state_issue_lease_lock_fresh(self._runtime_getter())
+
+
 def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> ReviewerBotRuntime:
     runtime: ReviewerBotRuntime | None = None
+
+    def runtime_getter() -> ReviewerBotRuntime:
+        assert runtime is not None
+        return runtime
+
     config_service = _EnvConfig()
     output_sink = _FileOutputSink(config_service)
     deferred_payload_loader = _JsonDeferredPayloadLoader(config_service)
 
-    state_store_services = SimpleNamespace(
-        load_state=lambda *, fail_on_unavailable=False: state_store.load_state(
-            runtime, fail_on_unavailable=fail_on_unavailable
-        ),
-        save_state=lambda current_state: state_store.save_state(runtime, current_state),
-    )
-    github_services = SimpleNamespace(
-        github_api_request=lambda *args, **kwargs: github_api.github_api_request(
-            runtime, *args, **kwargs
-        ),
-        github_api=lambda *args, **kwargs: github_api.github_api(runtime, *args, **kwargs),
-    )
-    lock_services = SimpleNamespace()
+    state_store_services = _BootstrapStateStoreServices(runtime_getter)
+    github_services = _BootstrapGitHubServices(runtime_getter)
+    lock_services = _BootstrapLockServices(runtime_getter)
     handlers = SimpleNamespace(
         handle_issue_or_pr_opened=lambda current_state: lifecycle.handle_issue_or_pr_opened(runtime, current_state),
         handle_labeled_event=lambda current_state: lifecycle.handle_labeled_event(runtime, current_state),
