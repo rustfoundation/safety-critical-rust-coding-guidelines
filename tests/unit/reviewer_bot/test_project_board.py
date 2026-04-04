@@ -39,6 +39,16 @@ def test_reviewer_board_preflight_validates_manifest(monkeypatch):
     assert preflight.project_id == "PVT_kwDOB"
 
 
+def test_reviewer_board_preflight_is_disabled_without_runtime_flag(monkeypatch):
+    runtime = _runtime(monkeypatch)
+
+    preflight = project_board.reviewer_board_preflight(runtime)
+
+    assert preflight.enabled is False
+    assert preflight.valid is True
+    assert preflight.project_id is None
+
+
 def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypatch):
     state = make_state()
     make_tracked_review_state(state, 42, reviewer="alice", assigned_at="2026-03-20T12:34:56Z", active_cycle_started_at="2026-03-20T12:34:56Z")

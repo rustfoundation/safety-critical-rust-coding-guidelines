@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import os
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -121,8 +120,7 @@ class BoardPreviewResult:
 
 
 def reviewer_board_enabled(bot) -> bool:
-    del bot
-    return os.environ.get(REVIEWER_BOARD_ENABLED_ENV, "false").strip().lower() == "true"
+    return bot.get_config_value(REVIEWER_BOARD_ENABLED_ENV, "false").strip().lower() == "true"
 
 
 def _field_type_name(field_node: dict[str, Any]) -> str:
