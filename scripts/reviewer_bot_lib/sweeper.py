@@ -12,8 +12,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote
 
-import requests
-
 from .reconcile import (
     _artifact_expected_name,
     _artifact_expected_payload_name,
@@ -298,8 +296,7 @@ def _download_artifact_payload(bot, artifact: dict, expected_payload_name: str) 
     response = None
     for attempt in range(1, max_attempts + 1):
         try:
-            response = bot.requests.request(
-                "GET",
+            response = bot.artifact_download_transport.download(
                 download_url,
                 headers={
                     "Authorization": f"Bearer {bot.get_github_token()}",
@@ -307,7 +304,7 @@ def _download_artifact_payload(bot, artifact: dict, expected_payload_name: str) 
                     "X-GitHub-Api-Version": "2022-11-28",
                 },
             )
-        except requests.RequestException:
+        except Exception:
             if attempt < max_attempts:
                 time.sleep(_download_retry_delay(bot, attempt))
                 continue

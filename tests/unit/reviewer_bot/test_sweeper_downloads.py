@@ -4,21 +4,30 @@ from tests.fixtures.http_responses import FakeGitHubResponse
 from tests.fixtures.reviewer_bot import make_zip_payload
 
 
+class RecordingArtifactDownloadTransport:
+    def __init__(self, responses):
+        self._responses = iter(responses)
+        self.calls = []
+
+    def download(self, url, *, headers=None, timeout_seconds=None):
+        self.calls.append({"url": url, "headers": headers, "timeout_seconds": timeout_seconds})
+        response = next(self._responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 def test_download_artifact_payload_retries_429_then_succeeds(monkeypatch):
     payload = {"source_event_key": "issue_comment:100"}
     responses = iter([FakeGitHubResponse(429, {"message": "slow down"}, "slow down")])
     success_response = FakeGitHubResponse(200, None, "")
     success_response.content = make_zip_payload("deferred-comment.json", payload)
 
-    def fake_request(*args, **kwargs):
-        return next(responses, success_response)
-
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("GITHUB_TOKEN", "token")
     runtime.get_github_token = lambda: "token"
+    runtime.artifact_download_transport = RecordingArtifactDownloadTransport([*responses, success_response])
     monkeypatch.setattr(sweeper.time, "sleep", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(sweeper.requests, "request", fake_request)
-    runtime.requests = sweeper.requests
 
     status, artifact_payload = sweeper._download_artifact_payload(
         runtime,
@@ -34,13 +43,8 @@ def test_download_artifact_payload_reports_request_exception_unavailable(monkeyp
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("GITHUB_TOKEN", "token")
     runtime.get_github_token = lambda: "token"
+    runtime.artifact_download_transport = RecordingArtifactDownloadTransport([RuntimeError("timeout")])
     monkeypatch.setattr(sweeper.time, "sleep", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        sweeper.requests,
-        "request",
-        lambda *args, **kwargs: (_ for _ in ()).throw(sweeper.requests.RequestException("timeout")),
-    )
-    runtime.requests = sweeper.requests
 
     status, payload = sweeper._download_artifact_payload(
         runtime,
@@ -56,13 +60,10 @@ def test_download_artifact_payload_reports_retry_exhaustion_unavailable(monkeypa
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("GITHUB_TOKEN", "token")
     runtime.get_github_token = lambda: "token"
-    monkeypatch.setattr(sweeper.time, "sleep", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        sweeper.requests,
-        "request",
-        lambda *args, **kwargs: FakeGitHubResponse(429, {"message": "slow down"}, "slow down"),
+    runtime.artifact_download_transport = RecordingArtifactDownloadTransport(
+        [FakeGitHubResponse(429, {"message": "slow down"}, "slow down")] * 6
     )
-    runtime.requests = sweeper.requests
+    monkeypatch.setattr(sweeper.time, "sleep", lambda *_args, **_kwargs: None)
 
     status, payload = sweeper._download_artifact_payload(
         runtime,
