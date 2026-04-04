@@ -24,7 +24,19 @@ from .reviews import (
 )
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    logger = getattr(bot, "logger", None)
+    if logger is not None and hasattr(logger, "event"):
+        logger.event(level, message, **fields)
+        return
+    stream = __import__("sys").stderr if level in {"warning", "error"} else __import__("sys").stdout
+    print(message, file=stream)
+
+
 def _now_iso(bot) -> str:
+    clock = getattr(bot, "clock", None)
+    if clock is not None and hasattr(clock, "now"):
+        return clock.now().isoformat()
     return bot.datetime.now(bot.timezone.utc).isoformat()
 
 
@@ -888,7 +900,7 @@ def _validate_live_comment_replay_contract(
 def handle_workflow_run_event(bot, state: dict) -> bool:
     bot.assert_lock_held("handle_workflow_run_event")
     if str(state.get("freshness_runtime_epoch", "")).strip() != "freshness_v15":
-        print("V18 workflow_run reconcile safe-noop before epoch flip")
+        _log(bot, "info", "V18 workflow_run reconcile safe-noop before epoch flip")
         return False
     payload = _load_deferred_context(bot)
     parsed_payload = parse_deferred_context_payload(payload)
@@ -905,9 +917,12 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
     try:
         if isinstance(parsed_payload, ObserverNoopPayload):
             _validate_workflow_run_artifact_identity(bot, parsed_payload.raw_payload)
-            print(
-                "Observer workflow produced explicit no-op payload for "
-                f"{source_event_key}: {parsed_payload.reason}"
+            _log(
+                bot,
+                "info",
+                f"Observer workflow produced explicit no-op payload for {source_event_key}: {parsed_payload.reason}",
+                source_event_key=source_event_key,
+                reason=parsed_payload.reason,
             )
             return False
 
