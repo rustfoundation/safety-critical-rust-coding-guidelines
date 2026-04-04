@@ -203,6 +203,48 @@ class ArtifactDownloadTransport(Protocol):
 
 
 @runtime_checkable
+class EventInputsContext(Protocol):
+    def get_config_value(self, name: str, default: str = "") -> str: ...
+
+
+@runtime_checkable
+class EventHandlerContext(Protocol):
+    logger: Logger
+
+    def get_config_value(self, name: str, default: str = "") -> str: ...
+
+    def collect_touched_item(self, issue_number: int | None) -> None: ...
+
+
+@runtime_checkable
+class ProjectBoardMetadataContext(Protocol):
+    def get_config_value(self, name: str, default: str = "") -> str: ...
+
+    def get_github_graphql_token(self, *, prefer_board_token: bool = False) -> str: ...
+
+    def github_graphql(
+        self,
+        query: str,
+        variables: dict | None = None,
+        *,
+        token: str | None = None,
+    ) -> Any | None: ...
+
+
+@runtime_checkable
+class ProjectBoardProjectionContext(Protocol):
+    def get_issue_or_pr_snapshot(self, issue_number: int) -> dict | None: ...
+
+    def compute_reviewer_response_state(
+        self,
+        issue_number: int,
+        review_data: dict,
+        *,
+        issue_snapshot: dict | None = None,
+    ) -> dict: ...
+
+
+@runtime_checkable
 class AppEventContextRuntime(Protocol):
     EVENT_INTENT_MUTATING: str
     EVENT_INTENT_NON_MUTATING_DEFER: str

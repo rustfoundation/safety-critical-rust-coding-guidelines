@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from .context import EventHandlerContext
 
-def _log(bot, level: str, message: str, **fields) -> None:
+
+def _log(bot: EventHandlerContext, level: str, message: str, **fields) -> None:
     logger = getattr(bot, "logger", None)
     if logger is not None and hasattr(logger, "event"):
         logger.event(level, message, **fields)
@@ -16,11 +18,11 @@ def _runtime_epoch(state: dict) -> str:
     return str(state.get("freshness_runtime_epoch", "")).strip() or "legacy_v14"
 
 
-def _is_pr_event(bot) -> bool:
+def _is_pr_event(bot: EventHandlerContext) -> bool:
     return bot.get_config_value("IS_PULL_REQUEST", "false").lower() == "true"
 
 
-def _require_v18_for_pr(bot, state: dict, context: str) -> bool:
+def _require_v18_for_pr(bot: EventHandlerContext, state: dict, context: str) -> bool:
     if not _is_pr_event(bot):
         return True
     epoch = _runtime_epoch(state)
@@ -30,7 +32,7 @@ def _require_v18_for_pr(bot, state: dict, context: str) -> bool:
     return True
 
 
-def _require_legacy_for_legacy_pr(bot, state: dict, context: str) -> bool:
+def _require_legacy_for_legacy_pr(bot: EventHandlerContext, state: dict, context: str) -> bool:
     if not _is_pr_event(bot):
         return True
     epoch = _runtime_epoch(state)
@@ -40,7 +42,7 @@ def _require_legacy_for_legacy_pr(bot, state: dict, context: str) -> bool:
     return True
 
 
-def handle_pull_request_review_event(bot, state: dict) -> bool:
+def handle_pull_request_review_event(bot: EventHandlerContext, state: dict) -> bool:
     issue_number = int(bot.get_config_value("ISSUE_NUMBER", "0") or 0)
     if not issue_number:
         return False

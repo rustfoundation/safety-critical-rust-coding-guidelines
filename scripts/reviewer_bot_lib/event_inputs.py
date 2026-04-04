@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 
 from .context import (
-    AppEventContextRuntime,
     AssignmentRequest,
     CommentEventRequest,
     EventContext,
+    EventInputsContext,
     IssueLifecycleRequest,
     LabelEventRequest,
     ManualDispatchRequest,
@@ -53,18 +53,18 @@ def _parse_labels(value: str) -> tuple[str, ...]:
     return tuple(str(label) for label in payload)
 
 
-def parse_issue_labels(bot: AppEventContextRuntime) -> list[str]:
+def parse_issue_labels(bot: EventInputsContext) -> list[str]:
     return list(_parse_labels(bot.get_config_value("ISSUE_LABELS", "[]")))
 
 
-def get_target_repo_root(bot: AppEventContextRuntime) -> Path | None:
+def get_target_repo_root(bot: EventInputsContext) -> Path | None:
     configured = bot.get_config_value("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
     if not configured:
         return None
     return Path(configured)
 
 
-def build_event_context(bot: AppEventContextRuntime) -> EventContext:
+def build_event_context(bot: EventInputsContext) -> EventContext:
     return EventContext(
         event_name=bot.get_config_value("EVENT_NAME").strip(),
         event_action=bot.get_config_value("EVENT_ACTION").strip(),
@@ -92,7 +92,7 @@ def build_event_context(bot: AppEventContextRuntime) -> EventContext:
     )
 
 
-def build_comment_event_request(bot: AppEventContextRuntime, *, issue_number: int | None = None) -> CommentEventRequest:
+def build_comment_event_request(bot: EventInputsContext, *, issue_number: int | None = None) -> CommentEventRequest:
     return CommentEventRequest(
         issue_number=issue_number if issue_number is not None else (_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0),
         is_pull_request=bool(_parse_optional_bool(bot.get_config_value("IS_PULL_REQUEST"))),
@@ -111,7 +111,7 @@ def build_comment_event_request(bot: AppEventContextRuntime, *, issue_number: in
     )
 
 
-def build_pr_comment_trust_context(bot: AppEventContextRuntime) -> PrCommentTrustContext:
+def build_pr_comment_trust_context(bot: EventInputsContext) -> PrCommentTrustContext:
     return PrCommentTrustContext(
         github_repository=bot.get_config_value("GITHUB_REPOSITORY"),
         comment_author_association=bot.get_config_value("COMMENT_AUTHOR_ASSOCIATION").strip(),
@@ -122,7 +122,7 @@ def build_pr_comment_trust_context(bot: AppEventContextRuntime) -> PrCommentTrus
     )
 
 
-def build_assignment_request(bot: AppEventContextRuntime, *, issue_number: int) -> AssignmentRequest:
+def build_assignment_request(bot: EventInputsContext, *, issue_number: int) -> AssignmentRequest:
     return AssignmentRequest(
         issue_number=issue_number,
         issue_author=bot.get_config_value("ISSUE_AUTHOR"),
@@ -134,7 +134,7 @@ def build_assignment_request(bot: AppEventContextRuntime, *, issue_number: int) 
 
 
 def build_privileged_command_request(
-    bot: AppEventContextRuntime,
+    bot: EventInputsContext,
     *,
     issue_number: int,
     actor: str = "",
@@ -155,7 +155,7 @@ def build_privileged_command_request(
     )
 
 
-def build_manual_dispatch_request(bot: AppEventContextRuntime) -> ManualDispatchRequest:
+def build_manual_dispatch_request(bot: EventInputsContext) -> ManualDispatchRequest:
     return ManualDispatchRequest(
         action=bot.get_config_value("MANUAL_ACTION").strip(),
         issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")),
@@ -163,7 +163,7 @@ def build_manual_dispatch_request(bot: AppEventContextRuntime) -> ManualDispatch
     )
 
 
-def build_issue_lifecycle_request(bot: AppEventContextRuntime) -> IssueLifecycleRequest:
+def build_issue_lifecycle_request(bot: EventInputsContext) -> IssueLifecycleRequest:
     return IssueLifecycleRequest(
         issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0,
         is_pull_request=bool(_parse_optional_bool(bot.get_config_value("IS_PULL_REQUEST"))),
@@ -180,7 +180,7 @@ def build_issue_lifecycle_request(bot: AppEventContextRuntime) -> IssueLifecycle
     )
 
 
-def build_label_event_request(bot: AppEventContextRuntime) -> LabelEventRequest:
+def build_label_event_request(bot: EventInputsContext) -> LabelEventRequest:
     return LabelEventRequest(
         issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0,
         is_pull_request=bool(_parse_optional_bool(bot.get_config_value("IS_PULL_REQUEST"))),
@@ -188,7 +188,7 @@ def build_label_event_request(bot: AppEventContextRuntime) -> LabelEventRequest:
     )
 
 
-def build_pull_request_sync_request(bot: AppEventContextRuntime) -> PullRequestSyncRequest:
+def build_pull_request_sync_request(bot: EventInputsContext) -> PullRequestSyncRequest:
     return PullRequestSyncRequest(
         issue_number=_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0,
         head_sha=bot.get_config_value("PR_HEAD_SHA").strip(),
