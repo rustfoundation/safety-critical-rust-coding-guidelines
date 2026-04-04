@@ -1,6 +1,19 @@
 import pytest
 
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+from tests.fixtures.focused_fake_services import (
+    ArtifactDownloadTransportStub,
+    ConfigBag,
+    DeferredPayloadStore,
+    GitHubStub,
+    GraphQLTransportStub,
+    HandlerStub,
+    LockStub,
+    OutputCapture,
+    RestTransportStub,
+    StateStoreStub,
+    TouchTrackerStub,
+)
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 pytestmark = pytest.mark.contract
@@ -182,3 +195,19 @@ def test_fake_runtime_github_api_mode_delegates_to_shared_route_fake(monkeypatch
     runtime = FakeReviewerBotRuntime(monkeypatch, github=github)
 
     assert runtime.github_api("GET", "pulls/42") == {"head": {"sha": "head-1"}}
+
+
+def test_focused_fake_service_types_are_exposed_for_direct_fixture_composition(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime.config, ConfigBag)
+    assert isinstance(runtime.outputs, OutputCapture)
+    assert isinstance(runtime.deferred_payloads, DeferredPayloadStore)
+    assert isinstance(runtime.state_store, StateStoreStub)
+    assert isinstance(runtime.github, GitHubStub)
+    assert isinstance(runtime.locks, LockStub)
+    assert isinstance(runtime.rest_transport, RestTransportStub)
+    assert isinstance(runtime.graphql_transport, GraphQLTransportStub)
+    assert isinstance(runtime.artifact_download_transport, ArtifactDownloadTransportStub)
+    assert isinstance(runtime.handlers, HandlerStub)
+    assert isinstance(runtime.touch_tracker, TouchTrackerStub)
