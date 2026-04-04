@@ -1,3 +1,10 @@
+from datetime import datetime, timezone
+
+from tests.fixtures.fake_clock import FakeClock
+from tests.fixtures.fake_jitter import DeterministicJitter
+from tests.fixtures.fake_sleeper import RecordingSleeper
+from tests.fixtures.fake_uuid import FixedUuidSource
+from tests.fixtures.recording_logger import RecordingLogger
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
 
@@ -15,3 +22,52 @@ def test_shared_github_fixture_smoke_routes_simple_request():
     result = routes.github_api_request("GET", "pulls/42")
 
     assert result.payload == {"head": {"sha": "head-1"}}
+
+
+def test_fake_clock_can_set_and_advance_time():
+    clock = FakeClock(datetime(2026, 3, 17, 10, 0, tzinfo=timezone.utc))
+
+    assert clock.now() == datetime(2026, 3, 17, 10, 0, tzinfo=timezone.utc)
+    clock.advance(seconds=30)
+    assert clock.now() == datetime(2026, 3, 17, 10, 0, 30, tzinfo=timezone.utc)
+
+
+def test_recording_sleeper_captures_sleep_calls():
+    sleeper = RecordingSleeper()
+
+    sleeper.sleep(1.5)
+    sleeper.sleep(2.0)
+
+    assert sleeper.calls == [1.5, 2.0]
+
+
+def test_deterministic_jitter_replays_configured_values():
+    jitter = DeterministicJitter([0.5, 0.75])
+
+    assert jitter.uniform(0.1, 1.0) == 0.5
+    assert jitter.uniform(0.1, 1.0) == 0.75
+    assert jitter.uniform(0.1, 1.0) == 0.75
+    assert jitter.calls == [(0.1, 1.0), (0.1, 1.0), (0.1, 1.0)]
+
+
+def test_fixed_uuid_source_replays_values_and_records_issued_ids():
+    source = FixedUuidSource(["uuid-1", "uuid-2"])
+
+    assert source.uuid4_hex() == "uuid-1"
+    assert source.uuid4_hex() == "uuid-2"
+    assert source.uuid4_hex() == "uuid-2"
+    assert source.issued == ["uuid-1", "uuid-2", "uuid-2"]
+
+
+def test_recording_logger_captures_structured_events():
+    logger = RecordingLogger()
+
+    logger.event("warning", "retrying request", issue_number=42, retry_attempt=2)
+
+    assert logger.records == [
+        {
+            "level": "warning",
+            "message": "retrying request",
+            "fields": {"issue_number": 42, "retry_attempt": 2},
+        }
+    ]
