@@ -207,6 +207,11 @@ class HandlerStub:
     def call(self, name: str, state: dict) -> bool:
         return self._handlers[name](state)
 
+    def __getattr__(self, name: str):
+        if name in self.ALLOWED:
+            return lambda state: self._handlers[name](state)
+        raise AttributeError(name)
+
 
 class TouchTrackerStub:
     def __init__(self):

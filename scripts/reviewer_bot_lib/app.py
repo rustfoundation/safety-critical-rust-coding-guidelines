@@ -27,7 +27,7 @@ def _log(bot: AppExecutionRuntime, level: str, message: str, **fields) -> None:
 def _revalidate_epoch(bot: AppExecutionRuntime, expected_epoch: str | None, phase: str) -> None:
     if expected_epoch is None:
         return
-    latest_state = bot.load_state(fail_on_unavailable=True)
+    latest_state = bot.state_store.load_state(fail_on_unavailable=True)
     latest_epoch = latest_state.get("freshness_runtime_epoch")
     if latest_epoch != expected_epoch:
         raise RuntimeError(
@@ -180,10 +180,10 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
 
     try:
         if lock_required:
-            bot.acquire_state_issue_lease_lock()
+            bot.locks.acquire()
             lock_acquired = True
 
-        state = bot.load_state(fail_on_unavailable=lock_required)
+        state = bot.state_store.load_state(fail_on_unavailable=lock_required)
         active_reviews = state.get("active_reviews")
         if isinstance(active_reviews, dict):
             loaded_active_reviews_count = len(active_reviews)
@@ -200,42 +200,42 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
 
         if event_name == "issues":
             if event_action == "opened":
-                state_changed = bot.handle_issue_or_pr_opened(state)
+                state_changed = bot.handlers.handle_issue_or_pr_opened(state)
             elif event_action == "labeled":
-                state_changed = bot.handle_labeled_event(state)
+                state_changed = bot.handlers.handle_labeled_event(state)
             elif event_action == "edited":
-                state_changed = bot.handle_issue_edited_event(state)
+                state_changed = bot.handlers.handle_issue_edited_event(state)
             elif event_action == "closed":
-                state_changed = bot.handle_closed_event(state)
+                state_changed = bot.handlers.handle_closed_event(state)
 
         elif event_name == "pull_request_target":
             if event_action == "opened":
-                state_changed = bot.handle_issue_or_pr_opened(state)
+                state_changed = bot.handlers.handle_issue_or_pr_opened(state)
             elif event_action == "labeled":
-                state_changed = bot.handle_labeled_event(state)
+                state_changed = bot.handlers.handle_labeled_event(state)
             elif event_action == "closed":
-                state_changed = bot.handle_closed_event(state)
+                state_changed = bot.handlers.handle_closed_event(state)
             elif event_action == "synchronize":
-                state_changed = bot.handle_pull_request_target_synchronize(state)
+                state_changed = bot.handlers.handle_pull_request_target_synchronize(state)
 
         elif event_name == "pull_request_review":
             if event_action in {"submitted", "dismissed"}:
-                state_changed = bot.handle_pull_request_review_event(state)
+                state_changed = bot.handlers.handle_pull_request_review_event(state)
 
         elif event_name == "issue_comment":
             if event_action == "created":
-                state_changed = bot.handle_comment_event(state)
+                state_changed = bot.handlers.handle_comment_event(state)
 
         elif event_name == "workflow_dispatch":
-            state_changed = bot.handle_manual_dispatch(state)
+            state_changed = bot.handlers.handle_manual_dispatch(state)
 
         elif event_name == "schedule":
-            state_changed = bot.handle_scheduled_check(state)
+            state_changed = bot.handlers.handle_scheduled_check(state)
 
         elif event_name == "workflow_run":
             if event_action == "completed":
                 if context.workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
-                    state_changed = bot.handle_workflow_run_event(state)
+                    state_changed = bot.handlers.handle_workflow_run_event(state)
                 else:
                     _log(
                         bot,
@@ -282,14 +282,14 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
 
             _log(bot, "info", "State updates detected; attempting to persist reviewer-bot state.")
             _revalidate_epoch(bot, loaded_epoch, "authoritative save")
-            if not bot.save_state(state):
+            if not bot.state_store.save_state(state):
                 raise RuntimeError(
                     "State updates were computed but could not be persisted. "
                     "Failing this run to avoid silent success."
                 )
 
             if touched_items:
-                state = bot.load_state(fail_on_unavailable=True)
+                state = bot.state_store.load_state(fail_on_unavailable=True)
 
         if touched_items:
             if not lock_acquired:
@@ -310,7 +310,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 )
                 if _mark_projection_repair_needed(bot, state, touched_items, str(exc)):
                     _revalidate_epoch(bot, loaded_epoch, "projection-failure repair marker save")
-                    if not bot.save_state(state):
+                    if not bot.state_store.save_state(state):
                         raise RuntimeError(
                             "Projection failed and repair-needed metadata could not be persisted."
                         )
@@ -318,7 +318,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 if projection_epoch_repair:
                     state["status_projection_epoch"] = bot.STATUS_PROJECTION_EPOCH
                     _revalidate_epoch(bot, loaded_epoch, "status-projection epoch save")
-                    if not bot.save_state(state):
+                    if not bot.state_store.save_state(state):
                         raise RuntimeError(
                             "Status projection epoch repair succeeded but could not be persisted."
                         )
@@ -344,7 +344,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
         exit_code = 1
     finally:
         if lock_acquired:
-            if not bot.release_state_issue_lease_lock():
+            if not bot.locks.release():
                 release_failed = True
 
     if release_failed:

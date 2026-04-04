@@ -359,12 +359,6 @@ class ReviewerBotRuntime:
     def load_deferred_payload(self) -> dict:
         return self.deferred_payloads.load()
 
-    def load_state(self, *, fail_on_unavailable: bool = False) -> dict:
-        return self.state_store.load_state(fail_on_unavailable=fail_on_unavailable)
-
-    def save_state(self, state: dict) -> bool:
-        return self.state_store.save_state(state)
-
     def github_api_request(self, *args, **kwargs):
         return self.github.github_api_request(*args, **kwargs)
 
@@ -376,36 +370,6 @@ class ReviewerBotRuntime:
 
     def drain_touched_items(self) -> list[int]:
         return self.touch_tracker.drain()
-
-    def handle_issue_or_pr_opened(self, state: dict) -> bool:
-        return self.handlers.handle_issue_or_pr_opened(state)
-
-    def handle_labeled_event(self, state: dict) -> bool:
-        return self.handlers.handle_labeled_event(state)
-
-    def handle_issue_edited_event(self, state: dict) -> bool:
-        return self.handlers.handle_issue_edited_event(state)
-
-    def handle_closed_event(self, state: dict) -> bool:
-        return self.handlers.handle_closed_event(state)
-
-    def handle_pull_request_target_synchronize(self, state: dict) -> bool:
-        return self.handlers.handle_pull_request_target_synchronize(state)
-
-    def handle_pull_request_review_event(self, state: dict) -> bool:
-        return self.handlers.handle_pull_request_review_event(state)
-
-    def handle_comment_event(self, state: dict) -> bool:
-        return self.handlers.handle_comment_event(state)
-
-    def handle_manual_dispatch(self, state: dict) -> bool:
-        return self.handlers.handle_manual_dispatch(state)
-
-    def handle_scheduled_check(self, state: dict) -> bool:
-        return self.handlers.handle_scheduled_check(state)
-
-    def handle_workflow_run_event(self, state: dict) -> bool:
-        return self.handlers.handle_workflow_run_event(state)
 
     def assert_lock_held(self, context: str) -> None:
         return self.adapters.assert_lock_held(context)

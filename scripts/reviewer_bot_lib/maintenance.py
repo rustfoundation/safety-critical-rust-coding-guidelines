@@ -154,14 +154,14 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
         return False
     bot.assert_lock_held("handle_manual_dispatch")
     if action == "sync-members":
-        _, changes = bot.sync_members_with_queue(state)
+        _, changes = bot.adapters.sync_members_with_queue(state)
         return bool(changes)
     if action == "repair-review-status-labels":
         for issue_number in bot.list_open_items_with_status_labels():
             bot.collect_touched_item(issue_number)
         return False
     if action == "check-overdue":
-        return bot.handle_scheduled_check(state)
+        return bot.handlers.handle_scheduled_check(state)
     if action == "execute-pending-privileged-command":
         source_event_key = request.privileged_source_event_key
         if not source_event_key:
