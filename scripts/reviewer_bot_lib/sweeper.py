@@ -5,13 +5,13 @@ from __future__ import annotations
 import io
 import json
 import os
-import random
 import time
 import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import quote
 
+from . import retrying
 from .reconcile import (
     _artifact_expected_name,
     _artifact_expected_payload_name,
@@ -64,8 +64,15 @@ def _read_api_payload(bot, endpoint: str) -> tuple[Any | None, str | None]:
 
 def _download_retry_delay(bot, retry_attempt: int) -> float:
     base = float(getattr(bot, "LOCK_RETRY_BASE_SECONDS", 2.0))
-    bounded_base = min(base * (2 ** max(retry_attempt - 1, 0)), 8.0)
-    return bounded_base + random.uniform(0, bounded_base)
+
+    class _BotJitter:
+        def uniform(self, lower: float, upper: float) -> float:
+            jitter = getattr(bot, "jitter", None)
+            if jitter is not None and hasattr(jitter, "uniform"):
+                return jitter.uniform(lower, upper)
+            return __import__("random").uniform(lower, upper)
+
+    return retrying.bounded_exponential_delay(base, retry_attempt, jitter=_BotJitter())
 
 
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
@@ -309,7 +316,7 @@ def _download_artifact_payload(bot, artifact: dict, expected_payload_name: str) 
                 time.sleep(_download_retry_delay(bot, attempt))
                 continue
             return "download_unavailable", None
-        if response.status_code == 429 or response.status_code >= 500:
+        if retrying.is_retryable_status(response.status_code):
             if attempt < max_attempts:
                 time.sleep(_download_retry_delay(bot, attempt))
                 continue
