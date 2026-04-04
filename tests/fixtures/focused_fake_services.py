@@ -172,11 +172,13 @@ class GraphQLTransportStub:
 class ArtifactDownloadTransportStub:
     def __init__(self):
         self._download: Callable[..., Any] = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No artifact download stub configured"))
+        self.calls: list[dict[str, Any]] = []
 
     def stub(self, func: Callable[..., Any]) -> None:
         self._download = func
 
     def download(self, url: str, *, headers=None, timeout_seconds=None):
+        self.calls.append({"url": url, "headers": headers, "timeout_seconds": timeout_seconds})
         return self._download(url=url, headers=headers, timeout_seconds=timeout_seconds)
 
 

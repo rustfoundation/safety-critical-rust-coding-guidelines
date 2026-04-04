@@ -6,17 +6,16 @@ from tests.fixtures.http_responses import FakeGitHubResponse
 from tests.fixtures.reviewer_bot import make_zip_payload
 
 
-class RecordingArtifactDownloadTransport:
-    def __init__(self, responses):
-        self._responses = iter(responses)
-        self.calls = []
+def _stub_download_sequence(runtime, responses):
+    iterator = iter(responses)
 
-    def download(self, url, *, headers=None, timeout_seconds=None):
-        self.calls.append({"url": url, "headers": headers, "timeout_seconds": timeout_seconds})
-        response = next(self._responses)
+    def fake_download(**kwargs):
+        response = next(iterator)
         if isinstance(response, Exception):
             raise response
         return response
+
+    runtime.artifact_download_transport.stub(fake_download)
 
 
 def test_download_artifact_payload_retries_429_then_succeeds(monkeypatch):
@@ -30,7 +29,7 @@ def test_download_artifact_payload_retries_429_then_succeeds(monkeypatch):
     runtime.get_github_token = lambda: "token"
     runtime.jitter = DeterministicJitter(0.5)
     runtime.sleeper = RecordingSleeper()
-    runtime.artifact_download_transport = RecordingArtifactDownloadTransport([*responses, success_response])
+    _stub_download_sequence(runtime, [*responses, success_response])
 
     status, artifact_payload = sweeper._download_artifact_payload(
         runtime,
@@ -41,6 +40,7 @@ def test_download_artifact_payload_retries_429_then_succeeds(monkeypatch):
     assert status == "ok"
     assert artifact_payload == payload
     assert runtime.sleeper.calls == [2.5]
+    assert runtime.artifact_download_transport.calls[0]["url"] == "https://example.com/artifact.zip"
 
 
 def test_download_retry_delay_uses_shared_backoff_with_jitter(monkeypatch):
@@ -57,7 +57,7 @@ def test_download_artifact_payload_reports_request_exception_unavailable(monkeyp
     runtime.set_config_value("GITHUB_TOKEN", "token")
     runtime.get_github_token = lambda: "token"
     runtime.sleeper = RecordingSleeper()
-    runtime.artifact_download_transport = RecordingArtifactDownloadTransport([RuntimeError("timeout")])
+    _stub_download_sequence(runtime, [RuntimeError("timeout")])
 
     status, payload = sweeper._download_artifact_payload(
         runtime,
@@ -74,9 +74,7 @@ def test_download_artifact_payload_reports_retry_exhaustion_unavailable(monkeypa
     runtime.set_config_value("GITHUB_TOKEN", "token")
     runtime.get_github_token = lambda: "token"
     runtime.sleeper = RecordingSleeper()
-    runtime.artifact_download_transport = RecordingArtifactDownloadTransport(
-        [FakeGitHubResponse(429, {"message": "slow down"}, "slow down")] * 6
-    )
+    _stub_download_sequence(runtime, [FakeGitHubResponse(429, {"message": "slow down"}, "slow down")] * 6)
 
     status, payload = sweeper._download_artifact_payload(
         runtime,
