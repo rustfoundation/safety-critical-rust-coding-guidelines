@@ -2,6 +2,7 @@
 
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -33,11 +34,12 @@ def _log(bot: StateStoreContext, level: str, message: str, **fields: Any) -> Non
     if logger is not None and hasattr(logger, "event"):
         logger.event(level, message, **fields)
         return
-    print(message, file=__import__("sys").stderr)
+    sys.stderr.write(f"{message}\n")
 
 
 def _log_fallback(level: str, message: str) -> None:
-    print(message, file=__import__("sys").stderr)
+    del level
+    sys.stderr.write(f"{message}\n")
 
 
 def _sleep(bot: StateStoreContext, seconds: float) -> None:
