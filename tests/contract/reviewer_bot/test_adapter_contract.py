@@ -8,7 +8,7 @@ pytestmark = pytest.mark.contract
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import event_inputs, lease_lock, review_state
 from scripts.reviewer_bot_lib.context import ReviewerBotContext
-from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
+from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime, StdErrLogger
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
 
@@ -267,3 +267,12 @@ def test_runtime_accepts_injected_infra_services():
     assert runtime.logger is logger
     assert runtime.rest_transport is rest_transport
     assert runtime.graphql_transport is graphql_transport
+
+
+def test_default_stderr_logger_renders_message_and_sorted_fields():
+    writes = []
+    logger = StdErrLogger(SimpleNamespace(stderr=SimpleNamespace(write=lambda text: writes.append(text))))
+
+    logger.event("warning", "retrying request", retry_attempt=2, issue_number=42)
+
+    assert writes == ["[warning] retrying request issue_number=42 retry_attempt=2\n"]

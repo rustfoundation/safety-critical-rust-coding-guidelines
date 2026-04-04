@@ -22,6 +22,7 @@ def test_fake_runtime_exposes_explicit_service_fields_and_no_omnibus_service_con
     assert runtime.config is not None
     assert runtime.outputs is not None
     assert runtime.deferred_payloads is not None
+    assert runtime.logger is not None
     assert runtime.state_store is not None
     assert runtime.github is not None
     assert runtime.locks is not None
@@ -46,6 +47,20 @@ def test_fake_runtime_output_sink_records_writes(monkeypatch):
     runtime.write_output("state_changed", "true")
 
     assert runtime.outputs.writes == [("state_changed", "true")]
+
+
+def test_fake_runtime_recording_logger_captures_structured_events(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    runtime.logger.event("warning", "retrying", issue_number=42, retry_attempt=2)
+
+    assert runtime.logger.records == [
+        {
+            "level": "warning",
+            "message": "retrying",
+            "fields": {"issue_number": 42, "retry_attempt": 2},
+        }
+    ]
 
 
 def test_fake_runtime_touched_items_preserve_uniqueness_and_drain(monkeypatch):

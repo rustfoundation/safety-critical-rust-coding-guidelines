@@ -38,6 +38,7 @@ from scripts.reviewer_bot_lib.config import (
     GitHubApiResult,
 )
 from scripts.reviewer_bot_lib.context import LeaseContext
+from tests.fixtures.recording_logger import RecordingLogger
 
 
 class ConfigBag:
@@ -210,6 +211,7 @@ class FakeReviewerBotRuntime:
         self.sys = sys
         self.random = random
         self.time = time
+        self.logger = RecordingLogger()
         self.ACTIVE_LEASE_CONTEXT = LeaseContext(
             lock_token="test-lock-token",
             lock_owner_run_id="test-run",
