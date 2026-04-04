@@ -21,12 +21,7 @@ from .event_inputs import (
 
 
 def _log(bot, level: str, message: str, **fields) -> None:
-    logger = getattr(bot, "logger", None)
-    if logger is not None and hasattr(logger, "event"):
-        logger.event(level, message, **fields)
-        return
-    stream = __import__("sys").stderr if level in {"warning", "error"} else __import__("sys").stdout
-    print(message, file=stream)
+    bot.logger.event(level, message, **fields)
 
 
 def _now() -> datetime:

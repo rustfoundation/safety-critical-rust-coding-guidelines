@@ -2,7 +2,6 @@
 
 import json
 import re
-import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -30,16 +29,7 @@ from .context import StateStoreContext, StateStoreRuntimeContext
 
 
 def _log(bot: StateStoreRuntimeContext, level: str, message: str, **fields: Any) -> None:
-    logger = getattr(bot, "logger", None)
-    if logger is not None and hasattr(logger, "event"):
-        logger.event(level, message, **fields)
-        return
-    sys.stderr.write(f"{message}\n")
-
-
-def _log_fallback(level: str, message: str) -> None:
-    del level
-    sys.stderr.write(f"{message}\n")
+    bot.logger.event(level, message, **fields)
 
 
 def _sleep(bot: StateStoreRuntimeContext, seconds: float) -> None:
@@ -278,8 +268,7 @@ def parse_state_yaml_from_issue_body(body: str) -> dict:
 
     try:
         state = yaml.safe_load(yaml_content) or {}
-    except yaml.YAMLError as exc:
-        _log_fallback("warning", f"Failed to parse state YAML: {exc}")
+    except yaml.YAMLError:
         state = {}
 
     if not isinstance(state, dict):
@@ -298,8 +287,7 @@ def parse_lock_metadata_from_issue_body(body: str) -> dict:
 
     try:
         parsed = json.loads(lock_json)
-    except json.JSONDecodeError as exc:
-        _log_fallback("warning", f"Failed to parse lock metadata JSON: {exc}")
+    except json.JSONDecodeError:
         return normalize_lock_metadata(None)
 
     if not isinstance(parsed, dict):

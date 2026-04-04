@@ -15,7 +15,7 @@ from tests.fixtures.reviewer_bot import make_state
 
 
 def test_load_state_sets_schema_and_epoch_defaults():
-    bot = SimpleNamespace(get_state_issue=lambda: {"body": "queue: []\n"})
+    bot = SimpleNamespace(get_state_issue=lambda: {"body": "queue: []\n"}, logger=RecordingLogger())
 
     state = state_store.load_state(bot)
 
@@ -39,7 +39,7 @@ def test_get_state_issue_snapshot_uses_retry_aware_read():
             transport_error=None,
         )
 
-    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request, get_config_value=lambda name, default="": default)
+    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request, get_config_value=lambda name, default="": default, logger=RecordingLogger())
 
     snapshot = state_store.get_state_issue_snapshot(bot)
 
@@ -64,7 +64,7 @@ def test_conditional_patch_state_issue_sends_if_match_header():
             transport_error=None,
         )
 
-    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request)
+    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request, logger=RecordingLogger())
 
     state_store.conditional_patch_state_issue(bot, "updated", '"etag-1"')
 
@@ -78,7 +78,7 @@ def test_conditional_patch_state_issue_omits_if_match_when_etag_missing():
         observed["extra_headers"] = extra_headers
         return GitHubApiResult(200, {"body": data["body"]}, {}, "ok", True, None, 0, None)
 
-    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request)
+    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request, logger=RecordingLogger())
 
     state_store.conditional_patch_state_issue(bot, "updated", None)
 
@@ -144,6 +144,7 @@ def test_get_state_issue_snapshot_builds_html_url_from_runtime_config_when_missi
         STATE_ISSUE_NUMBER=1,
         github_api_request=fake_request,
         get_config_value=lambda name, default="": config.get(name, default),
+        logger=RecordingLogger(),
     )
 
     snapshot = state_store.get_state_issue_snapshot(bot)

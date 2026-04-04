@@ -1,7 +1,6 @@
 """Reviewer-bot lease lock helpers."""
 
 import json
-import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,12 +20,7 @@ from .context import LeaseLockContext, LeaseLockRuntimeContext
 
 
 def _log(bot: LeaseLockRuntimeContext, level: str, message: str, **fields: Any) -> None:
-    logger = getattr(bot, "logger", None)
-    if logger is not None and hasattr(logger, "event"):
-        logger.event(level, message, **fields)
-        return
-    stream = sys.stderr if level in {"warning", "error"} else sys.stdout
-    stream.write(f"{message}\n")
+    bot.logger.event(level, message, **fields)
 
 
 def _sleep(bot: LeaseLockRuntimeContext, seconds: float) -> None:

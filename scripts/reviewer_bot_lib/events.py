@@ -6,12 +6,7 @@ from .context import EventHandlerContext
 
 
 def _log(bot: EventHandlerContext, level: str, message: str, **fields) -> None:
-    logger = getattr(bot, "logger", None)
-    if logger is not None and hasattr(logger, "event"):
-        logger.event(level, message, **fields)
-        return
-    stream = __import__("sys").stderr if level in {"warning", "error"} else __import__("sys").stdout
-    stream.write(f"{message}\n")
+    bot.logger.event(level, message, **fields)
 
 
 def _runtime_epoch(state: dict) -> str:

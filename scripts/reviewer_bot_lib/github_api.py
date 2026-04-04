@@ -2,7 +2,6 @@
 
 import json
 import random
-import sys
 import time
 from urllib.parse import quote
 
@@ -27,12 +26,7 @@ class _RandomJitter:
 
 
 def _log(bot: GitHubApiContext, level: str, message: str, **fields) -> None:
-    logger = getattr(bot, "logger", None)
-    if logger is not None and hasattr(logger, "event"):
-        logger.event(level, message, **fields)
-        return
-    stream = sys.stderr if level in {"warning", "error"} else sys.stdout
-    print(message, file=stream)
+    bot.logger.event(level, message, **fields)
 
 
 def _sleep(bot: GitHubApiContext, seconds: float) -> None:
