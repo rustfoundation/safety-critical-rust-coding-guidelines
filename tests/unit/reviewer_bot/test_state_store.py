@@ -7,6 +7,10 @@ from scripts.reviewer_bot_lib.config import (
     GitHubApiResult,
     StateIssueSnapshot,
 )
+from tests.fixtures.fake_clock import FakeClock
+from tests.fixtures.fake_jitter import DeterministicJitter
+from tests.fixtures.fake_sleeper import RecordingSleeper
+from tests.fixtures.recording_logger import RecordingLogger
 from tests.fixtures.reviewer_bot import make_state
 
 
@@ -35,7 +39,7 @@ def test_get_state_issue_snapshot_uses_retry_aware_read():
             transport_error=None,
         )
 
-    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request)
+    bot = SimpleNamespace(STATE_ISSUE_NUMBER=1, github_api_request=fake_request, get_config_value=lambda name, default="": default)
 
     snapshot = state_store.get_state_issue_snapshot(bot)
 
@@ -81,7 +85,7 @@ def test_conditional_patch_state_issue_omits_if_match_when_etag_missing():
     assert observed["extra_headers"] is None
 
 
-def test_save_state_retries_precondition_failed_conflict(monkeypatch):
+def test_save_state_retries_precondition_failed_conflict_uses_injected_time_services():
     state = make_state()
     snapshot = StateIssueSnapshot(
         body="body",
@@ -95,15 +99,54 @@ def test_save_state_retries_precondition_failed_conflict(monkeypatch):
         ]
     )
 
+    clock = FakeClock()
+    sleeper = RecordingSleeper()
+    jitter = DeterministicJitter(0.25)
+    logger = RecordingLogger()
+
     bot = SimpleNamespace(
         STATE_ISSUE_NUMBER=1,
         ACTIVE_LEASE_CONTEXT=object(),
+        clock=clock,
+        sleeper=sleeper,
+        jitter=jitter,
+        logger=logger,
         ensure_state_issue_lease_lock_fresh=lambda: True,
         get_state_issue_snapshot=lambda: snapshot,
         parse_lock_metadata_from_issue_body=lambda body: {},
         render_state_issue_body=lambda state_obj, lock_meta, base_body: "updated",
         conditional_patch_state_issue=lambda body, etag=None: next(responses),
     )
-    monkeypatch.setattr(state_store.time, "sleep", lambda *_args, **_kwargs: None)
 
     assert state_store.save_state(bot, state) is True
+    assert state["last_updated"] == clock.now().isoformat()
+    assert sleeper.calls == [2.25]
+    assert jitter.calls == [(0, 2.0)]
+    assert logger.records[0]["level"] == "warning"
+    assert logger.records[-1]["level"] == "info"
+
+
+def test_get_state_issue_snapshot_builds_html_url_from_runtime_config_when_missing():
+    def fake_request(method, endpoint, data=None, extra_headers=None, **kwargs):
+        return GitHubApiResult(
+            status_code=200,
+            payload={"body": "state: ok"},
+            headers={"etag": '"abc"'},
+            text="ok",
+            ok=True,
+            failure_kind=None,
+            retry_attempts=1,
+            transport_error=None,
+        )
+
+    config = {"REPO_OWNER": "rustfoundation", "REPO_NAME": "safety-critical-rust-coding-guidelines"}
+    bot = SimpleNamespace(
+        STATE_ISSUE_NUMBER=1,
+        github_api_request=fake_request,
+        get_config_value=lambda name, default="": config.get(name, default),
+    )
+
+    snapshot = state_store.get_state_issue_snapshot(bot)
+
+    assert snapshot is not None
+    assert snapshot.html_url == "https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/1"

@@ -1,10 +1,7 @@
 """State issue parsing, loading, and saving helpers."""
 
 import json
-import random
 import re
-import sys
-import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -30,16 +27,71 @@ from .config import (
 from .context import StateStoreContext
 
 
+def _log(bot: StateStoreContext, level: str, message: str, **fields: Any) -> None:
+    logger = getattr(bot, "logger", None)
+    if logger is not None and hasattr(logger, "event"):
+        logger.event(level, message, **fields)
+        return
+    print(message, file=__import__("sys").stderr)
+
+
+def _log_fallback(level: str, message: str) -> None:
+    print(message, file=__import__("sys").stderr)
+
+
+def _sleep(bot: StateStoreContext, seconds: float) -> None:
+    sleeper = getattr(bot, "sleeper", None)
+    if sleeper is not None and hasattr(sleeper, "sleep"):
+        sleeper.sleep(seconds)
+        return
+    __import__("time").sleep(seconds)
+
+
+def _jitter(bot: StateStoreContext, lower: float, upper: float) -> float:
+    jitter = getattr(bot, "jitter", None)
+    if jitter is not None and hasattr(jitter, "uniform"):
+        return jitter.uniform(lower, upper)
+    return __import__("random").uniform(lower, upper)
+
+
+def _now_iso(bot: StateStoreContext) -> str:
+    clock = getattr(bot, "clock", None)
+    if clock is not None and hasattr(clock, "now"):
+        return clock.now().isoformat()
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _state_issue_number(bot: StateStoreContext) -> int:
+    accessor = getattr(bot, "state_issue_number", None)
+    if callable(accessor):
+        return accessor()
+    return getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
+
+
+def _lock_api_retry_limit(bot: StateStoreContext) -> int:
+    accessor = getattr(bot, "lock_api_retry_limit", None)
+    if callable(accessor):
+        return accessor()
+    return getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
+
+
+def _lock_retry_base_seconds(bot: StateStoreContext) -> float:
+    accessor = getattr(bot, "lock_retry_base_seconds", None)
+    if callable(accessor):
+        return accessor()
+    return getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+
+
 def get_state_issue(bot: StateStoreContext) -> dict | None:
     """Fetch the state issue from GitHub with retry for transient failures."""
-    state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
+    state_issue_number = _state_issue_number(bot)
     state_read_retry_limit = getattr(bot, "STATE_READ_RETRY_LIMIT", STATE_READ_RETRY_LIMIT)
     state_read_retry_base_seconds = getattr(
         bot, "STATE_READ_RETRY_BASE_SECONDS", STATE_READ_RETRY_BASE_SECONDS
     )
 
     if not state_issue_number:
-        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
+        _log(bot, "error", "STATE_ISSUE_NUMBER not set")
         return None
 
     for attempt in range(1, state_read_retry_limit + 1):
@@ -51,43 +103,52 @@ def get_state_issue(bot: StateStoreContext) -> dict | None:
 
         if response.status_code == 200:
             if not isinstance(response.payload, dict):
-                print("ERROR: State issue response payload was not an object", file=sys.stderr)
+                _log(bot, "error", "State issue response payload was not an object")
                 return None
             return response.payload
 
         if response.status_code in {401, 403, 404}:
-            print(
-                "ERROR: Failed to fetch state issue "
-                f"#{state_issue_number} (status {response.status_code}): {response.text}",
-                file=sys.stderr,
+            _log(
+                bot,
+                "error",
+                f"Failed to fetch state issue #{state_issue_number} (status {response.status_code}): {response.text}",
+                state_issue_number=state_issue_number,
+                status_code=response.status_code,
             )
             return None
 
         if response.status_code == 429 or response.status_code >= 500:
             if attempt < state_read_retry_limit:
-                delay = state_read_retry_base_seconds + random.uniform(0, state_read_retry_base_seconds)
-                print(
-                    "WARNING: Retryable state issue read failure "
-                    f"(status {response.status_code}); retrying ({attempt}/{state_read_retry_limit})",
-                    file=sys.stderr,
+                delay = state_read_retry_base_seconds + _jitter(bot, 0, state_read_retry_base_seconds)
+                _log(
+                    bot,
+                    "warning",
+                    f"Retryable state issue read failure (status {response.status_code}); retrying ({attempt}/{state_read_retry_limit})",
+                    state_issue_number=state_issue_number,
+                    status_code=response.status_code,
+                    retry_attempt=attempt,
                 )
-                time.sleep(delay)
+                _sleep(bot, delay)
                 continue
-            print(
-                "ERROR: Exhausted retries while fetching state issue "
-                f"#{state_issue_number}; last status {response.status_code}: {response.text}",
-                file=sys.stderr,
+            _log(
+                bot,
+                "error",
+                f"Exhausted retries while fetching state issue #{state_issue_number}; last status {response.status_code}: {response.text}",
+                state_issue_number=state_issue_number,
+                status_code=response.status_code,
             )
             return None
 
-        print(
-            "ERROR: Unexpected status while fetching state issue "
-            f"#{state_issue_number}: {response.status_code} {response.text}",
-            file=sys.stderr,
+        _log(
+            bot,
+            "error",
+            f"Unexpected status while fetching state issue #{state_issue_number}: {response.status_code} {response.text}",
+            state_issue_number=state_issue_number,
+            status_code=response.status_code,
         )
         return None
 
-    print(f"ERROR: Failed to fetch state issue #{state_issue_number} after retries", file=sys.stderr)
+    _log(bot, "error", f"Failed to fetch state issue #{state_issue_number} after retries", state_issue_number=state_issue_number)
     return None
 
 
@@ -191,7 +252,7 @@ def parse_state_yaml_from_issue_body(body: str) -> dict:
     try:
         state = yaml.safe_load(yaml_content) or {}
     except yaml.YAMLError as exc:
-        print(f"WARNING: Failed to parse state YAML: {exc}", file=sys.stderr)
+        _log_fallback("warning", f"Failed to parse state YAML: {exc}")
         state = {}
 
     if not isinstance(state, dict):
@@ -211,7 +272,7 @@ def parse_lock_metadata_from_issue_body(body: str) -> dict:
     try:
         parsed = json.loads(lock_json)
     except json.JSONDecodeError as exc:
-        print(f"WARNING: Failed to parse lock metadata JSON: {exc}", file=sys.stderr)
+        _log_fallback("warning", f"Failed to parse lock metadata JSON: {exc}")
         return normalize_lock_metadata(None)
 
     if not isinstance(parsed, dict):
@@ -271,9 +332,9 @@ def parse_state_from_issue(issue: dict) -> dict:
 
 
 def get_state_issue_snapshot(bot: StateStoreContext) -> StateIssueSnapshot | None:
-    state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
+    state_issue_number = _state_issue_number(bot)
     if not state_issue_number:
-        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
+        _log(bot, "error", "STATE_ISSUE_NUMBER not set")
         return None
 
     response = bot.github_api_request(
@@ -283,15 +344,17 @@ def get_state_issue_snapshot(bot: StateStoreContext) -> StateIssueSnapshot | Non
         suppress_error_log=True,
     )
     if response.status_code != 200:
-        print(
-            "ERROR: Failed to fetch state issue "
-            f"#{state_issue_number} (status {response.status_code}): {response.text}",
-            file=sys.stderr,
+        _log(
+            bot,
+            "error",
+            f"Failed to fetch state issue #{state_issue_number} (status {response.status_code}): {response.text}",
+            state_issue_number=state_issue_number,
+            status_code=response.status_code,
         )
         return None
 
     if not isinstance(response.payload, dict):
-        print("ERROR: State issue response payload was not an object", file=sys.stderr)
+        _log(bot, "error", "State issue response payload was not an object")
         return None
 
     body = response.payload.get("body")
@@ -300,14 +363,14 @@ def get_state_issue_snapshot(bot: StateStoreContext) -> StateIssueSnapshot | Non
 
     html_url = response.payload.get("html_url")
     if not isinstance(html_url, str) or not html_url:
-        repo = f"{__import__('os').environ.get('REPO_OWNER', '')}/{__import__('os').environ.get('REPO_NAME', '')}".strip("/")
+        repo = f"{bot.get_config_value('REPO_OWNER', '')}/{bot.get_config_value('REPO_NAME', '')}".strip("/")
         html_url = f"https://github.com/{repo}/issues/{state_issue_number}" if repo else ""
 
     return StateIssueSnapshot(body=body, etag=response.headers.get("etag"), html_url=html_url)
 
 
 def conditional_patch_state_issue(bot: StateStoreContext, body: str, etag: str | None = None):
-    state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
+    state_issue_number = _state_issue_number(bot)
     extra_headers = {"If-Match": etag} if isinstance(etag, str) and etag else None
     return bot.github_api_request(
         "PATCH",
@@ -343,7 +406,7 @@ def load_state(bot: StateStoreContext, *, fail_on_unavailable: bool = False) -> 
                 "State issue is unavailable for a mutating event; refusing to continue "
                 "with fallback defaults."
             )
-        print("WARNING: Could not fetch state issue, using defaults", file=sys.stderr)
+        _log(bot, "warning", "Could not fetch state issue, using defaults")
         return default_state
 
     state = parse_state_from_issue(issue)
@@ -371,19 +434,19 @@ def load_state(bot: StateStoreContext, *, fail_on_unavailable: bool = False) -> 
 def save_state(bot: StateStoreContext, state: dict) -> bool:
     assert_lock_held(bot, "save_state")
 
-    state_issue_number = getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
-    lock_api_retry_limit = getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
-    lock_retry_base_seconds = getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+    state_issue_number = _state_issue_number(bot)
+    lock_api_retry_limit = _lock_api_retry_limit(bot)
+    lock_retry_base_seconds = _lock_retry_base_seconds(bot)
 
     if not state_issue_number:
-        print("ERROR: STATE_ISSUE_NUMBER not set", file=sys.stderr)
+        _log(bot, "error", "STATE_ISSUE_NUMBER not set")
         return False
 
-    state["last_updated"] = datetime.now(timezone.utc).isoformat()
+    state["last_updated"] = _now_iso(bot)
 
     for attempt in range(1, lock_api_retry_limit + 1):
         if not bot.ensure_state_issue_lease_lock_fresh():
-            print("ERROR: Failed to refresh reviewer-bot lease lock before save", file=sys.stderr)
+            _log(bot, "error", "Failed to refresh reviewer-bot lease lock before save")
             return False
 
         snapshot = bot.get_state_issue_snapshot()
@@ -395,58 +458,68 @@ def save_state(bot: StateStoreContext, state: dict) -> bool:
 
         response = bot.conditional_patch_state_issue(body, snapshot.etag)
         if response.status_code == 200:
-            print(f"State saved to issue #{state_issue_number}")
+            _log(bot, "info", f"State saved to issue #{state_issue_number}", state_issue_number=state_issue_number)
             return True
 
         if response.status_code in {409, 412}:
-            print(
-                "WARNING: State save hit conflict "
-                f"(status {response.status_code}); retrying ({attempt}/{lock_api_retry_limit})",
-                file=sys.stderr,
+            _log(
+                bot,
+                "warning",
+                f"State save hit conflict (status {response.status_code}); retrying ({attempt}/{lock_api_retry_limit})",
+                state_issue_number=state_issue_number,
+                status_code=response.status_code,
+                retry_attempt=attempt,
             )
-            delay = lock_retry_base_seconds + random.uniform(0, lock_retry_base_seconds)
-            time.sleep(delay)
+            delay = lock_retry_base_seconds + _jitter(bot, 0, lock_retry_base_seconds)
+            _sleep(bot, delay)
             continue
 
         if response.status_code == 404:
-            print(
-                f"ERROR: State issue #{state_issue_number} not found during save_state",
-                file=sys.stderr,
-            )
+            _log(bot, "error", f"State issue #{state_issue_number} not found during save_state", state_issue_number=state_issue_number)
             return False
 
         if response.status_code in {401, 403}:
-            print(
-                "ERROR: Permission failure while saving state issue "
-                f"#{state_issue_number} (status {response.status_code}): {response.text}",
-                file=sys.stderr,
+            _log(
+                bot,
+                "error",
+                f"Permission failure while saving state issue #{state_issue_number} (status {response.status_code}): {response.text}",
+                state_issue_number=state_issue_number,
+                status_code=response.status_code,
             )
             return False
 
         if response.status_code == 429 or response.status_code >= 500:
             if attempt < lock_api_retry_limit:
-                delay = lock_retry_base_seconds + random.uniform(0, lock_retry_base_seconds)
-                print(
-                    "WARNING: Retryable state issue write failure "
-                    f"(status {response.status_code}); retrying ({attempt}/{lock_api_retry_limit})",
-                    file=sys.stderr,
+                delay = lock_retry_base_seconds + _jitter(bot, 0, lock_retry_base_seconds)
+                _log(
+                    bot,
+                    "warning",
+                    f"Retryable state issue write failure (status {response.status_code}); retrying ({attempt}/{lock_api_retry_limit})",
+                    state_issue_number=state_issue_number,
+                    status_code=response.status_code,
+                    retry_attempt=attempt,
                 )
-                time.sleep(delay)
+                _sleep(bot, delay)
                 continue
-            print(
-                "ERROR: Exhausted retries while saving state issue "
-                f"#{state_issue_number}; last status {response.status_code}: {response.text}",
-                file=sys.stderr,
+            _log(
+                bot,
+                "error",
+                f"Exhausted retries while saving state issue #{state_issue_number}; last status {response.status_code}: {response.text}",
+                state_issue_number=state_issue_number,
+                status_code=response.status_code,
             )
             return False
 
-        print(
-            f"ERROR: Unexpected status {response.status_code} while saving state issue: {response.text}",
-            file=sys.stderr,
+        _log(
+            bot,
+            "error",
+            f"Unexpected status {response.status_code} while saving state issue: {response.text}",
+            state_issue_number=state_issue_number,
+            status_code=response.status_code,
         )
         return False
 
-    print(f"ERROR: Failed to save state to issue #{state_issue_number} after retries", file=sys.stderr)
+    _log(bot, "error", f"Failed to save state to issue #{state_issue_number} after retries", state_issue_number=state_issue_number)
     return False
 
 
