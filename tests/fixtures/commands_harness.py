@@ -44,6 +44,8 @@ class CommandHarness:
         self._monkeypatch = monkeypatch
         self.runtime = FakeReviewerBotRuntime(monkeypatch)
         self.config = self.runtime.config
+        self.github = self.runtime.github
+        self.handlers = self.runtime.handlers
 
     def wrapper_set_comment_command(
         self,
@@ -119,7 +121,7 @@ class CommandHarness:
         self.runtime.get_user_permission_status = lambda username, required_permission="triage": status
 
     def stub_handler(self, name: str, func) -> None:
-        self.runtime.handlers.stub(name, func)
+        self.handlers.stub(name, func)
 
     def automation_runner(self) -> AutomationRunner:
         runner = AutomationRunner()

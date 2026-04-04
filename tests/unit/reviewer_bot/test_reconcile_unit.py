@@ -3,26 +3,22 @@ import pytest
 from scripts.reviewer_bot_lib import commands, lifecycle, reconcile, review_state
 from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+from tests.fixtures.reconcile_harness import ReconcileHarness, review_submitted_payload
 from tests.fixtures.reviewer_bot import make_state
 
 
 def test_parse_deferred_context_payload_returns_typed_review_payload():
-    payload = {
-        "schema_version": 2,
-        "source_workflow_name": "Reviewer Bot PR Review Submitted Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
-        "source_run_id": 500,
-        "source_run_attempt": 2,
-        "source_event_name": "pull_request_review",
-        "source_event_action": "submitted",
-        "source_event_key": "pull_request_review:11",
-        "pr_number": 42,
-        "review_id": 11,
-        "source_submitted_at": "2026-03-17T10:00:00Z",
-        "source_review_state": "COMMENTED",
-        "source_commit_id": "head-1",
-        "actor_login": "alice",
-    }
+    payload = review_submitted_payload(
+        pr_number=42,
+        review_id=11,
+        source_event_key="pull_request_review:11",
+        source_submitted_at="2026-03-17T10:00:00Z",
+        source_review_state="COMMENTED",
+        source_commit_id="head-1",
+        actor_login="alice",
+        source_run_id=500,
+        source_run_attempt=2,
+    )
 
     parsed = reconcile.parse_deferred_context_payload(payload)
 
@@ -313,3 +309,20 @@ def test_read_optional_reconcile_object_returns_none_for_not_found(monkeypatch):
     )
 
     assert reconcile._read_optional_reconcile_object(runtime, "pulls/42/reviews/11", label="live review #11") is None
+
+
+def test_reconcile_harness_exposes_deferred_payload_store(monkeypatch):
+    payload = review_submitted_payload(
+        pr_number=42,
+        review_id=11,
+        source_event_key="pull_request_review:11",
+        source_submitted_at="2026-03-17T10:00:00Z",
+        source_review_state="COMMENTED",
+        source_commit_id="head-1",
+        actor_login="alice",
+        source_run_id=500,
+        source_run_attempt=2,
+    )
+    harness = ReconcileHarness(monkeypatch, payload)
+
+    assert harness.deferred_payloads is harness.runtime.deferred_payloads

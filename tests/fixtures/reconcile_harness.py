@@ -124,6 +124,7 @@ class ReconcileHarness:
         self.github = RouteGitHubApi()
         self.runtime = FakeReviewerBotRuntime(self.monkeypatch, github=self.github)
         self.config = self.runtime.config
+        self.deferred_payloads = self.runtime.deferred_payloads
         self.runtime.stub_deferred_payload(self.payload)
         self.wrapper_set_trigger_from_payload(self.payload)
 
@@ -132,7 +133,7 @@ class ReconcileHarness:
 
     def set_payload(self, payload: dict) -> dict:
         self.payload = payload
-        self.runtime.stub_deferred_payload(payload)
+        self.deferred_payloads.set_payload(payload)
         self.wrapper_set_trigger_from_payload(payload)
         return payload
 

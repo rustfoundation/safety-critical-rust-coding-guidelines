@@ -19,6 +19,7 @@ class CommentRoutingHarness:
         self.github = RouteGitHubApi()
         self.runtime = FakeReviewerBotRuntime(monkeypatch, github=self.github)
         self.config = self.runtime.config
+        self.handlers = self.runtime.handlers
 
     def env_build_request(self, *, issue_number: int | None = None):
         return event_inputs.build_comment_event_request(self.runtime, issue_number=issue_number)

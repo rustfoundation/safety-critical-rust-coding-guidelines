@@ -17,6 +17,8 @@ from tests.fixtures.reviewer_bot import make_state
 
 def test_label_signoff_create_pr_marks_issue_review_complete_without_inline_status_sync(monkeypatch):
     harness = CommandHarness(monkeypatch)
+    assert harness.github is harness.runtime.github
+    assert harness.handlers is harness.runtime.handlers
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None

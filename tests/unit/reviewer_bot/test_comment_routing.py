@@ -10,6 +10,7 @@ from tests.fixtures.reviewer_bot import make_state
 
 def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_changes(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
+    assert harness.handlers is harness.runtime.handlers
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
