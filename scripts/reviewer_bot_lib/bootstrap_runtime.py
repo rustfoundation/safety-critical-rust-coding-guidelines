@@ -70,6 +70,41 @@ class _BootstrapLockServices:
         return lease_lock.ensure_state_issue_lease_lock_fresh(self._runtime_getter())
 
 
+class _BootstrapHandlerServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def handle_issue_or_pr_opened(self, current_state):
+        return lifecycle.handle_issue_or_pr_opened(self._runtime_getter(), current_state)
+
+    def handle_labeled_event(self, current_state):
+        return lifecycle.handle_labeled_event(self._runtime_getter(), current_state)
+
+    def handle_issue_edited_event(self, current_state):
+        return lifecycle.handle_issue_edited_event(self._runtime_getter(), current_state)
+
+    def handle_closed_event(self, current_state):
+        return lifecycle.handle_closed_event(self._runtime_getter(), current_state)
+
+    def handle_pull_request_target_synchronize(self, current_state):
+        return lifecycle.handle_pull_request_target_synchronize(self._runtime_getter(), current_state)
+
+    def handle_pull_request_review_event(self, current_state):
+        return events.handle_pull_request_review_event(self._runtime_getter(), current_state)
+
+    def handle_comment_event(self, current_state):
+        return comment_routing.handle_comment_event(self._runtime_getter(), current_state)
+
+    def handle_manual_dispatch(self, current_state):
+        return maintenance.handle_manual_dispatch(self._runtime_getter(), current_state)
+
+    def handle_scheduled_check(self, current_state):
+        return maintenance.handle_scheduled_check(self._runtime_getter(), current_state)
+
+    def handle_workflow_run_event(self, current_state):
+        return reconcile.handle_workflow_run_event(self._runtime_getter(), current_state)
+
+
 def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> ReviewerBotRuntime:
     runtime: ReviewerBotRuntime | None = None
 
@@ -84,20 +119,7 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
     state_store_services = _BootstrapStateStoreServices(runtime_getter)
     github_services = _BootstrapGitHubServices(runtime_getter)
     lock_services = _BootstrapLockServices(runtime_getter)
-    handlers = SimpleNamespace(
-        handle_issue_or_pr_opened=lambda current_state: lifecycle.handle_issue_or_pr_opened(runtime, current_state),
-        handle_labeled_event=lambda current_state: lifecycle.handle_labeled_event(runtime, current_state),
-        handle_issue_edited_event=lambda current_state: lifecycle.handle_issue_edited_event(runtime, current_state),
-        handle_closed_event=lambda current_state: lifecycle.handle_closed_event(runtime, current_state),
-        handle_pull_request_target_synchronize=lambda current_state: lifecycle.handle_pull_request_target_synchronize(
-            runtime, current_state
-        ),
-        handle_pull_request_review_event=lambda current_state: events.handle_pull_request_review_event(runtime, current_state),
-        handle_comment_event=lambda current_state: comment_routing.handle_comment_event(runtime, current_state),
-        handle_manual_dispatch=lambda current_state: maintenance.handle_manual_dispatch(runtime, current_state),
-        handle_scheduled_check=lambda current_state: maintenance.handle_scheduled_check(runtime, current_state),
-        handle_workflow_run_event=lambda current_state: reconcile.handle_workflow_run_event(runtime, current_state),
-    )
+    handlers = _BootstrapHandlerServices(runtime_getter)
     adapters = SimpleNamespace(
         assert_lock_held=lambda context: state_store.assert_lock_held(runtime, context),
         get_github_token=lambda: github_api.get_github_token(runtime),

@@ -313,6 +313,15 @@ def test_bootstrap_runtime_wires_explicit_state_github_and_lock_services():
     assert hasattr(runtime.locks, "refresh")
 
 
+def test_bootstrap_runtime_wires_explicit_handler_services():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert runtime.handlers.__class__.__name__ == "_BootstrapHandlerServices"
+    assert hasattr(runtime.handlers, "handle_issue_or_pr_opened")
+    assert hasattr(runtime.handlers, "handle_comment_event")
+    assert hasattr(runtime.handlers, "handle_workflow_run_event")
+
+
 def test_default_stderr_logger_renders_message_and_sorted_fields():
     writes = []
     logger = StdErrLogger(SimpleNamespace(stderr=SimpleNamespace(write=lambda text: writes.append(text))))
