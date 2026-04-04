@@ -269,6 +269,28 @@ def test_runtime_accepts_injected_infra_services():
     assert runtime.graphql_transport is graphql_transport
 
 
+def test_runtime_exposes_explicit_infra_and_domain_service_groups():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert runtime.infra.config is runtime.config
+    assert runtime.infra.outputs is runtime.outputs
+    assert runtime.infra.deferred_payloads is runtime.deferred_payloads
+    assert runtime.infra.rest_transport is runtime.rest_transport
+    assert runtime.infra.graphql_transport is runtime.graphql_transport
+    assert runtime.infra.artifact_download_transport is runtime.artifact_download_transport
+    assert runtime.infra.clock is runtime.clock
+    assert runtime.infra.sleeper is runtime.sleeper
+    assert runtime.infra.jitter is runtime.jitter
+    assert runtime.infra.uuid_source is runtime.uuid_source
+    assert runtime.infra.logger is runtime.logger
+    assert runtime.infra.touch_tracker is runtime.touch_tracker
+    assert runtime.domain.state_store is runtime.state_store
+    assert runtime.domain.github is runtime.github
+    assert runtime.domain.locks is runtime.locks
+    assert runtime.domain.handlers is runtime.handlers
+    assert runtime.domain.adapters is runtime.adapters
+
+
 def test_default_stderr_logger_renders_message_and_sorted_fields():
     writes = []
     logger = StdErrLogger(SimpleNamespace(stderr=SimpleNamespace(write=lambda text: writes.append(text))))

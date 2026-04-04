@@ -171,6 +171,46 @@ class RequestsArtifactDownloadTransport:
         return self._requests.request("GET", url, headers=headers, timeout=timeout_seconds)
 
 
+class RuntimeInfraServices:
+    def __init__(
+        self,
+        *,
+        config: Any,
+        outputs: Any,
+        deferred_payloads: Any,
+        rest_transport: Any,
+        graphql_transport: Any,
+        artifact_download_transport: Any,
+        clock: Any,
+        sleeper: Any,
+        jitter: Any,
+        uuid_source: Any,
+        logger: Any,
+        touch_tracker: Any,
+    ):
+        self.config = config
+        self.outputs = outputs
+        self.deferred_payloads = deferred_payloads
+        self.rest_transport = rest_transport
+        self.graphql_transport = graphql_transport
+        self.artifact_download_transport = artifact_download_transport
+        self.clock = clock
+        self.sleeper = sleeper
+        self.jitter = jitter
+        self.uuid_source = uuid_source
+        self.logger = logger
+        self.touch_tracker = touch_tracker
+
+
+class RuntimeDomainServices:
+    def __init__(self, *, state_store: Any, github: Any, locks: Any, handlers: Any, adapters: Any):
+        self.state_store = state_store
+        self.github = github
+        self.locks = locks
+        self.handlers = handlers
+        self.adapters = adapters
+
+
 class ReviewerBotRuntime:
     """Runtime object built from explicit services and named adapters."""
 
@@ -223,23 +263,46 @@ class ReviewerBotRuntime:
         self.sys = sys
         self.random = random
         self.time = time
-        self.config = config or _EnvConfig()
-        self.outputs = outputs or _FileOutputSink(self.config)
-        self.deferred_payloads = deferred_payloads or _JsonDeferredPayloadLoader(self.config)
-        self.rest_transport = rest_transport or RequestsRestTransport(requests)
-        self.graphql_transport = graphql_transport or RequestsGraphQLTransport(requests)
-        self.artifact_download_transport = artifact_download_transport or RequestsArtifactDownloadTransport(requests)
-        self.clock = clock or SystemClock()
-        self.sleeper = sleeper or SystemSleeper(time)
-        self.jitter = jitter or RandomJitterSource(random)
-        self.uuid_source = uuid_source or Uuid4Source()
-        self.logger = logger or StdErrLogger(sys)
-        self.state_store = state_store
-        self.github = github
-        self.locks = locks
-        self.handlers = handlers
-        self.adapters = adapters
-        self.touch_tracker = touch_tracker or _TouchTracker()
+        resolved_config = config or _EnvConfig()
+        resolved_touch_tracker = touch_tracker or _TouchTracker()
+        self.infra = RuntimeInfraServices(
+            config=resolved_config,
+            outputs=outputs or _FileOutputSink(resolved_config),
+            deferred_payloads=deferred_payloads or _JsonDeferredPayloadLoader(resolved_config),
+            rest_transport=rest_transport or RequestsRestTransport(requests),
+            graphql_transport=graphql_transport or RequestsGraphQLTransport(requests),
+            artifact_download_transport=artifact_download_transport or RequestsArtifactDownloadTransport(requests),
+            clock=clock or SystemClock(),
+            sleeper=sleeper or SystemSleeper(time),
+            jitter=jitter or RandomJitterSource(random),
+            uuid_source=uuid_source or Uuid4Source(),
+            logger=logger or StdErrLogger(sys),
+            touch_tracker=resolved_touch_tracker,
+        )
+        self.domain = RuntimeDomainServices(
+            state_store=state_store,
+            github=github,
+            locks=locks,
+            handlers=handlers,
+            adapters=adapters,
+        )
+        self.config = self.infra.config
+        self.outputs = self.infra.outputs
+        self.deferred_payloads = self.infra.deferred_payloads
+        self.rest_transport = self.infra.rest_transport
+        self.graphql_transport = self.infra.graphql_transport
+        self.artifact_download_transport = self.infra.artifact_download_transport
+        self.clock = self.infra.clock
+        self.sleeper = self.infra.sleeper
+        self.jitter = self.infra.jitter
+        self.uuid_source = self.infra.uuid_source
+        self.logger = self.infra.logger
+        self.touch_tracker = self.infra.touch_tracker
+        self.state_store = self.domain.state_store
+        self.github = self.domain.github
+        self.locks = self.domain.locks
+        self.handlers = self.domain.handlers
+        self.adapters = self.domain.adapters
         self.ACTIVE_LEASE_CONTEXT = active_lease_context
 
     def get_config_value(self, name: str, default: str = "") -> str:
