@@ -41,6 +41,7 @@ def test_github_api_request_retries_idempotent_get_on_502(monkeypatch):
     assert result.payload == {"ok": True}
     assert result.retry_attempts == 1
     assert result.failure_kind is None
+    assert bot.sleeper.calls == [2.0]
 
 
 def test_github_api_request_retries_transport_exception_for_idempotent_get(monkeypatch):
@@ -49,11 +50,13 @@ def test_github_api_request_retries_transport_exception_for_idempotent_get(monke
         "issues/42",
         [github_api.requests.RequestException("timeout"), github_result(200, {"ok": True})],
     )
-    result = github_api.github_api_request(_bot(monkeypatch, github=github), "GET", "issues/42", retry_policy="idempotent_read")
+    bot = _bot(monkeypatch, github=github)
+    result = github_api.github_api_request(bot, "GET", "issues/42", retry_policy="idempotent_read")
 
     assert result.ok is True
     assert result.payload == {"ok": True}
     assert result.retry_attempts == 1
+    assert bot.sleeper.calls == [2.0]
 
 
 def test_github_api_request_classifies_not_found_without_retry(monkeypatch):
