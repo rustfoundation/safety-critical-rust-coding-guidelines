@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
+from . import commands as commands_module
+from . import config as config_module
+from . import reconcile as reconcile_module
 from .context import AssignmentRequest, CommentEventRequest
 from .review_state import (
     accept_channel_event,
@@ -99,7 +102,7 @@ def validate_accept_no_fls_changes_handoff(
 ) -> tuple[bool, dict]:
     if request.is_pull_request:
         return False, {"reason": "pull_request_target_not_allowed"}
-    labels = bot.parse_issue_labels()
+    labels = commands_module.parse_issue_labels(bot)
     if bot.FLS_AUDIT_LABEL not in labels:
         return False, {"reason": "missing_fls_audit_label"}
     permission_status = bot.get_user_permission_status(request.comment_author, "triage")
@@ -163,7 +166,8 @@ def apply_comment_command(
     state_changed = False
     assignment_request = build_assignment_request_from_comment(request)
     if command == "pass":
-        response, success = bot.handle_pass_command(
+        response, success = commands_module.handle_pass_command(
+            bot,
             state,
             issue_number,
             comment_author,
@@ -173,7 +177,8 @@ def apply_comment_command(
         state_changed = success
     elif command == "away":
         if args:
-            response, success = bot.handle_pass_until_command(
+            response, success = commands_module.handle_pass_until_command(
+                bot,
                 state,
                 issue_number,
                 comment_author,
@@ -185,21 +190,23 @@ def apply_comment_command(
         else:
             response = f"❌ Missing date. Usage: `{bot.BOT_MENTION} /away YYYY-MM-DD [reason]`"
     elif command == "label":
-        response, success, state_changed = bot.handle_label_command(
+        response, success, state_changed = commands_module.handle_label_command(
+            bot,
             state,
             issue_number,
             " ".join(args),
             request=assignment_request,
         )
     elif command == "sync-members":
-        response, success = bot.handle_sync_members_command(state)
+        response, success = commands_module.handle_sync_members_command(bot, state)
         state_changed = success
     elif command == "queue":
-        response, success = bot.handle_queue_command(state)
+        response, success = commands_module.handle_queue_command(bot, state)
     elif command == "commands":
-        response, success = bot.handle_commands_command()
+        response, success = commands_module.handle_commands_command(bot)
     elif command == "claim":
-        response, success = bot.handle_claim_command(
+        response, success = commands_module.handle_claim_command(
+            bot,
             state,
             issue_number,
             comment_author,
@@ -207,7 +214,8 @@ def apply_comment_command(
         )
         state_changed = success
     elif command == "release":
-        response, success = bot.handle_release_command(
+        response, success = commands_module.handle_release_command(
+            bot,
             state,
             issue_number,
             comment_author,
@@ -216,9 +224,10 @@ def apply_comment_command(
         )
         state_changed = success
     elif command == "rectify":
-        response, success, state_changed = bot.handle_rectify_command(state, issue_number, comment_author)
+        response, success, state_changed = reconcile_module.handle_rectify_command(bot, state, issue_number, comment_author)
     elif command == "r?-user":
-        response, success = bot.handle_assign_command(
+        response, success = commands_module.handle_assign_command(
+            bot,
             state,
             issue_number,
             args[0] if args else "",
@@ -226,7 +235,8 @@ def apply_comment_command(
         )
         state_changed = success
     elif command == "assign-from-queue":
-        response, success = bot.handle_assign_from_queue_command(
+        response, success = commands_module.handle_assign_from_queue_command(
+            bot,
             state,
             issue_number,
             request=assignment_request,
@@ -241,7 +251,7 @@ def apply_comment_command(
         attempted = args[0] if args else ""
         response = f"⚠️ Unknown command `{attempted}`. Commands require a `/` prefix.\n\nTry `{bot.BOT_MENTION} /commands` to see available commands."
     else:
-        response = f"❌ Unknown command: `/{command}`\n\nAvailable commands:\n{bot.get_commands_help()}"
+        response = f"❌ Unknown command: `/{command}`\n\nAvailable commands:\n{config_module.get_commands_help()}"
     comment_id = request.comment_id
     if comment_id > 0 and command != "_multiple_commands":
         bot.add_reaction(comment_id, "eyes")

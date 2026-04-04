@@ -434,87 +434,9 @@ class ReviewerBotRuntime:
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
         return self.adapters.maybe_record_head_observation_repair(issue_number, review_data)
 
-    def handle_transition_notice(self, state: dict, issue_number: int, reviewer: str) -> bool:
-        return self.adapters.handle_transition_notice(state, issue_number, reviewer)
-
-    def handle_pass_command(self, state: dict, issue_number: int, comment_author: str, reason: str | None, request=None):
-        return self.adapters.handle_pass_command(state, issue_number, comment_author, reason, request=request)
-
-    def handle_pass_until_command(
-        self,
-        state: dict,
-        issue_number: int,
-        comment_author: str,
-        return_date: str,
-        reason: str | None,
-        request=None,
-    ):
-        return self.adapters.handle_pass_until_command(
-            state,
-            issue_number,
-            comment_author,
-            return_date,
-            reason,
-            request=request,
-        )
-
-    def handle_label_command(self, state: dict, issue_number: int, label_string: str, request=None):
-        return self.adapters.handle_label_command(state, issue_number, label_string, request=request)
-
-    def handle_sync_members_command(self, state: dict):
-        return self.adapters.handle_sync_members_command(state)
-
-    def handle_queue_command(self, state: dict):
-        return self.adapters.handle_queue_command(state)
-
-    def handle_commands_command(self):
-        return self.adapters.handle_commands_command()
-
-    def handle_claim_command(self, state: dict, issue_number: int, comment_author: str, request=None):
-        return self.adapters.handle_claim_command(state, issue_number, comment_author, request=request)
-
-    def handle_release_command(self, state: dict, issue_number: int, comment_author: str, args=None, request=None):
-        return self.adapters.handle_release_command(state, issue_number, comment_author, args, request=request)
-
-    def handle_rectify_command(self, state: dict, issue_number: int, comment_author: str):
-        return self.adapters.handle_rectify_command(state, issue_number, comment_author)
-
-    def handle_assign_command(self, state: dict, issue_number: int, username: str, request=None):
-        return self.adapters.handle_assign_command(state, issue_number, username, request=request)
-
-    def handle_assign_from_queue_command(self, state: dict, issue_number: int, request=None):
-        return self.adapters.handle_assign_from_queue_command(state, issue_number, request=request)
-
-    def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str, request=None):
-        return self.adapters.handle_accept_no_fls_changes_command(issue_number, comment_author, request=request)
-
-    def get_commands_help(self) -> str:
-        return self.adapters.get_commands_help()
-
     # Adapter-only mutable review-state compatibility surface.
     # Ownership lives in review_state.py; these methods remain so runtime-oriented
     # callers and test doubles can delegate through one adapter seam.
-    def ensure_review_entry(self, state: dict, issue_number: int, create: bool = False):
-        return self.adapters.ensure_review_entry(state, issue_number, create=create)
-
-    def set_current_reviewer(self, state: dict, issue_number: int, reviewer: str, assignment_method: str = "round-robin") -> None:
-        return self.adapters.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
-
-    def update_reviewer_activity(self, state: dict, issue_number: int, reviewer: str) -> bool:
-        return self.adapters.update_reviewer_activity(state, issue_number, reviewer)
-
-    def mark_review_complete(self, state: dict, issue_number: int, reviewer: str | None, source: str) -> bool:
-        return self.adapters.mark_review_complete(state, issue_number, reviewer, source)
-
-    def is_triage_or_higher(self, username: str) -> bool:
-        return self.adapters.is_triage_or_higher(username)
-
-    def trigger_mandatory_approver_escalation(self, state: dict, issue_number: int) -> bool:
-        return self.adapters.trigger_mandatory_approver_escalation(state, issue_number)
-
-    def satisfy_mandatory_approver_requirement(self, state: dict, issue_number: int, approver: str) -> bool:
-        return self.adapters.satisfy_mandatory_approver_requirement(state, issue_number, approver)
-
     def get_next_reviewer(self, state: dict, skip_usernames=None):
         return self.adapters.get_next_reviewer(state, skip_usernames)
 
@@ -621,15 +543,6 @@ class ReviewerBotRuntime:
         result = self.adapters.release_state_issue_lease_lock()
         self.ACTIVE_LEASE_CONTEXT = self.adapters.get_active_lease_context()
         return result
-
-    def process_pass_until_expirations(self, state: dict):
-        return self.adapters.process_pass_until_expirations(state)
-
-    def sync_members_with_queue(self, state: dict):
-        return self.adapters.sync_members_with_queue(state)
-
-    def sync_status_labels_for_items(self, state: dict, issue_numbers):
-        return self.adapters.sync_status_labels_for_items(state, issue_numbers)
 
     def fetch_members(self):
         from . import members as members_module

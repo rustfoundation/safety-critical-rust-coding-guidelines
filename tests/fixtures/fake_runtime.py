@@ -66,12 +66,27 @@ class FakeRuntimeInfraServices:
 
 
 class FakeRuntimeDomainServices:
-    def __init__(self, *, state_store, github, locks, handlers, workflow):
+    def __init__(self, *, state_store, github, locks, handlers, workflow, adapters):
         self.state_store = state_store
         self.github = github
         self.locks = locks
         self.handlers = handlers
         self.workflow = workflow
+        self.adapters = adapters
+
+
+class FakeRuntimeAdapterServices:
+    def __init__(self, runtime: "FakeReviewerBotRuntime"):
+        self._runtime = runtime
+
+    def process_pass_until_expirations(self, state: dict):
+        return self._runtime.workflow.process_pass_until_expirations(state)
+
+    def sync_members_with_queue(self, state: dict):
+        return self._runtime.workflow.sync_members_with_queue(state)
+
+    def sync_status_labels_for_items(self, state: dict, issue_numbers):
+        return self._runtime.workflow.sync_status_labels_for_items(state, issue_numbers)
 
 
 class FakeReviewerBotRuntime:
@@ -118,6 +133,7 @@ class FakeReviewerBotRuntime:
         self.github = GitHubStub(github)
         self.workflow = WorkflowBehaviorStub()
         self._fetch_members = lambda: []
+        self.adapters = FakeRuntimeAdapterServices(self)
         self.handlers = HandlerStub(
             {
                 "handle_issue_or_pr_opened": lambda state: lifecycle_module.handle_issue_or_pr_opened(self, state),
@@ -148,6 +164,7 @@ class FakeReviewerBotRuntime:
             locks=self.locks,
             handlers=self.handlers,
             workflow=self.workflow,
+            adapters=self.adapters,
         )
 
     def get_config_value(self, name: str, default: str = "") -> str:

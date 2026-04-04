@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import yaml
 
+from . import automation
 from .context import PrivilegedCommandRequest
 from .event_inputs import build_manual_dispatch_request
-from .lifecycle import maybe_record_head_observation_repair
+from .lifecycle import handle_transition_notice, maybe_record_head_observation_repair
 from .overdue import (
     backfill_transition_notice_if_present,
     check_overdue_reviews,
@@ -221,7 +222,7 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 command_name=str(command_name),
                 labels=labels,
             )
-            message, success = bot.handle_accept_no_fls_changes_command(issue_number, actor, request=request)
+            message, success = automation.handle_accept_no_fls_changes_command(bot, issue_number, actor, request=request)
             record["completed_at"] = _now_iso(bot)
             record["result_message"] = message
             record["status"] = "executed" if success else "failed_closed"
@@ -314,6 +315,6 @@ def handle_scheduled_check(bot, state: dict) -> bool:
         elif review["needs_transition"]:
             if backfill_transition_notice_if_present(bot, state, issue_number):
                 changed = True
-            elif bot.handle_transition_notice(state, issue_number, reviewer):
+            elif handle_transition_notice(bot, state, issue_number, reviewer):
                 changed = True
     return changed
