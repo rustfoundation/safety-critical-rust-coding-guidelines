@@ -7,6 +7,7 @@ import time
 from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 from scripts.reviewer_bot_lib import automation as automation_module
 from scripts.reviewer_bot_lib import commands as commands_module
@@ -140,6 +141,58 @@ class GitHubStub:
         )
 
 
+class RestTransportStub:
+    def __init__(self, runtime: "FakeReviewerBotRuntime"):
+        self._runtime = runtime
+
+    def request(self, method: str, url: str, *, headers=None, json_data=None, timeout_seconds=None):
+        del headers, timeout_seconds
+        parsed = urlparse(url)
+        parts = parsed.path.strip("/").split("/")
+        if len(parts) >= 4 and parts[0] == "repos":
+            endpoint = "/".join(parts[3:])
+        else:
+            endpoint = parsed.path.lstrip("/")
+        result = self._runtime.github_api_request(method, endpoint, data=json_data)
+
+        class _Response:
+            def __init__(self, api_result):
+                self.status_code = api_result.status_code or 0
+                self.headers = api_result.headers
+                self.text = api_result.text
+                self.content = b"" if api_result.payload is None else json.dumps(api_result.payload).encode("utf-8")
+                self._payload = api_result.payload
+
+            def json(self):
+                if isinstance(self._payload, Exception):
+                    raise self._payload
+                return self._payload
+
+        return _Response(result)
+
+
+class GraphQLTransportStub:
+    def __init__(self):
+        self._query: Callable[..., Any] = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No GraphQL stub configured"))
+
+    def stub(self, func: Callable[..., Any]) -> None:
+        self._query = func
+
+    def query(self, url: str, *, headers=None, query: str, variables=None, timeout_seconds=None):
+        return self._query(url=url, headers=headers, query=query, variables=variables, timeout_seconds=timeout_seconds)
+
+
+class ArtifactDownloadTransportStub:
+    def __init__(self):
+        self._download: Callable[..., Any] = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No artifact download stub configured"))
+
+    def stub(self, func: Callable[..., Any]) -> None:
+        self._download = func
+
+    def download(self, url: str, *, headers=None, timeout_seconds=None):
+        return self._download(url=url, headers=headers, timeout_seconds=timeout_seconds)
+
+
 class HandlerStub:
     ALLOWED = {
         "handle_issue_or_pr_opened",
@@ -225,6 +278,9 @@ class FakeReviewerBotRuntime:
         self.state_store = StateStoreStub()
         self.locks = LockStub()
         self.github = GitHubStub(github)
+        self.rest_transport = RestTransportStub(self)
+        self.graphql_transport = GraphQLTransportStub()
+        self.artifact_download_transport = ArtifactDownloadTransportStub()
         self.handlers = HandlerStub(
             {
                 "handle_issue_or_pr_opened": lambda state: lifecycle_module.handle_issue_or_pr_opened(self, state),
@@ -249,6 +305,36 @@ class FakeReviewerBotRuntime:
 
     def set_config_value(self, name: str, value: Any) -> None:
         self.config.set(name, value)
+
+    def get_github_token(self) -> str:
+        token = self.get_config_value("GITHUB_TOKEN")
+        if not token:
+            raise SystemExit(1)
+        return token
+
+    def state_issue_number(self) -> int:
+        return int(self.get_config_value("STATE_ISSUE_NUMBER", "0") or 0)
+
+    def lock_api_retry_limit(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "5") or 0)
+
+    def lock_retry_base_seconds(self) -> float:
+        return float(self.get_config_value("REVIEWER_BOT_LOCK_RETRY_SECONDS", "2.0") or 0.0)
+
+    def lock_lease_ttl_seconds(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_LOCK_TTL_SECONDS", "300") or 0)
+
+    def lock_max_wait_seconds(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "120") or 0)
+
+    def lock_renewal_window_seconds(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS", "60") or 0)
+
+    def lock_ref_name(self) -> str:
+        return self.get_config_value("REVIEWER_BOT_LOCK_REF_NAME", "refs/heads/reviewer-bot-lock")
+
+    def lock_ref_bootstrap_branch(self) -> str:
+        return self.get_config_value("REVIEWER_BOT_LOCK_BOOTSTRAP_BRANCH", "main")
 
     def write_output(self, name: str, value: str) -> None:
         self.outputs.write(name, value)

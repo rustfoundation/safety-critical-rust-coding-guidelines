@@ -26,10 +26,10 @@ from .config import (
     StateIssueBodyParts,
     StateIssueSnapshot,
 )
-from .context import StateStoreContext
+from .context import StateStoreContext, StateStoreRuntimeContext
 
 
-def _log(bot: StateStoreContext, level: str, message: str, **fields: Any) -> None:
+def _log(bot: StateStoreRuntimeContext, level: str, message: str, **fields: Any) -> None:
     logger = getattr(bot, "logger", None)
     if logger is not None and hasattr(logger, "event"):
         logger.event(level, message, **fields)
@@ -42,7 +42,7 @@ def _log_fallback(level: str, message: str) -> None:
     sys.stderr.write(f"{message}\n")
 
 
-def _sleep(bot: StateStoreContext, seconds: float) -> None:
+def _sleep(bot: StateStoreRuntimeContext, seconds: float) -> None:
     sleeper = getattr(bot, "sleeper", None)
     if sleeper is not None and hasattr(sleeper, "sleep"):
         sleeper.sleep(seconds)
@@ -50,14 +50,14 @@ def _sleep(bot: StateStoreContext, seconds: float) -> None:
     __import__("time").sleep(seconds)
 
 
-def _jitter(bot: StateStoreContext, lower: float, upper: float) -> float:
+def _jitter(bot: StateStoreRuntimeContext, lower: float, upper: float) -> float:
     jitter = getattr(bot, "jitter", None)
     if jitter is not None and hasattr(jitter, "uniform"):
         return jitter.uniform(lower, upper)
     return __import__("random").uniform(lower, upper)
 
 
-def _retry_delay(bot: StateStoreContext, base_seconds: float, retry_attempt: int) -> float:
+def _retry_delay(bot: StateStoreRuntimeContext, base_seconds: float, retry_attempt: int) -> float:
     class _BotJitter:
         def uniform(self, lower: float, upper: float) -> float:
             return _jitter(bot, lower, upper)
@@ -69,28 +69,28 @@ def _retry_delay(bot: StateStoreContext, base_seconds: float, retry_attempt: int
     )
 
 
-def _now_iso(bot: StateStoreContext) -> str:
+def _now_iso(bot: StateStoreRuntimeContext) -> str:
     clock = getattr(bot, "clock", None)
     if clock is not None and hasattr(clock, "now"):
         return clock.now().isoformat()
     return datetime.now(timezone.utc).isoformat()
 
 
-def _state_issue_number(bot: StateStoreContext) -> int:
+def _state_issue_number(bot: StateStoreRuntimeContext) -> int:
     accessor = getattr(bot, "state_issue_number", None)
     if callable(accessor):
         return accessor()
     return getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
 
 
-def _lock_api_retry_limit(bot: StateStoreContext) -> int:
+def _lock_api_retry_limit(bot: StateStoreRuntimeContext) -> int:
     accessor = getattr(bot, "lock_api_retry_limit", None)
     if callable(accessor):
         return accessor()
     return getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
 
 
-def _lock_retry_base_seconds(bot: StateStoreContext) -> float:
+def _lock_retry_base_seconds(bot: StateStoreRuntimeContext) -> float:
     accessor = getattr(bot, "lock_retry_base_seconds", None)
     if callable(accessor):
         return accessor()

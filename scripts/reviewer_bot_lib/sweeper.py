@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import quote
 
 from . import retrying
+from .context import SweeperContext
 from .reconcile import (
     _artifact_expected_name,
     _artifact_expected_payload_name,
@@ -37,11 +38,11 @@ def _now_iso() -> str:
     return _now().isoformat()
 
 
-def _retention_days(bot) -> int:
+def _retention_days(bot: SweeperContext) -> int:
     return int(bot.get_config_value("DEFERRED_ARTIFACT_RETENTION_DAYS", "7") or 7)
 
 
-def _github_repository(bot) -> str:
+def _github_repository(bot: SweeperContext) -> str:
     return bot.get_config_value("GITHUB_REPOSITORY", "")
 
 
@@ -58,7 +59,7 @@ def parse_timestamp(value: Any) -> datetime | None:
         return None
 
 
-def _read_api_payload(bot, endpoint: str) -> tuple[Any | None, str | None]:
+def _read_api_payload(bot: SweeperContext, endpoint: str) -> tuple[Any | None, str | None]:
     try:
         response = bot.github_api_request("GET", endpoint, retry_policy="idempotent_read", suppress_error_log=True)
     except SystemExit:
@@ -69,7 +70,7 @@ def _read_api_payload(bot, endpoint: str) -> tuple[Any | None, str | None]:
     return response.payload, None
 
 
-def _download_retry_delay(bot, retry_attempt: int) -> float:
+def _download_retry_delay(bot: SweeperContext, retry_attempt: int) -> float:
     base = float(getattr(bot, "LOCK_RETRY_BASE_SECONDS", 2.0))
 
     class _BotJitter:
@@ -121,7 +122,7 @@ def classify_artifact_gap_reason(gap: dict, now: datetime | None = None, *, rete
 
 
 def correlate_candidate_observer_runs(
-    bot,
+    bot: SweeperContext,
     source_event_key: str,
     *,
     source_event_kind: str,
@@ -257,7 +258,7 @@ def correlate_run_artifacts_exact(
     }
 
 
-def _fetch_workflow_runs_for_file(bot, workflow_file: str, event_name: str) -> list[dict] | None:
+def _fetch_workflow_runs_for_file(bot: SweeperContext, workflow_file: str, event_name: str) -> list[dict] | None:
     runs: list[dict] = []
     page = 1
     encoded_workflow = quote(workflow_file, safe="")
@@ -277,14 +278,14 @@ def _fetch_workflow_runs_for_file(bot, workflow_file: str, event_name: str) -> l
         page += 1
 
 
-def _fetch_run_detail(bot, run_id: int) -> dict | None:
+def _fetch_run_detail(bot: SweeperContext, run_id: int) -> dict | None:
     response, _ = _read_api_payload(bot, f"actions/runs/{run_id}")
     if isinstance(response, dict):
         return response
     return None
 
 
-def _list_run_artifacts(bot, run_id: int) -> list[dict] | None:
+def _list_run_artifacts(bot: SweeperContext, run_id: int) -> list[dict] | None:
     artifacts: list[dict] = []
     page = 1
     while True:
@@ -300,7 +301,7 @@ def _list_run_artifacts(bot, run_id: int) -> list[dict] | None:
         page += 1
 
 
-def _download_artifact_payload(bot, artifact: dict, expected_payload_name: str) -> tuple[str, dict | None]:
+def _download_artifact_payload(bot: SweeperContext, artifact: dict, expected_payload_name: str) -> tuple[str, dict | None]:
     if artifact.get("expired") is True:
         return "expired", None
     download_url = artifact.get("archive_download_url")
@@ -347,7 +348,7 @@ def _download_artifact_payload(bot, artifact: dict, expected_payload_name: str) 
     return "ok", payload
 
 
-def inspect_run_artifact_payloads(bot, workflow_runs: list[dict], source_event_key: str, *, pr_number: int, source_event_kind: str) -> dict:
+def inspect_run_artifact_payloads(bot: SweeperContext, workflow_runs: list[dict], source_event_key: str, *, pr_number: int, source_event_kind: str) -> dict:
     payloads_by_run: dict[int, list[dict]] = {}
     prior_visibility: dict[int, dict[str, str]] = {}
     artifact_scan_outcomes: dict[int, str] = {}

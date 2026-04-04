@@ -281,17 +281,27 @@ class AppExecutionRuntime(AppEventContextRuntime, Protocol):
 
 
 @runtime_checkable
-class GitHubTransportContext(Protocol):
-    """GitHub API transport and mutation surface used by low-level helpers."""
+class GitHubApiContext(Protocol):
+    """Minimal runtime surface required by github_api helpers."""
 
     LOCK_API_RETRY_LIMIT: int
     LOCK_RETRY_BASE_SECONDS: float
     REVIEWER_REQUEST_422_TEMPLATE: str
     AssignmentAttempt: type[AssignmentAttempt]
     GitHubApiResult: type[GitHubApiResult]
+    logger: Logger
+    rest_transport: RestTransport
+    graphql_transport: GraphQLTransport
 
+    def get_config_value(self, name: str, default: str = "") -> str: ...
     def get_github_token(self) -> str: ...
     def get_github_graphql_token(self, *, prefer_board_token: bool = False) -> str: ...
+
+
+@runtime_checkable
+class GitHubTransportContext(GitHubApiContext, Protocol):
+    """Compatibility transport surface expected by call sites."""
+
     def github_api_request(
         self,
         method: str,
@@ -328,8 +338,8 @@ class GitHubTransportContext(Protocol):
 
 
 @runtime_checkable
-class StateStoreContext(Protocol):
-    """State issue and serialization surface used by state-store helpers."""
+class StateStoreRuntimeContext(Protocol):
+    """Minimal runtime surface required by state_store helpers."""
 
     ACTIVE_LEASE_CONTEXT: LeaseContext | None
     STATE_ISSUE_NUMBER: int
@@ -338,8 +348,12 @@ class StateStoreContext(Protocol):
     LOCK_API_RETRY_LIMIT: int
     LOCK_RETRY_BASE_SECONDS: float
     GitHubApiResult: type[GitHubApiResult]
-    sys: Any
+    logger: Logger
+    sleeper: Sleeper
+    jitter: JitterSource
+    clock: Clock
 
+    def get_config_value(self, name: str, default: str = "") -> str: ...
     def github_api_request(
         self,
         method: str,
@@ -351,9 +365,6 @@ class StateStoreContext(Protocol):
         timeout_seconds: float | None = None,
         suppress_error_log: bool = False,
     ) -> GitHubApiResult: ...
-    def get_state_issue(self) -> dict | None: ...
-    def get_state_issue_snapshot(self) -> StateIssueSnapshot | None: ...
-    def conditional_patch_state_issue(self, body: str, etag: str | None = None) -> GitHubApiResult: ...
     def parse_lock_metadata_from_issue_body(self, body: str) -> dict: ...
     def render_state_issue_body(
         self,
@@ -367,11 +378,23 @@ class StateStoreContext(Protocol):
     def parse_iso8601_timestamp(self, value: Any) -> datetime | None: ...
     def normalize_lock_metadata(self, lock_meta: dict | None) -> dict: ...
     def ensure_state_issue_lease_lock_fresh(self) -> bool: ...
+    def state_issue_number(self) -> int: ...
+    def lock_api_retry_limit(self) -> int: ...
+    def lock_retry_base_seconds(self) -> float: ...
 
 
 @runtime_checkable
-class LeaseLockContext(Protocol):
-    """Lock-specific runtime surface used by lease-lock helpers."""
+class StateStoreContext(StateStoreRuntimeContext, Protocol):
+    """Compatibility state-store surface expected by current runtime."""
+
+    def get_state_issue(self) -> dict | None: ...
+    def get_state_issue_snapshot(self) -> StateIssueSnapshot | None: ...
+    def conditional_patch_state_issue(self, body: str, etag: str | None = None) -> GitHubApiResult: ...
+
+
+@runtime_checkable
+class LeaseLockRuntimeContext(Protocol):
+    """Minimal runtime surface required by lease_lock helpers."""
 
     ACTIVE_LEASE_CONTEXT: LeaseContext | None
     LOCK_API_RETRY_LIMIT: int
@@ -384,8 +407,14 @@ class LeaseLockContext(Protocol):
     LOCK_COMMIT_MARKER: str
     LOCK_SCHEMA_VERSION: int
     LeaseContext: type[LeaseContext]
-    sys: Any
+    logger: Logger
+    sleeper: Sleeper
+    jitter: JitterSource
+    clock: Clock
+    uuid_source: UuidSource
+    time: Any
 
+    def get_config_value(self, name: str, default: str = "") -> str: ...
     def parse_iso8601_timestamp(self, value: Any) -> datetime | None: ...
     def normalize_lock_metadata(self, lock_meta: dict | None) -> dict: ...
     def clear_lock_metadata(self) -> dict: ...
@@ -403,7 +432,6 @@ class LeaseLockContext(Protocol):
     ) -> GitHubApiResult: ...
     def get_lock_ref_display(self) -> str: ...
     def get_state_issue_html_url(self) -> str: ...
-    def get_lock_ref_snapshot(self) -> tuple[str, str, dict]: ...
     def build_lock_metadata(
         self,
         lock_token: str,
@@ -411,10 +439,65 @@ class LeaseLockContext(Protocol):
         lock_owner_workflow: str,
         lock_owner_job: str,
     ) -> dict: ...
+    def lock_is_currently_valid(self, lock_meta: dict, now: datetime | None = None) -> bool: ...
+    def lock_api_retry_limit(self) -> int: ...
+    def lock_retry_base_seconds(self) -> float: ...
+    def lock_lease_ttl_seconds(self) -> int: ...
+    def lock_max_wait_seconds(self) -> int: ...
+    def lock_renewal_window_seconds(self) -> int: ...
+    def lock_ref_name(self) -> str: ...
+    def lock_ref_bootstrap_branch(self) -> str: ...
+
+
+@runtime_checkable
+class LeaseLockContext(LeaseLockRuntimeContext, Protocol):
+    """Compatibility lock surface expected by current runtime."""
+
+    def get_lock_ref_snapshot(self) -> tuple[str, str, dict]: ...
     def create_lock_commit(self, parent_sha: str, tree_sha: str, lock_meta: dict) -> GitHubApiResult: ...
     def cas_update_lock_ref(self, new_sha: str) -> GitHubApiResult: ...
-    def lock_is_currently_valid(self, lock_meta: dict, now: datetime | None = None) -> bool: ...
     def renew_state_issue_lease_lock(self, context: LeaseContext) -> bool: ...
+
+
+@runtime_checkable
+class SweeperContext(Protocol):
+    LOCK_RETRY_BASE_SECONDS: float
+    STATUS_PROJECTION_EPOCH: str
+    TRANSITION_PERIOD_DAYS: int
+    DEFERRED_DISCOVERY_OVERLAP_SECONDS: int
+    DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS: int
+    REVIEW_FRESHNESS_RUNBOOK_PATH: str
+    GitHubApiResult: type[GitHubApiResult]
+    artifact_download_transport: ArtifactDownloadTransport
+    jitter: JitterSource
+    logger: Logger
+
+    def get_config_value(self, name: str, default: str = "") -> str: ...
+    def get_github_token(self) -> str: ...
+    def github_api_request(
+        self,
+        method: str,
+        endpoint: str,
+        data: dict | None = None,
+        extra_headers: dict[str, str] | None = None,
+        *,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
+        suppress_error_log: bool = False,
+    ) -> GitHubApiResult: ...
+    def github_api(self, method: str, endpoint: str, data: dict | None = None) -> Any | None: ...
+    def get_pull_request_reviews(self, issue_number: int) -> list[dict] | None: ...
+    def get_issue_or_pr_snapshot(self, issue_number: int) -> dict | None: ...
+    def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict) -> HeadObservationRepairResult: ...
+    def compute_reviewer_response_state(
+        self,
+        issue_number: int,
+        review_data: dict,
+        *,
+        issue_snapshot: dict | None = None,
+        pull_request: dict | None = None,
+        reviews: list[dict] | None = None,
+    ) -> dict[str, object]: ...
 
 
 @runtime_checkable

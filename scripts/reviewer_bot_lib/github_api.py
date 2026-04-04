@@ -16,7 +16,7 @@ from .config import (
     REVIEWER_BOARD_TOKEN_ENV,
     STATUS_LABEL_CONFIG,
 )
-from .context import GitHubTransportContext
+from .context import GitHubApiContext, GitHubTransportContext
 
 RETRY_POLICY_NONE = retrying.RETRY_POLICY_NONE
 RETRY_POLICY_IDEMPOTENT_READ = retrying.RETRY_POLICY_IDEMPOTENT_READ
@@ -27,7 +27,7 @@ class _RandomJitter:
         return __import__("random").uniform(lower, upper)
 
 
-def _log(bot: GitHubTransportContext, level: str, message: str, **fields) -> None:
+def _log(bot: GitHubApiContext, level: str, message: str, **fields) -> None:
     logger = getattr(bot, "logger", None)
     if logger is not None and hasattr(logger, "event"):
         logger.event(level, message, **fields)
@@ -109,7 +109,7 @@ def _build_result(
     )
 
 
-def get_github_token(bot: GitHubTransportContext) -> str:
+def get_github_token(bot: GitHubApiContext) -> str:
     token = bot.get_config_value("GITHUB_TOKEN")
     if not token:
         _log(bot, "error", "GITHUB_TOKEN not set")
@@ -117,7 +117,7 @@ def get_github_token(bot: GitHubTransportContext) -> str:
     return token
 
 
-def get_github_graphql_token(bot: GitHubTransportContext, *, prefer_board_token: bool = False) -> str:
+def get_github_graphql_token(bot: GitHubApiContext, *, prefer_board_token: bool = False) -> str:
     if prefer_board_token:
         token = bot.get_config_value(REVIEWER_BOARD_TOKEN_ENV)
         if not token:
@@ -127,7 +127,7 @@ def get_github_graphql_token(bot: GitHubTransportContext, *, prefer_board_token:
 
 
 def github_api_request(
-    bot: GitHubTransportContext,
+    bot: GitHubApiContext,
     method: str,
     endpoint: str,
     data: dict | None = None,
@@ -241,7 +241,7 @@ def github_api(bot: GitHubTransportContext, method: str, endpoint: str, data: di
 
 
 def github_graphql_request(
-    bot: GitHubTransportContext,
+    bot: GitHubApiContext,
     query: str,
     variables: dict | None = None,
     *,

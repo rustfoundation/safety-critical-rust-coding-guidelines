@@ -17,10 +17,10 @@ from .config import (
     LOCK_RETRY_BASE_SECONDS,
     LeaseContext,
 )
-from .context import LeaseLockContext
+from .context import LeaseLockContext, LeaseLockRuntimeContext
 
 
-def _log(bot: LeaseLockContext, level: str, message: str, **fields: Any) -> None:
+def _log(bot: LeaseLockRuntimeContext, level: str, message: str, **fields: Any) -> None:
     logger = getattr(bot, "logger", None)
     if logger is not None and hasattr(logger, "event"):
         logger.event(level, message, **fields)
@@ -29,7 +29,7 @@ def _log(bot: LeaseLockContext, level: str, message: str, **fields: Any) -> None
     stream.write(f"{message}\n")
 
 
-def _sleep(bot: LeaseLockContext, seconds: float) -> None:
+def _sleep(bot: LeaseLockRuntimeContext, seconds: float) -> None:
     sleeper = getattr(bot, "sleeper", None)
     if sleeper is not None and hasattr(sleeper, "sleep"):
         sleeper.sleep(seconds)
@@ -37,14 +37,14 @@ def _sleep(bot: LeaseLockContext, seconds: float) -> None:
     __import__("time").sleep(seconds)
 
 
-def _jitter(bot: LeaseLockContext, lower: float, upper: float) -> float:
+def _jitter(bot: LeaseLockRuntimeContext, lower: float, upper: float) -> float:
     jitter = getattr(bot, "jitter", None)
     if jitter is not None and hasattr(jitter, "uniform"):
         return jitter.uniform(lower, upper)
     return __import__("random").uniform(lower, upper)
 
 
-def _retry_delay(bot: LeaseLockContext, base_seconds: float, retry_attempt: int) -> float:
+def _retry_delay(bot: LeaseLockRuntimeContext, base_seconds: float, retry_attempt: int) -> float:
     class _BotJitter:
         def uniform(self, lower: float, upper: float) -> float:
             return _jitter(bot, lower, upper)
@@ -56,7 +56,7 @@ def _retry_delay(bot: LeaseLockContext, base_seconds: float, retry_attempt: int)
     )
 
 
-def _now(bot: LeaseLockContext) -> datetime:
+def _now(bot: LeaseLockRuntimeContext) -> datetime:
     clock = getattr(bot, "clock", None)
     if clock is not None and hasattr(clock, "now"):
         return clock.now()
@@ -65,49 +65,49 @@ def _now(bot: LeaseLockContext) -> datetime:
     return datetime_module.now(timezone_module.utc)
 
 
-def _monotonic(bot: LeaseLockContext) -> float:
+def _monotonic(bot: LeaseLockRuntimeContext) -> float:
     time_module = getattr(bot, "time", None)
     if time_module is not None and hasattr(time_module, "monotonic"):
         return time_module.monotonic()
     return __import__("time").monotonic()
 
 
-def _uuid4_hex(bot: LeaseLockContext) -> str:
+def _uuid4_hex(bot: LeaseLockRuntimeContext) -> str:
     source = getattr(bot, "uuid_source", None)
     if source is not None and hasattr(source, "uuid4_hex"):
         return source.uuid4_hex()
     return __import__("uuid").uuid4().hex
 
 
-def _lock_lease_ttl_seconds(bot: LeaseLockContext) -> int:
+def _lock_lease_ttl_seconds(bot: LeaseLockRuntimeContext) -> int:
     accessor = getattr(bot, "lock_lease_ttl_seconds", None)
     if callable(accessor):
         return accessor()
     return getattr(bot, "LOCK_LEASE_TTL_SECONDS", LOCK_LEASE_TTL_SECONDS)
 
 
-def _lock_api_retry_limit(bot: LeaseLockContext) -> int:
+def _lock_api_retry_limit(bot: LeaseLockRuntimeContext) -> int:
     accessor = getattr(bot, "lock_api_retry_limit", None)
     if callable(accessor):
         return accessor()
     return getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
 
 
-def _lock_retry_base_seconds(bot: LeaseLockContext) -> float:
+def _lock_retry_base_seconds(bot: LeaseLockRuntimeContext) -> float:
     accessor = getattr(bot, "lock_retry_base_seconds", None)
     if callable(accessor):
         return accessor()
     return getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
 
 
-def _lock_max_wait_seconds(bot: LeaseLockContext) -> int:
+def _lock_max_wait_seconds(bot: LeaseLockRuntimeContext) -> int:
     accessor = getattr(bot, "lock_max_wait_seconds", None)
     if callable(accessor):
         return accessor()
     return getattr(bot, "LOCK_MAX_WAIT_SECONDS", LOCK_MAX_WAIT_SECONDS)
 
 
-def _lock_renewal_window_seconds(bot: LeaseLockContext) -> int:
+def _lock_renewal_window_seconds(bot: LeaseLockRuntimeContext) -> int:
     accessor = getattr(bot, "lock_renewal_window_seconds", None)
     if callable(accessor):
         return accessor()
