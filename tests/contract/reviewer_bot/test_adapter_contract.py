@@ -238,12 +238,16 @@ def test_runtime_accepts_injected_infra_services():
     jitter = object()
     uuid_source = object()
     logger = object()
+    rest_transport = object()
+    graphql_transport = object()
 
     runtime = ReviewerBotRuntime(
         requests=SimpleNamespace(),
         sys=SimpleNamespace(stderr=SimpleNamespace(write=lambda _text: None)),
         random=SimpleNamespace(uniform=lambda lower, upper: lower),
         time=SimpleNamespace(sleep=lambda _seconds: None),
+        rest_transport=rest_transport,
+        graphql_transport=graphql_transport,
         clock=clock,
         sleeper=sleeper,
         jitter=jitter,
@@ -261,3 +265,5 @@ def test_runtime_accepts_injected_infra_services():
     assert runtime.jitter is jitter
     assert runtime.uuid_source is uuid_source
     assert runtime.logger is logger
+    assert runtime.rest_transport is rest_transport
+    assert runtime.graphql_transport is graphql_transport

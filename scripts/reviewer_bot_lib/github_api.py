@@ -240,11 +240,12 @@ def github_graphql_request(
     max_attempts = 1 + (LOCK_API_RETRY_LIMIT if retry_policy == RETRY_POLICY_IDEMPOTENT_READ else 0)
     for attempt in range(1, max_attempts + 1):
         try:
-            response = requests.post(
+            response = bot.graphql_transport.query(
                 "https://api.github.com/graphql",
                 headers=headers,
-                json={"query": query, "variables": variables or {}},
-                timeout=timeout_seconds,
+                query=query,
+                variables=variables,
+                timeout_seconds=timeout_seconds,
             )
         except requests.RequestException as exc:
             failure_kind = _classify_failure(None, transport_error=True)

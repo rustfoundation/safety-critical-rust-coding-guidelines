@@ -136,6 +136,27 @@ class RequestsRestTransport:
         return self._requests.request(method, url, headers=headers, json=json_data, timeout=timeout_seconds)
 
 
+class RequestsGraphQLTransport:
+    def __init__(self, requests_module: Any):
+        self._requests = requests_module
+
+    def query(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        query: str,
+        variables: dict[str, Any] | None = None,
+        timeout_seconds: float | None = None,
+    ) -> Any:
+        return self._requests.post(
+            url,
+            headers=headers,
+            json={"query": query, "variables": variables or {}},
+            timeout=timeout_seconds,
+        )
+
+
 class ReviewerBotRuntime:
     """Runtime object built from explicit services and named adapters."""
 
@@ -169,6 +190,7 @@ class ReviewerBotRuntime:
         outputs: Any | None = None,
         deferred_payloads: Any | None = None,
         rest_transport: Any | None = None,
+        graphql_transport: Any | None = None,
         clock: Any | None = None,
         sleeper: Any | None = None,
         jitter: Any | None = None,
@@ -190,6 +212,7 @@ class ReviewerBotRuntime:
         self.outputs = outputs or _FileOutputSink(self.config)
         self.deferred_payloads = deferred_payloads or _JsonDeferredPayloadLoader(self.config)
         self.rest_transport = rest_transport or RequestsRestTransport(requests)
+        self.graphql_transport = graphql_transport or RequestsGraphQLTransport(requests)
         self.clock = clock or SystemClock()
         self.sleeper = sleeper or SystemSleeper(time)
         self.jitter = jitter or RandomJitterSource(random)

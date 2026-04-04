@@ -28,6 +28,27 @@ class RecordingRestTransport:
         return response
 
 
+class RecordingGraphQLTransport:
+    def __init__(self, responses=None):
+        self._responses = iter(responses or [])
+        self.calls = []
+
+    def query(self, url, *, headers=None, query=None, variables=None, timeout_seconds=None):
+        self.calls.append(
+            {
+                "url": url,
+                "headers": headers,
+                "query": query,
+                "variables": variables,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        response = next(self._responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 def _bot(**overrides):
     bot = SimpleNamespace(
         GitHubApiResult=GitHubApiResult,
@@ -35,6 +56,7 @@ def _bot(**overrides):
         get_github_graphql_token=lambda prefer_board_token=False: "token",
         get_config_value=lambda name, default="": __import__("os").environ.get(name, default),
         rest_transport=RecordingRestTransport(),
+        graphql_transport=RecordingGraphQLTransport(),
         STATE_ISSUE_NUMBER=1,
     )
     for key, value in overrides.items():
@@ -103,16 +125,19 @@ def test_github_api_request_classifies_forbidden_without_retry(monkeypatch):
 
 
 def test_github_graphql_request_retries_idempotent_query_on_502(monkeypatch):
-    responses = iter(
+    transport = RecordingGraphQLTransport(
         [
             FakeGitHubResponse(502, {"message": "bad gateway"}, "bad gateway"),
             FakeGitHubResponse(200, {"data": {"viewer": {"login": "bot"}}}, "ok"),
         ]
     )
-    monkeypatch.setattr(github_api.requests, "post", lambda *args, **kwargs: next(responses))
     monkeypatch.setattr(github_api.time, "sleep", lambda *_args, **_kwargs: None)
 
-    result = github_api.github_graphql_request(_bot(), "query { viewer { login } }", retry_policy="idempotent_read")
+    result = github_api.github_graphql_request(
+        _bot(graphql_transport=transport),
+        "query { viewer { login } }",
+        retry_policy="idempotent_read",
+    )
 
     assert result.ok is True
     assert result.payload == {"data": {"viewer": {"login": "bot"}}}
@@ -150,18 +175,18 @@ def test_github_api_request_reports_retry_exhaustion_on_repeated_429(monkeypatch
 
 
 def test_github_graphql_request_reports_invalid_payload(monkeypatch):
-    monkeypatch.setattr(github_api.requests, "post", lambda *args, **kwargs: FakeGitHubResponse(200, ValueError("bad json"), "bad json"))
+    transport = RecordingGraphQLTransport([FakeGitHubResponse(200, ValueError("bad json"), "bad json")])
 
-    result = github_api.github_graphql_request(_bot(), "query { viewer { login } }")
+    result = github_api.github_graphql_request(_bot(graphql_transport=transport), "query { viewer { login } }")
 
     assert result.ok is False
     assert result.failure_kind == "invalid_payload"
 
 
 def test_github_graphql_request_reports_graphql_errors(monkeypatch):
-    monkeypatch.setattr(github_api.requests, "post", lambda *args, **kwargs: FakeGitHubResponse(200, {"errors": [{"message": "boom"}]}, "boom"))
+    transport = RecordingGraphQLTransport([FakeGitHubResponse(200, {"errors": [{"message": "boom"}]}, "boom")])
 
-    result = github_api.github_graphql_request(_bot(), "query { viewer { login } }")
+    result = github_api.github_graphql_request(_bot(graphql_transport=transport), "query { viewer { login } }")
 
     assert result.ok is False
     assert result.failure_kind == "invalid_payload"
@@ -265,18 +290,12 @@ def test_github_api_request_reports_transport_retry_exhaustion(monkeypatch):
 
 
 def test_github_graphql_request_passes_timeout(monkeypatch):
-    observed = {}
+    transport = RecordingGraphQLTransport([FakeGitHubResponse(200, {"data": {"viewer": {"login": "bot"}}}, "ok")])
 
-    def fake_post(url, headers=None, json=None, timeout=None):
-        observed["timeout"] = timeout
-        return FakeGitHubResponse(200, {"data": {"viewer": {"login": "bot"}}}, "ok")
-
-    monkeypatch.setattr(github_api.requests, "post", fake_post)
-
-    result = github_api.github_graphql_request(_bot(), "query { viewer { login } }", timeout_seconds=9.5)
+    result = github_api.github_graphql_request(_bot(graphql_transport=transport), "query { viewer { login } }", timeout_seconds=9.5)
 
     assert result.ok is True
-    assert observed["timeout"] == 9.5
+    assert transport.calls[0]["timeout_seconds"] == 9.5
 
 
 def test_find_open_pr_for_branch_status_blank_owner_or_branch_is_not_found(monkeypatch):
