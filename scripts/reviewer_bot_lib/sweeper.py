@@ -83,6 +83,14 @@ def _download_retry_delay(bot: SweeperContext, retry_attempt: int) -> float:
     return retrying.bounded_exponential_delay(base, retry_attempt, jitter=_BotJitter())
 
 
+def _sleep(bot: SweeperContext, seconds: float) -> None:
+    sleeper = getattr(bot, "sleeper", None)
+    if sleeper is not None and hasattr(sleeper, "sleep"):
+        sleeper.sleep(seconds)
+        return
+    time.sleep(seconds)
+
+
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
     status = str(run_details.get("status", "")).strip()
     conclusion = run_details.get("conclusion")
@@ -321,12 +329,12 @@ def _download_artifact_payload(bot: SweeperContext, artifact: dict, expected_pay
             )
         except Exception:
             if attempt < max_attempts:
-                time.sleep(_download_retry_delay(bot, attempt))
+                _sleep(bot, _download_retry_delay(bot, attempt))
                 continue
             return "download_unavailable", None
         if retrying.is_retryable_status(response.status_code):
             if attempt < max_attempts:
-                time.sleep(_download_retry_delay(bot, attempt))
+                _sleep(bot, _download_retry_delay(bot, attempt))
                 continue
             return "download_unavailable", None
         break
