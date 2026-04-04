@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import get_type_hints
 
 import pytest
@@ -7,6 +8,7 @@ pytestmark = pytest.mark.contract
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import event_inputs, lease_lock, review_state
 from scripts.reviewer_bot_lib.context import ReviewerBotContext
+from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
 
@@ -228,3 +230,34 @@ def test_runtime_typed_config_accessors_read_runtime_config(monkeypatch):
     assert runtime.lock_renewal_window_seconds() == 90
     assert runtime.lock_ref_name() == "heads/test-lock"
     assert runtime.lock_ref_bootstrap_branch() == "develop"
+
+
+def test_runtime_accepts_injected_infra_services():
+    clock = object()
+    sleeper = object()
+    jitter = object()
+    uuid_source = object()
+    logger = object()
+
+    runtime = ReviewerBotRuntime(
+        requests=SimpleNamespace(),
+        sys=SimpleNamespace(stderr=SimpleNamespace(write=lambda _text: None)),
+        random=SimpleNamespace(uniform=lambda lower, upper: lower),
+        time=SimpleNamespace(sleep=lambda _seconds: None),
+        clock=clock,
+        sleeper=sleeper,
+        jitter=jitter,
+        uuid_source=uuid_source,
+        logger=logger,
+        state_store=SimpleNamespace(load_state=lambda **kwargs: {}, save_state=lambda state: True),
+        github=SimpleNamespace(github_api=lambda *args, **kwargs: {}, github_api_request=lambda *args, **kwargs: {}),
+        locks=SimpleNamespace(),
+        handlers=SimpleNamespace(),
+        adapters=SimpleNamespace(),
+    )
+
+    assert runtime.clock is clock
+    assert runtime.sleeper is sleeper
+    assert runtime.jitter is jitter
+    assert runtime.uuid_source is uuid_source
+    assert runtime.logger is logger

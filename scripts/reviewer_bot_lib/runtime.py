@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -83,6 +84,42 @@ class _TouchTracker:
         return touched
 
 
+class SystemClock:
+    def now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
+
+class SystemSleeper:
+    def __init__(self, time_module: Any):
+        self._time = time_module
+
+    def sleep(self, seconds: float) -> None:
+        self._time.sleep(seconds)
+
+
+class RandomJitterSource:
+    def __init__(self, random_module: Any):
+        self._random = random_module
+
+    def uniform(self, lower: float, upper: float) -> float:
+        return self._random.uniform(lower, upper)
+
+
+class Uuid4Source:
+    def uuid4_hex(self) -> str:
+        return uuid.uuid4().hex
+
+
+class StdErrLogger:
+    def __init__(self, sys_module: Any):
+        self._sys = sys_module
+
+    def event(self, level: str, message: str, **fields: Any) -> None:
+        rendered_fields = " ".join(f"{key}={value}" for key, value in sorted(fields.items()))
+        suffix = f" {rendered_fields}" if rendered_fields else ""
+        self._sys.stderr.write(f"[{level}] {message}{suffix}\n")
+
+
 class ReviewerBotRuntime:
     """Runtime object built from explicit services and named adapters."""
 
@@ -115,6 +152,11 @@ class ReviewerBotRuntime:
         config: Any | None = None,
         outputs: Any | None = None,
         deferred_payloads: Any | None = None,
+        clock: Any | None = None,
+        sleeper: Any | None = None,
+        jitter: Any | None = None,
+        uuid_source: Any | None = None,
+        logger: Any | None = None,
         state_store: Any,
         github: Any,
         locks: Any,
@@ -130,6 +172,11 @@ class ReviewerBotRuntime:
         self.config = config or _EnvConfig()
         self.outputs = outputs or _FileOutputSink(self.config)
         self.deferred_payloads = deferred_payloads or _JsonDeferredPayloadLoader(self.config)
+        self.clock = clock or SystemClock()
+        self.sleeper = sleeper or SystemSleeper(time)
+        self.jitter = jitter or RandomJitterSource(random)
+        self.uuid_source = uuid_source or Uuid4Source()
+        self.logger = logger or StdErrLogger(sys)
         self.state_store = state_store
         self.github = github
         self.locks = locks
