@@ -16,6 +16,27 @@ from .event_inputs import (
 )
 from .guidance import get_issue_guidance, get_pr_guidance
 
+_CONVERSATIONAL_WORDS = {
+    "i",
+    "we",
+    "you",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "can",
+    "could",
+    "would",
+    "should",
+    "please",
+    "thanks",
+    "thank",
+    "hi",
+    "hello",
+    "hey",
+}
+
 
 def build_assignment_request(bot, *, issue_number: int) -> AssignmentRequest:
     return decode_assignment_request(bot, issue_number=issue_number)
@@ -60,8 +81,7 @@ def parse_command(bot, comment_body: str) -> tuple[str, list[str]] | None:
         malformed_match = re.search(malformed_pattern, comment_body, re.IGNORECASE | re.MULTILINE)
         if malformed_match:
             attempted = malformed_match.group(1).lower()
-            conversational = {"i", "we", "you", "the", "a", "an", "is", "are", "can", "could", "would", "should", "please", "thanks", "thank", "hi", "hello", "hey"}
-            if attempted in conversational:
+            if attempted in _CONVERSATIONAL_WORDS:
                 return None
             if attempted in bot.COMMANDS or attempted in {"r?-user", "assign-from-queue"}:
                 return "_malformed_known", [attempted]

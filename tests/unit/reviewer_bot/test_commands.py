@@ -3,6 +3,7 @@ import pytest
 
 from scripts.reviewer_bot_lib import (
     automation,
+    commands,
     comment_application,
     guidance,
     reconcile,
@@ -335,3 +336,59 @@ def test_manual_dispatch_marks_live_permission_unavailable_for_pending_privilege
     pending = review["pending_privileged_commands"]["issue_comment:100"]
     assert pending["status"] == "failed_closed"
     assert pending["result"] == "live_permission_unavailable"
+
+
+@pytest.mark.parametrize(
+    ("comment_body", "expected"),
+    [
+        ("@guidelines-bot /queue", ("queue", [])),
+        ("@guidelines-bot /r? producers", ("assign-from-queue", [])),
+        ("@guidelines-bot /r? @alice", ("r?-user", ["@alice"])),
+        ("@guidelines-bot queue", ("_malformed_known", ["queue"])),
+        ("@guidelines-bot /queue\n@guidelines-bot /pass", ("_multiple_commands", [])),
+        ("@guidelines-bot hello", None),
+    ],
+)
+def test_parse_command_preserves_known_command_classification(monkeypatch, comment_body, expected):
+    harness = CommandHarness(monkeypatch)
+    parser_bot = type(
+        "ParserBot",
+        (),
+        {
+            "BOT_MENTION": harness.runtime.BOT_MENTION,
+            "COMMANDS": {
+                "queue",
+                "pass",
+                "label",
+                "away",
+                "claim",
+                "release",
+                "rectify",
+                "sync-members",
+                "accept-no-fls-changes",
+            },
+        },
+    )()
+
+    assert commands.parse_command(parser_bot, comment_body) == expected
+
+
+def test_parse_command_preserves_quoted_args(monkeypatch):
+    harness = CommandHarness(monkeypatch)
+
+    parser_bot = type("ParserBot", (), {"BOT_MENTION": harness.runtime.BOT_MENTION, "COMMANDS": {"label"}})()
+
+    assert commands.parse_command(parser_bot, '@guidelines-bot /label +"needs decision"') == ("label", ["+needs decision"])
+
+
+def test_strip_code_blocks_removes_fenced_indented_and_inline_code(monkeypatch):
+    harness = CommandHarness(monkeypatch)
+    comment_body = """before
+```bash
+@guidelines-bot /queue
+```
+    @guidelines-bot /queue
+inline `@guidelines-bot /queue`
+after"""
+
+    assert harness.runtime.strip_code_blocks(comment_body) == "before\n\n\ninline \nafter"
