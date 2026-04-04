@@ -136,6 +136,10 @@ class RestTransportStub:
     def __init__(self, runtime):
         self._runtime = runtime
         self.calls: list[dict[str, Any]] = []
+        self._direct_request: Callable[..., Any] | None = None
+
+    def stub(self, func: Callable[..., Any]) -> None:
+        self._direct_request = func
 
     def request(self, method: str, url: str, *, headers=None, json_data=None, timeout_seconds=None):
         self.calls.append(
@@ -149,6 +153,14 @@ class RestTransportStub:
         )
         parsed = urlparse(url)
         parts = parsed.path.strip("/").split("/")
+        if self._direct_request is not None and (len(parts) < 4 or parts[0] != "repos"):
+            return self._direct_request(
+                method=method,
+                url=url,
+                headers=headers,
+                json_data=json_data,
+                timeout_seconds=timeout_seconds,
+            )
         if len(parts) >= 4 and parts[0] == "repos":
             endpoint = "/".join(parts[3:])
         else:
