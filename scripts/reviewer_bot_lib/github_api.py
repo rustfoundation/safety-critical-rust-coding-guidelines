@@ -24,7 +24,7 @@ RETRY_POLICY_IDEMPOTENT_READ = retrying.RETRY_POLICY_IDEMPOTENT_READ
 
 class _RandomJitter:
     def uniform(self, lower: float, upper: float) -> float:
-        return __import__("random").uniform(lower, upper)
+        return random.uniform(lower, upper)
 
 
 def _log(bot: GitHubApiContext, level: str, message: str, **fields) -> None:
@@ -34,6 +34,22 @@ def _log(bot: GitHubApiContext, level: str, message: str, **fields) -> None:
         return
     stream = sys.stderr if level in {"warning", "error"} else sys.stdout
     print(message, file=stream)
+
+
+def _sleep(bot: GitHubApiContext, seconds: float) -> None:
+    sleeper = getattr(bot, "sleeper", None)
+    if sleeper is not None and hasattr(sleeper, "sleep"):
+        sleeper.sleep(seconds)
+        return
+    time.sleep(seconds)
+
+
+def _retry_delay(bot: GitHubApiContext, base_seconds: float, retry_attempt: int) -> float:
+    return retrying.bounded_exponential_delay(
+        base_seconds,
+        retry_attempt,
+        jitter=getattr(bot, "jitter", None) or _RandomJitter(),
+    )
 
 
 def _should_retry_status(status_code: int | None) -> bool:
@@ -58,14 +74,6 @@ def _classify_failure(status_code: int | None, *, invalid_payload: bool = False,
     if status_code >= 500:
         return "server_error"
     return None
-
-
-def _retry_delay(base_seconds: float, retry_attempt: int) -> float:
-    return retrying.bounded_exponential_delay(
-        base_seconds,
-        retry_attempt,
-        jitter=_RandomJitter(),
-    )
 
 
 def _validate_rest_retry_policy(method: str, retry_policy: str) -> None:
@@ -165,7 +173,7 @@ def github_api_request(
             failure_kind = _classify_failure(None, transport_error=True)
             if attempt < max_attempts:
                 retry_attempts += 1
-                time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
+                _sleep(bot, _retry_delay(bot, LOCK_RETRY_BASE_SECONDS, retry_attempts))
                 continue
             if not suppress_error_log:
                 _log(bot, "error", f"GitHub API transport error: {exc}", transport_error=str(exc))
@@ -206,7 +214,7 @@ def github_api_request(
         failure_kind = _classify_failure(response.status_code, invalid_payload=invalid_payload)
         if retry_policy == RETRY_POLICY_IDEMPOTENT_READ and _should_retry_status(response.status_code) and attempt < max_attempts:
             retry_attempts += 1
-            time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
+            _sleep(bot, _retry_delay(bot, LOCK_RETRY_BASE_SECONDS, retry_attempts))
             continue
 
         if not suppress_error_log:
@@ -273,7 +281,7 @@ def github_graphql_request(
             failure_kind = _classify_failure(None, transport_error=True)
             if retry_policy == RETRY_POLICY_IDEMPOTENT_READ and attempt < max_attempts:
                 retry_attempts += 1
-                time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
+                _sleep(bot, _retry_delay(bot, LOCK_RETRY_BASE_SECONDS, retry_attempts))
                 continue
             if not suppress_error_log:
                 _log(bot, "error", f"GitHub GraphQL transport error: {exc}", transport_error=str(exc))
@@ -318,7 +326,7 @@ def github_graphql_request(
         )
         if _should_retry_status(response.status_code) and attempt < max_attempts:
             retry_attempts += 1
-            time.sleep(_retry_delay(LOCK_RETRY_BASE_SECONDS, retry_attempts))
+            _sleep(bot, _retry_delay(bot, LOCK_RETRY_BASE_SECONDS, retry_attempts))
             continue
 
         if not suppress_error_log:
@@ -491,7 +499,7 @@ def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, 
             )
         if response.status_code == 429 or response.status_code >= 500:
             if attempt < lock_api_retry_limit:
-                delay = lock_retry_base_seconds + random.uniform(0, lock_retry_base_seconds)
+                delay = _retry_delay(bot, lock_retry_base_seconds, attempt)
                 _log(
                     bot,
                     "warning",
@@ -501,7 +509,7 @@ def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, 
                     status_code=response.status_code,
                     retry_attempt=attempt,
                 )
-                time.sleep(delay)
+                _sleep(bot, delay)
                 continue
             return bot.AssignmentAttempt(
                 success=False,
