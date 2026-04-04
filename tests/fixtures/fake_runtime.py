@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
 import random
 import sys
 import time
-from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -50,6 +48,7 @@ from tests.fixtures.focused_fake_services import (
     RestTransportStub,
     StateStoreStub,
     TouchTrackerStub,
+    WorkflowBehaviorStub,
 )
 from tests.fixtures.recording_logger import RecordingLogger
 
@@ -67,11 +66,12 @@ class FakeRuntimeInfraServices:
 
 
 class FakeRuntimeDomainServices:
-    def __init__(self, *, state_store, github, locks, handlers):
+    def __init__(self, *, state_store, github, locks, handlers, workflow):
         self.state_store = state_store
         self.github = github
         self.locks = locks
         self.handlers = handlers
+        self.workflow = workflow
 
 
 class FakeReviewerBotRuntime:
@@ -116,6 +116,7 @@ class FakeReviewerBotRuntime:
         self.state_store = StateStoreStub()
         self.locks = LockStub()
         self.github = GitHubStub(github)
+        self.workflow = WorkflowBehaviorStub()
         self.handlers = HandlerStub(
             {
                 "handle_issue_or_pr_opened": lambda state: lifecycle_module.handle_issue_or_pr_opened(self, state),
@@ -145,10 +146,8 @@ class FakeReviewerBotRuntime:
             github=self.github,
             locks=self.locks,
             handlers=self.handlers,
+            workflow=self.workflow,
         )
-        self._process_pass_until: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
-        self._sync_members: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
-        self._sync_status_labels: Callable[[dict, Any], bool] = lambda state, issue_numbers: False
 
     def get_config_value(self, name: str, default: str = "") -> str:
         return self.config.get(name, default)
@@ -211,13 +210,13 @@ class FakeReviewerBotRuntime:
         return self.locks.release()
 
     def process_pass_until_expirations(self, state: dict):
-        return self._process_pass_until(state)
+        return self.workflow.process_pass_until_expirations(state)
 
     def sync_members_with_queue(self, state: dict):
-        return self._sync_members(state)
+        return self.workflow.sync_members_with_queue(state)
 
     def sync_status_labels_for_items(self, state: dict, issue_numbers):
-        return self._sync_status_labels(state, issue_numbers)
+        return self.workflow.sync_status_labels_for_items(state, issue_numbers)
 
     def ensure_review_entry(self, state: dict, issue_number: int, create: bool = False):
         return review_state_module.ensure_review_entry(state, issue_number, create=create)
@@ -472,36 +471,19 @@ class FakeReviewerBotRuntime:
         self.deferred_payloads.set_payload(payload)
 
     def stub_state_sequence(self, *states: dict) -> None:
-        state_queue = [deepcopy(state) for state in states]
-
-        def fake_load_state(*, fail_on_unavailable: bool = False):
-            if not state_queue:
-                raise AssertionError("No more fake states queued")
-            if len(state_queue) == 1:
-                return state_queue[0]
-            return state_queue.pop(0)
-
-        self.state_store.stub_load(fake_load_state)
+        self.state_store.stub_state_sequence(*states)
 
     def stub_state_unavailable(self, message: str = "state unavailable") -> None:
-        def fake_load_state(*, fail_on_unavailable: bool = False):
-            assert fail_on_unavailable is True
-            raise RuntimeError(message)
-
-        self.state_store.stub_load(fake_load_state)
+        self.state_store.stub_state_unavailable(message)
 
     def record_saves(self, snapshots: list) -> None:
-        def fake_save_state(state: dict) -> bool:
-            snapshots.append(json.loads(json.dumps(state)))
-            return True
-
-        self.state_store.stub_save(fake_save_state)
+        self.state_store.record_saves(snapshots)
 
     def stub_pass_until(self, func: Callable[[dict], tuple[dict, list[str]]]) -> None:
-        self._process_pass_until = func
+        self.workflow.stub_pass_until(func)
 
     def stub_sync_members(self, func: Callable[[dict], tuple[dict, list[str]]]) -> None:
-        self._sync_members = func
+        self.workflow.stub_sync_members(func)
 
     def stub_sync_status_labels(self, func: Callable[[dict, Any], bool]) -> None:
-        self._sync_status_labels = func
+        self.workflow.stub_sync_status_labels(func)

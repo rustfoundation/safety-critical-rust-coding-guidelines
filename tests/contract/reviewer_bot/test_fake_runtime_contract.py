@@ -13,6 +13,7 @@ from tests.fixtures.focused_fake_services import (
     RestTransportStub,
     StateStoreStub,
     TouchTrackerStub,
+    WorkflowBehaviorStub,
 )
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
@@ -213,6 +214,7 @@ def test_focused_fake_service_types_are_exposed_for_direct_fixture_composition(m
     assert isinstance(runtime.artifact_download_transport, ArtifactDownloadTransportStub)
     assert isinstance(runtime.handlers, HandlerStub)
     assert isinstance(runtime.touch_tracker, TouchTrackerStub)
+    assert isinstance(runtime.workflow, WorkflowBehaviorStub)
 
 
 def test_fake_runtime_groups_focused_services_into_infra_and_domain_shells(monkeypatch):
@@ -230,3 +232,4 @@ def test_fake_runtime_groups_focused_services_into_infra_and_domain_shells(monke
     assert runtime.domain.github is runtime.github
     assert runtime.domain.locks is runtime.locks
     assert runtime.domain.handlers is runtime.handlers
+    assert runtime.domain.workflow is runtime.workflow

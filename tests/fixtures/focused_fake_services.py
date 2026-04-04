@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import Any, Callable
 from urllib.parse import urlparse
 
@@ -48,6 +49,33 @@ class StateStoreStub:
 
     def stub_save(self, func: Callable[[dict], bool]) -> None:
         self._save = func
+
+    def stub_state_sequence(self, *states: dict) -> None:
+        state_queue = [deepcopy(state) for state in states]
+
+        def fake_load_state(*, fail_on_unavailable: bool = False):
+            del fail_on_unavailable
+            if not state_queue:
+                raise AssertionError("No more fake states queued")
+            if len(state_queue) == 1:
+                return state_queue[0]
+            return state_queue.pop(0)
+
+        self.stub_load(fake_load_state)
+
+    def stub_state_unavailable(self, message: str = "state unavailable") -> None:
+        def fake_load_state(*, fail_on_unavailable: bool = False):
+            assert fail_on_unavailable is True
+            raise RuntimeError(message)
+
+        self.stub_load(fake_load_state)
+
+    def record_saves(self, snapshots: list) -> None:
+        def fake_save_state(state: dict) -> bool:
+            snapshots.append(json.loads(json.dumps(state)))
+            return True
+
+        self.stub_save(fake_save_state)
 
     def load_state(self, *, fail_on_unavailable: bool = False) -> dict:
         return self._load(fail_on_unavailable=fail_on_unavailable)
@@ -225,3 +253,28 @@ class TouchTrackerStub:
         items = list(self._touched)
         self._touched.clear()
         return items
+
+
+class WorkflowBehaviorStub:
+    def __init__(self):
+        self._process_pass_until: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
+        self._sync_members: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
+        self._sync_status_labels: Callable[[dict, Any], bool] = lambda state, issue_numbers: False
+
+    def process_pass_until_expirations(self, state: dict):
+        return self._process_pass_until(state)
+
+    def sync_members_with_queue(self, state: dict):
+        return self._sync_members(state)
+
+    def sync_status_labels_for_items(self, state: dict, issue_numbers):
+        return self._sync_status_labels(state, issue_numbers)
+
+    def stub_pass_until(self, func: Callable[[dict], tuple[dict, list[str]]]) -> None:
+        self._process_pass_until = func
+
+    def stub_sync_members(self, func: Callable[[dict], tuple[dict, list[str]]]) -> None:
+        self._sync_members = func
+
+    def stub_sync_status_labels(self, func: Callable[[dict, Any], bool]) -> None:
+        self._sync_status_labels = func
