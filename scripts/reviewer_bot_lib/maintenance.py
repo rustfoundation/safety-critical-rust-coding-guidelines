@@ -24,6 +24,10 @@ from .review_state import (
 from .sweeper import sweep_deferred_gaps
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
+
 def _now_iso(bot) -> str:
     return bot.datetime.now(bot.timezone.utc).isoformat()
 
@@ -245,9 +249,13 @@ def handle_scheduled_check(bot, state: dict) -> bool:
                 if _clear_maintenance_repair_marker(review_data, "review_repair"):
                     changed = True
             except Exception as exc:
-                print(
-                    f"WARNING: Scheduled repair failed for #{issue_number} during review_repair: {exc}",
-                    file=bot.sys.stderr,
+                _log(
+                    bot,
+                    "warning",
+                    f"Scheduled repair failed for #{issue_number} during review_repair: {exc}",
+                    issue_number=issue_number,
+                    phase="review_repair",
+                    error=str(exc),
                 )
                 if _record_maintenance_repair_marker(
                     bot,
@@ -262,9 +270,13 @@ def handle_scheduled_check(bot, state: dict) -> bool:
             try:
                 repair_result = maybe_record_head_observation_repair(bot, issue_number, review_data)
             except Exception as exc:
-                print(
-                    f"WARNING: Scheduled repair failed for #{issue_number} during head_observation_repair: {exc}",
-                    file=bot.sys.stderr,
+                _log(
+                    bot,
+                    "warning",
+                    f"Scheduled repair failed for #{issue_number} during head_observation_repair: {exc}",
+                    issue_number=issue_number,
+                    phase="head_observation_repair",
+                    error=str(exc),
                 )
                 if _record_maintenance_repair_marker(
                     bot,
