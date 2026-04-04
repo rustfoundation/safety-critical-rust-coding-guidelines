@@ -1,9 +1,11 @@
 from pathlib import Path
+
 import pytest
 
 pytestmark = pytest.mark.contract
 
 import yaml
+
 
 def test_sweeper_repair_workflow_exposes_reviewer_board_preview_dispatch():
     data = yaml.safe_load(Path(".github/workflows/reviewer-bot-sweeper-repair.yml").read_text(encoding="utf-8"))

@@ -10,6 +10,8 @@ from .event_inputs import (
 )
 from .event_inputs import (
     get_target_repo_root as decode_target_repo_root,
+)
+from .event_inputs import (
     parse_issue_labels as decode_issue_labels,
 )
 

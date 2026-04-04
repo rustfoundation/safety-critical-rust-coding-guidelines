@@ -26,6 +26,7 @@ class AppHarness:
         self.locks = self.runtime.locks
         self.handlers = self.runtime.handlers
         self.touch_tracker = self.runtime.touch_tracker
+        self._monkeypatch.setattr(reviewer_bot, "build_runtime", lambda: self.runtime)
 
     def set_event(self, **values) -> None:
         set_env_values(self.config, **values)
