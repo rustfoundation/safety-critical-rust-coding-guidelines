@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
+from . import retrying
 from .config import (
     LOCK_API_RETRY_LIMIT,
     LOCK_COMMIT_MARKER,
@@ -40,6 +41,18 @@ def _jitter(bot: LeaseLockContext, lower: float, upper: float) -> float:
     if jitter is not None and hasattr(jitter, "uniform"):
         return jitter.uniform(lower, upper)
     return __import__("random").uniform(lower, upper)
+
+
+def _retry_delay(bot: LeaseLockContext, base_seconds: float, retry_attempt: int) -> float:
+    class _BotJitter:
+        def uniform(self, lower: float, upper: float) -> float:
+            return _jitter(bot, lower, upper)
+
+    return retrying.bounded_exponential_delay(
+        base_seconds,
+        retry_attempt,
+        jitter=_BotJitter(),
+    )
 
 
 def _now(bot: LeaseLockContext) -> datetime:
@@ -439,8 +452,8 @@ def renew_state_issue_lease_lock(bot: LeaseLockContext, context: LeaseContext) -
         )
         create_response = bot.create_lock_commit(ref_head_sha, tree_sha, desired_lock)
         if create_response.status_code != 201:
-            if create_response.status_code == 429 or create_response.status_code >= 500:
-                delay = retry_base + _jitter(bot, 0, retry_base)
+            if retrying.is_retryable_status(create_response.status_code):
+                delay = _retry_delay(bot, retry_base, attempt)
                 _log(
                     bot,
                     "warning",
@@ -473,8 +486,8 @@ def renew_state_issue_lease_lock(bot: LeaseLockContext, context: LeaseContext) -
                 token_prefix=context.lock_token[:8],
             )
             return True
-        if update_response.status_code in {409, 422, 429} or update_response.status_code >= 500:
-            delay = retry_base + _jitter(bot, 0, retry_base)
+        if update_response.status_code in {409, 422} or retrying.is_retryable_status(update_response.status_code):
+            delay = _retry_delay(bot, retry_base, attempt)
             _log(
                 bot,
                 "warning",
@@ -539,7 +552,7 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
             )
             create_response = bot.create_lock_commit(ref_head_sha, tree_sha, desired_lock)
             if create_response.status_code != 201:
-                if create_response.status_code == 429 or create_response.status_code >= 500:
+                if retrying.is_retryable_status(create_response.status_code):
                     _log(
                         bot,
                         "warning",
@@ -547,7 +560,7 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                         status_code=create_response.status_code,
                         retry_attempt=attempt,
                     )
-                    delay = retry_base + _jitter(bot, 0, retry_base)
+                    delay = _retry_delay(bot, retry_base, attempt)
                     _sleep(bot, delay)
                     continue
                 if create_response.status_code in {401, 403}:
@@ -590,7 +603,7 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                         retry_attempt=attempt,
                         token_prefix=lock_token[:8],
                     )
-                    delay = retry_base + _jitter(bot, 0, retry_base)
+                    delay = _retry_delay(bot, retry_base, attempt)
                     _sleep(bot, delay)
                     continue
                 conflicting_token = snapshot_lock.get("lock_token") if isinstance(snapshot_lock, dict) else None
@@ -607,7 +620,7 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                     "Insufficient permission to acquire reviewer-bot lease lock "
                     f"(status {update_response.status_code}): {update_response.text}"
                 )
-            elif update_response.status_code == 429 or update_response.status_code >= 500:
+            elif retrying.is_retryable_status(update_response.status_code):
                 _log(bot, "warning", "Retryable lease lock acquire failure", status_code=update_response.status_code, retry_attempt=attempt)
             else:
                 raise RuntimeError(
@@ -625,7 +638,7 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                 lock_expires_at=lock_expires_at,
                 lock_ref=bot.get_lock_ref_display(),
             )
-        delay = retry_base + _jitter(bot, 0, retry_base)
+        delay = _retry_delay(bot, retry_base, attempt)
         _sleep(bot, delay)
 
 
@@ -653,7 +666,7 @@ def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
                         retry_attempt=attempt,
                         token_prefix=context.lock_token[:8],
                     )
-                    delay = retry_base + _jitter(bot, 0, retry_base)
+                    delay = _retry_delay(bot, retry_base, attempt)
                     _sleep(bot, delay)
                     continue
                 _log(
@@ -666,7 +679,7 @@ def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
                 return False
             create_response = bot.create_lock_commit(ref_head_sha, tree_sha, bot.clear_lock_metadata())
             if create_response.status_code != 201:
-                if create_response.status_code in {429} or create_response.status_code >= 500:
+                if retrying.is_retryable_status(create_response.status_code):
                     _log(
                         bot,
                         "warning",
@@ -675,7 +688,7 @@ def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
                         retry_attempt=attempt,
                         retry_limit=retry_limit,
                     )
-                    delay = retry_base + _jitter(bot, 0, retry_base)
+                    delay = _retry_delay(bot, retry_base, attempt)
                     _sleep(bot, delay)
                     continue
                 _log(
@@ -701,7 +714,7 @@ def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
                     lock_ref=bot.get_lock_ref_display(),
                 )
                 return True
-            if update_response.status_code in {409, 422, 429} or update_response.status_code >= 500:
+            if update_response.status_code in {409, 422} or retrying.is_retryable_status(update_response.status_code):
                 _log(
                     bot,
                     "warning",
@@ -710,7 +723,7 @@ def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
                     retry_attempt=attempt,
                     retry_limit=retry_limit,
                 )
-                delay = retry_base + _jitter(bot, 0, retry_base)
+                delay = _retry_delay(bot, retry_base, attempt)
                 _sleep(bot, delay)
                 continue
             if update_response.status_code in {401, 403, 404}:
