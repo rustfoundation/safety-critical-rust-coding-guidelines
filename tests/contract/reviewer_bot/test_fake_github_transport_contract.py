@@ -97,3 +97,53 @@ def test_route_github_api_add_pull_request_reviews_registers_page_route():
 
     assert result.ok is True
     assert result.payload == [{"id": 10}]
+
+
+def test_route_github_api_request_sequence_replays_retryable_failures_then_success():
+    routes = RouteGitHubApi().add_request_sequence(
+        "GET",
+        "issues/42",
+        [
+            github_result(429, {"message": "slow down"}),
+            github_result(502, {"message": "bad gateway"}),
+            github_result(200, {"ok": True}),
+        ],
+    )
+
+    first = routes.github_api_request("GET", "issues/42")
+    second = routes.github_api_request("GET", "issues/42")
+    third = routes.github_api_request("GET", "issues/42")
+    fourth = routes.github_api_request("GET", "issues/42")
+
+    assert first.failure_kind == "rate_limited"
+    assert second.failure_kind == "server_error"
+    assert third.ok is True
+    assert fourth.ok is True
+
+
+def test_route_github_api_request_sequence_can_raise_then_return_success():
+    routes = RouteGitHubApi().add_request_sequence(
+        "GET",
+        "issues/42",
+        [RuntimeError("timeout"), github_result(200, {"ok": True})],
+    )
+
+    with pytest.raises(RuntimeError, match="timeout"):
+        routes.github_api_request("GET", "issues/42")
+
+    result = routes.github_api_request("GET", "issues/42")
+
+    assert result.ok is True
+    assert result.payload == {"ok": True}
+
+
+def test_route_github_api_api_sequence_replays_values_and_keeps_last_value():
+    routes = RouteGitHubApi().add_api_sequence(
+        "GET",
+        "pulls/42",
+        [{"head": {"sha": "head-1"}}, {"head": {"sha": "head-2"}}],
+    )
+
+    assert routes.github_api("GET", "pulls/42") == {"head": {"sha": "head-1"}}
+    assert routes.github_api("GET", "pulls/42") == {"head": {"sha": "head-2"}}
+    assert routes.github_api("GET", "pulls/42") == {"head": {"sha": "head-2"}}

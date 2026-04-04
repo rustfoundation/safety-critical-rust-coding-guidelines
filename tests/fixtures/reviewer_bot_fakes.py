@@ -62,11 +62,31 @@ class GitHubCall:
 
 class RouteGitHubApi:
     def __init__(self):
-        self._request_routes: dict[tuple[str, str], GitHubApiResult] = {}
-        self._api_routes: dict[tuple[str, str], Any] = {}
+        self._request_routes: dict[tuple[str, str], list[GitHubApiResult | BaseException]] = {}
+        self._api_routes: dict[tuple[str, str], list[Any | BaseException]] = {}
         self._raise_system_exit_on_request = False
         self.request_calls: list[GitHubCall] = []
         self.api_calls: list[GitHubCall] = []
+
+    @staticmethod
+    def _normalize_route_sequence(value: Any) -> list[Any]:
+        if isinstance(value, list):
+            if not value:
+                raise ValueError("Route sequence cannot be empty")
+            return list(value)
+        return [value]
+
+    @staticmethod
+    def _consume_route(routes: dict[tuple[str, str], list[Any]], key: tuple[str, str], *, kind: str) -> Any:
+        route = routes.get(key)
+        if route is None:
+            raise AssertionError(f"Unexpected GitHub {kind} route: {key[0]} {key[1]}")
+        current = route[0]
+        if len(route) > 1:
+            del route[0]
+        if isinstance(current, BaseException):
+            raise current
+        return current
 
     def add_request(
         self,
@@ -75,11 +95,31 @@ class RouteGitHubApi:
         result: GitHubApiResult | None = None,
         **result_kwargs,
     ) -> "RouteGitHubApi":
-        self._request_routes[(method, endpoint)] = result or github_result(**result_kwargs)
+        return self.add_request_sequence(
+            method,
+            endpoint,
+            [result or github_result(**result_kwargs)],
+        )
+
+    def add_request_sequence(
+        self,
+        method: str,
+        endpoint: str,
+        results: list[GitHubApiResult | BaseException],
+    ) -> "RouteGitHubApi":
+        self._request_routes[(method, endpoint)] = self._normalize_route_sequence(results)
         return self
 
     def add_api(self, method: str, endpoint: str, payload: Any) -> "RouteGitHubApi":
-        self._api_routes[(method, endpoint)] = payload
+        return self.add_api_sequence(method, endpoint, [payload])
+
+    def add_api_sequence(
+        self,
+        method: str,
+        endpoint: str,
+        payloads: list[Any | BaseException],
+    ) -> "RouteGitHubApi":
+        self._api_routes[(method, endpoint)] = self._normalize_route_sequence(payloads)
         return self
 
     def add_pull_request_snapshot(self, issue_number: int, payload: Any) -> "RouteGitHubApi":
@@ -127,10 +167,7 @@ class RouteGitHubApi:
         )
         if self._raise_system_exit_on_request:
             raise SystemExit(1)
-        route = self._request_routes.get((method, endpoint))
-        if route is None:
-            raise AssertionError(f"Unexpected GitHub request route: {method} {endpoint}")
-        return route
+        return self._consume_route(self._request_routes, (method, endpoint), kind="request")
 
     def github_api(self, method: str, endpoint: str, data: dict | None = None):
         self.api_calls.append(
@@ -138,10 +175,11 @@ class RouteGitHubApi:
         )
         key = (method, endpoint)
         if key in self._api_routes:
-            return self._api_routes[key]
+            return self._consume_route(self._api_routes, key, kind="api")
         route = self._request_routes.get(key)
         if route is None:
             raise AssertionError(f"Unexpected GitHub API route: {method} {endpoint}")
+        route = self._consume_route(self._request_routes, key, kind="api")
         if not route.ok:
             return None
         if route.payload is None:
