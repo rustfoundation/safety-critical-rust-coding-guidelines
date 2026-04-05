@@ -335,7 +335,7 @@ def reconcile_active_review_entry(
         return f"ℹ️ #{issue_number} is not a pull request in this event context; `/rectify` only reconciles PR reviews.", True, False
     if str(state.get("freshness_runtime_epoch", "")).strip() != "freshness_v15" and bot.get_config_value("IS_PULL_REQUEST", "false").lower() == "true":
         return "ℹ️ PR review freshness rectify is epoch-gated and currently inactive.", True, False
-    head_repair_result = bot.adapters.review.maybe_record_head_observation_repair(issue_number, review_data)
+    head_repair_result = bot.adapters.review_state.maybe_record_head_observation_repair(issue_number, review_data)
     state_changed = head_repair_result.changed
     try:
         reviews = _read_reconcile_reviews(bot, issue_number)
@@ -968,7 +968,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
             else:
                 live_commit_id = parsed_payload.source_commit_id
             actor = context.actor_login
-            state_changed = bot.adapters.review.maybe_record_head_observation_repair(pr_number, review_data).changed
+            state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(pr_number, review_data).changed
             if isinstance(review_data.get("current_reviewer"), str) and review_data.get("current_reviewer", "").lower() == actor.lower() and isinstance(live_commit_id, str) and isinstance(live_submitted_at, str):
                 accept_channel_event(
                     review_data,
@@ -1000,7 +1000,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 timestamp=_now_iso(bot),
                 dismissal_only=True,
             )
-            state_changed = bot.adapters.review.maybe_record_head_observation_repair(pr_number, review_data).changed
+            state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(pr_number, review_data).changed
             if _record_review_rebuild(bot, state, pr_number, review_data):
                 state_changed = True
             _mark_reconciled_source_event(review_data, source_event_key)

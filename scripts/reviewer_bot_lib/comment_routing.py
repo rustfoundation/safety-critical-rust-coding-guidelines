@@ -89,7 +89,7 @@ def _comment_line_is_command(bot, line: str) -> bool:
 
 
 def classify_comment_payload(bot, body: str) -> dict:
-    normalized = _normalize_comment_body(bot.adapters.review.strip_code_blocks(body))
+    normalized = _normalize_comment_body(bot.adapters.commands.strip_code_blocks(body))
     if not normalized:
         return {
             "comment_class": "empty_or_whitespace",
@@ -102,7 +102,7 @@ def classify_comment_payload(bot, body: str) -> dict:
     lines = [line for line in normalized.splitlines() if line.strip()]
     command_lines = [line for line in lines if _comment_line_is_command(bot, line)]
     non_command_lines = [line for line in lines if not _comment_line_is_command(bot, line)]
-    parsed = bot.adapters.review.parse_command(normalized)
+    parsed = bot.adapters.commands.parse_command(normalized)
     command = None
     args: list[str] = []
     if parsed:

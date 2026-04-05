@@ -265,7 +265,7 @@ def _derive_review_state(
     issue_snapshot: dict[str, Any],
 ) -> ReviewStateDerivation:
     preview_review_data = copy.deepcopy(review_data_snapshot)
-    derived = bot.adapters.review.compute_reviewer_response_state(
+    derived = bot.adapters.review_state.compute_reviewer_response_state(
         issue_number,
         preview_review_data,
         issue_snapshot=copy.deepcopy(issue_snapshot),

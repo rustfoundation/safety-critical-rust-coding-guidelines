@@ -35,7 +35,7 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             _log(bot, "warning", f"Skipping overdue evaluation for #{issue_number}; issue/PR snapshot unavailable", issue_number=issue_number)
             continue
         if isinstance(issue_snapshot.get("pull_request"), dict):
-            response_state = bot.adapters.review.compute_reviewer_response_state(
+            response_state = bot.adapters.review_state.compute_reviewer_response_state(
                 issue_number,
                 review_data,
                 issue_snapshot=issue_snapshot,
