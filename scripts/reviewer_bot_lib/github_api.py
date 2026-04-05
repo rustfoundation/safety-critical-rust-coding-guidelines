@@ -528,7 +528,7 @@ def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, 
 
 
 def assign_reviewer(bot: GitHubTransportContext, issue_number: int, username: str) -> bool:
-    return bot.request_reviewer_assignment(issue_number, username).success
+    return request_reviewer_assignment(bot, issue_number, username).success
 
 
 def get_assignment_failure_comment(bot: GitHubTransportContext, reviewer: str, attempt) -> str | None:
@@ -603,8 +603,8 @@ def remove_pr_reviewer(bot: GitHubTransportContext, issue_number: int, username:
 def unassign_reviewer(bot: GitHubTransportContext, issue_number: int, username: str) -> bool:
     is_pr = _is_pull_request(bot)
     if is_pr:
-        bot.remove_pr_reviewer(issue_number, username)
-    return bot.remove_assignee(issue_number, username)
+        remove_pr_reviewer(bot, issue_number, username)
+    return remove_assignee(bot, issue_number, username)
 
 
 def get_user_permission_status(

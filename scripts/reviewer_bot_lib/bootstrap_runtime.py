@@ -54,6 +54,63 @@ class _BootstrapGitHubServices:
     def github_api(self, *args, **kwargs):
         return github_api.github_api(self._runtime_getter(), *args, **kwargs)
 
+    def get_github_token(self):
+        return github_api.get_github_token(self._runtime_getter())
+
+    def get_github_graphql_token(self, *, prefer_board_token=False):
+        return github_api.get_github_graphql_token(self._runtime_getter(), prefer_board_token=prefer_board_token)
+
+    def github_graphql(self, query, variables=None, *, token=None):
+        return github_api.github_graphql(self._runtime_getter(), query, variables, token=token)
+
+    def post_comment(self, issue_number, body):
+        return github_api.post_comment(self._runtime_getter(), issue_number, body)
+
+    def get_repo_labels(self):
+        return github_api.get_repo_labels(self._runtime_getter())
+
+    def add_label(self, issue_number, label):
+        return github_api.add_label(self._runtime_getter(), issue_number, label)
+
+    def remove_label(self, issue_number, label):
+        return github_api.remove_label(self._runtime_getter(), issue_number, label)
+
+    def ensure_label_exists(self, label, *, color=None, description=None):
+        return github_api.ensure_label_exists(self._runtime_getter(), label, color=color, description=description)
+
+    def get_issue_assignees(self, issue_number):
+        return github_api.get_issue_assignees(self._runtime_getter(), issue_number)
+
+    def request_reviewer_assignment(self, issue_number, username):
+        return github_api.request_reviewer_assignment(self._runtime_getter(), issue_number, username)
+
+    def get_assignment_failure_comment(self, reviewer, attempt):
+        return github_api.get_assignment_failure_comment(self._runtime_getter(), reviewer, attempt)
+
+    def add_reaction(self, comment_id, reaction):
+        return github_api.add_reaction(self._runtime_getter(), comment_id, reaction)
+
+    def remove_assignee(self, issue_number, username):
+        return github_api.remove_assignee(self._runtime_getter(), issue_number, username)
+
+    def remove_pr_reviewer(self, issue_number, username):
+        return github_api.remove_pr_reviewer(self._runtime_getter(), issue_number, username)
+
+    def unassign_reviewer(self, issue_number, username):
+        return github_api.unassign_reviewer(self._runtime_getter(), issue_number, username)
+
+    def get_user_permission_status(self, username, required_permission="triage"):
+        return github_api.get_user_permission_status(self._runtime_getter(), username, required_permission)
+
+    def check_user_permission(self, username, required_permission="triage"):
+        return github_api.check_user_permission(self._runtime_getter(), username, required_permission)
+
+    def get_issue_or_pr_snapshot(self, issue_number):
+        return github_api.github_api(self._runtime_getter(), "GET", f"issues/{issue_number}")
+
+    def get_pull_request_reviews(self, issue_number):
+        return reviews.get_pull_request_reviews(self._runtime_getter(), issue_number)
+
 
 class _BootstrapLockServices:
     def __init__(self, runtime_getter):
