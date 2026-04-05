@@ -2,7 +2,6 @@
 
 import json
 import random
-import time
 from urllib.parse import quote
 
 import requests
@@ -30,18 +29,14 @@ def _log(bot: GitHubApiContext, level: str, message: str, **fields) -> None:
 
 
 def _sleep(bot: GitHubApiContext, seconds: float) -> None:
-    sleeper = getattr(bot, "sleeper", None)
-    if sleeper is not None and hasattr(sleeper, "sleep"):
-        sleeper.sleep(seconds)
-        return
-    time.sleep(seconds)
+    bot.sleeper.sleep(seconds)
 
 
 def _retry_delay(bot: GitHubApiContext, base_seconds: float, retry_attempt: int) -> float:
     return retrying.bounded_exponential_delay(
         base_seconds,
         retry_attempt,
-        jitter=getattr(bot, "jitter", None) or _RandomJitter(),
+        jitter=bot.jitter,
     )
 
 
@@ -480,8 +475,8 @@ def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, 
         payload = {"assignees": [username]}
         assignment_target = "issue assignee"
 
-    lock_api_retry_limit = getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
-    lock_retry_base_seconds = getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+    lock_api_retry_limit = bot.lock_api_retry_limit()
+    lock_retry_base_seconds = bot.lock_retry_base_seconds()
 
     for attempt in range(1, lock_api_retry_limit + 1):
         response = bot.github_api_request("POST", endpoint, payload, suppress_error_log=True)
@@ -619,12 +614,6 @@ def get_user_permission_status(
             retry_policy=RETRY_POLICY_IDEMPOTENT_READ,
         )
     except SystemExit:
-        fallback = getattr(bot, "check_user_permission", None)
-        if callable(fallback) and getattr(fallback, "__name__", "") != "check_user_permission":
-            result = fallback(username, required_permission)
-            if result is None:
-                return "unavailable"
-            return "granted" if result else "denied"
         return "unavailable"
     if not response.ok:
         return "unavailable"

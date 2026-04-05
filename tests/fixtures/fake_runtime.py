@@ -36,6 +36,10 @@ from scripts.reviewer_bot_lib.config import (
     GitHubApiResult,
 )
 from scripts.reviewer_bot_lib.context import LeaseContext
+from tests.fixtures.fake_clock import FakeClock
+from tests.fixtures.fake_jitter import DeterministicJitter
+from tests.fixtures.fake_sleeper import RecordingSleeper
+from tests.fixtures.fake_uuid import FixedUuidSource
 from tests.fixtures.focused_fake_services import (
     ArtifactDownloadTransportStub,
     ConfigBag,
@@ -55,7 +59,7 @@ from tests.fixtures.recording_logger import RecordingLogger
 
 
 class FakeRuntimeInfraServices:
-    def __init__(self, *, config, outputs, deferred_payloads, logger, rest_transport, graphql_transport, artifact_download_transport, touch_tracker):
+    def __init__(self, *, config, outputs, deferred_payloads, logger, rest_transport, graphql_transport, artifact_download_transport, clock, sleeper, jitter, uuid_source, touch_tracker):
         self.config = config
         self.outputs = outputs
         self.deferred_payloads = deferred_payloads
@@ -63,6 +67,10 @@ class FakeRuntimeInfraServices:
         self.rest_transport = rest_transport
         self.graphql_transport = graphql_transport
         self.artifact_download_transport = artifact_download_transport
+        self.clock = clock
+        self.sleeper = sleeper
+        self.jitter = jitter
+        self.uuid_source = uuid_source
         self.touch_tracker = touch_tracker
 
 
@@ -394,6 +402,10 @@ class FakeReviewerBotRuntime:
         self.sys = sys
         self.random = random
         self.time = time
+        self.clock = FakeClock(datetime(2026, 1, 1, tzinfo=timezone.utc))
+        self.sleeper = RecordingSleeper()
+        self.jitter = DeterministicJitter(0.0)
+        self.uuid_source = FixedUuidSource("fake-runtime-uuid")
         self.logger = RecordingLogger()
         self.ACTIVE_LEASE_CONTEXT = LeaseContext(
             lock_token="test-lock-token",
@@ -431,6 +443,10 @@ class FakeReviewerBotRuntime:
             rest_transport=self.rest_transport,
             graphql_transport=self.graphql_transport,
             artifact_download_transport=self.artifact_download_transport,
+            clock=self.clock,
+            sleeper=self.sleeper,
+            jitter=self.jitter,
+            uuid_source=self.uuid_source,
             touch_tracker=self.touch_tracker,
         )
         self.domain = FakeRuntimeDomainServices(

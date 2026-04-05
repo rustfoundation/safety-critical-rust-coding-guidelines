@@ -269,12 +269,16 @@ class GitHubApiContext(Protocol):
     AssignmentAttempt: type[AssignmentAttempt]
     GitHubApiResult: type[GitHubApiResult]
     logger: Logger
+    sleeper: Sleeper
+    jitter: JitterSource
     rest_transport: RestTransport
     graphql_transport: GraphQLTransport
 
     def get_config_value(self, name: str, default: str = "") -> str: ...
     def get_github_token(self) -> str: ...
     def get_github_graphql_token(self, *, prefer_board_token: bool = False) -> str: ...
+    def lock_api_retry_limit(self) -> int: ...
+    def lock_retry_base_seconds(self) -> float: ...
 
 
 @runtime_checkable
@@ -430,7 +434,6 @@ class LeaseLockContext(LeaseLockRuntimeContext, Protocol):
 
 @runtime_checkable
 class SweeperContext(Protocol):
-    LOCK_RETRY_BASE_SECONDS: float
     STATUS_PROJECTION_EPOCH: str
     TRANSITION_PERIOD_DAYS: int
     DEFERRED_DISCOVERY_OVERLAP_SECONDS: int
@@ -438,6 +441,7 @@ class SweeperContext(Protocol):
     REVIEW_FRESHNESS_RUNBOOK_PATH: str
     GitHubApiResult: type[GitHubApiResult]
     artifact_download_transport: ArtifactDownloadTransport
+    sleeper: Sleeper
     jitter: JitterSource
     logger: Logger
 
@@ -467,6 +471,8 @@ class SweeperContext(Protocol):
         pull_request: dict | None = None,
         reviews: list[dict] | None = None,
     ) -> dict[str, object]: ...
+    def lock_api_retry_limit(self) -> int: ...
+    def lock_retry_base_seconds(self) -> float: ...
 
 
 @runtime_checkable

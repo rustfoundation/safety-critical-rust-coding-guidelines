@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import json
-import time
 import zipfile
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -71,24 +70,12 @@ def _read_api_payload(bot: SweeperContext, endpoint: str) -> tuple[Any | None, s
 
 
 def _download_retry_delay(bot: SweeperContext, retry_attempt: int) -> float:
-    base = float(getattr(bot, "LOCK_RETRY_BASE_SECONDS", 2.0))
-
-    class _BotJitter:
-        def uniform(self, lower: float, upper: float) -> float:
-            jitter = getattr(bot, "jitter", None)
-            if jitter is not None and hasattr(jitter, "uniform"):
-                return jitter.uniform(lower, upper)
-            return __import__("random").uniform(lower, upper)
-
-    return retrying.bounded_exponential_delay(base, retry_attempt, jitter=_BotJitter())
+    base = float(bot.lock_retry_base_seconds())
+    return retrying.bounded_exponential_delay(base, retry_attempt, jitter=bot.jitter)
 
 
 def _sleep(bot: SweeperContext, seconds: float) -> None:
-    sleeper = getattr(bot, "sleeper", None)
-    if sleeper is not None and hasattr(sleeper, "sleep"):
-        sleeper.sleep(seconds)
-        return
-    time.sleep(seconds)
+    bot.sleeper.sleep(seconds)
 
 
 def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
@@ -315,7 +302,7 @@ def _download_artifact_payload(bot: SweeperContext, artifact: dict, expected_pay
     download_url = artifact.get("archive_download_url")
     if not isinstance(download_url, str) or not download_url:
         return "missing_download_url", None
-    max_attempts = int(getattr(bot, "LOCK_API_RETRY_LIMIT", 5)) + 1
+    max_attempts = int(bot.lock_api_retry_limit()) + 1
     response = None
     for attempt in range(1, max_attempts + 1):
         try:
