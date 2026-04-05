@@ -431,6 +431,7 @@ class ReviewerBotRuntime:
     def get_pull_request_reviews(self, issue_number: int):
         return self.adapters.github.get_pull_request_reviews(issue_number)
 
+    # Adapter-only mutable review-state compatibility surface.
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
         return self.adapters.review.maybe_record_head_observation_repair(issue_number, review_data)
 
