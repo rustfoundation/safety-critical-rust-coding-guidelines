@@ -12,6 +12,37 @@ from .comment_application import (
 )
 from .comment_routing import classify_comment_payload, classify_issue_comment_actor
 from .context import CommentEventRequest
+from .reconcile_payloads import (
+    DeferredCommentPayload,
+    DeferredCommentReplayContext,
+    DeferredReviewPayload,
+    ObserverNoopPayload,
+    build_deferred_comment_replay_context,
+    build_deferred_review_replay_context,
+    parse_deferred_context_payload,
+)
+from .reconcile_payloads import (
+    expected_observer_identity as _expected_observer_identity,
+)
+from .reconcile_reads import (
+    LiveCommentReplayContext,
+    ReconcileReadError,
+)
+from .reconcile_reads import (
+    read_live_comment_replay_context as _read_live_comment_replay_context,
+)
+from .reconcile_reads import (
+    read_live_pr_replay_context as _read_live_pr_replay_context,
+)
+from .reconcile_reads import (
+    read_optional_reconcile_object as _read_optional_reconcile_object,
+)
+from .reconcile_reads import (
+    read_reconcile_object as _read_reconcile_object,
+)
+from .reconcile_reads import (
+    read_reconcile_reviews as _read_reconcile_reviews,
+)
 from .review_state import (
     accept_channel_event,
     ensure_review_entry,
@@ -32,211 +63,11 @@ def _now_iso(bot) -> str:
     return bot.clock.now().isoformat()
 
 
-class ReconcileReadError(RuntimeError):
-    def __init__(self, message: str, *, failure_kind: str | None = None):
-        super().__init__(message)
-        self.failure_kind = failure_kind
-
-
 @dataclass(frozen=True)
 class LiveCommentReplayValidationResult:
     live_classified: dict | None
     changed: bool
     failed_closed: bool
-
-
-@dataclass(frozen=True)
-class DeferredArtifactIdentity:
-    schema_version: int
-    source_workflow_name: str
-    source_workflow_file: str
-    source_run_id: int
-    source_run_attempt: int
-    source_event_name: str
-    source_event_action: str
-    source_event_key: str
-
-
-@dataclass(frozen=True)
-class LivePrReplayContext:
-    issue_author: str
-    issue_labels: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class LiveCommentReplayContext:
-    comment_author: str
-    comment_user_type: str
-    comment_author_association: str
-    comment_sender_type: str
-    comment_installation_id: str
-    comment_performed_via_github_app: bool
-
-
-@dataclass(frozen=True)
-class DeferredReviewPayload:
-    identity: DeferredArtifactIdentity
-    pr_number: int
-    review_id: int
-    source_submitted_at: str | None
-    source_review_state: str | None
-    source_commit_id: str | None
-    actor_login: str | None
-    raw_payload: dict
-
-
-@dataclass(frozen=True)
-class DeferredCommentPayload:
-    identity: DeferredArtifactIdentity
-    pr_number: int
-    comment_id: int
-    comment_class: str
-    has_non_command_text: bool
-    source_body_digest: str
-    source_created_at: str
-    actor_login: str | None
-    raw_payload: dict
-
-
-@dataclass(frozen=True)
-class ObserverNoopPayload:
-    identity: DeferredArtifactIdentity
-    pr_number: int
-    reason: str
-    raw_payload: dict
-
-
-@dataclass(frozen=True)
-class DeferredCommentReplayContext:
-    payload: DeferredCommentPayload
-    expected_event_name: str
-    live_comment_endpoint: str
-
-    @property
-    def source_event_key(self) -> str:
-        return self.payload.identity.source_event_key
-
-    @property
-    def comment_id(self) -> int:
-        return self.payload.comment_id
-
-    @property
-    def pr_number(self) -> int:
-        return self.payload.pr_number
-
-    @property
-    def actor_login(self) -> str:
-        return self.payload.actor_login or ""
-
-    @property
-    def source_created_at(self) -> str:
-        return self.payload.source_created_at
-
-    @property
-    def source_freshness_eligible(self) -> bool:
-        return self.payload.comment_class in {"plain_text", "command_plus_text"} and self.payload.has_non_command_text
-
-
-@dataclass(frozen=True)
-class DeferredReviewReplayContext:
-    payload: DeferredReviewPayload
-
-    @property
-    def source_event_key(self) -> str:
-        return self.payload.identity.source_event_key
-
-    @property
-    def review_id(self) -> int:
-        return self.payload.review_id
-
-    @property
-    def pr_number(self) -> int:
-        return self.payload.pr_number
-
-    @property
-    def actor_login(self) -> str:
-        return self.payload.actor_login or ""
-
-
-def _build_deferred_identity(payload: dict) -> DeferredArtifactIdentity:
-    return DeferredArtifactIdentity(
-        schema_version=int(payload["schema_version"]),
-        source_workflow_name=str(payload["source_workflow_name"]),
-        source_workflow_file=str(payload["source_workflow_file"]),
-        source_run_id=int(payload["source_run_id"]),
-        source_run_attempt=int(payload["source_run_attempt"]),
-        source_event_name=str(payload["source_event_name"]),
-        source_event_action=str(payload["source_event_action"]),
-        source_event_key=str(payload["source_event_key"]),
-    )
-
-
-def build_deferred_comment_replay_context(
-    payload: DeferredCommentPayload,
-    *,
-    expected_event_name: str,
-    live_comment_endpoint: str,
-) -> DeferredCommentReplayContext:
-    if payload.identity.source_event_key != f"{expected_event_name}:{payload.comment_id}":
-        raise RuntimeError("Deferred comment artifact source_event_key mismatch")
-    return DeferredCommentReplayContext(
-        payload=payload,
-        expected_event_name=expected_event_name,
-        live_comment_endpoint=live_comment_endpoint,
-    )
-
-
-def build_deferred_review_replay_context(
-    payload: DeferredReviewPayload,
-    *,
-    expected_event_action: str,
-) -> DeferredReviewReplayContext:
-    expected_prefix = (
-        "pull_request_review:"
-        if expected_event_action == "submitted"
-        else "pull_request_review_dismissed:"
-    )
-    if payload.identity.source_event_action != expected_event_action:
-        raise RuntimeError("Deferred review artifact action mismatch")
-    if payload.identity.source_event_key != f"{expected_prefix}{payload.review_id}":
-        raise RuntimeError(f"Deferred review-{expected_event_action} artifact source_event_key mismatch")
-    return DeferredReviewReplayContext(payload=payload)
-
-
-def _read_reconcile_object(bot, endpoint: str, *, label: str) -> dict:
-    try:
-        response = bot.github_api_request("GET", endpoint, retry_policy="idempotent_read")
-    except SystemExit:
-        payload = bot.github_api("GET", endpoint)
-        if not isinstance(payload, dict):
-            raise ReconcileReadError(f"{label} unavailable", failure_kind="unavailable")
-        return payload
-    if not response.ok:
-        failure_kind = response.failure_kind
-        if failure_kind == "not_found":
-            raise ReconcileReadError(f"{label} not found", failure_kind=failure_kind)
-        raise ReconcileReadError(f"{label} unavailable", failure_kind=failure_kind)
-    if not isinstance(response.payload, dict):
-        raise ReconcileReadError(f"{label} payload invalid", failure_kind="invalid_payload")
-    return response.payload
-
-
-def _read_optional_reconcile_object(bot, endpoint: str, *, label: str) -> dict | None:
-    try:
-        return _read_reconcile_object(bot, endpoint, label=label)
-    except ReconcileReadError as exc:
-        if exc.failure_kind == "not_found":
-            return None
-        raise
-
-
-def _read_reconcile_reviews(bot, issue_number: int) -> list[dict]:
-    reviews = bot.github.get_pull_request_reviews(issue_number)
-    if reviews is None:
-        raise ReconcileReadError(f"live reviews for PR #{issue_number} unavailable", failure_kind="unavailable")
-    if not isinstance(reviews, list):
-        raise ReconcileReadError(f"live reviews for PR #{issue_number} payload invalid", failure_kind="invalid_payload")
-    return reviews
 
 
 def _ensure_source_event_key(review_data: dict, source_event_key: str, payload: dict | None = None) -> None:
@@ -491,168 +322,6 @@ def _load_deferred_context(bot) -> dict:
     return bot.load_deferred_payload()
 
 
-def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | DeferredCommentPayload | ObserverNoopPayload:
-    if not isinstance(payload, dict):
-        raise RuntimeError("Deferred context payload must be a JSON object")
-
-    if payload.get("kind") == "observer_noop":
-        _validate_observer_noop_payload(payload)
-        return ObserverNoopPayload(
-            identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
-            reason=str(payload["reason"]),
-            raw_payload=payload,
-        )
-
-    event_name = payload.get("source_event_name")
-    event_action = payload.get("source_event_action")
-    if event_name == "issue_comment" and event_action == "created":
-        _validate_deferred_comment_artifact(payload)
-        return DeferredCommentPayload(
-            identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
-            comment_id=int(payload["comment_id"]),
-            comment_class=str(payload["comment_class"]),
-            has_non_command_text=bool(payload["has_non_command_text"]),
-            source_body_digest=str(payload["source_body_digest"]),
-            source_created_at=str(payload["source_created_at"]),
-            actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
-            raw_payload=payload,
-        )
-    if event_name == "pull_request_review_comment" and event_action == "created":
-        _validate_deferred_review_comment_artifact(payload)
-        return DeferredCommentPayload(
-            identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
-            comment_id=int(payload["comment_id"]),
-            comment_class=str(payload["comment_class"]),
-            has_non_command_text=bool(payload["has_non_command_text"]),
-            source_body_digest=str(payload["source_body_digest"]),
-            source_created_at=str(payload["source_created_at"]),
-            actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
-            raw_payload=payload,
-        )
-    if event_name == "pull_request_review" and event_action in {"submitted", "dismissed"}:
-        _validate_deferred_review_artifact(payload)
-        return DeferredReviewPayload(
-            identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
-            review_id=int(payload["review_id"]),
-            source_submitted_at=(
-                str(payload["source_submitted_at"]) if payload.get("source_submitted_at") is not None else None
-            ),
-            source_review_state=(
-                str(payload["source_review_state"]) if payload.get("source_review_state") is not None else None
-            ),
-            source_commit_id=(
-                str(payload["source_commit_id"]) if payload.get("source_commit_id") is not None else None
-            ),
-            actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
-            raw_payload=payload,
-        )
-    raise RuntimeError("Unsupported deferred workflow_run payload")
-
-
-def _read_live_pr_replay_context(bot, pr_number: int) -> LivePrReplayContext:
-    pull_request = _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number} for reconcile context")
-    author = pull_request.get("user")
-    if not isinstance(author, dict):
-        raise RuntimeError(f"Live PR #{pr_number} is missing author metadata")
-    author_login = author.get("login")
-    if not isinstance(author_login, str) or not author_login.strip():
-        raise RuntimeError(f"Live PR #{pr_number} is missing a valid author login")
-    labels = pull_request.get("labels")
-    if labels is None:
-        labels = []
-    if not isinstance(labels, list):
-        raise RuntimeError(f"Live PR #{pr_number} labels are malformed")
-    label_names: list[str] = []
-    for label in labels:
-        if not isinstance(label, dict):
-            raise RuntimeError(f"Live PR #{pr_number} contains malformed label metadata")
-        name = label.get("name")
-        if not isinstance(name, str):
-            raise RuntimeError(f"Live PR #{pr_number} contains a label without a valid name")
-        label_names.append(name)
-    return LivePrReplayContext(issue_author=author_login, issue_labels=tuple(label_names))
-
-
-def _read_live_comment_replay_context(live_comment: dict, payload: dict) -> LiveCommentReplayContext:
-    user = live_comment.get("user")
-    if not isinstance(user, dict):
-        raise RuntimeError("Live deferred comment user metadata is unavailable")
-    comment_author = user.get("login") or payload.get("actor_login") or ""
-    if not isinstance(comment_author, str) or not comment_author.strip():
-        raise RuntimeError("Live deferred comment author login is unavailable")
-    comment_user_type = user.get("type")
-    if not isinstance(comment_user_type, str) or not comment_user_type.strip():
-        raise RuntimeError("Live deferred comment user type is unavailable")
-    author_association = live_comment.get("author_association")
-    if not isinstance(author_association, str) or not author_association.strip():
-        raise RuntimeError("Live deferred comment author association is unavailable")
-    return LiveCommentReplayContext(
-        comment_author=comment_author,
-        comment_user_type=comment_user_type,
-        comment_author_association=author_association,
-        comment_sender_type=comment_user_type,
-        comment_installation_id="",
-        comment_performed_via_github_app=bool(live_comment.get("performed_via_github_app")),
-    )
-
-
-def _validate_observer_noop_payload(payload: dict) -> None:
-    required = {
-        "schema_version",
-        "kind",
-        "reason",
-        "source_workflow_name",
-        "source_workflow_file",
-        "source_run_id",
-        "source_run_attempt",
-        "source_event_name",
-        "source_event_action",
-        "source_event_key",
-        "pr_number",
-    }
-    missing = sorted(required - set(payload))
-    if missing:
-        raise RuntimeError("Observer no-op payload missing required fields: " + ", ".join(missing))
-    if payload.get("schema_version") != 1:
-        raise RuntimeError("Observer no-op payload schema_version is not accepted")
-    if payload.get("kind") != "observer_noop":
-        raise RuntimeError("Observer no-op payload kind mismatch")
-    if not isinstance(payload.get("reason"), str) or not payload.get("reason"):
-        raise RuntimeError("Observer no-op payload reason must be a non-empty string")
-    if not isinstance(payload.get("pr_number"), int):
-        raise RuntimeError("Observer no-op payload pr_number must be an integer")
-
-
-def _expected_observer_identity(payload: dict) -> tuple[str, str]:
-    event_name = payload.get("source_event_name")
-    event_action = payload.get("source_event_action")
-    if event_name == "issue_comment" and event_action == "created":
-        return (
-            "Reviewer Bot PR Comment Observer",
-            ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        )
-    if event_name == "pull_request_review" and event_action == "submitted":
-        return (
-            "Reviewer Bot PR Review Submitted Observer",
-            ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
-        )
-    if event_name == "pull_request_review" and event_action == "dismissed":
-        return (
-            "Reviewer Bot PR Review Dismissed Observer",
-            ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
-        )
-    if event_name == "pull_request_review_comment" and event_action == "created":
-        return (
-            "Reviewer Bot PR Review Comment Observer",
-            ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
-        )
-    raise RuntimeError("Unsupported deferred workflow identity")
-
-
 def _validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
     expected_name, expected_file = _expected_observer_identity(payload)
     if payload.get("source_workflow_name") != expected_name:
@@ -670,36 +339,6 @@ def _validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
         raise RuntimeError("Deferred artifact run_attempt mismatch")
     if bot.get_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION").strip() != "success":
         raise RuntimeError("Triggering observer workflow did not conclude successfully")
-
-
-def _artifact_expected_name(payload: dict) -> str:
-    event_name = payload.get("source_event_name")
-    event_action = payload.get("source_event_action")
-    run_id = payload.get("source_run_id")
-    run_attempt = payload.get("source_run_attempt")
-    if event_name == "issue_comment" and event_action == "created":
-        return f"reviewer-bot-comment-context-{run_id}-attempt-{run_attempt}"
-    if event_name == "pull_request_review" and event_action == "submitted":
-        return f"reviewer-bot-review-submitted-context-{run_id}-attempt-{run_attempt}"
-    if event_name == "pull_request_review" and event_action == "dismissed":
-        return f"reviewer-bot-review-dismissed-context-{run_id}-attempt-{run_attempt}"
-    if event_name == "pull_request_review_comment" and event_action == "created":
-        return f"reviewer-bot-review-comment-context-{run_id}-attempt-{run_attempt}"
-    raise RuntimeError("Unsupported deferred artifact naming")
-
-
-def _artifact_expected_payload_name(payload: dict) -> str:
-    event_name = payload.get("source_event_name")
-    event_action = payload.get("source_event_action")
-    if event_name == "issue_comment" and event_action == "created":
-        return "deferred-comment.json"
-    if event_name == "pull_request_review" and event_action == "submitted":
-        return "deferred-review-submitted.json"
-    if event_name == "pull_request_review" and event_action == "dismissed":
-        return "deferred-review-dismissed.json"
-    if event_name == "pull_request_review_comment" and event_action == "created":
-        return "deferred-review-comment.json"
-    raise RuntimeError("Unsupported deferred payload path")
 
 
 def _reconcile_deferred_comment(
