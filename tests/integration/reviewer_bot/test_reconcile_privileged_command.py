@@ -4,7 +4,7 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-from scripts.reviewer_bot_lib import maintenance, review_state
+from scripts.reviewer_bot_lib import automation, maintenance, review_state
 from scripts.reviewer_bot_lib.config import FLS_AUDIT_LABEL
 from tests.fixtures.commands_harness import CommandHarness
 from tests.fixtures.reviewer_bot import make_state
@@ -25,7 +25,7 @@ def test_execute_pending_privileged_command_revalidates_live_state(monkeypatch):
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
     harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
-    harness.runtime.handle_accept_no_fls_changes_command = lambda issue_number, actor, request=None: ("ok", True)
+    monkeypatch.setattr(automation, "handle_accept_no_fls_changes_command", lambda bot, issue_number, actor, request=None: ("ok", True))
 
     assert maintenance.handle_manual_dispatch(harness.runtime, state) is True
     assert review["pending_privileged_commands"]["issue_comment:100"]["status"] == "executed"
@@ -55,7 +55,7 @@ def test_execute_pending_privileged_command_passes_revalidated_typed_request(mon
         observed["request"] = request
         return ("ok", True)
 
-    harness.runtime.handle_accept_no_fls_changes_command = fake_handle
+    monkeypatch.setattr(automation, "handle_accept_no_fls_changes_command", lambda bot, issue_number, actor, request=None: fake_handle(issue_number, actor, request))
 
     assert maintenance.handle_manual_dispatch(harness.runtime, state) is True
     request = observed["request"]
@@ -87,7 +87,7 @@ def test_execute_pending_privileged_command_does_not_leak_issue_labels_env(monke
     monkeypatch.delenv("ISSUE_LABELS", raising=False)
     harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
-    harness.runtime.handle_accept_no_fls_changes_command = lambda issue_number, actor, request=None: ("ok", True)
+    monkeypatch.setattr(automation, "handle_accept_no_fls_changes_command", lambda bot, issue_number, actor, request=None: ("ok", True))
 
     assert maintenance.handle_manual_dispatch(harness.runtime, state) is True
     assert "ISSUE_LABELS" not in os.environ
@@ -108,7 +108,11 @@ def test_execute_pending_privileged_command_fails_closed_without_live_fls_audit_
     harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": "status: awaiting reviewer response"}]}
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
     called = {"handle": 0}
-    harness.runtime.handle_accept_no_fls_changes_command = lambda issue_number, actor, request=None: called.__setitem__("handle", called["handle"] + 1) or ("ok", True)
+    monkeypatch.setattr(
+        automation,
+        "handle_accept_no_fls_changes_command",
+        lambda bot, issue_number, actor, request=None: called.__setitem__("handle", called["handle"] + 1) or ("ok", True),
+    )
 
     assert maintenance.handle_manual_dispatch(harness.runtime, state) is True
     assert called["handle"] == 0

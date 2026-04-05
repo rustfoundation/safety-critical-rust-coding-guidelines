@@ -22,7 +22,7 @@ def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypa
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
     effects = harness.capture_comment_side_effects()
-    harness.runtime.parse_issue_labels = lambda: [FLS_AUDIT_LABEL]
+    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
 
     assert comment_routing.handle_comment_event(harness.runtime, state, request) is True
@@ -65,7 +65,7 @@ def test_closed_non_pr_command_comment_does_not_create_pending_privileged_comman
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
     effects = harness.capture_comment_side_effects()
-    harness.runtime.parse_issue_labels = lambda: [FLS_AUDIT_LABEL]
+    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
     harness.runtime.check_user_permission = lambda username, required_permission="triage": True
 
     assert comment_routing.handle_comment_event(harness.runtime, state, request) is False
