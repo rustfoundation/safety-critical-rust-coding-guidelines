@@ -1,9 +1,19 @@
 """Automation-heavy reviewer-bot helpers."""
 
-import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .context import PrivilegedCommandRequest
+from .event_inputs import (
+    build_privileged_command_request as decode_privileged_command_request,
+)
+from .event_inputs import (
+    get_target_repo_root as decode_target_repo_root,
+)
+from .event_inputs import (
+    parse_issue_labels as decode_issue_labels,
+)
 
 
 def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
@@ -32,11 +42,24 @@ def list_changed_files(repo_root: Path) -> list[str]:
     return sorted(set(files))
 
 
-def get_target_repo_root() -> Path:
-    configured = os.environ.get("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
-    if configured:
-        return Path(configured)
+def get_target_repo_root(bot) -> Path:
+    configured = decode_target_repo_root(bot)
+    if configured is not None:
+        return configured
     return Path(__file__).resolve().parents[2]
+
+
+def build_privileged_command_request(bot, *, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
+    return decode_privileged_command_request(
+        bot,
+        issue_number=issue_number,
+        actor=actor,
+        command_name=command_name,
+    )
+
+
+def bot_parse_issue_labels(bot) -> list[str]:
+    return decode_issue_labels(bot)
 
 
 def get_default_branch(bot) -> str:
@@ -46,23 +69,41 @@ def get_default_branch(bot) -> str:
     return "main"
 
 
-def find_open_pr_for_branch(bot, branch: str) -> dict | None:
-    owner = os.environ.get("REPO_OWNER", "").strip()
+def find_open_pr_for_branch_status(bot, branch: str) -> tuple[str, dict | None]:
+    owner = bot.get_config_value("REPO_OWNER", "").strip()
     branch = branch.strip()
     if not owner or not branch:
-        return None
-    response = bot.github_api("GET", f"pulls?state=open&head={owner}:{branch}")
-    if isinstance(response, list) and response:
-        first = response[0]
+        return "not_found", None
+    response = bot.github_api_request(
+        "GET",
+        f"pulls?state=open&head={owner}:{branch}",
+        retry_policy="idempotent_read",
+    )
+    if not response.ok:
+        return "unavailable", None
+    payload = response.payload
+    if not isinstance(payload, list):
+        return "unavailable", None
+    if payload:
+        first = payload[0]
         if isinstance(first, dict):
-            return first
-    return None
+            return "found", first
+    return "not_found", None
+
+
+def find_open_pr_for_branch(bot, branch: str) -> dict | None:
+    status, pr = find_open_pr_for_branch_status(bot, branch)
+    if status != "found":
+        return None
+    return pr
 
 
 def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict | None:
-    existing = bot.find_open_pr_for_branch(branch)
-    if existing:
+    lookup_status, existing = find_open_pr_for_branch_status(bot, branch)
+    if lookup_status == "found":
         return existing
+    if lookup_status == "unavailable":
+        raise RuntimeError(f"Unable to determine whether branch '{branch}' already has an open PR")
     title = "chore: update spec.lock (no guideline impact)"
     body = (
         "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n"
@@ -78,20 +119,34 @@ def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict 
     return None
 
 
-def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author: str) -> tuple[str, bool]:
-    if os.environ.get("IS_PULL_REQUEST", "false").lower() == "true":
+def handle_accept_no_fls_changes_command(
+    bot,
+    issue_number: int,
+    comment_author: str,
+    request: PrivilegedCommandRequest | None = None,
+) -> tuple[str, bool]:
+    privileged_request = request or build_privileged_command_request(
+        bot,
+        issue_number=issue_number,
+        actor=comment_author,
+        command_name="accept-no-fls-changes",
+    )
+    if privileged_request.is_pull_request:
         return "❌ This command can only be used on issues, not PRs.", False
-    labels = bot.parse_issue_labels()
+    labels = list(privileged_request.issue_labels)
     if bot.FLS_AUDIT_LABEL not in labels:
         return "❌ This command is only available on issues labeled `fls-audit`.", False
-    if not bot.check_user_permission(comment_author, "triage"):
+    permission_status = bot.github.get_user_permission_status(comment_author, "triage")
+    if permission_status == "unavailable":
+        return "❌ Unable to verify triage permissions right now; refusing to run this command.", False
+    if permission_status != "granted":
         return "❌ You must have triage permissions to run this command.", False
 
-    repo_root = get_target_repo_root()
-    if bot.list_changed_files(repo_root):
+    repo_root = Path(privileged_request.target_repo_root) if privileged_request.target_repo_root else get_target_repo_root(bot)
+    if bot.adapters.automation.list_changed_files(repo_root):
         return "❌ Working tree is not clean; refusing to update spec.lock.", False
 
-    audit_result = bot.run_command(
+    audit_result = bot.adapters.automation.run_command(
         ["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
         cwd=repo_root,
         check=False,
@@ -103,21 +158,21 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
             False,
         )
     if audit_result.returncode != 0:
-        details = bot.summarize_output(audit_result)
+        details = bot.adapters.automation.summarize_output(audit_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
         return f"❌ Audit command failed.{detail_text}", False
 
-    update_result = bot.run_command(
+    update_result = bot.adapters.automation.run_command(
         ["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"],
         cwd=repo_root,
         check=False,
     )
     if update_result.returncode != 0:
-        details = bot.summarize_output(update_result)
+        details = bot.adapters.automation.summarize_output(update_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
         return f"❌ Failed to update spec.lock.{detail_text}", False
 
-    changed_files = bot.list_changed_files(repo_root)
+    changed_files = bot.adapters.automation.list_changed_files(repo_root)
     if not changed_files:
         return "✅ `src/spec.lock` is already up to date; no PR needed.", True
 
@@ -131,16 +186,16 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
         )
 
     branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    base_branch = bot.get_default_branch()
+    base_branch = bot.adapters.automation.get_default_branch()
     branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
-    if bot.run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
+    if bot.adapters.automation.run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
         suffix = datetime.now(timezone.utc).strftime("%H%M%S")
         branch_name = f"{branch_name}-{suffix}"
 
     try:
-        bot.run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
-        bot.run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
-        bot.run_command(
+        bot.adapters.automation.run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
+        bot.adapters.automation.run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
+        bot.adapters.automation.run_command(
             [
                 "git",
                 "-c",
@@ -153,11 +208,11 @@ def handle_accept_no_fls_changes_command(bot, issue_number: int, comment_author:
             ],
             cwd=repo_root,
         )
-        bot.run_command(["git", "push", "origin", branch_name], cwd=repo_root)
+        bot.adapters.automation.run_command(["git", "push", "origin", branch_name], cwd=repo_root)
     except RuntimeError as exc:
         return f"❌ Failed to create branch or push changes: {exc}", False
 
-    pr = bot.create_pull_request(branch_name, base_branch, issue_number)
+    pr = bot.adapters.automation.create_pull_request(branch_name, base_branch, issue_number)
     if not pr or "html_url" not in pr:
         return "❌ Failed to open a pull request for the spec.lock update.", False
 

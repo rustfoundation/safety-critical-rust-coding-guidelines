@@ -57,6 +57,30 @@ lint.ignore = [
 [tool.ruff.lint.flake8-comprehensions]
 allow-dict-calls-with-keyword-arguments = true
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--import-mode=importlib",
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+]
+markers = [
+    "integration: filesystem, subprocess, multi-module, or boundary tests",
+    "contract: workflow, CLI, adapter, or artifact contract tests",
+]
+filterwarnings = ["error"]
+xfail_strict = true
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["scripts.reviewer_bot", "scripts.reviewer_bot_lib"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
 [dependency-groups]
 dev = [
     "pytest>=8.3.0",

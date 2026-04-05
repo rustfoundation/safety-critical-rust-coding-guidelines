@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
+
 def check_overdue_reviews(bot, state: dict) -> list[dict]:
     """Check all active reviews for overdue ones."""
     if "active_reviews" not in state:
@@ -18,15 +22,20 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
         if review_data.get("review_completed_at"):
             continue
 
+        if review_data.get("transition_notice_sent_at"):
+            continue
+
         current_reviewer = review_data.get("current_reviewer")
         if not current_reviewer:
             continue
 
         issue_number = int(issue_key)
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
-        if isinstance(issue_snapshot, dict) and isinstance(issue_snapshot.get("pull_request"), dict):
-            response_state = bot.reviews_module.compute_reviewer_response_state(
-                bot,
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
+        if not isinstance(issue_snapshot, dict):
+            _log(bot, "warning", f"Skipping overdue evaluation for #{issue_number}; issue/PR snapshot unavailable", issue_number=issue_number)
+            continue
+        if isinstance(issue_snapshot.get("pull_request"), dict):
+            response_state = bot.adapters.review_state.compute_reviewer_response_state(
                 issue_number,
                 review_data,
                 issue_snapshot=issue_snapshot,
@@ -53,11 +62,6 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             continue
 
         transition_warning_sent = review_data.get("transition_warning_sent")
-        transition_notice_sent_at = review_data.get("transition_notice_sent_at")
-
-        if transition_notice_sent_at:
-            continue
-
         if transition_warning_sent:
             try:
                 warning_dt = bot.datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
@@ -169,10 +173,11 @@ If no action is taken within {bot.TRANSITION_PERIOD_DAYS} days, you may be trans
 
 _Life happens! If you're dealing with something, just let us know._"""
 
-    bot.post_comment(issue_number, warning_message)
+    if not bot.github.post_comment(issue_number, warning_message):
+        return False
 
     now = bot.datetime.now(bot.timezone.utc).isoformat()
     review_data["transition_warning_sent"] = now
 
-    print(f"Posted overdue warning for #{issue_number} to @{reviewer}")
+    _log(bot, "info", f"Posted overdue warning for #{issue_number} to @{reviewer}", issue_number=issue_number, reviewer=reviewer)
     return True

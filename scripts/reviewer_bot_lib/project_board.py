@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import os
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -15,6 +14,7 @@ from .config import (
     REVIEWER_BOARD_FIELD_REVIEWER,
     REVIEWER_BOARD_FIELD_WAITING_SINCE,
     REVIEWER_BOARD_OPTION_ATTENTION_NO,
+    REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED,
     REVIEWER_BOARD_OPTION_ATTENTION_TRANSITION_NOTICE_SENT,
     REVIEWER_BOARD_OPTION_ATTENTION_TRIAGE_APPROVAL_REQUIRED,
     REVIEWER_BOARD_OPTION_ATTENTION_WARNING_SENT,
@@ -27,6 +27,7 @@ from .config import (
     REVIEWER_BOARD_PROJECT_MANIFEST,
     REVIEWER_BOARD_PROJECT_NUMBER,
 )
+from .context import ProjectBoardMetadataContext, ProjectBoardProjectionContext
 
 PROJECT_BOARD_METADATA_QUERY = """
 query ReviewerBoardProjectMetadata($organization: String!, $projectNumber: Int!) {
@@ -119,9 +120,8 @@ class BoardPreviewResult:
     noop_reason: str | None
 
 
-def reviewer_board_enabled(bot) -> bool:
-    del bot
-    return os.environ.get(REVIEWER_BOARD_ENABLED_ENV, "false").strip().lower() == "true"
+def reviewer_board_enabled(bot: ProjectBoardMetadataContext) -> bool:
+    return bot.get_config_value(REVIEWER_BOARD_ENABLED_ENV, "false").strip().lower() == "true"
 
 
 def _field_type_name(field_node: dict[str, Any]) -> str:
@@ -137,7 +137,7 @@ def _field_type_name(field_node: dict[str, Any]) -> str:
     return typename.lower()
 
 
-def resolve_project_metadata(bot) -> ProjectMetadata:
+def resolve_project_metadata(bot: ProjectBoardMetadataContext) -> ProjectMetadata:
     cached = getattr(bot, "_reviewer_board_project_metadata", None)
     if isinstance(cached, ProjectMetadata):
         return cached
@@ -191,7 +191,7 @@ def resolve_project_metadata(bot) -> ProjectMetadata:
     return metadata
 
 
-def validate_project_manifest(bot, metadata: ProjectMetadata) -> tuple[str, ...]:
+def validate_project_manifest(bot: ProjectBoardMetadataContext, metadata: ProjectMetadata) -> tuple[str, ...]:
     del bot
     errors: list[str] = []
     for field_name, expected in REVIEWER_BOARD_PROJECT_MANIFEST.items():
@@ -209,7 +209,7 @@ def validate_project_manifest(bot, metadata: ProjectMetadata) -> tuple[str, ...]
     return tuple(errors)
 
 
-def reviewer_board_preflight(bot) -> ProjectBoardPreflight:
+def reviewer_board_preflight(bot: ProjectBoardMetadataContext) -> ProjectBoardPreflight:
     if not reviewer_board_enabled(bot):
         return ProjectBoardPreflight(
             enabled=False,
@@ -258,9 +258,14 @@ def _format_date(value: Any) -> str | None:
     return value[:10]
 
 
-def _derive_review_state(bot, issue_number: int, review_data_snapshot: dict[str, Any], issue_snapshot: dict[str, Any]) -> ReviewStateDerivation:
+def _derive_review_state(
+    bot: ProjectBoardProjectionContext,
+    issue_number: int,
+    review_data_snapshot: dict[str, Any],
+    issue_snapshot: dict[str, Any],
+) -> ReviewStateDerivation:
     preview_review_data = copy.deepcopy(review_data_snapshot)
-    derived = bot.compute_reviewer_response_state(
+    derived = bot.adapters.review_state.compute_reviewer_response_state(
         issue_number,
         preview_review_data,
         issue_snapshot=copy.deepcopy(issue_snapshot),
@@ -273,9 +278,15 @@ def _derive_review_state(bot, issue_number: int, review_data_snapshot: dict[str,
     )
 
 
-def build_board_projection_input(bot, state: dict, issue_number: int, *, issue_snapshot: dict[str, Any] | None = None) -> BoardProjectionInput:
+def build_board_projection_input(
+    bot: ProjectBoardProjectionContext,
+    state: dict,
+    issue_number: int,
+    *,
+    issue_snapshot: dict[str, Any] | None = None,
+) -> BoardProjectionInput:
     if issue_snapshot is None:
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
     if not isinstance(issue_snapshot, dict):
         raise RuntimeError(f"Unable to load issue or PR snapshot for #{issue_number}")
 
@@ -339,7 +350,10 @@ def derive_board_projection(input: BoardProjectionInput) -> BoardProjectionValue
         raise RuntimeError(f"Unsupported board review state for #{input.issue_number}: {derivation.state}")
 
     needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_NO
-    if review_data.get("mandatory_approver_required"):
+    repair_needed = review_data.get("repair_needed")
+    if isinstance(repair_needed, dict) and repair_needed.get("kind") == "projection_failure":
+        needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED
+    elif review_data.get("mandatory_approver_required"):
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_TRIAGE_APPROVAL_REQUIRED
     elif review_data.get("transition_notice_sent_at"):
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_TRANSITION_NOTICE_SENT
@@ -357,7 +371,7 @@ def derive_board_projection(input: BoardProjectionInput) -> BoardProjectionValue
 
 
 def preview_board_projection_for_item(bot, state: dict, issue_number: int) -> BoardPreviewResult:
-    issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+    issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
     input = build_board_projection_input(bot, state, issue_number, issue_snapshot=issue_snapshot)
     desired = derive_board_projection(input)
     return BoardPreviewResult(
