@@ -43,7 +43,7 @@ def test_comment_application_stores_pending_privileged_command_from_typed_reques
         comment_author="dana",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
-    harness.runtime.parse_issue_labels = lambda: [FLS_AUDIT_LABEL]
+    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
     harness.runtime.post_comment = lambda issue_number, body: True
 

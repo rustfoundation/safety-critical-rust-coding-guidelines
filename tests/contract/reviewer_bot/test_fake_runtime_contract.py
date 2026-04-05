@@ -44,6 +44,7 @@ def test_fake_runtime_exposes_explicit_service_fields_and_no_omnibus_service_con
     assert runtime.touch_tracker is not None
     assert runtime.infra is not None
     assert runtime.domain is not None
+    assert runtime.compat is not None
     assert hasattr(runtime, "services") is False
     assert hasattr(runtime, "components") is False
 
@@ -214,3 +215,12 @@ def test_fake_runtime_groups_focused_services_into_infra_and_domain_shells(monke
     assert runtime.domain.locks is runtime.locks
     assert runtime.domain.handlers is runtime.handlers
     assert runtime.domain.workflow is runtime.workflow
+
+
+def test_fake_runtime_exposes_compatibility_groups_for_thin_delegation(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime.compat, "github")
+    assert hasattr(runtime.compat, "review")
+    assert hasattr(runtime.compat, "state_lock")
+    assert hasattr(runtime.compat, "automation")
