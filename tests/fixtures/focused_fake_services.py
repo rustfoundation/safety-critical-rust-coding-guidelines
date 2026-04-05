@@ -42,6 +42,8 @@ class StateStoreStub:
     def __init__(self):
         self._load: Callable[..., dict] = lambda *, fail_on_unavailable=False: {"active_reviews": {}}
         self._save: Callable[[dict], bool] = lambda state: True
+        self.load_calls: list[dict[str, Any]] = []
+        self.save_calls: list[dict] = []
 
     def stub_load(self, func: Callable[..., dict]) -> None:
         self._load = func
@@ -77,9 +79,11 @@ class StateStoreStub:
         self.stub_save(fake_save_state)
 
     def load_state(self, *, fail_on_unavailable: bool = False) -> dict:
+        self.load_calls.append({"fail_on_unavailable": fail_on_unavailable})
         return self._load(fail_on_unavailable=fail_on_unavailable)
 
     def save_state(self, state: dict) -> bool:
+        self.save_calls.append(json.loads(json.dumps(state)))
         return self._save(state)
 
 
@@ -88,6 +92,7 @@ class LockStub:
         self._acquire: Callable[[], Any] = lambda: None
         self._release: Callable[[], bool] = lambda: True
         self._refresh: Callable[[], bool] = lambda: True
+        self.calls: list[str] = []
 
     def stub(self, *, acquire=None, release=None, refresh=None) -> None:
         if acquire is not None:
@@ -98,12 +103,15 @@ class LockStub:
             self._refresh = refresh
 
     def acquire(self):
+        self.calls.append("acquire")
         return self._acquire()
 
     def release(self) -> bool:
+        self.calls.append("release")
         return self._release()
 
     def refresh(self) -> bool:
+        self.calls.append("refresh")
         return self._refresh()
 
 
@@ -467,14 +475,18 @@ class WorkflowBehaviorStub:
         self._process_pass_until: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_members: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_status_labels: Callable[[dict, Any], bool] = lambda state, issue_numbers: False
+        self.calls: list[dict[str, Any]] = []
 
     def process_pass_until_expirations(self, state: dict):
+        self.calls.append({"name": "process_pass_until_expirations", "state": deepcopy(state)})
         return self._process_pass_until(state)
 
     def sync_members_with_queue(self, state: dict):
+        self.calls.append({"name": "sync_members_with_queue", "state": deepcopy(state)})
         return self._sync_members(state)
 
     def sync_status_labels_for_items(self, state: dict, issue_numbers):
+        self.calls.append({"name": "sync_status_labels_for_items", "state": deepcopy(state), "issue_numbers": list(issue_numbers)})
         return self._sync_status_labels(state, issue_numbers)
 
     def stub_pass_until(self, func: Callable[[dict], tuple[dict, list[str]]]) -> None:

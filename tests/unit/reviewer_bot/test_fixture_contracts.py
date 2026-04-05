@@ -8,7 +8,10 @@ from tests.fixtures.focused_fake_services import (
     ArtifactDownloadTransportStub,
     GitHubStub,
     GraphQLTransportStub,
+    LockStub,
     RestTransportStub,
+    StateStoreStub,
+    WorkflowBehaviorStub,
 )
 from tests.fixtures.recording_logger import RecordingLogger
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
@@ -112,3 +115,41 @@ def test_artifact_download_transport_stub_replays_sequence_and_raises_exceptions
 
     assert transport.download("https://example.com/artifact.zip") == {"ok": True}
     assert transport.download("https://example.com/artifact.zip") == {"ok": True}
+
+
+def test_state_store_stub_records_load_and_save_calls():
+    store = StateStoreStub()
+    store.stub_load(lambda *, fail_on_unavailable=False: {"active_reviews": {"42": {}}})
+    store.stub_save(lambda state: True)
+
+    assert store.load_state(fail_on_unavailable=True) == {"active_reviews": {"42": {}}}
+    assert store.save_state({"active_reviews": {"42": {"current_reviewer": "alice"}}}) is True
+    assert store.load_calls == [{"fail_on_unavailable": True}]
+    assert store.save_calls == [{"active_reviews": {"42": {"current_reviewer": "alice"}}}]
+
+
+def test_lock_stub_records_acquire_release_refresh_calls():
+    lock = LockStub()
+    lock.stub(acquire=lambda: "token", release=lambda: True, refresh=lambda: False)
+
+    assert lock.acquire() == "token"
+    assert lock.refresh() is False
+    assert lock.release() is True
+    assert lock.calls == ["acquire", "refresh", "release"]
+
+
+def test_workflow_behavior_stub_records_behavior_calls():
+    workflow = WorkflowBehaviorStub()
+    workflow.stub_pass_until(lambda state: ({**state, "restored": True}, ["alice"]))
+    workflow.stub_sync_members(lambda state: ({**state, "synced": True}, ["bob"]))
+    workflow.stub_sync_status_labels(lambda state, issue_numbers: True)
+
+    state = {"active_reviews": {}}
+    assert workflow.process_pass_until_expirations(state) == ({"active_reviews": {}, "restored": True}, ["alice"])
+    assert workflow.sync_members_with_queue(state) == ({"active_reviews": {}, "synced": True}, ["bob"])
+    assert workflow.sync_status_labels_for_items(state, [42, 99]) is True
+    assert [call["name"] for call in workflow.calls] == [
+        "process_pass_until_expirations",
+        "sync_members_with_queue",
+        "sync_status_labels_for_items",
+    ]
