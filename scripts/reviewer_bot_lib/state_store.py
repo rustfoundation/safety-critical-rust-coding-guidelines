@@ -1,19 +1,16 @@
 """State issue parsing, loading, and saving helpers."""
 
-import json
 import re
 from datetime import datetime, timezone
 from typing import Any
 
 import yaml
 
-from . import retrying
+from . import lock_codec, retrying
 from .config import (
     FRESHNESS_RUNTIME_EPOCH_LEGACY,
     LOCK_BLOCK_END_MARKER,
     LOCK_BLOCK_START_MARKER,
-    LOCK_METADATA_KEYS,
-    LOCK_SCHEMA_VERSION,
     STATE_BLOCK_END_MARKER,
     STATE_BLOCK_START_MARKER,
     STATE_SCHEMA_VERSION,
@@ -204,22 +201,7 @@ def extract_fenced_block(inner_block: str, language_pattern: str) -> str | None:
 
 
 def normalize_lock_metadata(lock_meta: dict | None) -> dict:
-    normalized: dict[str, Any] = dict.fromkeys(LOCK_METADATA_KEYS)
-    normalized["schema_version"] = LOCK_SCHEMA_VERSION
-
-    if not isinstance(lock_meta, dict):
-        return normalized
-
-    for key in LOCK_METADATA_KEYS:
-        if key == "schema_version":
-            schema_value = lock_meta.get("schema_version")
-            if isinstance(schema_value, int):
-                normalized["schema_version"] = schema_value
-            continue
-        if key in lock_meta:
-            normalized[key] = lock_meta.get(key)
-
-    return normalized
+    return lock_codec.normalize_lock_metadata(lock_meta)
 
 
 def parse_state_yaml_from_issue_body(body: str) -> dict:
@@ -250,20 +232,7 @@ def parse_lock_metadata_from_issue_body(body: str) -> dict:
     parts = split_state_issue_body(body)
     if not parts.has_lock_markers or parts.lock_block_inner is None:
         return normalize_lock_metadata(None)
-
-    lock_json = extract_fenced_block(parts.lock_block_inner, "json")
-    if lock_json is None:
-        return normalize_lock_metadata(None)
-
-    try:
-        parsed = json.loads(lock_json)
-    except json.JSONDecodeError:
-        return normalize_lock_metadata(None)
-
-    if not isinstance(parsed, dict):
-        return normalize_lock_metadata(None)
-
-    return normalize_lock_metadata(parsed)
+    return lock_codec.parse_lock_metadata_block(parts.lock_block_inner)
 
 
 def render_marked_fenced_block(start_marker: str, end_marker: str, language: str, content: str) -> str:
@@ -296,13 +265,7 @@ def render_state_issue_body(
             yaml_content,
         )
 
-    lock_json = json.dumps(normalize_lock_metadata(lock_meta), indent=2, sort_keys=False)
-    lock_section = render_marked_fenced_block(
-        LOCK_BLOCK_START_MARKER,
-        LOCK_BLOCK_END_MARKER,
-        "json",
-        lock_json,
-    )
+    lock_section = lock_codec.render_marked_lock_block(lock_meta)
 
     prefix = parts.prefix or default_state_issue_prefix()
     between = parts.between_state_and_lock if parts.has_state_markers and parts.has_lock_markers else "\n\n"

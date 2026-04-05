@@ -1,12 +1,10 @@
 """Reviewer-bot lease lock helpers."""
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 
-from . import retrying
+from . import lock_codec, retrying
 from .config import (
-    LOCK_COMMIT_MARKER,
     LOCK_REF_NAME,
     LeaseContext,
 )
@@ -106,7 +104,7 @@ def get_lock_owner_context(bot: LeaseLockContext) -> tuple[str, str, str]:
 def build_lock_metadata(bot: LeaseLockContext, lock_token: str, lock_owner_run_id: str, lock_owner_workflow: str, lock_owner_job: str) -> dict:
     acquired_at = _now(bot)
     expires_at = acquired_at.timestamp() + _lock_lease_ttl_seconds(bot)
-    return bot.normalize_lock_metadata(
+    return lock_codec.normalize_lock_metadata(
         {
             "schema_version": 1,
             "lock_state": "locked",
@@ -121,7 +119,7 @@ def build_lock_metadata(bot: LeaseLockContext, lock_token: str, lock_owner_run_i
 
 
 def clear_lock_metadata(bot: LeaseLockContext) -> dict:
-    return bot.normalize_lock_metadata({"lock_state": "unlocked"})
+    return lock_codec.normalize_lock_metadata({"lock_state": "unlocked"})
 
 
 def normalize_lock_ref_name(ref_name: str) -> str:
@@ -230,19 +228,13 @@ def _snapshot_is_stale_unlocked_predecessor(current_lock: dict) -> bool:
 
 
 def render_lock_commit_message(bot: LeaseLockContext, lock_meta: dict) -> str:
-    lock_json = json.dumps(bot.normalize_lock_metadata(lock_meta), sort_keys=False)
-    return f"{LOCK_COMMIT_MARKER}\n{lock_json}"
+    del bot
+    return lock_codec.render_lock_commit_message(lock_meta)
 
 
 def parse_lock_metadata_from_lock_commit_message(bot: LeaseLockContext, message: str) -> dict:
-    if not message.startswith(f"{LOCK_COMMIT_MARKER}\n"):
-        return bot.clear_lock_metadata()
-    lock_json = message.split("\n", 1)[1]
-    try:
-        parsed = json.loads(lock_json)
-    except json.JSONDecodeError:
-        return bot.clear_lock_metadata()
-    return bot.normalize_lock_metadata(parsed if isinstance(parsed, dict) else None)
+    del bot
+    return lock_codec.parse_lock_commit_message(message)
 
 
 def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
