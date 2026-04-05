@@ -168,16 +168,16 @@ class FakeRuntimeReviewCompatibility:
         return lifecycle_module.handle_transition_notice(self._runtime, state, issue_number, reviewer)
 
     def ensure_review_entry(self, state: dict, issue_number: int, create: bool = False):
-        return self.compat.review.ensure_review_entry(state, issue_number, create=create)
+        return review_state_module.ensure_review_entry(state, issue_number, create=create)
 
     def set_current_reviewer(self, state: dict, issue_number: int, reviewer: str, assignment_method: str | None = None) -> None:
-        return self.compat.review.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
+        return review_state_module.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
 
     def mark_review_complete(self, state: dict, issue_number: int, reviewer: str | None, source: str) -> bool:
-        return self.compat.review.mark_review_complete(state, issue_number, reviewer, source)
+        return review_state_module.mark_review_complete(state, issue_number, reviewer, source)
 
     def update_reviewer_activity(self, state: dict, issue_number: int, reviewer: str) -> bool:
-        return self.compat.review.update_reviewer_activity(state, issue_number, reviewer)
+        return review_state_module.update_reviewer_activity(state, issue_number, reviewer)
 
     def list_open_items_with_status_labels(self) -> list[int]:
         return reviews_module.list_open_items_with_status_labels(self._runtime)
