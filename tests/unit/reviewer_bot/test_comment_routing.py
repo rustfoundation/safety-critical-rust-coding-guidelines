@@ -79,8 +79,12 @@ def test_classify_comment_payload_distinguishes_command_plus_text():
     payload = comment_routing.classify_comment_payload(
         SimpleNamespace(
             BOT_MENTION="@guidelines-bot",
-            strip_code_blocks=lambda body: body,
-            parse_command=lambda body: ("queue", []),
+            adapters=SimpleNamespace(
+                review=SimpleNamespace(
+                    strip_code_blocks=lambda body: body,
+                    parse_command=lambda body: ("queue", []),
+                )
+            ),
         ),
         "hello\n@guidelines-bot /queue",
     )

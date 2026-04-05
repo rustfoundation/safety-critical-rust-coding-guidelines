@@ -384,51 +384,6 @@ class ReviewerBotRuntime:
         return self.adapters.github.github_graphql(query, variables, token=token)
 
     # Adapter-only mutable review-state compatibility surface.
-    def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
-        return self.adapters.review.maybe_record_head_observation_repair(issue_number, review_data)
-
-    def get_next_reviewer(self, state: dict, skip_usernames=None):
-        return self.adapters.review.get_next_reviewer(state, skip_usernames)
-
-    def strip_code_blocks(self, comment_body: str) -> str:
-        return self.adapters.review.strip_code_blocks(comment_body)
-
-    def parse_command(self, comment_body: str):
-        return self.adapters.review.parse_command(comment_body)
-
-    def record_assignment(self, state: dict, github: str, issue_number: int, kind: str) -> None:
-        return self.adapters.review.record_assignment(state, github, issue_number, kind)
-
-    def reposition_member_as_next(self, state: dict, username: str) -> bool:
-        return self.adapters.review.reposition_member_as_next(state, username)
-
-    def parse_iso8601_timestamp(self, value: Any):
-        return self.adapters.state_lock.parse_iso8601_timestamp(value)
-
-    def compute_reviewer_response_state(self, issue_number: int, review_data: dict, *, issue_snapshot=None):
-        return self.adapters.review.compute_reviewer_response_state(issue_number, review_data, issue_snapshot=issue_snapshot)
-
-    def run_command(self, command, cwd, check=False):
-        return self.adapters.automation.run_command(command, cwd, check)
-
-    def summarize_output(self, result, limit: int = 20) -> str:
-        return self.adapters.automation.summarize_output(result, limit)
-
-    def list_changed_files(self, repo_root):
-        return self.adapters.automation.list_changed_files(repo_root)
-
-    def get_default_branch(self) -> str:
-        return self.adapters.automation.get_default_branch()
-
-    def find_open_pr_for_branch_status(self, branch: str):
-        return self.adapters.automation.find_open_pr_for_branch_status(branch)
-
-    def create_pull_request(self, branch: str, base: str, issue_number: int):
-        return self.adapters.automation.create_pull_request(branch, base, issue_number)
-
-    def parse_issue_labels(self) -> list[str]:
-        return self.adapters.automation.parse_issue_labels()
-
     def normalize_lock_metadata(self, lock_meta: dict | None):
         return self.adapters.state_lock.normalize_lock_metadata(lock_meta)
 
@@ -493,8 +448,3 @@ class ReviewerBotRuntime:
         result = self.adapters.state_lock.release_state_issue_lease_lock()
         self.ACTIVE_LEASE_CONTEXT = self.adapters.state_lock.get_active_lease_context()
         return result
-
-    def fetch_members(self):
-        from . import members as members_module
-
-        return members_module.fetch_members(self)

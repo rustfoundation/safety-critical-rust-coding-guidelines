@@ -83,7 +83,10 @@ def test_label_signoff_create_pr_on_pr_does_not_mark_issue_complete(monkeypatch)
 def test_create_pull_request_fails_closed_when_open_pr_lookup_unavailable(monkeypatch):
     harness = CommandHarness(monkeypatch)
     called = {"post": 0}
-    harness.runtime.find_open_pr_for_branch_status = lambda branch: ("unavailable", None)
+    harness.runtime.set_config_value("REPO_OWNER", "rustfoundation")
+    harness.runtime.github_api_request = lambda method, endpoint, data=None, extra_headers=None, **kwargs: harness.runtime.GitHubApiResult(
+        502, {"message": "bad gateway"}, {}, "bad gateway", False, "server_error", 1, None
+    )
     harness.runtime.github_api = lambda method, endpoint, data=None: called.__setitem__("post", called["post"] + 1) or None
 
     with pytest.raises(RuntimeError, match="Unable to determine whether branch 'feature-branch' already has an open PR"):
@@ -384,7 +387,6 @@ def test_parse_command_preserves_quoted_args(monkeypatch):
 
 
 def test_strip_code_blocks_removes_fenced_indented_and_inline_code(monkeypatch):
-    harness = CommandHarness(monkeypatch)
     comment_body = """before
 ```bash
 @guidelines-bot /queue
@@ -393,4 +395,4 @@ def test_strip_code_blocks_removes_fenced_indented_and_inline_code(monkeypatch):
 inline `@guidelines-bot /queue`
 after"""
 
-    assert harness.runtime.strip_code_blocks(comment_body) == "before\n\n\ninline \nafter"
+    assert commands.strip_code_blocks(comment_body) == "before\n\n\ninline \nafter"

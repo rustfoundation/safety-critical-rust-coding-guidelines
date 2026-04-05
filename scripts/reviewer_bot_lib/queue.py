@@ -6,7 +6,7 @@ from .config import MAX_RECENT_ASSIGNMENTS
 
 def sync_members_with_queue(bot, state: dict) -> tuple[dict, list[str]]:
     """Sync the queue with the current members list."""
-    producers = bot.fetch_members()
+    producers = bot.adapters.automation.fetch_members()
     current_queue = {member["github"]: member for member in state["queue"]}
     pass_until_users = {member["github"] for member in state.get("pass_until", [])}
 
@@ -143,4 +143,3 @@ def record_assignment(
 
     state["recent_assignments"].insert(0, assignment)
     state["recent_assignments"] = state["recent_assignments"][:max_recent_assignments]
-

@@ -99,7 +99,7 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
     if not any(label in bot.REVIEW_LABELS for label in labels):
         return False
     issue_author = request.issue_author
-    reviewer = bot.get_next_reviewer(state, skip_usernames={issue_author} if issue_author else set())
+    reviewer = bot.adapters.review.get_next_reviewer(state, skip_usernames={issue_author} if issue_author else set())
     if not reviewer:
         bot.github.post_comment(issue_number, f"⚠️ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue.")
         return False
@@ -111,7 +111,7 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
         head_sha = request.pr_head_sha
         if head_sha:
             review_data["active_head_sha"] = head_sha
-    bot.record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
+    bot.adapters.review.record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
     failure_comment = bot.github.get_assignment_failure_comment(reviewer, assignment_attempt)
     if failure_comment:
         bot.github.post_comment(issue_number, failure_comment)

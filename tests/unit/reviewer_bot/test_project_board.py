@@ -110,9 +110,10 @@ def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
     accept_reviewer_comment(review, semantic_key="issue_comment:1", timestamp="2026-03-21T08:00:00Z", actor="alice")
     accept_reviewer_review(review, semantic_key="pull_request_review:10", timestamp="2026-03-21T08:00:00Z", actor="alice", reviewed_head_sha="head-1", source_precedence=1)
     routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1"))
+    routes.add_pull_request_reviews(42, [])
     runtime = _runtime(monkeypatch, routes)
     runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
-    runtime.compute_reviewer_response_state = lambda issue_number, review_data, **kwargs: {
+    runtime.adapters.review.compute_reviewer_response_state = lambda issue_number, review_data, **kwargs: {
         "state": "awaiting_reviewer_response",
         "anchor_timestamp": "2026-03-21T08:00:00Z",
     }

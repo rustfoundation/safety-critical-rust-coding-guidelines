@@ -134,7 +134,7 @@ def _apply_assignment_side_effects(
     issue_number = request.issue_number
     assignment_attempt = bot.github.request_reviewer_assignment(issue_number, reviewer)
     review_state.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
-    bot.record_assignment(state, reviewer, issue_number, "pr" if request.is_pull_request else "issue")
+    bot.adapters.review.record_assignment(state, reviewer, issue_number, "pr" if request.is_pull_request else "issue")
     failure_comment = bot.github.get_assignment_failure_comment(reviewer, assignment_attempt)
     if failure_comment:
         bot.github.post_comment(issue_number, failure_comment)
@@ -187,10 +187,10 @@ def handle_pass_command(
     skip_set = set(issue_data["skipped"])
     if assignment_request.issue_author:
         skip_set.add(assignment_request.issue_author)
-    next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
+    next_reviewer = bot.adapters.review.get_next_reviewer(state, skip_usernames=skip_set)
     if not next_reviewer:
         return ("❌ No other reviewers available. Everyone in the queue has either passed on this issue or is the author."), False
-    bot.reposition_member_as_next(state, passed_reviewer)
+    bot.adapters.review.reposition_member_as_next(state, passed_reviewer)
     bot.github.unassign_reviewer(issue_number, passed_reviewer)
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
@@ -269,7 +269,7 @@ def handle_pass_until_command(
     if is_current_reviewer:
         bot.github.unassign_reviewer(issue_number, comment_author)
         skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
-        next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
+        next_reviewer = bot.adapters.review.get_next_reviewer(state, skip_usernames=skip_set)
         if next_reviewer:
             assignment_attempt, failure_comment = _apply_assignment_side_effects(
                 bot,
@@ -526,7 +526,7 @@ def handle_release_command(
     if "active_reviews" in state and issue_key in state["active_reviews"] and isinstance(state["active_reviews"][issue_key], dict):
         state["active_reviews"][issue_key]["current_reviewer"] = None
     if assignment_method == "round-robin":
-        bot.reposition_member_as_next(state, target_username)
+        bot.adapters.review.reposition_member_as_next(state, target_username)
     reason_text = f" Reason: {reason}" if reason else ""
     if releasing_other:
         return (f"✅ @{comment_author} has released @{target_username} from this review.{reason_text}\n\n_This issue/PR is now unassigned. Use `{bot.BOT_MENTION} /r? producers` to assign the next reviewer from the queue, or `{bot.BOT_MENTION} /claim` to claim it._"), True
@@ -587,7 +587,7 @@ def handle_assign_from_queue_command(
     for assignee in current_assignees:
         bot.github.unassign_reviewer(issue_number, assignee)
     skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
-    next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
+    next_reviewer = bot.adapters.review.get_next_reviewer(state, skip_usernames=skip_set)
     if not next_reviewer:
         return (f"❌ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue."), False
     assignment_attempt, _failure_comment = _apply_assignment_side_effects(

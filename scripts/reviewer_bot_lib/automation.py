@@ -99,7 +99,7 @@ def find_open_pr_for_branch(bot, branch: str) -> dict | None:
 
 
 def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict | None:
-    lookup_status, existing = bot.find_open_pr_for_branch_status(branch)
+    lookup_status, existing = find_open_pr_for_branch_status(bot, branch)
     if lookup_status == "found":
         return existing
     if lookup_status == "unavailable":
@@ -143,10 +143,10 @@ def handle_accept_no_fls_changes_command(
         return "❌ You must have triage permissions to run this command.", False
 
     repo_root = Path(privileged_request.target_repo_root) if privileged_request.target_repo_root else get_target_repo_root(bot)
-    if bot.list_changed_files(repo_root):
+    if bot.adapters.automation.list_changed_files(repo_root):
         return "❌ Working tree is not clean; refusing to update spec.lock.", False
 
-    audit_result = bot.run_command(
+    audit_result = bot.adapters.automation.run_command(
         ["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
         cwd=repo_root,
         check=False,
@@ -158,21 +158,21 @@ def handle_accept_no_fls_changes_command(
             False,
         )
     if audit_result.returncode != 0:
-        details = bot.summarize_output(audit_result)
+        details = bot.adapters.automation.summarize_output(audit_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
         return f"❌ Audit command failed.{detail_text}", False
 
-    update_result = bot.run_command(
+    update_result = bot.adapters.automation.run_command(
         ["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"],
         cwd=repo_root,
         check=False,
     )
     if update_result.returncode != 0:
-        details = bot.summarize_output(update_result)
+        details = bot.adapters.automation.summarize_output(update_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
         return f"❌ Failed to update spec.lock.{detail_text}", False
 
-    changed_files = bot.list_changed_files(repo_root)
+    changed_files = bot.adapters.automation.list_changed_files(repo_root)
     if not changed_files:
         return "✅ `src/spec.lock` is already up to date; no PR needed.", True
 
@@ -186,16 +186,16 @@ def handle_accept_no_fls_changes_command(
         )
 
     branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    base_branch = bot.get_default_branch()
+    base_branch = bot.adapters.automation.get_default_branch()
     branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
-    if bot.run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
+    if bot.adapters.automation.run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
         suffix = datetime.now(timezone.utc).strftime("%H%M%S")
         branch_name = f"{branch_name}-{suffix}"
 
     try:
-        bot.run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
-        bot.run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
-        bot.run_command(
+        bot.adapters.automation.run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
+        bot.adapters.automation.run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
+        bot.adapters.automation.run_command(
             [
                 "git",
                 "-c",
@@ -208,11 +208,11 @@ def handle_accept_no_fls_changes_command(
             ],
             cwd=repo_root,
         )
-        bot.run_command(["git", "push", "origin", branch_name], cwd=repo_root)
+        bot.adapters.automation.run_command(["git", "push", "origin", branch_name], cwd=repo_root)
     except RuntimeError as exc:
         return f"❌ Failed to create branch or push changes: {exc}", False
 
-    pr = bot.create_pull_request(branch_name, base_branch, issue_number)
+    pr = bot.adapters.automation.create_pull_request(branch_name, base_branch, issue_number)
     if not pr or "html_url" not in pr:
         return "❌ Failed to open a pull request for the spec.lock update.", False
 

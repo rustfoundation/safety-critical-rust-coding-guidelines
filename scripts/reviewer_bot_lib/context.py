@@ -234,14 +234,7 @@ class ProjectBoardMetadataContext(Protocol):
 @runtime_checkable
 class ProjectBoardProjectionContext(Protocol):
     github: Any
-
-    def compute_reviewer_response_state(
-        self,
-        issue_number: int,
-        review_data: dict,
-        *,
-        issue_snapshot: dict | None = None,
-    ) -> dict: ...
+    adapters: Any
 
 
 @runtime_checkable
