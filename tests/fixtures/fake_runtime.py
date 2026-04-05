@@ -9,12 +9,10 @@ from typing import Any, Callable
 
 from scripts.reviewer_bot_lib import automation as automation_module
 from scripts.reviewer_bot_lib import commands as commands_module
-from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
 from scripts.reviewer_bot_lib import config as config_module
 from scripts.reviewer_bot_lib import github_api as github_api_module
 from scripts.reviewer_bot_lib import lease_lock as lease_lock_module
 from scripts.reviewer_bot_lib import lifecycle as lifecycle_module
-from scripts.reviewer_bot_lib import maintenance as maintenance_module
 from scripts.reviewer_bot_lib import queue as queue_module
 from scripts.reviewer_bot_lib import reconcile as reconcile_module
 from scripts.reviewer_bot_lib import review_state as review_state_module
@@ -51,6 +49,7 @@ from tests.fixtures.focused_fake_services import (
     StateStoreStub,
     TouchTrackerStub,
     WorkflowBehaviorStub,
+    build_default_handler_map,
 )
 from tests.fixtures.recording_logger import RecordingLogger
 
@@ -423,20 +422,7 @@ class FakeReviewerBotRuntime:
             automation=FakeRuntimeAutomationCompatibility(self),
         )
         self.adapters = FakeRuntimeAdapterServices(self)
-        self.handlers = HandlerStub(
-            {
-                "handle_issue_or_pr_opened": lambda state: lifecycle_module.handle_issue_or_pr_opened(self, state),
-                "handle_labeled_event": lambda state: lifecycle_module.handle_labeled_event(self, state),
-                "handle_issue_edited_event": lambda state: lifecycle_module.handle_issue_edited_event(self, state),
-                "handle_closed_event": lambda state: lifecycle_module.handle_closed_event(self, state),
-                "handle_pull_request_target_synchronize": lambda state: lifecycle_module.handle_pull_request_target_synchronize(self, state),
-                "handle_pull_request_review_event": lambda state: lifecycle_module.handle_pull_request_review_event(self, state),
-                "handle_comment_event": lambda state: comment_routing_module.handle_comment_event(self, state),
-                "handle_manual_dispatch": lambda state: maintenance_module.handle_manual_dispatch(self, state),
-                "handle_scheduled_check": lambda state: maintenance_module.handle_scheduled_check(self, state),
-                "handle_workflow_run_event": lambda state: reconcile_module.handle_workflow_run_event(self, state),
-            }
-        )
+        self.handlers = HandlerStub(build_default_handler_map(self))
         self.infra = FakeRuntimeInfraServices(
             config=self.config,
             outputs=self.outputs,

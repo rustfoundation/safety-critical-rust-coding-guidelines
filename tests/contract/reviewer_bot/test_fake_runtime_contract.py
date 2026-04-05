@@ -14,6 +14,7 @@ from tests.fixtures.focused_fake_services import (
     StateStoreStub,
     TouchTrackerStub,
     WorkflowBehaviorStub,
+    build_default_handler_map,
 )
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
@@ -235,3 +236,11 @@ def test_fake_runtime_exposes_compatibility_groups_for_thin_delegation(monkeypat
     assert hasattr(runtime.compat, "review")
     assert hasattr(runtime.compat, "state_lock")
     assert hasattr(runtime.compat, "automation")
+
+
+def test_fake_runtime_default_handlers_are_built_from_focused_fake_service_helper(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    expected = build_default_handler_map(runtime)
+
+    assert set(expected) == HandlerStub.ALLOWED
