@@ -80,7 +80,7 @@ def test_classify_comment_payload_distinguishes_command_plus_text():
         SimpleNamespace(
             BOT_MENTION="@guidelines-bot",
             adapters=SimpleNamespace(
-                review=SimpleNamespace(
+                commands=SimpleNamespace(
                     strip_code_blocks=lambda body: body,
                     parse_command=lambda body: ("queue", []),
                 )

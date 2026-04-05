@@ -161,7 +161,7 @@ class _BootstrapHandlerServices:
         return reconcile.handle_workflow_run_event(self._runtime_getter(), current_state)
 
 
-class _BootstrapReviewAdapterServices:
+class _BootstrapReviewStateAdapterServices:
     def __init__(self, runtime_getter):
         self._runtime_getter = runtime_getter
 
@@ -173,6 +173,39 @@ class _BootstrapReviewAdapterServices:
 
     def handle_transition_notice(self, current_state, issue_number, reviewer):
         return lifecycle.handle_transition_notice(self._runtime(), current_state, issue_number, reviewer)
+
+    # Adapter-only mutable review-state compatibility surface.
+    def ensure_review_entry(self, current_state, issue_number, create=False):
+        return review_state.ensure_review_entry(current_state, issue_number, create=create)
+
+    def set_current_reviewer(self, current_state, issue_number, reviewer, assignment_method="round-robin"):
+        return review_state.set_current_reviewer(current_state, issue_number, reviewer, assignment_method=assignment_method)
+
+    def update_reviewer_activity(self, current_state, issue_number, reviewer):
+        return review_state.update_reviewer_activity(current_state, issue_number, reviewer)
+
+    def mark_review_complete(self, current_state, issue_number, reviewer, source):
+        return review_state.mark_review_complete(current_state, issue_number, reviewer, source)
+
+    def is_triage_or_higher(self, username):
+        return reviews.is_triage_or_higher(self._runtime(), username)
+
+    def trigger_mandatory_approver_escalation(self, current_state, issue_number):
+        return reviews.trigger_mandatory_approver_escalation(self._runtime(), current_state, issue_number)
+
+    def satisfy_mandatory_approver_requirement(self, current_state, issue_number, approver):
+        return reviews.satisfy_mandatory_approver_requirement(self._runtime(), current_state, issue_number, approver)
+
+    def compute_reviewer_response_state(self, issue_number, review_data, *, issue_snapshot=None):
+        return reviews.compute_reviewer_response_state(self._runtime(), issue_number, review_data, issue_snapshot=issue_snapshot)
+
+
+class _BootstrapCommandAdapterServices:
+    def __init__(self, runtime_getter):
+        self._runtime_getter = runtime_getter
+
+    def _runtime(self):
+        return self._runtime_getter()
 
     def handle_pass_command(self, current_state, issue_number, comment_author, reason, request=None):
         return commands.handle_pass_command(self._runtime(), current_state, issue_number, comment_author, reason, request=request)
@@ -213,45 +246,22 @@ class _BootstrapReviewAdapterServices:
     def get_commands_help(self):
         return config.get_commands_help()
 
-    # Adapter-only mutable review-state compatibility surface.
-    def ensure_review_entry(self, current_state, issue_number, create=False):
-        return review_state.ensure_review_entry(current_state, issue_number, create=create)
-
-    def set_current_reviewer(self, current_state, issue_number, reviewer, assignment_method="round-robin"):
-        return review_state.set_current_reviewer(current_state, issue_number, reviewer, assignment_method=assignment_method)
-
-    def update_reviewer_activity(self, current_state, issue_number, reviewer):
-        return review_state.update_reviewer_activity(current_state, issue_number, reviewer)
-
-    def mark_review_complete(self, current_state, issue_number, reviewer, source):
-        return review_state.mark_review_complete(current_state, issue_number, reviewer, source)
-
-    def is_triage_or_higher(self, username):
-        return reviews.is_triage_or_higher(self._runtime(), username)
-
-    def trigger_mandatory_approver_escalation(self, current_state, issue_number):
-        return reviews.trigger_mandatory_approver_escalation(self._runtime(), current_state, issue_number)
-
-    def satisfy_mandatory_approver_requirement(self, current_state, issue_number, approver):
-        return reviews.satisfy_mandatory_approver_requirement(self._runtime(), current_state, issue_number, approver)
-
-    def get_next_reviewer(self, state, skip_usernames=None):
-        return get_next_reviewer(state, skip_usernames)
-
     def strip_code_blocks(self, comment_body):
         return commands.strip_code_blocks(comment_body)
 
     def parse_command(self, comment_body):
         return commands.parse_command(self._runtime(), comment_body)
 
+
+class _BootstrapQueueAdapterServices:
+    def get_next_reviewer(self, state, skip_usernames=None):
+        return get_next_reviewer(state, skip_usernames)
+
     def record_assignment(self, state, github, issue_number, kind):
         return record_assignment(state, github, issue_number, kind)
 
     def reposition_member_as_next(self, state, username):
         return reposition_member_as_next(state, username)
-
-    def compute_reviewer_response_state(self, issue_number, review_data, *, issue_snapshot=None):
-        return reviews.compute_reviewer_response_state(self._runtime(), issue_number, review_data, issue_snapshot=issue_snapshot)
 
 
 class _BootstrapWorkflowAdapterServices:
@@ -373,9 +383,11 @@ class _BootstrapStateLockAdapterServices:
 
 
 class _BootstrapAdapterGroups:
-    def __init__(self, *, github, review, workflow, automation, state_lock):
+    def __init__(self, *, github, review_state, commands, queue, workflow, automation, state_lock):
         self.github = github
-        self.review = review
+        self.review_state = review_state
+        self.commands = commands
+        self.queue = queue
         self.workflow = workflow
         self.automation = automation
         self.state_lock = state_lock
@@ -398,7 +410,9 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
     handlers = _BootstrapHandlerServices(runtime_getter)
     adapters = _BootstrapAdapterGroups(
         github=github_services,
-        review=_BootstrapReviewAdapterServices(runtime_getter),
+        review_state=_BootstrapReviewStateAdapterServices(runtime_getter),
+        commands=_BootstrapCommandAdapterServices(runtime_getter),
+        queue=_BootstrapQueueAdapterServices(),
         workflow=_BootstrapWorkflowAdapterServices(runtime_getter),
         automation=_BootstrapAutomationAdapterServices(runtime_getter),
         state_lock=_BootstrapStateLockAdapterServices(runtime_getter, lock_services),

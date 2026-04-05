@@ -83,6 +83,9 @@ class FakeRuntimeAdapterServices:
         self._runtime = runtime
         self.workflow = runtime.workflow
         self.review = runtime.compat.review
+        self.review_state = runtime.compat.review
+        self.commands = runtime.compat.review
+        self.queue = runtime.compat.review
         self.automation = runtime.compat.automation
 
     def process_pass_until_expirations(self, state: dict):
@@ -95,7 +98,7 @@ class FakeRuntimeAdapterServices:
         return self._runtime.workflow.sync_status_labels_for_items(state, issue_numbers)
 
 
-def _instance_override(runtime: "FakeReviewerBotRuntime", name: str):
+def runtime_instance_override(runtime: "FakeReviewerBotRuntime", name: str):
     override = runtime.__dict__.get(name)
     return override if callable(override) else None
 
@@ -169,7 +172,7 @@ class FakeRuntimeReviewCompatibility:
         self._runtime = runtime
 
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
-        override = _instance_override(self._runtime, "maybe_record_head_observation_repair")
+        override = runtime_instance_override(self._runtime, "maybe_record_head_observation_repair")
         if override is not None:
             return override(issue_number, review_data)
         return lifecycle_module.maybe_record_head_observation_repair(self._runtime, issue_number, review_data)
@@ -244,7 +247,7 @@ class FakeRuntimeReviewCompatibility:
         return queue_module.reposition_member_as_next(state, username)
 
     def compute_reviewer_response_state(self, issue_number: int, state: dict, *, issue_snapshot=None):
-        override = _instance_override(self._runtime, "compute_reviewer_response_state")
+        override = runtime_instance_override(self._runtime, "compute_reviewer_response_state")
         if override is not None:
             return override(issue_number, state, issue_snapshot=issue_snapshot)
         return reviews_module.compute_reviewer_response_state(self._runtime, issue_number, state, issue_snapshot=issue_snapshot)
@@ -317,49 +320,49 @@ class FakeRuntimeAutomationCompatibility:
         self._runtime = runtime
 
     def run_command(self, command, cwd, check=False):
-        override = _instance_override(self._runtime, "run_command")
+        override = runtime_instance_override(self._runtime, "run_command")
         if override is not None:
             return override(command, cwd, check=check)
         return automation_module.run_command(command, cwd=cwd, check=check)
 
     def summarize_output(self, result, limit: int = 20) -> str:
-        override = _instance_override(self._runtime, "summarize_output")
+        override = runtime_instance_override(self._runtime, "summarize_output")
         if override is not None:
             return override(result, limit)
         return automation_module.summarize_output(result, limit=limit)
 
     def list_changed_files(self, repo_root):
-        override = _instance_override(self._runtime, "list_changed_files")
+        override = runtime_instance_override(self._runtime, "list_changed_files")
         if override is not None:
             return override(repo_root)
         return automation_module.list_changed_files(repo_root)
 
     def get_default_branch(self) -> str:
-        override = _instance_override(self._runtime, "get_default_branch")
+        override = runtime_instance_override(self._runtime, "get_default_branch")
         if override is not None:
             return override()
         return automation_module.get_default_branch(self._runtime)
 
     def find_open_pr_for_branch_status(self, branch: str):
-        override = _instance_override(self._runtime, "find_open_pr_for_branch_status")
+        override = runtime_instance_override(self._runtime, "find_open_pr_for_branch_status")
         if override is not None:
             return override(branch)
         return automation_module.find_open_pr_for_branch_status(self._runtime, branch)
 
     def create_pull_request(self, branch: str, base: str, issue_number: int):
-        override = _instance_override(self._runtime, "create_pull_request")
+        override = runtime_instance_override(self._runtime, "create_pull_request")
         if override is not None:
             return override(branch, base, issue_number)
         return automation_module.create_pull_request(self._runtime, branch, base, issue_number)
 
     def parse_issue_labels(self) -> list[str]:
-        override = _instance_override(self._runtime, "parse_issue_labels")
+        override = runtime_instance_override(self._runtime, "parse_issue_labels")
         if override is not None:
             return override()
         return automation_module.bot_parse_issue_labels(self._runtime)
 
     def fetch_members(self):
-        override = _instance_override(self._runtime, "fetch_members")
+        override = runtime_instance_override(self._runtime, "fetch_members")
         if override is not None:
             return override()
         return self._runtime._fetch_members()
@@ -753,13 +756,13 @@ class FakeReviewerBotRuntime:
         return self.handlers.call("handle_workflow_run_event", state)
 
     def github_api(self, method: str, endpoint: str, data=None):
-        override = _instance_override(self, "github_api")
+        override = runtime_instance_override(self, "github_api")
         if override is not None:
             return override(method, endpoint, data=data)
         return self.github.github_api(method, endpoint, data=data)
 
     def github_api_request(self, method: str, endpoint: str, data=None, extra_headers=None, **kwargs):
-        override = _instance_override(self, "github_api_request")
+        override = runtime_instance_override(self, "github_api_request")
         if override is not None:
             return override(method, endpoint, data=data, extra_headers=extra_headers, **kwargs)
         return self.github.github_api_request(
