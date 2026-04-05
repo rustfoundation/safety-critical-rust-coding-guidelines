@@ -29,10 +29,7 @@ def _log(bot, level: str, message: str, **fields) -> None:
 
 
 def _now_iso(bot) -> str:
-    clock = getattr(bot, "clock", None)
-    if clock is not None and hasattr(clock, "now"):
-        return clock.now().isoformat()
-    return bot.datetime.now(bot.timezone.utc).isoformat()
+    return bot.clock.now().isoformat()
 
 
 class ReconcileReadError(RuntimeError):

@@ -16,12 +16,7 @@ from .maintenance import (
 
 
 def _log(bot: AppExecutionRuntime, level: str, message: str, **fields) -> None:
-    logger = getattr(bot, "logger", None)
-    if logger is not None and hasattr(logger, "event"):
-        logger.event(level, message, **fields)
-        return
-    stream = sys.stderr if level in {"warning", "error"} else sys.stdout
-    stream.write(f"{message}\n")
+    bot.logger.event(level, message, **fields)
 
 
 def _revalidate_epoch(bot: AppExecutionRuntime, expected_epoch: str | None, phase: str) -> None:
