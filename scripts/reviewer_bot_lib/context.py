@@ -328,11 +328,6 @@ class StateStoreRuntimeContext(Protocol):
     """Minimal runtime surface required by state_store helpers."""
 
     ACTIVE_LEASE_CONTEXT: LeaseContext | None
-    STATE_ISSUE_NUMBER: int
-    STATE_READ_RETRY_LIMIT: int
-    STATE_READ_RETRY_BASE_SECONDS: float
-    LOCK_API_RETRY_LIMIT: int
-    LOCK_RETRY_BASE_SECONDS: float
     GitHubApiResult: type[GitHubApiResult]
     logger: Logger
     sleeper: Sleeper
@@ -365,6 +360,8 @@ class StateStoreRuntimeContext(Protocol):
     def normalize_lock_metadata(self, lock_meta: dict | None) -> dict: ...
     def ensure_state_issue_lease_lock_fresh(self) -> bool: ...
     def state_issue_number(self) -> int: ...
+    def state_read_retry_limit(self) -> int: ...
+    def state_read_retry_base_seconds(self) -> float: ...
     def lock_api_retry_limit(self) -> int: ...
     def lock_retry_base_seconds(self) -> float: ...
 
@@ -383,13 +380,6 @@ class LeaseLockRuntimeContext(Protocol):
     """Minimal runtime surface required by lease_lock helpers."""
 
     ACTIVE_LEASE_CONTEXT: LeaseContext | None
-    LOCK_API_RETRY_LIMIT: int
-    LOCK_RETRY_BASE_SECONDS: float
-    LOCK_LEASE_TTL_SECONDS: int
-    LOCK_MAX_WAIT_SECONDS: int
-    LOCK_RENEWAL_WINDOW_SECONDS: int
-    LOCK_REF_NAME: str
-    LOCK_REF_BOOTSTRAP_BRANCH: str
     LOCK_COMMIT_MARKER: str
     LOCK_SCHEMA_VERSION: int
     LeaseContext: type[LeaseContext]

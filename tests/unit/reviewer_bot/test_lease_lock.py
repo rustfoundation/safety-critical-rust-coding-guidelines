@@ -45,6 +45,13 @@ def _lease_bot(**overrides):
         config_values.update(overrides["config_values"])
         delattr(bot, "config_values")
     bot.clear_lock_metadata = lambda: lease_lock.clear_lock_metadata(bot)
+    bot.lock_api_retry_limit = lambda: bot.LOCK_API_RETRY_LIMIT
+    bot.lock_retry_base_seconds = lambda: bot.LOCK_RETRY_BASE_SECONDS
+    bot.lock_lease_ttl_seconds = lambda: getattr(bot, "LOCK_LEASE_TTL_SECONDS", 300)
+    bot.lock_max_wait_seconds = lambda: bot.LOCK_MAX_WAIT_SECONDS
+    bot.lock_renewal_window_seconds = lambda: bot.LOCK_RENEWAL_WINDOW_SECONDS
+    bot.lock_ref_name = lambda: bot.LOCK_REF_NAME
+    bot.lock_ref_bootstrap_branch = lambda: bot.LOCK_REF_BOOTSTRAP_BRANCH
     bot.get_state_issue_html_url = lambda: lease_lock.get_state_issue_html_url(bot)
     bot.get_lock_ref_display = lambda: lease_lock.get_lock_ref_display(bot)
     bot.get_lock_ref_snapshot = lambda: lease_lock.get_lock_ref_snapshot(bot)

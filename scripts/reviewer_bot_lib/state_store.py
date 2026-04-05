@@ -10,17 +10,12 @@ import yaml
 from . import retrying
 from .config import (
     FRESHNESS_RUNTIME_EPOCH_LEGACY,
-    LOCK_API_RETRY_LIMIT,
     LOCK_BLOCK_END_MARKER,
     LOCK_BLOCK_START_MARKER,
     LOCK_METADATA_KEYS,
-    LOCK_RETRY_BASE_SECONDS,
     LOCK_SCHEMA_VERSION,
     STATE_BLOCK_END_MARKER,
     STATE_BLOCK_START_MARKER,
-    STATE_ISSUE_NUMBER,
-    STATE_READ_RETRY_BASE_SECONDS,
-    STATE_READ_RETRY_LIMIT,
     STATE_SCHEMA_VERSION,
     StateIssueBodyParts,
     StateIssueSnapshot,
@@ -33,18 +28,11 @@ def _log(bot: StateStoreRuntimeContext, level: str, message: str, **fields: Any)
 
 
 def _sleep(bot: StateStoreRuntimeContext, seconds: float) -> None:
-    sleeper = getattr(bot, "sleeper", None)
-    if sleeper is not None and hasattr(sleeper, "sleep"):
-        sleeper.sleep(seconds)
-        return
-    __import__("time").sleep(seconds)
+    bot.sleeper.sleep(seconds)
 
 
 def _jitter(bot: StateStoreRuntimeContext, lower: float, upper: float) -> float:
-    jitter = getattr(bot, "jitter", None)
-    if jitter is not None and hasattr(jitter, "uniform"):
-        return jitter.uniform(lower, upper)
-    return __import__("random").uniform(lower, upper)
+    return bot.jitter.uniform(lower, upper)
 
 
 def _retry_delay(bot: StateStoreRuntimeContext, base_seconds: float, retry_attempt: int) -> float:
@@ -60,45 +48,27 @@ def _retry_delay(bot: StateStoreRuntimeContext, base_seconds: float, retry_attem
 
 
 def _now_iso(bot: StateStoreRuntimeContext) -> str:
-    clock = getattr(bot, "clock", None)
-    if clock is not None and hasattr(clock, "now"):
-        return clock.now().isoformat()
-    return datetime.now(timezone.utc).isoformat()
+    return bot.clock.now().isoformat()
 
 
 def _state_issue_number(bot: StateStoreRuntimeContext) -> int:
-    accessor = getattr(bot, "state_issue_number", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "STATE_ISSUE_NUMBER", STATE_ISSUE_NUMBER)
+    return bot.state_issue_number()
 
 
 def _lock_api_retry_limit(bot: StateStoreRuntimeContext) -> int:
-    accessor = getattr(bot, "lock_api_retry_limit", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
+    return bot.lock_api_retry_limit()
 
 
 def _lock_retry_base_seconds(bot: StateStoreRuntimeContext) -> float:
-    accessor = getattr(bot, "lock_retry_base_seconds", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+    return bot.lock_retry_base_seconds()
 
 
 def _state_read_retry_limit(bot: StateStoreRuntimeContext) -> int:
-    accessor = getattr(bot, "state_read_retry_limit", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "STATE_READ_RETRY_LIMIT", STATE_READ_RETRY_LIMIT)
+    return bot.state_read_retry_limit()
 
 
 def _state_read_retry_base_seconds(bot: StateStoreRuntimeContext) -> float:
-    accessor = getattr(bot, "state_read_retry_base_seconds", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "STATE_READ_RETRY_BASE_SECONDS", STATE_READ_RETRY_BASE_SECONDS)
+    return bot.state_read_retry_base_seconds()
 
 
 def get_state_issue(bot: StateStoreContext) -> dict | None:

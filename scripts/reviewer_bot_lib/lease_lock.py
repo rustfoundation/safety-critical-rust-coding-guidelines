@@ -6,14 +6,8 @@ from typing import Any
 
 from . import retrying
 from .config import (
-    LOCK_API_RETRY_LIMIT,
     LOCK_COMMIT_MARKER,
-    LOCK_LEASE_TTL_SECONDS,
-    LOCK_MAX_WAIT_SECONDS,
-    LOCK_REF_BOOTSTRAP_BRANCH,
     LOCK_REF_NAME,
-    LOCK_RENEWAL_WINDOW_SECONDS,
-    LOCK_RETRY_BASE_SECONDS,
     LeaseContext,
 )
 from .context import LeaseLockContext, LeaseLockRuntimeContext
@@ -24,18 +18,11 @@ def _log(bot: LeaseLockRuntimeContext, level: str, message: str, **fields: Any) 
 
 
 def _sleep(bot: LeaseLockRuntimeContext, seconds: float) -> None:
-    sleeper = getattr(bot, "sleeper", None)
-    if sleeper is not None and hasattr(sleeper, "sleep"):
-        sleeper.sleep(seconds)
-        return
-    __import__("time").sleep(seconds)
+    bot.sleeper.sleep(seconds)
 
 
 def _jitter(bot: LeaseLockRuntimeContext, lower: float, upper: float) -> float:
-    jitter = getattr(bot, "jitter", None)
-    if jitter is not None and hasattr(jitter, "uniform"):
-        return jitter.uniform(lower, upper)
-    return __import__("random").uniform(lower, upper)
+    return bot.jitter.uniform(lower, upper)
 
 
 def _retry_delay(bot: LeaseLockRuntimeContext, base_seconds: float, retry_attempt: int) -> float:
@@ -51,61 +38,35 @@ def _retry_delay(bot: LeaseLockRuntimeContext, base_seconds: float, retry_attemp
 
 
 def _now(bot: LeaseLockRuntimeContext) -> datetime:
-    clock = getattr(bot, "clock", None)
-    if clock is not None and hasattr(clock, "now"):
-        return clock.now()
-    datetime_module = getattr(bot, "datetime", datetime)
-    timezone_module = getattr(bot, "timezone", timezone)
-    return datetime_module.now(timezone_module.utc)
+    return bot.clock.now()
 
 
 def _monotonic(bot: LeaseLockRuntimeContext) -> float:
-    time_module = getattr(bot, "time", None)
-    if time_module is not None and hasattr(time_module, "monotonic"):
-        return time_module.monotonic()
-    return __import__("time").monotonic()
+    return bot.time.monotonic()
 
 
 def _uuid4_hex(bot: LeaseLockRuntimeContext) -> str:
-    source = getattr(bot, "uuid_source", None)
-    if source is not None and hasattr(source, "uuid4_hex"):
-        return source.uuid4_hex()
-    return __import__("uuid").uuid4().hex
+    return bot.uuid_source.uuid4_hex()
 
 
 def _lock_lease_ttl_seconds(bot: LeaseLockRuntimeContext) -> int:
-    accessor = getattr(bot, "lock_lease_ttl_seconds", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "LOCK_LEASE_TTL_SECONDS", LOCK_LEASE_TTL_SECONDS)
+    return bot.lock_lease_ttl_seconds()
 
 
 def _lock_api_retry_limit(bot: LeaseLockRuntimeContext) -> int:
-    accessor = getattr(bot, "lock_api_retry_limit", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
+    return bot.lock_api_retry_limit()
 
 
 def _lock_retry_base_seconds(bot: LeaseLockRuntimeContext) -> float:
-    accessor = getattr(bot, "lock_retry_base_seconds", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+    return bot.lock_retry_base_seconds()
 
 
 def _lock_max_wait_seconds(bot: LeaseLockRuntimeContext) -> int:
-    accessor = getattr(bot, "lock_max_wait_seconds", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "LOCK_MAX_WAIT_SECONDS", LOCK_MAX_WAIT_SECONDS)
+    return bot.lock_max_wait_seconds()
 
 
 def _lock_renewal_window_seconds(bot: LeaseLockRuntimeContext) -> int:
-    accessor = getattr(bot, "lock_renewal_window_seconds", None)
-    if callable(accessor):
-        return accessor()
-    return getattr(bot, "LOCK_RENEWAL_WINDOW_SECONDS", LOCK_RENEWAL_WINDOW_SECONDS)
+    return bot.lock_renewal_window_seconds()
 
 
 def lock_is_currently_valid(bot: LeaseLockContext, lock_meta: dict, now: datetime | None = None) -> bool:
@@ -173,9 +134,7 @@ def normalize_lock_ref_name(ref_name: str) -> str:
 
 
 def get_lock_ref_name(bot: LeaseLockContext) -> str:
-    if callable(getattr(bot, "lock_ref_name", None)):
-        return normalize_lock_ref_name(bot.lock_ref_name())
-    return normalize_lock_ref_name(getattr(bot, "LOCK_REF_NAME", LOCK_REF_NAME))
+    return normalize_lock_ref_name(bot.lock_ref_name())
 
 
 def get_lock_ref_display(bot: LeaseLockContext) -> str:
@@ -305,10 +264,7 @@ def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
             f"{get_lock_ref_display(bot)} (status {response.status_code}): {response.text}"
         )
 
-    if callable(getattr(bot, "lock_ref_bootstrap_branch", None)):
-        default_branch = bot.lock_ref_bootstrap_branch()
-    else:
-        default_branch = getattr(bot, "LOCK_REF_BOOTSTRAP_BRANCH", LOCK_REF_BOOTSTRAP_BRANCH)
+    default_branch = bot.lock_ref_bootstrap_branch()
     branch_response = bot.github_api_request(
         "GET",
         f"git/ref/heads/{default_branch}",

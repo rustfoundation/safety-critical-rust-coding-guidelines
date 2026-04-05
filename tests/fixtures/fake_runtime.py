@@ -431,6 +431,12 @@ class FakeReviewerBotRuntime:
     def state_issue_number(self) -> int:
         return int(self.get_config_value("STATE_ISSUE_NUMBER", "0") or 0)
 
+    def state_read_retry_limit(self) -> int:
+        return int(self.get_config_value("REVIEWER_BOT_STATE_READ_RETRY_LIMIT", "4") or 0)
+
+    def state_read_retry_base_seconds(self) -> float:
+        return float(self.get_config_value("REVIEWER_BOT_STATE_READ_RETRY_SECONDS", "1.0") or 0.0)
+
     def lock_api_retry_limit(self) -> int:
         return int(self.get_config_value("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "5") or 0)
 
