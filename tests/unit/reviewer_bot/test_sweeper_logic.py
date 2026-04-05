@@ -298,6 +298,14 @@ def test_observer_run_reason_mapping_and_near_miss_signature():
     assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "almost"}, signature) == "observer_state_unknown"
 
 
+def test_approval_pending_signature_is_loaded_from_runbook():
+    assert sweeper._approval_pending_signature_from_runbook() == {
+        "status": "waiting",
+        "conclusion": None,
+        "name": "approval_pending",
+    }
+
+
 def test_negative_missing_run_requires_full_scan_and_recheck():
     gap = {
         "source_event_created_at": "2026-03-15T00:00:00Z",
