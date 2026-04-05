@@ -161,74 +161,6 @@ class _BootstrapHandlerServices:
         return reconcile.handle_workflow_run_event(self._runtime_getter(), current_state)
 
 
-class _BootstrapGitHubAdapterServices:
-    def __init__(self, runtime_getter):
-        self._runtime_getter = runtime_getter
-
-    def _runtime(self):
-        return self._runtime_getter()
-
-    def assert_lock_held(self, context):
-        return state_store.assert_lock_held(self._runtime(), context)
-
-    def get_github_token(self):
-        return github_api.get_github_token(self._runtime())
-
-    def get_github_graphql_token(self, *, prefer_board_token=False):
-        return github_api.get_github_graphql_token(self._runtime(), prefer_board_token=prefer_board_token)
-
-    def github_graphql(self, query, variables=None, *, token=None):
-        return github_api.github_graphql(self._runtime(), query, variables, token=token)
-
-    def post_comment(self, issue_number, body):
-        return github_api.post_comment(self._runtime(), issue_number, body)
-
-    def get_repo_labels(self):
-        return github_api.get_repo_labels(self._runtime())
-
-    def add_label(self, issue_number, label):
-        return github_api.add_label(self._runtime(), issue_number, label)
-
-    def remove_label(self, issue_number, label):
-        return github_api.remove_label(self._runtime(), issue_number, label)
-
-    def ensure_label_exists(self, label, *, color=None, description=None):
-        return github_api.ensure_label_exists(self._runtime(), label, color=color, description=description)
-
-    def get_issue_assignees(self, issue_number):
-        return github_api.get_issue_assignees(self._runtime(), issue_number)
-
-    def request_reviewer_assignment(self, issue_number, username):
-        return github_api.request_reviewer_assignment(self._runtime(), issue_number, username)
-
-    def get_assignment_failure_comment(self, reviewer, attempt):
-        return github_api.get_assignment_failure_comment(self._runtime(), reviewer, attempt)
-
-    def add_reaction(self, comment_id, reaction):
-        return github_api.add_reaction(self._runtime(), comment_id, reaction)
-
-    def remove_assignee(self, issue_number, username):
-        return github_api.remove_assignee(self._runtime(), issue_number, username)
-
-    def remove_pr_reviewer(self, issue_number, username):
-        return github_api.remove_pr_reviewer(self._runtime(), issue_number, username)
-
-    def unassign_reviewer(self, issue_number, username):
-        return github_api.unassign_reviewer(self._runtime(), issue_number, username)
-
-    def get_user_permission_status(self, username, required_permission="triage"):
-        return github_api.get_user_permission_status(self._runtime(), username, required_permission)
-
-    def check_user_permission(self, username, required_permission="triage"):
-        return github_api.check_user_permission(self._runtime(), username, required_permission)
-
-    def get_issue_or_pr_snapshot(self, issue_number):
-        return github_api.github_api(self._runtime(), "GET", f"issues/{issue_number}")
-
-    def get_pull_request_reviews(self, issue_number):
-        return reviews.get_pull_request_reviews(self._runtime(), issue_number)
-
-
 class _BootstrapReviewAdapterServices:
     def __init__(self, runtime_getter):
         self._runtime_getter = runtime_getter
@@ -372,8 +304,9 @@ class _BootstrapAutomationAdapterServices:
 
 
 class _BootstrapStateLockAdapterServices:
-    def __init__(self, runtime_getter):
+    def __init__(self, runtime_getter, lock_services):
         self._runtime_getter = runtime_getter
+        self._lock_services = lock_services
 
     def _runtime(self):
         return self._runtime_getter()
@@ -427,13 +360,13 @@ class _BootstrapStateLockAdapterServices:
         return lease_lock.renew_state_issue_lease_lock(self._runtime(), context)
 
     def ensure_state_issue_lease_lock_fresh(self):
-        return lease_lock.ensure_state_issue_lease_lock_fresh(self._runtime())
+        return self._lock_services.refresh()
 
     def acquire_state_issue_lease_lock(self):
-        return lease_lock.acquire_state_issue_lease_lock(self._runtime())
+        return self._lock_services.acquire()
 
     def release_state_issue_lease_lock(self):
-        return lease_lock.release_state_issue_lease_lock(self._runtime())
+        return self._lock_services.release()
 
     def get_active_lease_context(self):
         return self._runtime().ACTIVE_LEASE_CONTEXT
@@ -464,11 +397,11 @@ def build_runtime(*, requests, sys, random, time, active_lease_context=None) -> 
     lock_services = _BootstrapLockServices(runtime_getter)
     handlers = _BootstrapHandlerServices(runtime_getter)
     adapters = _BootstrapAdapterGroups(
-        github=_BootstrapGitHubAdapterServices(runtime_getter),
+        github=github_services,
         review=_BootstrapReviewAdapterServices(runtime_getter),
         workflow=_BootstrapWorkflowAdapterServices(runtime_getter),
         automation=_BootstrapAutomationAdapterServices(runtime_getter),
-        state_lock=_BootstrapStateLockAdapterServices(runtime_getter),
+        state_lock=_BootstrapStateLockAdapterServices(runtime_getter, lock_services),
     )
 
     runtime = ReviewerBotRuntime(

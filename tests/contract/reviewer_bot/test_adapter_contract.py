@@ -366,6 +366,7 @@ def test_bootstrap_runtime_wires_explicit_adapter_services():
     assert hasattr(runtime.adapters, "workflow")
     assert hasattr(runtime.adapters, "automation")
     assert hasattr(runtime.adapters, "state_lock")
+    assert runtime.adapters.github is runtime.github
     assert hasattr(runtime.adapters.github, "get_github_token")
     assert hasattr(runtime.adapters.review, "handle_pass_command")
     assert hasattr(runtime.adapters.state_lock, "render_state_issue_body")
