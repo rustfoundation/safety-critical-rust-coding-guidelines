@@ -286,7 +286,7 @@ def build_board_projection_input(
     issue_snapshot: dict[str, Any] | None = None,
 ) -> BoardProjectionInput:
     if issue_snapshot is None:
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
     if not isinstance(issue_snapshot, dict):
         raise RuntimeError(f"Unable to load issue or PR snapshot for #{issue_number}")
 
@@ -371,7 +371,7 @@ def derive_board_projection(input: BoardProjectionInput) -> BoardProjectionValue
 
 
 def preview_board_projection_for_item(bot, state: dict, issue_number: int) -> BoardPreviewResult:
-    issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+    issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
     input = build_board_projection_input(bot, state, issue_number, issue_snapshot=issue_snapshot)
     desired = derive_board_projection(input)
     return BoardPreviewResult(

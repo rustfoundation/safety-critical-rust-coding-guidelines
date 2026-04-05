@@ -367,6 +367,7 @@ class FakeReviewerBotRuntime:
         self.outputs = OutputCapture()
         self.deferred_payloads = DeferredPayloadStore()
         self.github = GitHubStub(github)
+        self.github.bind_runtime(self)
         self.rest_transport = RestTransportStub(self.github)
         self.graphql_transport = GraphQLTransportStub()
         self.artifact_download_transport = ArtifactDownloadTransportStub()

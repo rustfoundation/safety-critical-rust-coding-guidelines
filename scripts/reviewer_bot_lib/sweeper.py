@@ -651,7 +651,7 @@ def _discover_visible_comment_events(bot, issue_number: int, review_data: dict) 
 def _discover_visible_review_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
     watermark = _load_surface_watermark(review_data, "reviews_submitted")
     watermark["last_scan_started_at"] = _now_iso()
-    reviews = bot.get_pull_request_reviews(issue_number)
+    reviews = bot.github.get_pull_request_reviews(issue_number)
     if reviews is None:
         return None, False
     floor = _surface_scan_floor(bot, watermark)
@@ -718,7 +718,7 @@ def _discover_visible_review_comment_events(bot, issue_number: int, review_data:
 def _discover_visible_review_dismissal_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
     watermark = _load_surface_watermark(review_data, "reviews_dismissed")
     watermark["last_scan_started_at"] = _now_iso()
-    reviews = bot.get_pull_request_reviews(issue_number)
+    reviews = bot.github.get_pull_request_reviews(issue_number)
     if reviews is None:
         return None, False
     floor = _surface_scan_floor(bot, watermark)

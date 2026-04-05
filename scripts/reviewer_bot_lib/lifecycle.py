@@ -64,7 +64,7 @@ Per our [contribution guidelines](CONTRIBUTING.md#review-deadlines), this may re
 You may still continue this review, or use `{bot.BOT_MENTION} /pass`, `{bot.BOT_MENTION} /release`, or `{bot.BOT_MENTION} /away` if you need to step back.
 
 _If you believe this is in error or have extenuating circumstances, please reach out to the subcommittee._"""
-    if not bot.post_comment(issue_number, notice_message):
+    if not bot.github.post_comment(issue_number, notice_message):
         return False
     record_transition_notice_sent(
         review_data,
@@ -90,7 +90,7 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
             tracked_reviewer = review_data.get("current_reviewer")
     if tracked_reviewer:
         return False
-    current_assignees = bot.get_issue_assignees(issue_number)
+    current_assignees = bot.github.get_issue_assignees(issue_number)
     if current_assignees is None:
         raise RuntimeError(f"Unable to determine assignees for #{issue_number}")
     if current_assignees:
@@ -101,10 +101,10 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
     issue_author = request.issue_author
     reviewer = bot.get_next_reviewer(state, skip_usernames={issue_author} if issue_author else set())
     if not reviewer:
-        bot.post_comment(issue_number, f"⚠️ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue.")
+        bot.github.post_comment(issue_number, f"⚠️ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue.")
         return False
     is_pr = request.is_pull_request
-    assignment_attempt = bot.request_reviewer_assignment(issue_number, reviewer)
+    assignment_attempt = bot.github.request_reviewer_assignment(issue_number, reviewer)
     set_current_reviewer(state, issue_number, reviewer)
     review_data = ensure_review_entry(state, issue_number, create=True)
     if is_pr and isinstance(review_data, dict):
@@ -112,14 +112,14 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
         if head_sha:
             review_data["active_head_sha"] = head_sha
     bot.record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
-    failure_comment = bot.get_assignment_failure_comment(reviewer, assignment_attempt)
+    failure_comment = bot.github.get_assignment_failure_comment(reviewer, assignment_attempt)
     if failure_comment:
-        bot.post_comment(issue_number, failure_comment)
+        bot.github.post_comment(issue_number, failure_comment)
     if is_pr and assignment_attempt.success:
-        bot.post_comment(issue_number, get_pr_guidance(reviewer, issue_author))
+        bot.github.post_comment(issue_number, get_pr_guidance(reviewer, issue_author))
     if not is_pr:
         guidance = get_fls_audit_guidance(reviewer, issue_author) if bot.FLS_AUDIT_LABEL in labels else get_issue_guidance(reviewer, issue_author)
-        bot.post_comment(issue_number, guidance)
+        bot.github.post_comment(issue_number, guidance)
     return True
 
 

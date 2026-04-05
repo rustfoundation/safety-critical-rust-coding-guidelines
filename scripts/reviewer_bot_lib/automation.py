@@ -136,7 +136,7 @@ def handle_accept_no_fls_changes_command(
     labels = list(privileged_request.issue_labels)
     if bot.FLS_AUDIT_LABEL not in labels:
         return "❌ This command is only available on issues labeled `fls-audit`.", False
-    permission_status = bot.get_user_permission_status(comment_author, "triage")
+    permission_status = bot.github.get_user_permission_status(comment_author, "triage")
     if permission_status == "unavailable":
         return "❌ Unable to verify triage permissions right now; refusing to run this command.", False
     if permission_status != "granted":

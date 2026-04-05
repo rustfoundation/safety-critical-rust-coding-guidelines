@@ -186,7 +186,7 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 record["completed_at"] = _now_iso(bot)
                 record["result"] = "unsupported_command"
                 return True
-            issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+            issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
             if not isinstance(issue_snapshot, dict) or isinstance(issue_snapshot.get("pull_request"), dict):
                 record["status"] = "failed_closed"
                 record["completed_at"] = _now_iso(bot)
@@ -199,7 +199,7 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 name = label.get("name")
                 if isinstance(name, str):
                     labels.add(name)
-            permission_status = bot.get_user_permission_status(actor, "triage")
+            permission_status = bot.github.get_user_permission_status(actor, "triage")
             if bot.FLS_AUDIT_LABEL not in labels:
                 record["status"] = "failed_closed"
                 record["completed_at"] = _now_iso(bot)
@@ -240,7 +240,7 @@ def handle_scheduled_check(bot, state: dict) -> bool:
             if not isinstance(review_data, dict) or not review_data.get("current_reviewer"):
                 continue
             issue_number = int(issue_key)
-            issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+            issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
             if not isinstance(issue_snapshot, dict) or not isinstance(issue_snapshot.get("pull_request"), dict):
                 continue
             try:

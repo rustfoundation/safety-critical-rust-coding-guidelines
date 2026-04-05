@@ -383,54 +383,6 @@ class ReviewerBotRuntime:
     def github_graphql(self, query: str, variables=None, *, token=None):
         return self.adapters.github.github_graphql(query, variables, token=token)
 
-    def post_comment(self, issue_number: int, body: str) -> bool:
-        return self.adapters.github.post_comment(issue_number, body)
-
-    def get_repo_labels(self):
-        return self.adapters.github.get_repo_labels()
-
-    def add_label(self, issue_number: int, label: str) -> bool:
-        return self.adapters.github.add_label(issue_number, label)
-
-    def remove_label(self, issue_number: int, label: str) -> bool:
-        return self.adapters.github.remove_label(issue_number, label)
-
-    def ensure_label_exists(self, label: str, *, color: str | None = None, description: str | None = None) -> bool:
-        return self.adapters.github.ensure_label_exists(label, color=color, description=description)
-
-    def get_issue_assignees(self, issue_number: int):
-        return self.adapters.github.get_issue_assignees(issue_number)
-
-    def request_reviewer_assignment(self, issue_number: int, username: str):
-        return self.adapters.github.request_reviewer_assignment(issue_number, username)
-
-    def get_assignment_failure_comment(self, reviewer: str, attempt):
-        return self.adapters.github.get_assignment_failure_comment(reviewer, attempt)
-
-    def add_reaction(self, comment_id: int, reaction: str) -> bool:
-        return self.adapters.github.add_reaction(comment_id, reaction)
-
-    def remove_assignee(self, issue_number: int, username: str) -> bool:
-        return self.adapters.github.remove_assignee(issue_number, username)
-
-    def remove_pr_reviewer(self, issue_number: int, username: str) -> bool:
-        return self.adapters.github.remove_pr_reviewer(issue_number, username)
-
-    def unassign_reviewer(self, issue_number: int, username: str) -> bool:
-        return self.adapters.github.unassign_reviewer(issue_number, username)
-
-    def get_user_permission_status(self, username: str, required_permission: str = "triage") -> str:
-        return self.adapters.github.get_user_permission_status(username, required_permission)
-
-    def check_user_permission(self, username: str, required_permission: str = "triage"):
-        return self.adapters.github.check_user_permission(username, required_permission)
-
-    def get_issue_or_pr_snapshot(self, issue_number: int):
-        return self.adapters.github.get_issue_or_pr_snapshot(issue_number)
-
-    def get_pull_request_reviews(self, issue_number: int):
-        return self.adapters.github.get_pull_request_reviews(issue_number)
-
     # Adapter-only mutable review-state compatibility surface.
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
         return self.adapters.review.maybe_record_head_observation_repair(issue_number, review_data)

@@ -116,7 +116,7 @@ def get_pull_request_reviews_result(bot, issue_number: int, reviews: list[dict] 
 
 
 def _permission_status(bot, username: str, permission: str) -> str:
-    status = bot.get_user_permission_status(username, permission)
+    status = bot.github.get_user_permission_status(username, permission)
     if status not in {"granted", "denied", "unavailable"}:
         return "unavailable"
     return status
@@ -163,7 +163,7 @@ def get_latest_valid_current_reviewer_review_for_cycle(
     if boundary is None:
         return None
     if reviews is None:
-        reviews = bot.get_pull_request_reviews(issue_number)
+        reviews = bot.github.get_pull_request_reviews(issue_number)
     if reviews is None:
         return None
     latest_review = None
@@ -205,7 +205,7 @@ def get_valid_current_reviewer_reviews_for_cycle(
     if boundary is None:
         return []
     if reviews is None:
-        reviews = bot.get_pull_request_reviews(issue_number)
+        reviews = bot.github.get_pull_request_reviews(issue_number)
     if reviews is None:
         return []
     valid_reviews: list[dict] = []
@@ -740,7 +740,7 @@ def trigger_mandatory_approver_escalation(bot, state: dict, issue_number: int) -
         review_data["mandatory_approver_satisfied_by"] = None
         review_data["mandatory_approver_satisfied_at"] = None
         state_changed = True
-    if bot.ensure_label_exists(MANDATORY_TRIAGE_APPROVER_LABEL):
+    if bot.github.ensure_label_exists(MANDATORY_TRIAGE_APPROVER_LABEL):
         try:
             if bot.add_label_with_status(issue_number, MANDATORY_TRIAGE_APPROVER_LABEL):
                 if review_data.get("mandatory_approver_label_applied_at") is None:
@@ -749,7 +749,7 @@ def trigger_mandatory_approver_escalation(bot, state: dict, issue_number: int) -
         except RuntimeError as exc:
             _log(bot, "warning", f"Unable to apply escalation label on #{issue_number}: {exc}", issue_number=issue_number, error=str(exc))
     if review_data.get("mandatory_approver_pinged_at") is None:
-        if bot.post_comment(issue_number, MANDATORY_TRIAGE_ESCALATION_TEMPLATE):
+        if bot.github.post_comment(issue_number, MANDATORY_TRIAGE_ESCALATION_TEMPLATE):
             review_data["mandatory_approver_pinged_at"] = now
             state_changed = True
     return state_changed
@@ -769,7 +769,7 @@ def satisfy_mandatory_approver_requirement(bot, state: dict, issue_number: int, 
         bot.remove_label_with_status(issue_number, MANDATORY_TRIAGE_APPROVER_LABEL)
     except RuntimeError as exc:
         _log(bot, "warning", f"Unable to remove escalation label on #{issue_number}: {exc}", issue_number=issue_number, error=str(exc))
-    bot.post_comment(issue_number, MANDATORY_TRIAGE_SATISFIED_TEMPLATE.format(approver=approver))
+    bot.github.post_comment(issue_number, MANDATORY_TRIAGE_SATISFIED_TEMPLATE.format(approver=approver))
     return True
 
 
@@ -927,7 +927,7 @@ def compute_reviewer_response_state(
     reviews: list[dict] | None = None,
 ) -> dict[str, object]:
     if issue_snapshot is None:
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
     if not isinstance(issue_snapshot, dict):
         return {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
     is_pr = isinstance(issue_snapshot.get("pull_request"), dict)
@@ -1109,7 +1109,7 @@ def project_status_labels_for_item(
     issue_snapshot: dict | None = None,
 ) -> tuple[set[str] | None, dict[str, str | None]]:
     if issue_snapshot is None:
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
     if not isinstance(issue_snapshot, dict):
         return None, {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
     if str(issue_snapshot.get("state", "")).lower() == "closed":
@@ -1135,7 +1135,7 @@ def sync_status_labels(bot, issue_number: int, desired_labels: set[str], actual_
     if not to_add and not to_remove:
         return False
     for label in STATUS_LABELS:
-        if not bot.ensure_label_exists(label):
+        if not bot.github.ensure_label_exists(label):
             raise RuntimeError(f"Unable to ensure reviewer-bot status label exists: {label}")
     changed = False
     for label in sorted(to_remove):
@@ -1152,7 +1152,7 @@ def sync_status_labels(bot, issue_number: int, desired_labels: set[str], actual_
 def sync_status_labels_for_items(bot, state: dict, issue_numbers: Iterable[int]) -> bool:
     changed = False
     for issue_number in sorted({n for n in issue_numbers if isinstance(n, int) and n > 0}):
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
         desired_labels, metadata = bot.project_status_labels_for_item(issue_number, state, issue_snapshot=issue_snapshot)
         if desired_labels is None:
             reason = metadata.get("reason") if isinstance(metadata, dict) else "unknown"

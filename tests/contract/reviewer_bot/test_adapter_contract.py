@@ -175,10 +175,10 @@ def test_github_api_assignment_helpers_use_runtime_config_for_pr_vs_issue(monkey
     runtime.github_api_request = fake_request
 
     runtime.set_config_value("IS_PULL_REQUEST", "true")
-    github_pr_attempt = reviewer_bot._runtime_bot(runtime).request_reviewer_assignment(42, "alice")
+    github_pr_attempt = reviewer_bot._runtime_bot(runtime).github.request_reviewer_assignment(42, "alice")
 
     runtime.set_config_value("IS_PULL_REQUEST", "false")
-    github_issue_attempt = reviewer_bot._runtime_bot(runtime).request_reviewer_assignment(42, "alice")
+    github_issue_attempt = reviewer_bot._runtime_bot(runtime).github.request_reviewer_assignment(42, "alice")
 
     assert github_pr_attempt.success is True
     assert github_issue_attempt.success is True

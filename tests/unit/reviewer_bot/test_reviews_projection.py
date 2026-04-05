@@ -12,12 +12,15 @@ from tests.fixtures.reviewer_bot import (
 
 
 def _bot(**overrides):
-    bot = SimpleNamespace(
-        github_api_request=lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(200, {}, {}, "ok", True, None, 0, None),
-        github_api=lambda method, endpoint, data=None: {},
+    github = SimpleNamespace(
         get_pull_request_reviews=lambda issue_number: [],
         get_issue_or_pr_snapshot=lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []},
         get_user_permission_status=lambda username, required_permission="push": "granted",
+    )
+    bot = SimpleNamespace(
+        github_api_request=lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(200, {}, {}, "ok", True, None, 0, None),
+        github_api=lambda method, endpoint, data=None: {},
+        github=github,
         parse_github_timestamp=reviews.parse_github_timestamp,
         parse_iso8601_timestamp=reviews.parse_github_timestamp,
         ensure_review_entry=lambda state, issue_number, create=False: None,

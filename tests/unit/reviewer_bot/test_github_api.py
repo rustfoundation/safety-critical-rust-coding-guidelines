@@ -237,16 +237,16 @@ def test_get_assignment_failure_comment_uses_runtime_config_for_pr_message(monke
 
 
 def test_unassign_reviewer_uses_runtime_config_to_remove_pr_reviewer(monkeypatch):
-    calls = []
-    bot = _bot(
-        monkeypatch,
-        config={"IS_PULL_REQUEST": "true"},
-        remove_pr_reviewer=lambda issue_number, username: calls.append(("pr", issue_number, username)) or True,
-        remove_assignee=lambda issue_number, username: calls.append(("issue", issue_number, username)) or True,
-    )
+    github = RouteGitHubApi()
+    github.add_api("DELETE", "pulls/42/requested_reviewers", {})
+    github.add_api("DELETE", "issues/42/assignees", {})
+    bot = _bot(monkeypatch, config={"IS_PULL_REQUEST": "true"}, github=github)
 
     assert github_api.unassign_reviewer(bot, 42, "alice") is True
-    assert calls == [("pr", 42, "alice"), ("issue", 42, "alice")]
+    assert [call.endpoint for call in github.api_calls] == [
+        "pulls/42/requested_reviewers",
+        "issues/42/assignees",
+    ]
 
 
 def test_find_open_pr_for_branch_status_reports_unavailable_for_malformed_payload(monkeypatch):

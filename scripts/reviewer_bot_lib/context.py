@@ -233,7 +233,7 @@ class ProjectBoardMetadataContext(Protocol):
 
 @runtime_checkable
 class ProjectBoardProjectionContext(Protocol):
-    def get_issue_or_pr_snapshot(self, issue_number: int) -> dict | None: ...
+    github: Any
 
     def compute_reviewer_response_state(
         self,

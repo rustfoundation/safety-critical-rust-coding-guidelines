@@ -30,7 +30,7 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             continue
 
         issue_number = int(issue_key)
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
         if not isinstance(issue_snapshot, dict):
             _log(bot, "warning", f"Skipping overdue evaluation for #{issue_number}; issue/PR snapshot unavailable", issue_number=issue_number)
             continue
@@ -173,7 +173,7 @@ If no action is taken within {bot.TRANSITION_PERIOD_DAYS} days, you may be trans
 
 _Life happens! If you're dealing with something, just let us know._"""
 
-    if not bot.post_comment(issue_number, warning_message):
+    if not bot.github.post_comment(issue_number, warning_message):
         return False
 
     now = bot.datetime.now(bot.timezone.utc).isoformat()

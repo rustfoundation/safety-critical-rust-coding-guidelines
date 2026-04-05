@@ -104,7 +104,7 @@ def validate_accept_no_fls_changes_handoff(
     labels = commands_module.parse_issue_labels(bot)
     if bot.FLS_AUDIT_LABEL not in labels:
         return False, {"reason": "missing_fls_audit_label"}
-    permission_status = bot.get_user_permission_status(request.comment_author, "triage")
+    permission_status = bot.github.get_user_permission_status(request.comment_author, "triage")
     if permission_status == "unavailable":
         return False, {"reason": "authorization_unavailable"}
     if permission_status != "granted":
@@ -144,7 +144,7 @@ def apply_comment_command(
     if command == "accept-no-fls-changes":
         is_valid, metadata = validate_accept_no_fls_changes_handoff(bot, request)
         if not is_valid:
-            bot.post_comment(
+            bot.github.post_comment(
                 issue_number,
                 "❌ This command is not eligible for privileged handoff from the current trusted live state.",
             )
@@ -152,13 +152,13 @@ def apply_comment_command(
         stored = store_pending_privileged_command(review_data, issue_number, source_event_key, command, comment_author, list(args))
         if stored:
             review_data["pending_privileged_commands"][source_event_key].update(metadata)
-            bot.post_comment(
+            bot.github.post_comment(
                 issue_number,
                 "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `#314` state.",
             )
         return stored
     if command == "_multiple_commands":
-        bot.post_comment(issue_number, f"⚠️ Multiple bot commands in one comment are ignored. Please post a single command per comment. For a list of commands, use `{bot.BOT_MENTION} /commands`.")
+        bot.github.post_comment(issue_number, f"⚠️ Multiple bot commands in one comment are ignored. Please post a single command per comment. For a list of commands, use `{bot.BOT_MENTION} /commands`.")
         return False
     response = ""
     success = False
@@ -255,11 +255,11 @@ def apply_comment_command(
         response = f"❌ Unknown command: `/{command}`\n\nAvailable commands:\n{config_module.get_commands_help()}"
     comment_id = request.comment_id
     if comment_id > 0 and command != "_multiple_commands":
-        bot.add_reaction(comment_id, "eyes")
+        bot.github.add_reaction(comment_id, "eyes")
         if success:
-            bot.add_reaction(comment_id, "+1")
+            bot.github.add_reaction(comment_id, "+1")
     if response:
-        bot.post_comment(issue_number, response)
+        bot.github.post_comment(issue_number, response)
     return state_changed
 
 

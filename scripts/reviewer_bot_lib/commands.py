@@ -132,15 +132,15 @@ def _apply_assignment_side_effects(
     assignment_method: str,
 ) -> tuple[AssignmentAttempt, str | None]:
     issue_number = request.issue_number
-    assignment_attempt = bot.request_reviewer_assignment(issue_number, reviewer)
+    assignment_attempt = bot.github.request_reviewer_assignment(issue_number, reviewer)
     review_state.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
     bot.record_assignment(state, reviewer, issue_number, "pr" if request.is_pull_request else "issue")
-    failure_comment = bot.get_assignment_failure_comment(reviewer, assignment_attempt)
+    failure_comment = bot.github.get_assignment_failure_comment(reviewer, assignment_attempt)
     if failure_comment:
-        bot.post_comment(issue_number, failure_comment)
+        bot.github.post_comment(issue_number, failure_comment)
     if assignment_attempt.success:
         if request.is_pull_request:
-            bot.post_comment(issue_number, get_pr_guidance(reviewer, request.issue_author))
+            bot.github.post_comment(issue_number, get_pr_guidance(reviewer, request.issue_author))
         else:
             labels = set(request.issue_labels)
             guidance = (
@@ -148,12 +148,12 @@ def _apply_assignment_side_effects(
                 if bot.FLS_AUDIT_LABEL in labels
                 else get_issue_guidance(reviewer, request.issue_author)
             )
-            bot.post_comment(issue_number, guidance)
+            bot.github.post_comment(issue_number, guidance)
     return assignment_attempt, failure_comment
 
 
 def _current_assignees_or_error(bot, issue_number: int) -> tuple[list[str] | None, str | None]:
-    current_assignees = bot.get_issue_assignees(issue_number)
+    current_assignees = bot.github.get_issue_assignees(issue_number)
     if current_assignees is None:
         return None, "❌ Unable to determine current assignees/reviewers from GitHub; refusing to continue."
     return current_assignees, None
@@ -191,7 +191,7 @@ def handle_pass_command(
     if not next_reviewer:
         return ("❌ No other reviewers available. Everyone in the queue has either passed on this issue or is the author."), False
     bot.reposition_member_as_next(state, passed_reviewer)
-    bot.unassign_reviewer(issue_number, passed_reviewer)
+    bot.github.unassign_reviewer(issue_number, passed_reviewer)
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
@@ -267,7 +267,7 @@ def handle_pass_until_command(
     is_current_reviewer = ((tracked_reviewer and tracked_reviewer.lower() == comment_author.lower()) or comment_author.lower() in [a.lower() for a in current_assignees])
     reassigned_msg = ""
     if is_current_reviewer:
-        bot.unassign_reviewer(issue_number, comment_author)
+        bot.github.unassign_reviewer(issue_number, comment_author)
         skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
         next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
         if next_reviewer:
@@ -306,7 +306,7 @@ def handle_label_command(
     matches = re.findall(pattern, label_string)
     if not matches:
         return "❌ No valid labels found. Use `+label-name` to add or `-label-name` to remove.", False, False
-    existing_labels = bot.get_repo_labels()
+    existing_labels = bot.github.get_repo_labels()
     results = []
     all_success = True
     state_changed = False
@@ -318,7 +318,7 @@ def handle_label_command(
             if label not in existing_labels:
                 results.append(f"⚠️ Label `{label}` does not exist in this repository")
                 all_success = False
-            elif bot.add_label(issue_number, label):
+            elif bot.github.add_label(issue_number, label):
                 results.append(f"✅ Added label `{label}`")
                 if label == "sign-off: create pr" and not assignment_request.is_pull_request:
                     review_data = review_state.ensure_review_entry(state, issue_number)
@@ -331,7 +331,7 @@ def handle_label_command(
                 results.append(f"❌ Failed to add label `{label}`")
                 all_success = False
         elif action == "-":
-            if bot.remove_label(issue_number, label):
+            if bot.github.remove_label(issue_number, label):
                 results.append(f"✅ Removed label `{label}`")
             else:
                 results.append(f"❌ Failed to remove label `{label}`")
@@ -456,7 +456,7 @@ def handle_claim_command(
     if assignee_error:
         return assignee_error, False
     for assignee in current_assignees:
-        bot.unassign_reviewer(issue_number, assignee)
+        bot.github.unassign_reviewer(issue_number, assignee)
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
@@ -489,7 +489,7 @@ def handle_release_command(
         target_username = args[0].lstrip("@")
         reason = " ".join(args[1:]) if len(args) > 1 else None
         releasing_other = target_username.lower() != comment_author.lower()
-        permission_status = bot.get_user_permission_status(comment_author, "triage")
+        permission_status = bot.github.get_user_permission_status(comment_author, "triage")
         if permission_status == "unavailable":
             return "❌ Unable to verify triage permissions right now; refusing to continue.", False
         if releasing_other and permission_status != "granted":
@@ -522,7 +522,7 @@ def handle_release_command(
         if current_assignees:
             return (f"❌ @{comment_author} is not assigned to this issue/PR. Current assignee(s): @{', @'.join(current_assignees)}"), False
         return "❌ No reviewer is currently assigned to release.", False
-    bot.unassign_reviewer(issue_number, target_username)
+    bot.github.unassign_reviewer(issue_number, target_username)
     if "active_reviews" in state and issue_key in state["active_reviews"] and isinstance(state["active_reviews"][issue_key], dict):
         state["active_reviews"][issue_key]["current_reviewer"] = None
     if assignment_method == "round-robin":
@@ -557,7 +557,7 @@ def handle_assign_command(
     if assignee_error:
         return assignee_error, False
     for assignee in current_assignees:
-        bot.unassign_reviewer(issue_number, assignee)
+        bot.github.unassign_reviewer(issue_number, assignee)
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
@@ -585,7 +585,7 @@ def handle_assign_from_queue_command(
     if assignee_error:
         return assignee_error, False
     for assignee in current_assignees:
-        bot.unassign_reviewer(issue_number, assignee)
+        bot.github.unassign_reviewer(issue_number, assignee)
     skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
     next_reviewer = bot.get_next_reviewer(state, skip_usernames=skip_set)
     if not next_reviewer:

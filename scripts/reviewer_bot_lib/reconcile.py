@@ -234,7 +234,7 @@ def _read_optional_reconcile_object(bot, endpoint: str, *, label: str) -> dict |
 
 
 def _read_reconcile_reviews(bot, issue_number: int) -> list[dict]:
-    reviews = bot.get_pull_request_reviews(issue_number)
+    reviews = bot.github.get_pull_request_reviews(issue_number)
     if reviews is None:
         raise ReconcileReadError(f"live reviews for PR #{issue_number} unavailable", failure_kind="unavailable")
     if not isinstance(reviews, list):
@@ -381,7 +381,7 @@ def handle_rectify_command(bot, state: dict, issue_number: int, comment_author: 
 
     triage_status = "denied"
     if not is_current_reviewer:
-        triage_status = bot.get_user_permission_status(comment_author, "triage")
+        triage_status = bot.github.get_user_permission_status(comment_author, "triage")
 
     if not is_current_reviewer and triage_status == "unavailable":
         return (

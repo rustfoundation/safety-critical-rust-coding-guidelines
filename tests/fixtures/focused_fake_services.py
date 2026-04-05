@@ -110,6 +110,10 @@ class LockStub:
 class GitHubStub:
     def __init__(self, github=None):
         self._github = github
+        self._runtime = None
+
+    def bind_runtime(self, runtime) -> None:
+        self._runtime = runtime
 
     def stub(self, github) -> None:
         self._github = github
@@ -129,6 +133,166 @@ class GitHubStub:
             extra_headers=extra_headers,
             **kwargs,
         )
+
+    def _runtime_required(self):
+        if self._runtime is None:
+            raise AssertionError("GitHubStub runtime not bound")
+        return self._runtime
+
+    def _instance_override(self, name: str):
+        runtime = self._runtime_required()
+        override = runtime.__dict__.get(name)
+        return override if callable(override) else None
+
+    def get_github_token(self):
+        override = self._instance_override("get_github_token")
+        if override is not None:
+            return override()
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.get_github_token(self._runtime_required())
+
+    def get_github_graphql_token(self, *, prefer_board_token=False):
+        override = self._instance_override("get_github_graphql_token")
+        if override is not None:
+            return override(prefer_board_token=prefer_board_token)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.get_github_graphql_token(self._runtime_required(), prefer_board_token=prefer_board_token)
+
+    def github_graphql(self, query, variables=None, *, token=None):
+        override = self._instance_override("github_graphql")
+        if override is not None:
+            return override(query, variables, token=token)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.github_graphql(self._runtime_required(), query, variables, token=token)
+
+    def post_comment(self, issue_number: int, body: str):
+        override = self._instance_override("post_comment")
+        if override is not None:
+            return override(issue_number, body)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.post_comment(self._runtime_required(), issue_number, body)
+
+    def get_repo_labels(self):
+        override = self._instance_override("get_repo_labels")
+        if override is not None:
+            return override()
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.get_repo_labels(self._runtime_required())
+
+    def add_label(self, issue_number: int, label: str):
+        override = self._instance_override("add_label")
+        if override is not None:
+            return override(issue_number, label)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.add_label(self._runtime_required(), issue_number, label)
+
+    def remove_label(self, issue_number: int, label: str):
+        override = self._instance_override("remove_label")
+        if override is not None:
+            return override(issue_number, label)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.remove_label(self._runtime_required(), issue_number, label)
+
+    def ensure_label_exists(self, label: str, *, color=None, description=None):
+        override = self._instance_override("ensure_label_exists")
+        if override is not None:
+            return override(label, color=color, description=description)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.ensure_label_exists(self._runtime_required(), label, color=color, description=description)
+
+    def get_issue_assignees(self, issue_number: int):
+        override = self._instance_override("get_issue_assignees")
+        if override is not None:
+            return override(issue_number)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.get_issue_assignees(self._runtime_required(), issue_number)
+
+    def request_reviewer_assignment(self, issue_number: int, username: str):
+        override = self._instance_override("request_reviewer_assignment")
+        if override is not None:
+            return override(issue_number, username)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.request_reviewer_assignment(self._runtime_required(), issue_number, username)
+
+    def get_assignment_failure_comment(self, reviewer: str, attempt):
+        override = self._instance_override("get_assignment_failure_comment")
+        if override is not None:
+            return override(reviewer, attempt)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.get_assignment_failure_comment(self._runtime_required(), reviewer, attempt)
+
+    def add_reaction(self, comment_id: int, reaction: str):
+        override = self._instance_override("add_reaction")
+        if override is not None:
+            return override(comment_id, reaction)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.add_reaction(self._runtime_required(), comment_id, reaction)
+
+    def remove_assignee(self, issue_number: int, username: str):
+        override = self._instance_override("remove_assignee")
+        if override is not None:
+            return override(issue_number, username)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.remove_assignee(self._runtime_required(), issue_number, username)
+
+    def remove_pr_reviewer(self, issue_number: int, username: str):
+        override = self._instance_override("remove_pr_reviewer")
+        if override is not None:
+            return override(issue_number, username)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.remove_pr_reviewer(self._runtime_required(), issue_number, username)
+
+    def unassign_reviewer(self, issue_number: int, username: str):
+        override = self._instance_override("unassign_reviewer")
+        if override is not None:
+            return override(issue_number, username)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.unassign_reviewer(self._runtime_required(), issue_number, username)
+
+    def get_user_permission_status(self, username: str, required_permission="triage"):
+        override = self._instance_override("get_user_permission_status")
+        if override is not None:
+            return override(username, required_permission)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.get_user_permission_status(self._runtime_required(), username, required_permission)
+
+    def check_user_permission(self, username: str, required_permission="triage"):
+        override = self._instance_override("check_user_permission")
+        if override is not None:
+            return override(username, required_permission)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.check_user_permission(self._runtime_required(), username, required_permission)
+
+    def get_issue_or_pr_snapshot(self, issue_number: int):
+        override = self._instance_override("get_issue_or_pr_snapshot")
+        if override is not None:
+            return override(issue_number)
+        return self.github_api("GET", f"issues/{issue_number}")
+
+    def get_pull_request_reviews(self, issue_number: int):
+        override = self._instance_override("get_pull_request_reviews")
+        if override is not None:
+            return override(issue_number)
+        from scripts.reviewer_bot_lib import reviews as reviews_module
+
+        return reviews_module.get_pull_request_reviews(self._runtime_required(), issue_number)
 
 
 class RestTransportStub:
