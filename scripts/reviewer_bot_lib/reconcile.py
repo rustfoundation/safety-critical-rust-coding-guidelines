@@ -13,10 +13,14 @@ from .comment_application import (
 from .comment_routing import classify_comment_payload, classify_issue_comment_actor
 from .context import CommentEventRequest
 from .reconcile_payloads import (
+    DeferredArtifactIdentity,
     DeferredCommentPayload,
     DeferredCommentReplayContext,
     DeferredReviewPayload,
+    DeferredReviewReplayContext,
     ObserverNoopPayload,
+    artifact_expected_name as _artifact_expected_name,
+    artifact_expected_payload_name as _artifact_expected_payload_name,
     build_deferred_comment_replay_context,
     build_deferred_review_replay_context,
     parse_deferred_context_payload,
