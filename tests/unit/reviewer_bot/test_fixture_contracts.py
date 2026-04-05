@@ -4,6 +4,10 @@ from tests.fixtures.fake_clock import FakeClock
 from tests.fixtures.fake_jitter import DeterministicJitter
 from tests.fixtures.fake_sleeper import RecordingSleeper
 from tests.fixtures.fake_uuid import FixedUuidSource
+from tests.fixtures.focused_fake_services import (
+    ArtifactDownloadTransportStub,
+    GraphQLTransportStub,
+)
 from tests.fixtures.recording_logger import RecordingLogger
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
@@ -71,3 +75,27 @@ def test_recording_logger_captures_structured_events():
             "fields": {"issue_number": 42, "retry_attempt": 2},
         }
     ]
+
+
+def test_graphql_transport_stub_replays_sequence_and_keeps_last_value():
+    transport = GraphQLTransportStub()
+    transport.stub_sequence([{"data": {"viewer": {"login": "bot"}}}, {"data": {"viewer": {"login": "bot-2"}}}])
+
+    assert transport.query("https://api.github.com/graphql", query="q") == {"data": {"viewer": {"login": "bot"}}}
+    assert transport.query("https://api.github.com/graphql", query="q") == {"data": {"viewer": {"login": "bot-2"}}}
+    assert transport.query("https://api.github.com/graphql", query="q") == {"data": {"viewer": {"login": "bot-2"}}}
+
+
+def test_artifact_download_transport_stub_replays_sequence_and_raises_exceptions():
+    transport = ArtifactDownloadTransportStub()
+    transport.stub_sequence([RuntimeError("timeout"), {"ok": True}])
+
+    try:
+        transport.download("https://example.com/artifact.zip")
+    except RuntimeError as exc:
+        assert "timeout" in str(exc)
+    else:
+        raise AssertionError("expected RuntimeError")
+
+    assert transport.download("https://example.com/artifact.zip") == {"ok": True}
+    assert transport.download("https://example.com/artifact.zip") == {"ok": True}

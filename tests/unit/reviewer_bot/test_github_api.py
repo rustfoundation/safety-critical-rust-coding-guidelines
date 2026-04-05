@@ -82,14 +82,13 @@ def test_github_api_request_classifies_forbidden_without_retry(monkeypatch):
 
 
 def test_github_graphql_request_retries_idempotent_query_on_502(monkeypatch):
-    responses = iter(
+    bot = _bot(monkeypatch)
+    bot.graphql_transport.stub_sequence(
         [
             FakeGitHubResponse(502, {"message": "bad gateway"}, "bad gateway"),
             FakeGitHubResponse(200, {"data": {"viewer": {"login": "bot"}}}, "ok"),
         ]
     )
-    bot = _bot(monkeypatch)
-    bot.graphql_transport.stub(lambda **kwargs: next(responses))
     result = github_api.github_graphql_request(
         bot,
         "query { viewer { login } }",
@@ -131,7 +130,7 @@ def test_github_api_request_reports_retry_exhaustion_on_repeated_429(monkeypatch
 
 def test_github_graphql_request_reports_invalid_payload(monkeypatch):
     bot = _bot(monkeypatch)
-    bot.graphql_transport.stub(lambda **kwargs: FakeGitHubResponse(200, ValueError("bad json"), "bad json"))
+    bot.graphql_transport.stub_sequence([FakeGitHubResponse(200, ValueError("bad json"), "bad json")])
 
     result = github_api.github_graphql_request(bot, "query { viewer { login } }")
 
@@ -141,7 +140,7 @@ def test_github_graphql_request_reports_invalid_payload(monkeypatch):
 
 def test_github_graphql_request_reports_graphql_errors(monkeypatch):
     bot = _bot(monkeypatch)
-    bot.graphql_transport.stub(lambda **kwargs: FakeGitHubResponse(200, {"errors": [{"message": "boom"}]}, "boom"))
+    bot.graphql_transport.stub_sequence([FakeGitHubResponse(200, {"errors": [{"message": "boom"}]}, "boom")])
 
     result = github_api.github_graphql_request(bot, "query { viewer { login } }")
 
@@ -321,7 +320,7 @@ def test_github_api_request_logs_error_response_to_recording_logger(monkeypatch)
 
 def test_github_graphql_request_passes_timeout(monkeypatch):
     bot = _bot(monkeypatch)
-    bot.graphql_transport.stub(lambda **kwargs: FakeGitHubResponse(200, {"data": {"viewer": {"login": "bot"}}}, "ok"))
+    bot.graphql_transport.stub_sequence([FakeGitHubResponse(200, {"data": {"viewer": {"login": "bot"}}}, "ok")])
 
     result = github_api.github_graphql_request(bot, "query { viewer { login } }", timeout_seconds=9.5)
 

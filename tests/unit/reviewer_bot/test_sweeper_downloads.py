@@ -6,18 +6,6 @@ from tests.fixtures.http_responses import FakeGitHubResponse
 from tests.fixtures.reviewer_bot import make_zip_payload
 
 
-def _stub_download_sequence(runtime, responses):
-    iterator = iter(responses)
-
-    def fake_download(**kwargs):
-        response = next(iterator)
-        if isinstance(response, Exception):
-            raise response
-        return response
-
-    runtime.artifact_download_transport.stub(fake_download)
-
-
 def test_download_artifact_payload_retries_429_then_succeeds(monkeypatch):
     payload = {"source_event_key": "issue_comment:100"}
     responses = iter([FakeGitHubResponse(429, {"message": "slow down"}, "slow down")])
@@ -29,7 +17,7 @@ def test_download_artifact_payload_retries_429_then_succeeds(monkeypatch):
     runtime.get_github_token = lambda: "token"
     runtime.jitter = DeterministicJitter(0.5)
     runtime.sleeper = RecordingSleeper()
-    _stub_download_sequence(runtime, [*responses, success_response])
+    runtime.artifact_download_transport.stub_sequence([*responses, success_response])
 
     status, artifact_payload = sweeper._download_artifact_payload(
         runtime,
@@ -57,7 +45,7 @@ def test_download_artifact_payload_reports_request_exception_unavailable(monkeyp
     runtime.set_config_value("GITHUB_TOKEN", "token")
     runtime.get_github_token = lambda: "token"
     runtime.sleeper = RecordingSleeper()
-    _stub_download_sequence(runtime, [RuntimeError("timeout")])
+    runtime.artifact_download_transport.stub_sequence([RuntimeError("timeout")])
 
     status, payload = sweeper._download_artifact_payload(
         runtime,
@@ -74,7 +62,7 @@ def test_download_artifact_payload_reports_retry_exhaustion_unavailable(monkeypa
     runtime.set_config_value("GITHUB_TOKEN", "token")
     runtime.get_github_token = lambda: "token"
     runtime.sleeper = RecordingSleeper()
-    _stub_download_sequence(runtime, [FakeGitHubResponse(429, {"message": "slow down"}, "slow down")] * 6)
+    runtime.artifact_download_transport.stub_sequence([FakeGitHubResponse(429, {"message": "slow down"}, "slow down")] * 6)
 
     status, payload = sweeper._download_artifact_payload(
         runtime,

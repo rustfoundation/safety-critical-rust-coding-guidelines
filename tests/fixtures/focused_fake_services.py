@@ -165,7 +165,7 @@ class RestTransportStub:
             endpoint = "/".join(parts[3:])
         else:
             endpoint = parsed.path.lstrip("/")
-        result = self._runtime.github_api_request(method, endpoint, data=json_data)
+        result = self._runtime.github.github_api_request(method, endpoint, data=json_data)
 
         class _Response:
             def __init__(self, api_result):
@@ -190,11 +190,19 @@ class RestTransportStub:
 
 class GraphQLTransportStub:
     def __init__(self):
-        self._query: Callable[..., Any] = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No GraphQL stub configured"))
+        self._query: Callable[..., Any] | None = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No GraphQL stub configured"))
+        self._sequence: list[Any] | None = None
         self.calls: list[dict[str, Any]] = []
 
     def stub(self, func: Callable[..., Any]) -> None:
+        self._sequence = None
         self._query = func
+
+    def stub_sequence(self, responses: list[Any]) -> None:
+        if not responses:
+            raise ValueError("response sequence cannot be empty")
+        self._query = None
+        self._sequence = list(responses)
 
     def query(self, url: str, *, headers=None, query: str, variables=None, timeout_seconds=None):
         self.calls.append(
@@ -206,19 +214,43 @@ class GraphQLTransportStub:
                 "timeout_seconds": timeout_seconds,
             }
         )
+        if self._sequence is not None:
+            response = self._sequence[0]
+            if len(self._sequence) > 1:
+                del self._sequence[0]
+            if isinstance(response, Exception):
+                raise response
+            return response
+        assert self._query is not None
         return self._query(url=url, headers=headers, query=query, variables=variables, timeout_seconds=timeout_seconds)
 
 
 class ArtifactDownloadTransportStub:
     def __init__(self):
-        self._download: Callable[..., Any] = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No artifact download stub configured"))
+        self._download: Callable[..., Any] | None = lambda **kwargs: (_ for _ in ()).throw(AssertionError("No artifact download stub configured"))
+        self._sequence: list[Any] | None = None
         self.calls: list[dict[str, Any]] = []
 
     def stub(self, func: Callable[..., Any]) -> None:
+        self._sequence = None
         self._download = func
+
+    def stub_sequence(self, responses: list[Any]) -> None:
+        if not responses:
+            raise ValueError("response sequence cannot be empty")
+        self._download = None
+        self._sequence = list(responses)
 
     def download(self, url: str, *, headers=None, timeout_seconds=None):
         self.calls.append({"url": url, "headers": headers, "timeout_seconds": timeout_seconds})
+        if self._sequence is not None:
+            response = self._sequence[0]
+            if len(self._sequence) > 1:
+                del self._sequence[0]
+            if isinstance(response, Exception):
+                raise response
+            return response
+        assert self._download is not None
         return self._download(url=url, headers=headers, timeout_seconds=timeout_seconds)
 
 
