@@ -17,7 +17,6 @@ class ConfigBag:
     def set(self, name: str, value) -> None:
         rendered = str(value)
         self.values[name] = rendered
-        self._monkeypatch.setenv(name, rendered)
 
 
 class OutputCapture:

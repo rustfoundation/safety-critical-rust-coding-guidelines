@@ -26,6 +26,17 @@ def test_fake_runtime_config_writes_round_trip_locally(monkeypatch):
     runtime.set_config_value("EVENT_NAME", "issue_comment")
 
     assert runtime.get_config_value("EVENT_NAME") == "issue_comment"
+
+
+def test_fake_runtime_config_writes_do_not_leak_to_process_env(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    monkeypatch.delenv("EVENT_NAME", raising=False)
+
+    runtime.set_config_value("EVENT_NAME", "issue_comment")
+
+    import os
+
+    assert "EVENT_NAME" not in os.environ
     assert hasattr(FakeReviewerBotRuntime, "__getattr__") is False
     assert "_module" not in vars(runtime)
 

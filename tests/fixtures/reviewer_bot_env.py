@@ -47,13 +47,11 @@ def clear_reviewer_bot_env(monkeypatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def reset_reviewer_bot_process_state(monkeypatch, target_module) -> None:
-    clear_reviewer_bot_env(monkeypatch)
-    monkeypatch.setattr(target_module, "ACTIVE_LEASE_CONTEXT", build_test_lease_context())
-    monkeypatch.setattr(target_module, "TOUCHED_ISSUE_NUMBERS", set())
-    monkeypatch.setattr(target_module, "_reviewer_board_project_metadata", None, raising=False)
-
-
 def set_env_values(config, **values) -> None:
     for name, value in values.items():
         config.set(name, value)
+
+
+def set_process_env_values(monkeypatch, **values) -> None:
+    for name, value in values.items():
+        monkeypatch.setenv(name, str(value))
