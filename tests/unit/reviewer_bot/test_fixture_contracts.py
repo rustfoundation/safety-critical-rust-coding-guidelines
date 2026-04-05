@@ -6,7 +6,9 @@ from tests.fixtures.fake_sleeper import RecordingSleeper
 from tests.fixtures.fake_uuid import FixedUuidSource
 from tests.fixtures.focused_fake_services import (
     ArtifactDownloadTransportStub,
+    GitHubStub,
     GraphQLTransportStub,
+    RestTransportStub,
 )
 from tests.fixtures.recording_logger import RecordingLogger
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
@@ -84,6 +86,17 @@ def test_graphql_transport_stub_replays_sequence_and_keeps_last_value():
     assert transport.query("https://api.github.com/graphql", query="q") == {"data": {"viewer": {"login": "bot"}}}
     assert transport.query("https://api.github.com/graphql", query="q") == {"data": {"viewer": {"login": "bot-2"}}}
     assert transport.query("https://api.github.com/graphql", query="q") == {"data": {"viewer": {"login": "bot-2"}}}
+
+
+def test_rest_transport_stub_routes_repo_urls_through_github_stub():
+    github = GitHubStub(RouteGitHubApi().add_request("GET", "issues/42", result=github_result(200, {"ok": True})))
+    transport = RestTransportStub(github)
+
+    response = transport.request("GET", "https://api.github.com/repos/rustfoundation/safety-critical-rust-coding-guidelines/issues/42")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert transport.calls[0]["url"].endswith("issues/42")
 
 
 def test_artifact_download_transport_stub_replays_sequence_and_raises_exceptions():

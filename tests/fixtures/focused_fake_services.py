@@ -133,8 +133,8 @@ class GitHubStub:
 
 
 class RestTransportStub:
-    def __init__(self, runtime):
-        self._runtime = runtime
+    def __init__(self, github_stub: GitHubStub):
+        self._github = github_stub
         self.calls: list[dict[str, Any]] = []
         self._direct_request: Callable[..., Any] | None = None
 
@@ -165,7 +165,7 @@ class RestTransportStub:
             endpoint = "/".join(parts[3:])
         else:
             endpoint = parsed.path.lstrip("/")
-        result = self._runtime.github.github_api_request(method, endpoint, data=json_data)
+        result = self._github.github_api_request(method, endpoint, data=json_data)
 
         class _Response:
             def __init__(self, api_result):
