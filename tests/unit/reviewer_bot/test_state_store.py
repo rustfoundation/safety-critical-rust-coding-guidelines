@@ -29,6 +29,29 @@ def test_load_state_sets_schema_and_epoch_defaults(monkeypatch):
     assert state["freshness_runtime_epoch"] == FRESHNESS_RUNTIME_EPOCH_LEGACY
 
 
+def test_load_state_materializes_missing_top_level_persisted_keys(monkeypatch):
+    bot = _bot(monkeypatch, get_state_issue=lambda: {"body": "schema_version: 5\n"})
+
+    state = state_store.load_state(bot)
+
+    assert state["schema_version"] == 5
+    assert state["status_projection_epoch"] is None
+    assert state["last_updated"] is None
+    assert state["current_index"] == 0
+    assert state["queue"] == []
+    assert state["pass_until"] == []
+    assert state["recent_assignments"] == []
+    assert state["active_reviews"] == {}
+
+
+def test_load_state_repairs_non_dict_active_reviews_fail_closed_to_empty_mapping(monkeypatch):
+    bot = _bot(monkeypatch, get_state_issue=lambda: {"body": "active_reviews: []\n"})
+
+    state = state_store.load_state(bot)
+
+    assert state["active_reviews"] == {}
+
+
 def test_get_state_issue_snapshot_uses_retry_aware_read(monkeypatch):
     observed = {}
 

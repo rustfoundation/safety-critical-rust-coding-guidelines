@@ -292,6 +292,24 @@ def test_repair_visible_review_gap_returns_true_for_bookkeeping_only_mutations(m
     assert "pull_request_review:303" not in review["deferred_gaps"]
 
 
+def test_load_surface_watermark_lazily_materializes_missing_surface_state(monkeypatch):
+    review = review_state.ensure_review_entry(make_state(), 42, create=True)
+    assert review is not None
+
+    watermark = sweeper._load_surface_watermark(review, "reviewer_comment")
+
+    assert watermark == {
+        "last_scan_started_at": None,
+        "last_scan_completed_at": None,
+        "last_safe_event_time": None,
+        "last_safe_event_id": None,
+        "lookback_seconds": None,
+        "bootstrap_window_seconds": None,
+        "bootstrap_completed_at": None,
+    }
+    assert review["observer_discovery_watermarks"]["reviewer_comment"] == watermark
+
+
 def test_observer_run_reason_mapping_and_near_miss_signature():
     signature = {"status": "waiting", "conclusion": None, "name": "approval_pending"}
     assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"

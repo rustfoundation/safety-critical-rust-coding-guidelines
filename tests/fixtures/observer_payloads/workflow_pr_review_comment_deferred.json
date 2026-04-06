@@ -1,0 +1,30 @@
+{
+  "fixture_metadata": {
+    "fixture_id": "workflow_pr_review_comment_deferred",
+    "contract_class": "workflow_emitted_payload",
+    "contract_source": "workflow YAML",
+    "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-comment-observer.yml"
+  },
+  "payload": {
+    "schema_version": 2,
+    "source_workflow_name": "Reviewer Bot PR Review Comment Observer",
+    "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
+    "source_run_id": 404,
+    "source_run_attempt": 6,
+    "source_event_name": "pull_request_review_comment",
+    "source_event_action": "created",
+    "source_event_key": "pull_request_review_comment:701",
+    "pr_number": 42,
+    "comment_id": 701,
+    "comment_class": "command_only",
+    "has_non_command_text": false,
+    "source_body_digest": "b3ea06a5981d84991c680b3a0b9a3e0bdbcbd0a52bddc7eaf79946cde1cd0f0a",
+    "source_created_at": "2026-03-20T21:00:00Z",
+    "actor_login": "reviewer2",
+    "actor_id": 7004,
+    "actor_class": "repo_user_principal",
+    "pull_request_review_id": 601,
+    "in_reply_to_id": null,
+    "source_artifact_name": "reviewer-bot-review-comment-context-404-attempt-6"
+  }
+}

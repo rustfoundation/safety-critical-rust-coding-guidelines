@@ -19,7 +19,7 @@ from .reviewer_bot_builders import (
     build_privileged_command_request,
 )
 from .reviewer_bot_env import set_env_values
-from .reviewer_bot_recorders import record_comments
+from .reviewer_bot_recorders import record_comment_side_effects, record_comments
 
 
 class AutomationRunner:
@@ -108,6 +108,9 @@ class CommandHarness:
 
     def capture_posted_comments(self):
         return record_comments(self.runtime)
+
+    def capture_comment_side_effects(self):
+        return record_comment_side_effects(self.runtime)
 
     def stub_assignees(self, assignees):
         self.runtime.get_issue_assignees = lambda issue_number: assignees

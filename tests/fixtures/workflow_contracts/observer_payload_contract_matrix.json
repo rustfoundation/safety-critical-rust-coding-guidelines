@@ -1,0 +1,42 @@
+{
+  "workflow_emitted_payloads": [
+    {
+      "fixture_id": "workflow_pr_comment_deferred",
+      "fixture_path": "tests/fixtures/observer_payloads/workflow_pr_comment_deferred.json",
+      "contract_source": "workflow YAML",
+      "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml"
+    },
+    {
+      "fixture_id": "workflow_pr_review_submitted_deferred",
+      "fixture_path": "tests/fixtures/observer_payloads/workflow_pr_review_submitted_deferred.json",
+      "contract_source": "workflow YAML",
+      "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml"
+    },
+    {
+      "fixture_id": "workflow_pr_review_dismissed_deferred",
+      "fixture_path": "tests/fixtures/observer_payloads/workflow_pr_review_dismissed_deferred.json",
+      "contract_source": "workflow YAML",
+      "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml"
+    },
+    {
+      "fixture_id": "workflow_pr_review_comment_deferred",
+      "fixture_path": "tests/fixtures/observer_payloads/workflow_pr_review_comment_deferred.json",
+      "contract_source": "workflow YAML",
+      "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-comment-observer.yml"
+    }
+  ],
+  "python_helper_outputs": [
+    {
+      "fixture_id": "helper_pr_comment_trusted_direct_noop",
+      "fixture_path": "tests/fixtures/observer_payloads/helper_pr_comment_trusted_direct_noop.json",
+      "contract_source": "production Python helper",
+      "source_function": "scripts.reviewer_bot_lib.comment_routing.build_pr_comment_observer_payload"
+    },
+    {
+      "fixture_id": "helper_pr_comment_automation_noop",
+      "fixture_path": "tests/fixtures/observer_payloads/helper_pr_comment_automation_noop.json",
+      "contract_source": "production Python helper",
+      "source_function": "scripts.reviewer_bot_lib.comment_routing.build_pr_comment_observer_payload"
+    }
+  ]
+}

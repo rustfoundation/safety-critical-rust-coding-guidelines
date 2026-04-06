@@ -1,0 +1,21 @@
+{
+  "fixture_metadata": {
+    "fixture_id": "helper_pr_comment_automation_noop",
+    "contract_class": "python_helper_output",
+    "contract_source": "production Python helper",
+    "source_function": "scripts.reviewer_bot_lib.comment_routing.build_pr_comment_observer_payload"
+  },
+  "payload": {
+    "schema_version": 1,
+    "kind": "observer_noop",
+    "reason": "ignored_non_human_automation",
+    "source_workflow_name": "Reviewer Bot PR Comment Observer",
+    "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+    "source_run_id": 998,
+    "source_run_attempt": 2,
+    "source_event_name": "issue_comment",
+    "source_event_action": "created",
+    "source_event_key": "issue_comment:101",
+    "pr_number": 42
+  }
+}

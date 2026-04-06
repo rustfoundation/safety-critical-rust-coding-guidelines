@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.reviewer_bot_core import state_adapters
 from scripts.reviewer_bot_lib import review_state, reviews
 from tests.fixtures.reviewer_bot import make_state
 
@@ -15,6 +16,14 @@ def _read(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
+def _read_state_contract_table() -> str:
+    return _read("tests/fixtures/state_contracts/review_state_contract_table.md")
+
+
+def _read_review_state_inventory() -> str:
+    return _read("tests/fixtures/equivalence/review_state/api_inventory.md")
+
+
 def test_ensure_review_entry_initializes_tracked_review_shape():
     state = make_state()
 
@@ -24,6 +33,111 @@ def test_ensure_review_entry_initializes_tracked_review_shape():
     assert review["current_reviewer"] is None
     assert review["reviewer_comment"]["accepted"] is None
     assert review["pending_privileged_commands"] == {}
+    assert review["observer_discovery_watermarks"] == {}
+    assert review["current_cycle_write_approval"] == {}
+
+
+def test_state_contract_table_fixture_lists_frozen_sections_and_field_classifications():
+    table = _read_state_contract_table()
+
+    for heading in [
+        "Top-Level Persisted Keys",
+        "Per-Review-Entry Keys",
+        "Per-Channel Keys",
+        "Lazy-Upgrade Cases",
+    ]:
+        assert heading in table
+
+    for line in [
+        "- active_reviews: required",
+        "- status_projection_epoch: lazily materialized",
+        "- pending_privileged_commands: lazily materialized",
+        "- current_cycle_write_approval: lazily materialized",
+        "- observer_discovery_watermarks: lazily materialized",
+        "- reconciled_source_events: tolerated legacy shape",
+        "- accepted: lazily materialized",
+        "- seen_keys: tolerated legacy shape",
+        "- non-list skipped: tolerated legacy shape",
+    ]:
+        assert line in table
+
+
+def test_ensure_review_entry_lazily_upgrades_sparse_legacy_review_entries():
+    state = make_state()
+    state["active_reviews"]["42"] = ["alice", "bob"]
+
+    review = review_state.ensure_review_entry(state, 42, create=False)
+
+    assert review is state["active_reviews"]["42"]
+    assert review["skipped"] == ["alice", "bob"]
+    assert review["reviewer_comment"] == {"accepted": None, "seen_keys": []}
+    assert review["pending_privileged_commands"] == {}
+    assert review["reconciled_source_events"] == []
+
+
+def test_ensure_review_entry_repairs_missing_nested_maps_and_legacy_list_fields():
+    state = make_state()
+    state["active_reviews"]["42"] = {
+        "skipped": "legacy",
+        "reviewer_comment": {"accepted": None, "seen_keys": "bad"},
+        "reconciled_source_events": "bad",
+    }
+
+    review = review_state.ensure_review_entry(state, 42, create=False)
+
+    assert review is not None
+    assert review["skipped"] == []
+    assert review["reviewer_comment"] == {"accepted": None, "seen_keys": []}
+    assert review["contributor_revision"] == {"accepted": None, "seen_keys": []}
+    assert review["deferred_gaps"] == {}
+    assert review["observer_discovery_watermarks"] == {}
+    assert review["pending_privileged_commands"] == {}
+    assert review["current_cycle_completion"] == {}
+    assert review["current_cycle_write_approval"] == {}
+    assert review["reconciled_source_events"] == []
+
+
+def test_core_state_adapter_matches_current_sparse_review_entry_upgrade_contract():
+    state = make_state()
+    state["active_reviews"]["42"] = ["alice", "bob"]
+
+    adapted = state_adapters.review_entry_from_persisted(state["active_reviews"]["42"])
+    upgraded = review_state.ensure_review_entry(state, 42, create=False)
+
+    assert adapted is not None
+    assert state_adapters.review_entry_to_persisted(adapted) == {
+        key: upgraded[key]
+        for key in state_adapters.review_entry_to_persisted(adapted)
+    }
+
+
+def test_review_state_mutation_inventory_freezes_overlap_classification_and_live_read_scope():
+    inventory = _read_review_state_inventory()
+
+    for heading in [
+        "Local-State-Only Mutation APIs",
+        "Live-Read-Assisted Mutation APIs",
+        "Read-Only Helpers",
+    ]:
+        assert heading in inventory
+
+    for line in [
+        "- ensure_review_entry: local-state-only mutation",
+        "- accept_channel_event: local-state-only mutation",
+        "- record_reviewer_activity: local-state-only mutation",
+        "- record_transition_notice_sent: local-state-only mutation",
+        "- set_current_reviewer: local-state-only mutation",
+        "- update_reviewer_activity: local-state-only mutation",
+        "- mark_review_complete: local-state-only mutation",
+        "- get_current_cycle_boundary: read-only helper",
+        "- clear_transition_timers: local-state-only mutation",
+        "- semantic_key_seen: read-only helper",
+        "- accept_reviewer_review_from_live_review: live-read-assisted mutation; C1c in-scope",
+        "- refresh_reviewer_review_from_live_preferred_review: live-read-assisted mutation; C1c in-scope",
+        "- repair_missing_reviewer_review_state: live-read-assisted mutation; C1c in-scope",
+        "- list_open_tracked_review_items: read-only helper",
+    ]:
+        assert line in inventory
 
 
 def test_accept_channel_event_deduplicates_semantic_keys():

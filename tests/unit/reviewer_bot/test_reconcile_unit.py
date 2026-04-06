@@ -200,6 +200,61 @@ def test_parse_deferred_context_payload_returns_typed_observer_noop_payload():
     assert parsed.pr_number == 42
 
 
+def test_ensure_source_event_key_creates_and_updates_deferred_gap_payloads():
+    review = review_state.ensure_review_entry(make_state(), 42, create=True)
+    assert review is not None
+
+    reconcile._ensure_source_event_key(review, "issue_comment:210", {"reason": "artifact_missing"})
+    reconcile._ensure_source_event_key(review, "issue_comment:210", {"reason": "reconcile_failed_closed"})
+
+    assert review["deferred_gaps"]["issue_comment:210"] == {
+        "source_event_key": "issue_comment:210",
+        "reason": "reconcile_failed_closed",
+    }
+
+
+def test_clear_source_event_key_and_mark_reconciled_source_event_updates_bookkeeping():
+    review = review_state.ensure_review_entry(make_state(), 42, create=True)
+    assert review is not None
+    review["deferred_gaps"]["issue_comment:210"] = {"reason": "artifact_missing"}
+
+    assert reconcile._clear_source_event_key(review, "issue_comment:210") is True
+    assert reconcile._mark_reconciled_source_event(review, "issue_comment:210") is True
+    assert reconcile._mark_reconciled_source_event(review, "issue_comment:210") is False
+    assert review["deferred_gaps"] == {}
+    assert review["reconciled_source_events"] == ["issue_comment:210"]
+
+
+def test_handle_workflow_run_event_collects_touched_item_for_projection_followup(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.ACTIVE_LEASE_CONTEXT = object()
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    runtime.stub_deferred_payload(
+        {
+            "schema_version": 1,
+            "kind": "observer_noop",
+            "reason": "trusted_direct_same_repo_human_comment",
+            "source_workflow_name": "Reviewer Bot PR Comment Observer",
+            "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            "source_run_id": 610,
+            "source_run_attempt": 1,
+            "source_event_name": "issue_comment",
+            "source_event_action": "created",
+            "source_event_key": "issue_comment:210",
+            "pr_number": 42,
+        }
+    )
+    state = make_state(epoch="freshness_v15")
+
+    changed = reconcile.handle_workflow_run_event(runtime, state)
+
+    assert changed is False
+    assert runtime.drain_touched_items() == [42]
+    assert "42" in state["active_reviews"]
+
+
 def test_reconcile_active_review_entry_uses_explicit_head_repair_changed_field(monkeypatch):
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)

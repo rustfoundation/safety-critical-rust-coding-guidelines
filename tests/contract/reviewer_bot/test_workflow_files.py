@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,19 @@ import pytest
 pytestmark = pytest.mark.contract
 
 import yaml
+
+
+def _load_observer_contract_matrix() -> dict:
+    return json.loads(
+        Path("tests/fixtures/workflow_contracts/observer_payload_contract_matrix.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def _load_fixture_payload(relative_path: str) -> dict:
+    data = json.loads(Path(relative_path).read_text(encoding="utf-8"))
+    return data["payload"]
 
 
 def test_issue_comment_direct_workflow_exports_issue_state():
@@ -114,6 +128,54 @@ def test_workflow_summaries_and_runbook_references_exist():
     assert runbook.exists()
     reconcile = Path(".github/workflows/reviewer-bot-reconcile.yml").read_text(encoding="utf-8")
     assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
+
+
+@pytest.mark.parametrize(
+    ("fixture_id", "workflow_name", "workflow_file", "artifact_name_shape"),
+    [
+        (
+            "workflow_pr_comment_deferred",
+            "Reviewer Bot PR Comment Observer",
+            ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            "reviewer-bot-comment-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+        ),
+        (
+            "workflow_pr_review_submitted_deferred",
+            "Reviewer Bot PR Review Submitted Observer",
+            ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+            "reviewer-bot-review-submitted-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+        ),
+        (
+            "workflow_pr_review_dismissed_deferred",
+            "Reviewer Bot PR Review Dismissed Observer",
+            ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
+            "reviewer-bot-review-dismissed-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+        ),
+        (
+            "workflow_pr_review_comment_deferred",
+            "Reviewer Bot PR Review Comment Observer",
+            ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
+            "reviewer-bot-review-comment-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+        ),
+    ],
+)
+def test_observer_workflow_fixture_identities_match_exact_workflow_contract_strings(
+    fixture_id, workflow_name, workflow_file, artifact_name_shape
+):
+    matrix = _load_observer_contract_matrix()
+    fixture_entry = next(
+        item for item in matrix["workflow_emitted_payloads"] if item["fixture_id"] == fixture_id
+    )
+    payload = _load_fixture_payload(fixture_entry["fixture_path"])
+    workflow_text = Path(workflow_file).read_text(encoding="utf-8")
+    workflow_data = yaml.safe_load(workflow_text)
+
+    assert fixture_entry["contract_source"] == "workflow YAML"
+    assert fixture_entry["source_workflow_file"] == workflow_file
+    assert payload["source_workflow_name"] == workflow_name
+    assert payload["source_workflow_file"] == workflow_file
+    assert workflow_data["name"] == workflow_name
+    assert artifact_name_shape in workflow_text
 
 def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):
     from scripts.reviewer_bot_lib import comment_routing

@@ -319,6 +319,68 @@ def test_validate_accept_no_fls_changes_handoff_distinguishes_permission_unavail
     assert metadata["reason"] == "authorization_unavailable"
 
 
+def test_apply_comment_command_records_privileged_handoff_side_effects(monkeypatch):
+    harness = CommandHarness(monkeypatch)
+    state = make_state()
+    side_effects = harness.capture_comment_side_effects()
+    request = harness.typed_comment_request(
+        issue_number=42,
+        actor="alice",
+        body="@guidelines-bot /accept-no-fls-changes",
+        issue_author="dana",
+        is_pull_request=False,
+    )
+    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
+    harness.stub_permission("granted")
+
+    changed = comment_application.apply_comment_command(
+        harness.runtime,
+        state,
+        request,
+        {"command": "accept-no-fls-changes", "args": [], "command_count": 1},
+        classify_issue_comment_actor=lambda current_request: "repo_user_principal",
+    )
+
+    pending = state["active_reviews"]["42"]["pending_privileged_commands"]["issue_comment:100"]
+    assert changed is True
+    assert pending["command_name"] == "accept-no-fls-changes"
+    assert pending["status"] == "pending"
+    assert pending["authorization"]["authorized"] is True
+    assert side_effects.comments == [
+        (
+            42,
+            "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `#314` state.",
+        )
+    ]
+    assert side_effects.reactions == []
+
+
+def test_apply_comment_command_adds_reactions_and_posts_normalized_queue_response(monkeypatch):
+    harness = CommandHarness(monkeypatch)
+    state = make_state()
+    side_effects = harness.capture_comment_side_effects()
+    request = harness.typed_comment_request(
+        issue_number=42,
+        actor="alice",
+        body="@guidelines-bot /queue",
+        issue_author="dana",
+        is_pull_request=False,
+    )
+    monkeypatch.setattr(commands, "handle_queue_command", lambda bot, current_state: ("queue snapshot", True))
+
+    changed = comment_application.apply_comment_command(
+        harness.runtime,
+        state,
+        request,
+        {"command": "queue", "args": [], "command_count": 1},
+        classify_issue_comment_actor=lambda current_request: "repo_user_principal",
+    )
+
+    assert changed is False
+    assert side_effects.comments == [(42, "queue snapshot")]
+    assert side_effects.reactions == [(100, "eyes"), (100, "+1")]
+
+
 def test_manual_dispatch_marks_live_permission_unavailable_for_pending_privileged_command(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
