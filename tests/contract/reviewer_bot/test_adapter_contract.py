@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from typing import get_type_hints
 
@@ -374,6 +376,50 @@ def test_bootstrap_runtime_wires_explicit_adapter_services():
     assert hasattr(runtime.adapters.commands, "handle_pass_command")
     assert hasattr(runtime.adapters.queue, "get_next_reviewer")
     assert hasattr(runtime.adapters.state_lock, "render_state_issue_body")
+
+
+def _load_runtime_surface_inventory() -> dict:
+    return json.loads(
+        Path("tests/fixtures/equivalence/runtime_surface/triple_inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def test_f2a_runtime_surface_inventory_fixture_records_retained_triples():
+    inventory = _load_runtime_surface_inventory()
+
+    assert inventory["harness_id"] == "F2a runtime/bootstrap/fake-runtime triple inventory"
+    capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
+
+    assert capabilities["comment-event dispatch"]["classification"] == "retained final surface"
+    assert capabilities["workflow-run dispatch"]["classification"] == "retained final surface"
+    assert capabilities["privileged pull request creation"]["classification"] == "retained final surface"
+
+
+def test_f2a_runtime_surface_inventory_matches_bootstrap_adapter_examples():
+    inventory = _load_runtime_surface_inventory()
+    capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
+
+    assert capabilities["comment-event dispatch"]["bootstrap_adapter"] == (
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_comment_event"
+    )
+    assert capabilities["workflow-run dispatch"]["bootstrap_adapter"] == (
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_workflow_run_event"
+    )
+    assert capabilities["sync status labels"]["bootstrap_adapter"] == (
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapWorkflowAdapterServices.sync_status_labels_for_items"
+    )
+
+
+def test_f2c_no_runtime_surface_triples_are_deletion_ready_yet():
+    inventory = _load_runtime_surface_inventory()
+
+    deletion_ready = [
+        entry for entry in inventory["capability_triples"] if entry["classification"] == "zero-caller deletion candidate"
+    ]
+
+    assert deletion_ready == []
 
 
 def test_default_stderr_logger_renders_message_and_sorted_fields():

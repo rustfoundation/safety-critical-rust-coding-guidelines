@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
@@ -236,6 +239,39 @@ def test_fake_runtime_exposes_compatibility_groups_for_thin_delegation(monkeypat
     assert hasattr(runtime.compat, "review")
     assert hasattr(runtime.compat, "state_lock")
     assert hasattr(runtime.compat, "automation")
+
+
+def _load_runtime_surface_inventory() -> dict:
+    return json.loads(
+        Path("tests/fixtures/equivalence/runtime_surface/triple_inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def test_f2a_runtime_surface_inventory_matches_fake_runtime_branch_examples():
+    inventory = _load_runtime_surface_inventory()
+    capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
+
+    assert capabilities["comment-event dispatch"]["fake_runtime_branch"] == (
+        "tests/fixtures/fake_runtime.py:handle_comment_event"
+    )
+    assert capabilities["workflow-run dispatch"]["fake_runtime_branch"] == (
+        "tests/fixtures/fake_runtime.py:handle_workflow_run_event"
+    )
+    assert capabilities["privileged accept-no-fls-changes execution"]["fake_runtime_branch"] == (
+        "tests/fixtures/fake_runtime.py:handle_accept_no_fls_changes_command"
+    )
+
+
+def test_f2b_no_migration_required_runtime_surface_triples_are_recorded():
+    inventory = _load_runtime_surface_inventory()
+
+    migration_required = [
+        entry for entry in inventory["capability_triples"] if entry["classification"] == "migration-required compatibility"
+    ]
+
+    assert migration_required == []
 
 
 def test_fake_runtime_default_handlers_are_built_from_focused_fake_service_helper(monkeypatch):

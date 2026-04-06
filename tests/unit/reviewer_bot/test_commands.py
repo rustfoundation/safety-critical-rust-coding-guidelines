@@ -1,4 +1,6 @@
 
+from pathlib import Path
+
 import pytest
 
 from scripts.reviewer_bot_lib import (
@@ -319,6 +321,60 @@ def test_validate_accept_no_fls_changes_handoff_distinguishes_permission_unavail
     assert metadata["reason"] == "authorization_unavailable"
 
 
+@pytest.mark.parametrize(
+    ("is_pull_request", "labels", "permission", "expected_reason"),
+    [
+        (True, (FLS_AUDIT_LABEL,), "granted", "pull_request_target_not_allowed"),
+        (False, (), "granted", "missing_fls_audit_label"),
+        (False, (FLS_AUDIT_LABEL,), "denied", "authorization_failed"),
+    ],
+)
+def test_validate_accept_no_fls_changes_handoff_freezes_fail_closed_reason_matrix(
+    monkeypatch,
+    is_pull_request,
+    labels,
+    permission,
+    expected_reason,
+):
+    harness = CommentRoutingHarness(monkeypatch)
+    harness.runtime.set_config_value("ISSUE_LABELS", str(list(labels)).replace("'", '"'))
+    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": permission
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=is_pull_request,
+        comment_author="alice",
+        comment_body="@guidelines-bot /accept-no-fls-changes",
+    )
+
+    ok, metadata = comment_application.validate_accept_no_fls_changes_handoff(harness.runtime, request)
+
+    assert ok is False
+    assert metadata == {"reason": expected_reason}
+
+
+def test_validate_accept_no_fls_changes_handoff_freezes_success_metadata_shape(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
+    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        comment_author="alice",
+        comment_body="@guidelines-bot /accept-no-fls-changes",
+    )
+
+    ok, metadata = comment_application.validate_accept_no_fls_changes_handoff(harness.runtime, request)
+
+    assert ok is True
+    assert metadata == {
+        "command_name": "accept-no-fls-changes",
+        "issue_number": 42,
+        "actor": "alice",
+        "authorization": {"required_permission": "triage", "authorized": True},
+        "target": {"kind": "issue", "number": 42, "labels": [FLS_AUDIT_LABEL]},
+    }
+
+
 def test_apply_comment_command_records_privileged_handoff_side_effects(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
@@ -458,3 +514,26 @@ inline `@guidelines-bot /queue`
 after"""
 
     assert commands.strip_code_blocks(comment_body) == "before\n\n\ninline \nafter"
+
+
+def test_comment_application_delegates_ordinary_command_decision_to_core_policy():
+    module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+
+    assert "comment_command_policy" in module_text
+    assert "decision = comment_command_policy.decide_comment_command(" in module_text
+
+
+def test_commands_module_exposes_rectify_handler_for_decision_adapter_surface():
+    assert hasattr(commands, "handle_rectify_command")
+
+
+def test_comment_application_and_automation_delegate_privileged_planning_to_core_policy():
+    comment_application_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+    automation_text = Path("scripts/reviewer_bot_lib/automation.py").read_text(encoding="utf-8")
+
+    assert "privileged_command_policy" in comment_application_text
+    assert "privileged_command_policy.validate_accept_no_fls_changes_handoff(" in comment_application_text
+    assert "privileged_command_policy.build_pending_privileged_command(" in comment_application_text
+    assert "from scripts.reviewer_bot_core import privileged_command_policy" in automation_text
+    assert "privileged_command_policy.prevalidate_accept_no_fls_changes_request(" in automation_text
+    assert "privileged_command_policy.plan_accept_no_fls_changes_execution(" in automation_text

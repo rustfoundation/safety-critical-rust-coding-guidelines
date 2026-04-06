@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import pytest
 
+from scripts.reviewer_bot_core import deferred_gap_diagnosis
 from scripts.reviewer_bot_lib import review_state, sweeper
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
@@ -312,8 +315,8 @@ def test_load_surface_watermark_lazily_materializes_missing_surface_state(monkey
 
 def test_observer_run_reason_mapping_and_near_miss_signature():
     signature = {"status": "waiting", "conclusion": None, "name": "approval_pending"}
-    assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"
-    assert sweeper.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "almost"}, signature) == "observer_state_unknown"
+    assert deferred_gap_diagnosis.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "approval_pending"}, signature) == "awaiting_observer_approval"
+    assert deferred_gap_diagnosis.observer_run_reason_from_details({"status": "waiting", "conclusion": None, "name": "almost"}, signature) == "observer_state_unknown"
 
 
 def test_approval_pending_signature_is_loaded_from_runbook():
@@ -332,16 +335,26 @@ def test_negative_missing_run_requires_full_scan_and_recheck():
         "correlated_run_found": False,
         "approval_pending_evidence_retained": False,
     }
-    assert sweeper.can_mark_observer_run_missing(gap) is True
+    assert deferred_gap_diagnosis.can_mark_observer_run_missing(gap) is True
     gap["later_recheck_complete"] = False
-    assert sweeper.can_mark_observer_run_missing(gap) is False
+    assert deferred_gap_diagnosis.can_mark_observer_run_missing(gap) is False
+
+
+def test_sweeper_delegates_diagnosis_and_narrow_recommendation_to_core_owner():
+    module_text = Path("scripts/reviewer_bot_lib/sweeper.py").read_text(encoding="utf-8")
+
+    assert "from scripts.reviewer_bot_core import deferred_gap_diagnosis" in module_text
+    assert "def observer_run_reason_from_details(" not in module_text
+    assert "def evaluate_deferred_gap_state(" not in module_text
+    assert "def _can_repair_visible_review(" not in module_text
+    assert "deferred_gap_diagnosis.evaluate_deferred_gap_state(" in module_text
+    assert "deferred_gap_diagnosis.recommend_visible_review_repair(" in module_text
 
 
 def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_window(monkeypatch):
     runtime = _runtime(monkeypatch)
     runtime.set_config_value("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
-    result = sweeper.correlate_candidate_observer_runs(
-        runtime,
+    result = deferred_gap_diagnosis.correlate_candidate_observer_runs(
         "issue_comment:101",
         source_event_kind="issue_comment:created",
         source_event_created_at="2026-03-17T10:00:00Z",
@@ -351,12 +364,13 @@ def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_win
             workflow_run(1, event="issue_comment", path=".github/workflows/reviewer-bot-pr-comment-observer.yml", created_at="2026-03-17T10:05:00Z"),
             workflow_run(2, event="issue_comment", path=".github/workflows/reviewer-bot-pr-comment-observer.yml", created_at="2026-03-17T10:40:00Z"),
         ],
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
     )
     assert result["candidate_run_ids"] == [1]
 
 
 def test_stage_b_artifact_correlation_rejects_ambiguous_exact_matches():
-    result = sweeper.correlate_run_artifacts_exact(
+    result = deferred_gap_diagnosis.correlate_run_artifacts_exact(
         {
             10: [artifact_payload(source_event_key="issue_comment:101", source_run_id=10)],
             11: [artifact_payload(source_event_key="issue_comment:101", source_run_id=11)],
@@ -369,18 +383,19 @@ def test_stage_b_artifact_correlation_rejects_ambiguous_exact_matches():
 
 
 def test_evaluate_gap_state_treats_artifact_download_unavailable_as_unknown():
-    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
+    reason, diagnostic = deferred_gap_diagnosis.evaluate_deferred_gap_state(
         {"source_event_created_at": "2026-03-17T00:00:00Z"},
         {"status": "candidate_runs_found", "correlated_run": 10},
         {"status": "completed", "conclusion": "success"},
         {"status": "no_exact_artifact_match", "artifact_scan_outcomes": {10: "download_unavailable"}},
+        runbook_signature=None,
     )
     assert reason == "observer_state_unknown"
     assert diagnostic == "artifact_download_unavailable"
 
 
 def test_evaluate_gap_state_only_emits_missing_after_negative_inference_contract():
-    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
+    reason, diagnostic = deferred_gap_diagnosis.evaluate_deferred_gap_state(
         {
             "source_event_created_at": "2026-03-15T00:00:00Z",
             "full_scan_complete": True,
@@ -396,28 +411,31 @@ def test_evaluate_gap_state_only_emits_missing_after_negative_inference_contract
         },
         None,
         None,
+        runbook_signature=None,
     )
     assert reason == "observer_run_missing"
     assert diagnostic == "negative_inference_satisfied"
 
 
 def test_evaluate_gap_state_completed_success_without_exact_artifact_is_artifact_missing():
-    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
+    reason, diagnostic = deferred_gap_diagnosis.evaluate_deferred_gap_state(
         {"source_event_created_at": "2026-03-17T00:00:00Z"},
         {"status": "candidate_runs_found", "correlated_run": 10},
         {"status": "completed", "conclusion": "success"},
         {"status": "no_exact_artifact_match", "reason": "no_exact_source_event_key_match"},
+        runbook_signature=None,
     )
     assert reason == "artifact_missing"
     assert diagnostic == "no_exact_source_event_key_match"
 
 
 def test_evaluate_gap_state_completed_success_with_expired_artifact_marks_artifact_expired():
-    reason, diagnostic = sweeper.evaluate_deferred_gap_state(
+    reason, diagnostic = deferred_gap_diagnosis.evaluate_deferred_gap_state(
         {"source_event_created_at": "2026-03-17T00:00:00Z"},
         {"status": "candidate_runs_found", "correlated_run": 10},
         {"status": "completed", "conclusion": "success"},
         {"status": "no_exact_artifact_match", "artifact_scan_outcomes": {10: "expired"}},
+        runbook_signature=None,
     )
     assert reason == "artifact_expired"
     assert diagnostic == "prior_visibility_or_retention_proof_required"
@@ -425,9 +443,9 @@ def test_evaluate_gap_state_completed_success_with_expired_artifact_marks_artifa
 
 def test_artifact_gap_reason_requires_prior_visibility_or_documented_retention():
     expired = {"artifact_seen_at": "2026-03-10T00:00:00Z", "run_created_at": "2026-03-10T00:00:00Z"}
-    assert sweeper.classify_artifact_gap_reason(expired) == "artifact_expired"
+    assert deferred_gap_diagnosis.classify_artifact_gap_reason(expired) == "artifact_expired"
     missing = {"artifact_inspection_complete": True, "run_created_at": "2026-03-17T00:00:00Z"}
-    assert sweeper.classify_artifact_gap_reason(missing) == "artifact_missing"
+    assert deferred_gap_diagnosis.classify_artifact_gap_reason(missing) == "artifact_missing"
 
 
 def test_artifact_gap_reason_uses_passed_retention_days():
@@ -436,9 +454,9 @@ def test_artifact_gap_reason_uses_passed_retention_days():
         "retention_window_documented": True,
     }
 
-    assert sweeper.classify_artifact_gap_reason(
+    assert deferred_gap_diagnosis.classify_artifact_gap_reason(
         gap,
-        now=sweeper.parse_timestamp("2026-03-05T00:00:00Z"),
+        now=deferred_gap_diagnosis.parse_timestamp("2026-03-05T00:00:00Z"),
         retention_days=3,
     ) == "artifact_expired"
 

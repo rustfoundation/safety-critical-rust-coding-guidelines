@@ -11,6 +11,25 @@ pytestmark = pytest.mark.contract
 
 ROOT = Path(__file__).resolve().parents[3]
 
+DELETED_REVIEW_MUTATION_SYMBOLS = [
+    "_ensure_channel_map",
+    "_ensure_dict",
+    "_ensure_review_entry",
+    "_reset_cycle_state",
+    "clear_transition_timers",
+    "_record_reviewer_activity",
+    "_record_transition_notice_sent",
+    "_set_current_reviewer",
+    "_semantic_key_seen",
+    "_accept_channel_event",
+    "_update_reviewer_activity",
+    "_mark_review_complete",
+    "_get_current_cycle_boundary",
+    "_legacy_accept_reviewer_review_from_live_review",
+    "_legacy_refresh_reviewer_review_from_live_preferred_review",
+    "_legacy_repair_missing_reviewer_review_state",
+]
+
 
 def _read(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
@@ -196,8 +215,17 @@ def test_review_state_module_exposes_named_mutation_surface():
         "update_reviewer_activity",
         "mark_review_complete",
         "get_current_cycle_boundary",
-    ]:
+        ]:
         assert hasattr(review_state, name)
+
+
+def test_review_state_local_mutation_surface_delegates_to_core_owner():
+    review_state_text = _read("scripts/reviewer_bot_lib/review_state.py")
+
+    assert "from scripts.reviewer_bot_core import review_state_machine" in review_state_text
+    assert "return review_state_machine.ensure_review_entry(state, issue_number, create=create)" in review_state_text
+    assert "return review_state_machine.accept_channel_event(" in review_state_text
+    assert "return review_state_machine.mark_review_complete(state, issue_number, reviewer, source)" in review_state_text
 
 
 def test_production_modules_do_not_import_mutable_review_state_api_from_reviews_module():
@@ -264,3 +292,32 @@ def test_reviews_module_no_longer_exposes_public_mutation_helpers():
         "get_current_cycle_boundary",
     ]:
         assert hasattr(reviews, name) is False
+
+
+def test_c1d_deletion_manifest_matches_deleted_duplicate_review_mutation_logic():
+    reviews_text = _read("scripts/reviewer_bot_lib/reviews.py")
+
+    for symbol in DELETED_REVIEW_MUTATION_SYMBOLS:
+        assert f"def {symbol}(" not in reviews_text
+
+
+def test_c1d_repo_wide_importer_and_caller_inventory_for_deleted_review_mutation_logic_is_zero():
+    importer_inventory = []
+    caller_inventory = []
+
+    for path in ROOT.glob("**/*.py"):
+        relative_path = path.relative_to(ROOT).as_posix()
+        if relative_path == "tests/contract/reviewer_bot/test_review_state_contract.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        for symbol in DELETED_REVIEW_MUTATION_SYMBOLS:
+            if (
+                f"from .reviews import {symbol}" in text
+                or f"from scripts.reviewer_bot_lib.reviews import {symbol}" in text
+            ):
+                importer_inventory.append((relative_path, symbol))
+            if f"reviews.{symbol}(" in text:
+                caller_inventory.append((relative_path, symbol))
+
+    assert importer_inventory == []
+    assert caller_inventory == []

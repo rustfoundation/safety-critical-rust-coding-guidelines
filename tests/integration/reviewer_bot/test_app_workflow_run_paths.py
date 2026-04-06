@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from scripts.reviewer_bot_lib.context import LeaseContext
@@ -5,6 +7,9 @@ from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
 pytestmark = pytest.mark.integration
+
+
+D4C_DELETION_MANIFEST = []
 
 
 def test_execute_run_cross_repo_review_does_not_acquire_lock(monkeypatch):
@@ -102,3 +107,23 @@ def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeyp
 
     assert acquire_called["value"] is True
     assert result.exit_code == 0
+
+
+def test_d4a_phase_map_records_workflow_run_and_non_mutating_branches_explicitly():
+    with open("tests/fixtures/equivalence/app/transaction_phase_map.json", encoding="utf-8") as handle:
+        phase_map = __import__("json").load(handle)
+
+    assert phase_map["branch_to_phase"]["issues/pull_request_target/issue_comment/workflow_dispatch/schedule/workflow_run dispatch"] == "event handling"
+    assert phase_map["branch_to_phase"]["locks.release"] == "lock release"
+
+
+def test_d4c_deletion_manifest_is_explicit_and_remaining_app_branches_stay_transactional():
+    app_text = Path("scripts/reviewer_bot_lib/app.py").read_text(encoding="utf-8")
+
+    assert D4C_DELETION_MANIFEST == []
+    assert 'if event_name == "issues":' in app_text
+    assert 'elif event_name == "pull_request_target":' in app_text
+    assert 'elif event_name == "workflow_run":' in app_text
+    assert 'if state_changed or sync_changes or restored:' in app_text
+    assert 'if touched_items:' in app_text
+    assert 'if projection_failure is not None:' in app_text

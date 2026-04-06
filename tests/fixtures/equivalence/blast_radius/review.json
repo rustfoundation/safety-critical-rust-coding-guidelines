@@ -1,0 +1,37 @@
+{
+  "harness_id": "F3 blast radius review",
+  "representative_changes": [
+    {
+      "change": "change reviewer-response derivation",
+      "expected_files": [
+        "scripts/reviewer_bot_lib/reviews.py",
+        "scripts/reviewer_bot_lib/reviews_projection.py",
+        "tests/unit/reviewer_bot/test_reviews_projection.py",
+        "tests/unit/reviewer_bot/test_reviews_live_fetch.py"
+      ]
+    },
+    {
+      "change": "change mandatory approver escalation",
+      "expected_files": [
+        "scripts/reviewer_bot_lib/reviews.py",
+        "tests/unit/reviewer_bot/test_reviews_live_fetch.py"
+      ]
+    },
+    {
+      "change": "change deferred replay fail-closed message",
+      "expected_files": [
+        "scripts/reviewer_bot_core/reconcile_replay_policy.py",
+        "tests/unit/reviewer_bot/test_reconcile_replay_equivalence.py",
+        "tests/integration/reviewer_bot/test_reconcile_workflow_run.py"
+      ]
+    },
+    {
+      "change": "change one command behavior",
+      "expected_files": [
+        "scripts/reviewer_bot_core/comment_command_policy.py",
+        "tests/unit/reviewer_bot/test_comment_command_equivalence.py",
+        "tests/unit/reviewer_bot/test_commands.py"
+      ]
+    }
+  ]
+}

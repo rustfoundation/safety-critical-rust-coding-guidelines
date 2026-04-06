@@ -93,8 +93,9 @@ def build_event_context(bot: EventInputsContext) -> EventContext:
 
 
 def build_comment_event_request(bot: EventInputsContext, *, issue_number: int | None = None) -> CommentEventRequest:
+    resolved_issue_number = issue_number if issue_number is not None else (_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0)
     return CommentEventRequest(
-        issue_number=issue_number if issue_number is not None else (_parse_optional_int(bot.get_config_value("ISSUE_NUMBER")) or 0),
+        issue_number=resolved_issue_number,
         is_pull_request=bool(_parse_optional_bool(bot.get_config_value("IS_PULL_REQUEST"))),
         issue_state=bot.get_config_value("ISSUE_STATE").strip().lower(),
         issue_author=bot.get_config_value("ISSUE_AUTHOR"),
@@ -112,13 +113,15 @@ def build_comment_event_request(bot: EventInputsContext, *, issue_number: int | 
 
 
 def build_pr_comment_trust_context(bot: EventInputsContext) -> PrCommentTrustContext:
+    github_run_id = _parse_optional_int(bot.get_config_value("GITHUB_RUN_ID")) or 0
+    github_run_attempt = _parse_optional_int(bot.get_config_value("GITHUB_RUN_ATTEMPT")) or 0
     return PrCommentTrustContext(
         github_repository=bot.get_config_value("GITHUB_REPOSITORY"),
         comment_author_association=bot.get_config_value("COMMENT_AUTHOR_ASSOCIATION").strip(),
         current_workflow_file=bot.get_config_value("CURRENT_WORKFLOW_FILE").strip(),
         github_ref=bot.get_config_value("GITHUB_REF").strip(),
-        github_run_id=_parse_optional_int(bot.get_config_value("GITHUB_RUN_ID")) or 0,
-        github_run_attempt=_parse_optional_int(bot.get_config_value("GITHUB_RUN_ATTEMPT")) or 0,
+        github_run_id=github_run_id,
+        github_run_attempt=github_run_attempt,
     )
 
 

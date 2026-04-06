@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from scripts.reviewer_bot_lib import commands, lifecycle, reconcile, review_state
@@ -381,3 +383,26 @@ def test_reconcile_harness_exposes_deferred_payload_store(monkeypatch):
     harness = ReconcileHarness(monkeypatch, payload)
 
     assert harness.deferred_payloads is harness.runtime.deferred_payloads
+
+
+def test_reconcile_module_delegates_replay_decision_logic_to_core_policy():
+    reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
+
+    assert "from scripts.reviewer_bot_core import reconcile_replay_policy" in reconcile_text
+    assert "reconcile_replay_policy.decide_comment_replay(" in reconcile_text
+    assert "reconcile_replay_policy.decide_review_submitted_replay(" in reconcile_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in reconcile_text
+
+
+def test_d2_reconcile_remaining_replay_branches_are_decode_read_or_apply_only():
+    reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
+
+    assert 'if event_name == "issue_comment" and isinstance(parsed_payload, DeferredCommentPayload):' in reconcile_text
+    assert 'if event_name == "pull_request_review_comment" and event_action == "created" and isinstance(parsed_payload, DeferredCommentPayload):' in reconcile_text
+    assert 'if event_name == "pull_request_review" and event_action == "submitted" and isinstance(parsed_payload, DeferredReviewPayload):' in reconcile_text
+    assert 'if event_name == "pull_request_review" and event_action == "dismissed" and isinstance(parsed_payload, DeferredReviewPayload):' in reconcile_text
+    assert "if validation_result.live_classified is None:" in reconcile_text
+    assert "if decision.accept_reviewer_review:" in reconcile_text
+    assert "if decision.accept_review_dismissal:" in reconcile_text
+    assert "classification changed from" not in reconcile_text
+    assert "no longer resolves to exactly one command" not in reconcile_text

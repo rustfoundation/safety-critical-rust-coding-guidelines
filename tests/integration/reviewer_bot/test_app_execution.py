@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 from tests.fixtures.app_harness import AppHarness
@@ -174,3 +177,27 @@ def test_execute_run_returns_failure_for_invalid_workflow_run_context(monkeypatc
 
     assert result.exit_code == 1
     assert result.state_changed is False
+
+
+def test_d4a_app_branch_to_phase_map_is_frozen_pre_edit():
+    app_text = Path("scripts/reviewer_bot_lib/app.py").read_text(encoding="utf-8")
+
+    assert "if lock_required:" in app_text
+    assert "state = bot.state_store.load_state(fail_on_unavailable=lock_required)" in app_text
+    assert "state, restored = bot.adapters.workflow.process_pass_until_expirations(state)" in app_text
+    assert "state, sync_changes = bot.adapters.workflow.sync_members_with_queue(state)" in app_text
+    assert "touched_items = bot.drain_touched_items()" in app_text
+    assert '_revalidate_epoch(bot, loaded_epoch, "authoritative save")' in app_text
+    assert "if not bot.state_store.save_state(state):" in app_text
+    assert "state = bot.state_store.load_state(fail_on_unavailable=True)" in app_text
+    assert '_revalidate_epoch(bot, loaded_epoch, "status-label projection")' in app_text
+    assert "if _mark_projection_repair_needed(bot, state, touched_items, str(exc)):" in app_text
+    assert "if not bot.locks.release():" in app_text
+
+
+def test_d4b_post_edit_phase_map_matches_pre_edit_transaction_shape():
+    pre_map = json.loads(Path("tests/fixtures/equivalence/app/transaction_phase_map.json").read_text(encoding="utf-8"))
+    post_map = json.loads(Path("tests/fixtures/equivalence/app/post_edit_transaction_phase_map.json").read_text(encoding="utf-8"))
+
+    assert post_map["harness_id"] == "D4b app post-edit transaction phase map"
+    assert post_map["branch_to_phase"] == pre_map["branch_to_phase"]

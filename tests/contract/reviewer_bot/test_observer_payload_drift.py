@@ -214,3 +214,10 @@ def test_observer_contract_matrix_separates_workflow_and_helper_sources():
         fixture = _load_fixture(fixture_path)
         assert fixture["fixture_metadata"]["contract_class"] == "python_helper_output"
         assert fixture["payload"]["kind"] == "observer_noop"
+
+
+def test_public_comment_routing_helper_surface_for_observer_payloads_remains_reachable():
+    module_text = Path("scripts/reviewer_bot_lib/comment_routing.py").read_text(encoding="utf-8")
+
+    assert "def build_pr_comment_observer_payload(" in module_text
+    assert "def handle_comment_event(" in module_text

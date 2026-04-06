@@ -10,16 +10,20 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+from scripts.reviewer_bot_core import deferred_gap_diagnosis
+
 from . import retrying
 from .config import REVIEW_FRESHNESS_RUNBOOK_PATH
 from .context import SweeperContext
 from .reconcile import (
-    _artifact_expected_name,
-    _artifact_expected_payload_name,
     _clear_source_event_key,
     _mark_reconciled_source_event,
     _update_deferred_gap,
     _was_reconciled_source_event,
+)
+from .reconcile_payloads import artifact_expected_name as _artifact_expected_name
+from .reconcile_payloads import (
+    artifact_expected_payload_name as _artifact_expected_payload_name,
 )
 from .review_state import (
     accept_reviewer_review_from_live_review,
@@ -95,181 +99,6 @@ def _download_retry_delay(bot: SweeperContext, retry_attempt: int) -> float:
 
 def _sleep(bot: SweeperContext, seconds: float) -> None:
     bot.sleeper.sleep(seconds)
-
-
-def observer_run_reason_from_details(run_details: dict, runbook_signature: dict | None) -> str:
-    status = str(run_details.get("status", "")).strip()
-    conclusion = run_details.get("conclusion")
-    if runbook_signature and all(run_details.get(key) == value for key, value in runbook_signature.items()):
-        return "awaiting_observer_approval"
-    if status in {"queued", "in_progress"}:
-        return "observer_in_progress"
-    if status == "completed":
-        if conclusion == "success":
-            return "completed_success"
-        if conclusion in {"failure", "timed_out", "action_required", "stale"}:
-            return "observer_failed"
-        if conclusion == "cancelled":
-            return "observer_cancelled"
-    return "observer_state_unknown"
-
-
-def can_mark_observer_run_missing(gap: dict, now: datetime | None = None) -> bool:
-    now = now or _now()
-    created_at = gap.get("source_event_created_at")
-    created_dt = parse_timestamp(created_at)
-    if created_dt is None or now < created_dt + timedelta(hours=24):
-        return False
-    return bool(gap.get("full_scan_complete") and gap.get("later_recheck_complete") and not gap.get("correlated_run_found") and not gap.get("approval_pending_evidence_retained"))
-
-
-def classify_artifact_gap_reason(gap: dict, now: datetime | None = None, *, retention_days: int = 7) -> str:
-    now = now or _now()
-    run_created_at = parse_timestamp(gap.get("run_created_at"))
-    if gap.get("artifact_seen_at") or gap.get("artifact_last_downloadable_at"):
-        return "artifact_expired"
-    if run_created_at is not None and gap.get("retention_window_documented") and now >= run_created_at + timedelta(days=retention_days):
-        return "artifact_expired"
-    if gap.get("artifact_inspection_complete"):
-        return "artifact_missing"
-    return "observer_state_unknown"
-
-
-def correlate_candidate_observer_runs(
-    bot: SweeperContext,
-    source_event_key: str,
-    *,
-    source_event_kind: str,
-    source_event_created_at: str,
-    pr_number: int,
-    workflow_file: str,
-    workflow_runs: list[dict] | None,
-) -> dict:
-    created_at = parse_timestamp(source_event_created_at)
-    if created_at is None:
-        return {
-            "status": "observer_state_unknown",
-            "reason": "invalid_source_event_created_at",
-            "candidate_run_ids": [],
-            "full_scan_complete": False,
-            "later_recheck_complete": False,
-            "correlated_run": None,
-        }
-    if workflow_runs is None:
-        return {
-            "status": "observer_state_unknown",
-            "reason": "workflow_run_scan_unavailable",
-            "candidate_run_ids": [],
-            "full_scan_complete": False,
-            "later_recheck_complete": False,
-            "correlated_run": None,
-        }
-    expected_event_map = {
-        "issue_comment:created": "issue_comment",
-        "pull_request_review:submitted": "pull_request_review",
-        "pull_request_review:dismissed": "pull_request_review",
-        "pull_request_review_comment:created": "pull_request_review_comment",
-    }
-    expected_event = expected_event_map.get(source_event_kind)
-    if expected_event is None:
-        return {
-            "status": "observer_state_unknown",
-            "reason": "unsupported_source_event_kind",
-            "candidate_run_ids": [],
-            "full_scan_complete": False,
-            "later_recheck_complete": False,
-            "correlated_run": None,
-        }
-    window_start = created_at - timedelta(minutes=2)
-    window_end = created_at + timedelta(minutes=30)
-    candidates: list[dict] = []
-    for run in workflow_runs:
-        if not isinstance(run, dict):
-            continue
-        if str(run.get("event", "")) != expected_event:
-            continue
-        created = parse_timestamp(run.get("created_at"))
-        if created is None or created < window_start or created > window_end:
-            continue
-        if str(run.get("path", "")) != workflow_file:
-            continue
-        repo = run.get("repository")
-        if isinstance(repo, dict):
-            full_name = repo.get("full_name")
-            if isinstance(full_name, str) and full_name != _github_repository(bot):
-                continue
-        prs = run.get("pull_requests")
-        if isinstance(prs, list) and prs:
-            if not any(isinstance(pr, dict) and pr.get("number") == pr_number for pr in prs):
-                continue
-        candidates.append(run)
-    candidate_run_ids = [run.get("id") for run in candidates if isinstance(run.get("id"), int)]
-    return {
-        "status": "candidate_runs_found" if candidates else "no_candidate_runs",
-        "reason": None,
-        "candidate_runs": candidates,
-        "candidate_run_ids": candidate_run_ids,
-        "full_scan_complete": True,
-        "later_recheck_complete": False,
-        "correlated_run": None,
-    }
-
-
-def correlate_run_artifacts_exact(
-    payloads_by_run: dict[int, list[dict]] | None,
-    source_event_key: str,
-    *,
-    pr_number: int,
-) -> dict:
-    if payloads_by_run is None:
-        return {"status": "observer_state_unknown", "reason": "artifact_scan_unavailable", "correlated_run": None}
-    matches: list[tuple[int, dict]] = []
-    candidate_run_ids: list[int] = []
-    for run_id, payloads in payloads_by_run.items():
-        if not isinstance(run_id, int):
-            continue
-        candidate_run_ids.append(run_id)
-        latest_by_attempt: dict[int, dict] = {}
-        for artifact_payload in payloads:
-            if not isinstance(artifact_payload, dict):
-                continue
-            attempt = artifact_payload.get("source_run_attempt")
-            if not isinstance(attempt, int):
-                continue
-            previous = latest_by_attempt.get(attempt)
-            if previous is None or artifact_payload.get("source_event_key") == source_event_key:
-                latest_by_attempt[attempt] = artifact_payload
-        for artifact_payload in latest_by_attempt.values():
-            if artifact_payload.get("source_event_key") != source_event_key:
-                continue
-            if artifact_payload.get("source_run_id") != run_id:
-                continue
-            if artifact_payload.get("pr_number") != pr_number:
-                continue
-            matches.append((run_id, artifact_payload))
-    if not matches:
-        return {
-            "status": "no_exact_artifact_match",
-            "reason": "no_exact_source_event_key_match",
-            "correlated_run": None,
-            "candidate_run_ids": sorted(candidate_run_ids),
-        }
-    distinct_run_ids = sorted({run_id for run_id, _ in matches})
-    if len(distinct_run_ids) > 1:
-        return {
-            "status": "observer_state_unknown",
-            "reason": "ambiguous_exact_artifact_matches",
-            "correlated_run": None,
-            "candidate_run_ids": distinct_run_ids,
-        }
-    run_id, matched_payload = matches[-1]
-    return {
-        "status": "exact_artifact_match",
-        "reason": None,
-        "correlated_run": run_id,
-        "artifact_payload": matched_payload,
-        "candidate_run_ids": distinct_run_ids,
-    }
 
 
 def _fetch_workflow_runs_for_file(bot: SweeperContext, workflow_file: str, event_name: str) -> list[dict] | None:
@@ -409,65 +238,15 @@ def inspect_run_artifact_payloads(bot: SweeperContext, workflow_runs: list[dict]
                 artifact_scan_outcomes[run_id] = status
         if run_id not in payloads_by_run and filtered:
             payloads_by_run.setdefault(run_id, [])
-    result = correlate_run_artifacts_exact(payloads_by_run, source_event_key, pr_number=pr_number)
+    result = deferred_gap_diagnosis.correlate_run_artifacts_exact(
+        payloads_by_run,
+        source_event_key,
+        pr_number=pr_number,
+    )
     result["payloads_by_run"] = payloads_by_run
     result["prior_visibility"] = prior_visibility
     result["artifact_scan_outcomes"] = artifact_scan_outcomes
     return result
-
-
-def evaluate_deferred_gap_state(
-    existing_gap: dict,
-    run_correlation: dict,
-    run_detail: dict | None,
-    artifact_correlation: dict | None,
-) -> tuple[str, str]:
-    if run_correlation.get("status") == "observer_state_unknown":
-        return "observer_state_unknown", str(run_correlation.get("reason") or "run_scan_unknown")
-    if run_correlation.get("status") == "no_candidate_runs":
-        gap = dict(existing_gap)
-        gap["full_scan_complete"] = bool(run_correlation.get("full_scan_complete"))
-        gap["later_recheck_complete"] = bool(run_correlation.get("later_recheck_complete"))
-        gap["correlated_run_found"] = False
-        gap["approval_pending_evidence_retained"] = False
-        if can_mark_observer_run_missing(gap):
-            return "observer_run_missing", "negative_inference_satisfied"
-        created_at = parse_timestamp(existing_gap.get("source_event_created_at"))
-        if created_at is not None and _now() < created_at + timedelta(hours=24):
-            return "awaiting_observer_run", "missing_run_window_open"
-        return "observer_state_unknown", "missing_run_window_not_proven"
-    if run_detail is None:
-        return "observer_state_unknown", "run_detail_unavailable"
-    run_state = observer_run_reason_from_details(run_detail, _approval_pending_signature_from_runbook())
-    if run_state in {
-        "awaiting_observer_approval",
-        "observer_in_progress",
-        "observer_failed",
-        "observer_cancelled",
-        "observer_state_unknown",
-    }:
-        return run_state, f"run_detail:{run_state}"
-    if run_state != "completed_success":
-        return "observer_state_unknown", "unmapped_run_state"
-    if artifact_correlation is None:
-        return "artifact_missing", "artifact_correlation_unavailable"
-    artifact_status = artifact_correlation.get("status")
-    if artifact_status == "exact_artifact_match":
-        return "observer_state_unknown", "successful_artifact_present_without_reconcile_marker"
-    if artifact_status == "no_exact_artifact_match":
-        scan_outcomes = artifact_correlation.get("artifact_scan_outcomes")
-        if isinstance(scan_outcomes, dict):
-            if any(outcome == "expired" for outcome in scan_outcomes.values()):
-                return "artifact_expired", "prior_visibility_or_retention_proof_required"
-            if any(outcome == "download_unavailable" for outcome in scan_outcomes.values()):
-                return "observer_state_unknown", "artifact_download_unavailable"
-            invalid_outcomes = {"missing_download_url", "download_failed", "invalid_payload_layout", "invalid_payload_format"}
-            if any(outcome in invalid_outcomes for outcome in scan_outcomes.values()):
-                return "artifact_invalid", "artifact_download_or_payload_invalid"
-        return "artifact_missing", str(artifact_correlation.get("reason") or "exact_artifact_missing")
-    if artifact_status == "observer_state_unknown":
-        return "observer_state_unknown", str(artifact_correlation.get("reason") or "artifact_ambiguity")
-    return "artifact_invalid", str(artifact_correlation.get("reason") or "artifact_invalid")
 
 
 def _update_observer_watermark(bot, review_data: dict, surface: str, event_time: str, event_id: str) -> None:
@@ -509,14 +288,14 @@ def _diagnose_deferred_event(
     workflow_runs: list[dict] | None,
 ) -> None:
     existing_gap = review_data.get("deferred_gaps", {}).get(source_event_key, {})
-    run_correlation = correlate_candidate_observer_runs(
-        bot,
+    run_correlation = deferred_gap_diagnosis.correlate_candidate_observer_runs(
         source_event_key,
         source_event_kind=source_event_kind,
         source_event_created_at=source_created_at,
         pr_number=issue_number,
         workflow_file=workflow_file,
         workflow_runs=workflow_runs,
+        github_repository=_github_repository(bot),
     )
     run_correlation["later_recheck_complete"] = bool(existing_gap.get("full_scan_complete"))
     artifact_correlation = None
@@ -534,7 +313,7 @@ def _diagnose_deferred_event(
             run_correlation["correlated_run"] = exact_run_id
             run_correlation["correlated_run_found"] = True
         run_detail = _maybe_fetch_single_candidate_run_detail(bot, run_correlation, artifact_correlation)
-    reason, diagnostic_reason = evaluate_deferred_gap_state(
+    reason, diagnostic_reason = deferred_gap_diagnosis.evaluate_deferred_gap_state(
         {
             **existing_gap,
             "source_event_created_at": source_created_at,
@@ -542,6 +321,7 @@ def _diagnose_deferred_event(
         run_correlation,
         run_detail,
         artifact_correlation,
+        runbook_signature=_approval_pending_signature_from_runbook(),
     )
     _record_gap_diagnostics(
         bot,
@@ -656,31 +436,13 @@ def _maybe_fetch_single_candidate_run_detail(bot, run_correlation: dict, artifac
     return _fetch_run_detail(bot, run_id)
 
 
-def _can_repair_visible_review(bot, review_data: dict, review: dict, source_event_key: str) -> tuple[str, str, str] | None:
-    current_reviewer = review_data.get("current_reviewer")
-    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
-        return None
-    author = review.get("user", {}).get("login") if isinstance(review, dict) else None
-    commit_id = review.get("commit_id") if isinstance(review, dict) else None
-    submitted_at = review.get("submitted_at") if isinstance(review, dict) else None
-    review_id = review.get("id") if isinstance(review, dict) else None
-    if not isinstance(author, str) or author.lower() != current_reviewer.lower():
-        return None
-    if not isinstance(commit_id, str) or not commit_id.strip():
-        return None
-    if not isinstance(submitted_at, str):
-        return None
-    boundary = get_current_cycle_boundary(bot, review_data)
-    submitted_dt = parse_timestamp(submitted_at)
-    if boundary is None or submitted_dt is None or submitted_dt < boundary:
-        return None
-    if source_event_key != f"pull_request_review:{review_id}":
-        return None
-    return author, submitted_at, commit_id
-
-
 def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source_event_key: str, review: dict) -> bool:
-    repair = _can_repair_visible_review(bot, review_data, review, source_event_key)
+    repair = deferred_gap_diagnosis.recommend_visible_review_repair(
+        review_data,
+        review,
+        source_event_key,
+        current_cycle_boundary=get_current_cycle_boundary(bot, review_data),
+    )
     if repair is None:
         return False
     author, submitted_at, commit_id = repair
@@ -958,14 +720,14 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 existing_gap = review_data.get("deferred_gaps", {}).get(source_event_key, {})
                 workflow_file = ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml"
                 workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "pull_request_review")
-                run_correlation = correlate_candidate_observer_runs(
-                    bot,
+                run_correlation = deferred_gap_diagnosis.correlate_candidate_observer_runs(
                     source_event_key,
                     source_event_kind="pull_request_review:submitted",
                     source_event_created_at=submitted_at,
                     pr_number=issue_number,
                     workflow_file=workflow_file,
                     workflow_runs=workflow_runs,
+                    github_repository=_github_repository(bot),
                 )
                 run_correlation["later_recheck_complete"] = bool(existing_gap.get("full_scan_complete"))
                 artifact_correlation = None
@@ -992,7 +754,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 ):
                     changed = True
                     continue
-                reason, diagnostic_reason = evaluate_deferred_gap_state(
+                reason, diagnostic_reason = deferred_gap_diagnosis.evaluate_deferred_gap_state(
                     {
                         **existing_gap,
                         "source_event_created_at": submitted_at,
@@ -1000,6 +762,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                     run_correlation,
                     run_detail,
                     artifact_correlation,
+                    runbook_signature=_approval_pending_signature_from_runbook(),
                 )
                 _record_gap_diagnostics(
                     bot,

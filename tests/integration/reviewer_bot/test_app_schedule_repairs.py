@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -150,3 +151,16 @@ def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repai
     assert posted_comments == []
     assert review["transition_warning_sent"] == "2026-04-01T12:12:04Z"
     assert saved_warning_values == []
+
+
+def test_c5c_sweeper_cleanup_keeps_mutation_apply_but_removes_embedded_diagnosis_defs():
+    module_text = Path("scripts/reviewer_bot_lib/sweeper.py").read_text(encoding="utf-8")
+
+    assert "def observer_run_reason_from_details(" not in module_text
+    assert "def can_mark_observer_run_missing(" not in module_text
+    assert "def classify_artifact_gap_reason(" not in module_text
+    assert "def correlate_candidate_observer_runs(" not in module_text
+    assert "def correlate_run_artifacts_exact(" not in module_text
+    assert "def evaluate_deferred_gap_state(" not in module_text
+    assert "def _repair_visible_review_gap(" in module_text
+    assert "deferred_gap_diagnosis.evaluate_deferred_gap_state(" in module_text

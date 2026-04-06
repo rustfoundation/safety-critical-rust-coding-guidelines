@@ -5,6 +5,9 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 
+from scripts.reviewer_bot_core import reconcile_replay_policy
+
+from . import reconcile_payloads as _reconcile_payloads
 from .comment_application import (
     digest_comment_body,
     process_comment_event,
@@ -13,14 +16,10 @@ from .comment_application import (
 from .comment_routing import classify_comment_payload, classify_issue_comment_actor
 from .context import CommentEventRequest
 from .reconcile_payloads import (
-    DeferredArtifactIdentity,
     DeferredCommentPayload,
     DeferredCommentReplayContext,
     DeferredReviewPayload,
-    DeferredReviewReplayContext,
     ObserverNoopPayload,
-    artifact_expected_name as _artifact_expected_name,
-    artifact_expected_payload_name as _artifact_expected_payload_name,
     build_deferred_comment_replay_context,
     build_deferred_review_replay_context,
     parse_deferred_context_payload,
@@ -53,10 +52,14 @@ from .review_state import (
     record_reviewer_activity,
 )
 from .reviews import (
-    find_triage_approval_after,
     rebuild_pr_approval_state_result,
     refresh_reviewer_review_from_live_preferred_review,
 )
+
+DeferredArtifactIdentity = _reconcile_payloads.DeferredArtifactIdentity
+DeferredReviewReplayContext = _reconcile_payloads.DeferredReviewReplayContext
+_artifact_expected_name = _reconcile_payloads.artifact_expected_name
+_artifact_expected_payload_name = _reconcile_payloads.artifact_expected_payload_name
 
 
 def _log(bot, level: str, message: str, **fields) -> None:
@@ -190,8 +193,10 @@ def reconcile_active_review_entry(
         state_changed = True
         review_data["review_completion_source"] = completion_source
     if review_data.get("mandatory_approver_required"):
+        from scripts.reviewer_bot_core import approval_policy
+
         escalation_opened_at = bot.parse_iso8601_timestamp(review_data.get("mandatory_approver_pinged_at")) or bot.parse_iso8601_timestamp(review_data.get("mandatory_approver_label_applied_at"))
-        triage_approval = find_triage_approval_after(bot, reviews, escalation_opened_at)
+        triage_approval = approval_policy.find_triage_approval_after(bot, reviews, escalation_opened_at)
         if triage_approval is not None:
             approver, _ = triage_approval
             if bot.satisfy_mandatory_approver_requirement(state, issue_number, approver):
@@ -380,26 +385,27 @@ def _reconcile_deferred_comment(
     try:
         live_comment = _read_reconcile_object(bot, context.live_comment_endpoint, label=f"deferred comment {comment_id}")
     except ReconcileReadError as exc:
+        decision = reconcile_replay_policy.decide_comment_replay(
+            comment_id=comment_id,
+            source_comment_class=context.payload.comment_class,
+            source_has_non_command_text=context.payload.has_non_command_text,
+            source_freshness_eligible=source_freshness_eligible,
+            live_comment_found=False,
+            live_body_digest_matches=False,
+            live_classified=None,
+            live_failure_kind=exc.failure_kind,
+            runbook_path=bot.REVIEW_FRESHNESS_RUNBOOK_PATH,
+        )
         changed = False
-        if source_freshness_eligible:
+        if decision.record_source_freshness:
             changed = record_conversation_freshness(bot, state, replay_request())
-        if exc.failure_kind == "not_found":
-            summary = (
-                f"Deferred comment {comment_id} is no longer visible; source-time freshness only may be preserved. "
-                f"See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
-            )
-        else:
-            summary = (
-                f"Deferred comment {comment_id} could not be validated from live GitHub data "
-                f"({exc.failure_kind or 'unavailable'}); replay suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
-            )
         gap_changed = _update_deferred_gap(
             bot,
             review_data,
             payload,
-            "reconcile_failed_closed",
-            summary,
-            failure_kind=exc.failure_kind,
+            str(decision.failed_closed_reason),
+            str(decision.diagnostic_summary),
+            failure_kind=decision.failure_kind,
         )
         return changed or gap_changed
     comment_context = _read_live_comment_replay_context(live_comment, payload)
@@ -407,10 +413,31 @@ def _reconcile_deferred_comment(
     if not isinstance(live_body, str):
         raise RuntimeError("Live deferred comment body is unavailable")
     if digest_comment_body(live_body) != payload.get("source_body_digest"):
+        decision = reconcile_replay_policy.decide_comment_replay(
+            comment_id=comment_id,
+            source_comment_class=context.payload.comment_class,
+            source_has_non_command_text=context.payload.has_non_command_text,
+            source_freshness_eligible=source_freshness_eligible,
+            live_comment_found=True,
+            live_body_digest_matches=False,
+            live_classified={
+                "comment_class": context.payload.comment_class,
+                "has_non_command_text": context.payload.has_non_command_text,
+                "command_count": 1,
+            },
+            live_failure_kind=None,
+            runbook_path=bot.REVIEW_FRESHNESS_RUNBOOK_PATH,
+        )
         changed = False
-        if source_freshness_eligible:
+        if decision.record_source_freshness:
             changed = record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body))
-        gap_changed = _update_deferred_gap(bot, review_data, payload, "reconcile_failed_closed", f"Deferred comment {comment_id} body digest changed; command execution suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.")
+        gap_changed = _update_deferred_gap(
+            bot,
+            review_data,
+            payload,
+            str(decision.failed_closed_reason),
+            str(decision.diagnostic_summary),
+        )
         return changed or gap_changed
     changed = False
     if source_freshness_eligible:
@@ -483,52 +510,28 @@ def _validate_live_comment_replay_contract(
     payload: dict,
     live_body: str,
 ) -> LiveCommentReplayValidationResult:
-    source_comment_class = str(payload.get("comment_class", ""))
     live_classified = classify_comment_payload(bot, live_body)
-    live_comment_class = str(live_classified.get("comment_class", ""))
-    source_has_non_command_text = bool(payload.get("has_non_command_text"))
-    live_has_non_command_text = bool(live_classified.get("has_non_command_text"))
-
-    if live_comment_class != source_comment_class:
+    decision = reconcile_replay_policy.decide_comment_replay(
+        comment_id=int(payload["comment_id"]),
+        source_comment_class=str(payload.get("comment_class", "")),
+        source_has_non_command_text=bool(payload.get("has_non_command_text")),
+        source_freshness_eligible=False,
+        live_comment_found=True,
+        live_body_digest_matches=True,
+        live_classified=live_classified,
+        live_failure_kind=None,
+        runbook_path=bot.REVIEW_FRESHNESS_RUNBOOK_PATH,
+    )
+    if decision.failed_closed_reason is not None:
         changed = _update_deferred_gap(
             bot,
             review_data,
             payload,
-            "reconcile_failed_closed",
-            (
-                f"Deferred comment {payload['comment_id']} classification changed from "
-                f"{source_comment_class} to {live_comment_class}; replay suppressed. "
-                f"See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
-            ),
+            decision.failed_closed_reason,
+            str(decision.diagnostic_summary),
+            failure_kind=decision.failure_kind,
         )
         return LiveCommentReplayValidationResult(None, changed, True)
-
-    if live_has_non_command_text != source_has_non_command_text:
-        changed = _update_deferred_gap(
-            bot,
-            review_data,
-            payload,
-            "reconcile_failed_closed",
-            (
-                f"Deferred comment {payload['comment_id']} non-command text classification drifted; "
-                f"replay suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
-            ),
-        )
-        return LiveCommentReplayValidationResult(None, changed, True)
-
-    if source_comment_class in {"command_only", "command_plus_text"} and int(live_classified.get("command_count", 0)) != 1:
-        changed = _update_deferred_gap(
-            bot,
-            review_data,
-            payload,
-            "reconcile_failed_closed",
-            (
-                f"Deferred comment {payload['comment_id']} no longer resolves to exactly one command; "
-                f"replay suppressed. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
-            ),
-        )
-        return LiveCommentReplayValidationResult(None, changed, True)
-
     return LiveCommentReplayValidationResult(live_classified, False, False)
 
 
@@ -552,12 +555,16 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
     try:
         if isinstance(parsed_payload, ObserverNoopPayload):
             _validate_workflow_run_artifact_identity(bot, parsed_payload.raw_payload)
+            decision = reconcile_replay_policy.decide_observer_noop(
+                source_event_key=source_event_key,
+                reason=parsed_payload.reason,
+            )
             _log(
                 bot,
                 "info",
-                f"Observer workflow produced explicit no-op payload for {source_event_key}: {parsed_payload.reason}",
-                source_event_key=source_event_key,
-                reason=parsed_payload.reason,
+                f"Observer workflow produced explicit no-op payload for {decision.source_event_key}: {decision.reason}",
+                source_event_key=decision.source_event_key,
+                reason=decision.reason,
             )
             return False
 
@@ -609,17 +616,24 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 live_commit_id = parsed_payload.source_commit_id
             actor = context.actor_login
             state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(pr_number, review_data).changed
-            if isinstance(review_data.get("current_reviewer"), str) and review_data.get("current_reviewer", "").lower() == actor.lower() and isinstance(live_commit_id, str) and isinstance(live_submitted_at, str):
+            decision = reconcile_replay_policy.decide_review_submitted_replay(
+                source_event_key=source_event_key,
+                actor_login=actor,
+                current_reviewer=review_data.get("current_reviewer"),
+                live_commit_id=live_commit_id if isinstance(live_commit_id, str) else None,
+                live_submitted_at=live_submitted_at if isinstance(live_submitted_at, str) else None,
+            )
+            if decision.accept_reviewer_review:
                 accept_channel_event(
                     review_data,
                     "reviewer_review",
                     semantic_key=source_event_key,
-                    timestamp=live_submitted_at,
-                    actor=actor,
-                    reviewed_head_sha=live_commit_id,
+                    timestamp=str(decision.replay_timestamp),
+                    actor=str(decision.actor_login),
+                    reviewed_head_sha=str(decision.reviewed_head_sha),
                     source_precedence=1,
                 )
-                record_reviewer_activity(review_data, live_submitted_at)
+                record_reviewer_activity(review_data, str(decision.replay_timestamp))
                 state_changed = True
             if _record_review_rebuild(bot, state, pr_number, review_data):
                 state_changed = True
@@ -633,13 +647,18 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 parsed_payload,
                 expected_event_action="dismissed",
             )
-            accept_channel_event(
-                review_data,
-                "review_dismissal",
-                semantic_key=source_event_key,
+            decision = reconcile_replay_policy.decide_review_dismissed_replay(
+                source_event_key=source_event_key,
                 timestamp=_now_iso(bot),
-                dismissal_only=True,
             )
+            if decision.accept_review_dismissal:
+                accept_channel_event(
+                    review_data,
+                    "review_dismissal",
+                    semantic_key=source_event_key,
+                    timestamp=str(decision.replay_timestamp),
+                    dismissal_only=True,
+                )
             state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(pr_number, review_data).changed
             if _record_review_rebuild(bot, state, pr_number, review_data):
                 state_changed = True

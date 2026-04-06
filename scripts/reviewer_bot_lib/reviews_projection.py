@@ -10,6 +10,14 @@ from .config import (
     STATUS_AWAITING_WRITE_APPROVAL_LABEL,
 )
 
+__all__ = [
+    "filter_current_head_reviews_for_cycle",
+    "normalize_reviews_with_parsed_timestamps",
+    "collect_permission_statuses",
+    "compute_pr_approval_state_from_reviews",
+    "desired_labels_from_response_state",
+]
+
 
 def filter_current_head_reviews_for_cycle(
     reviews: list[dict],

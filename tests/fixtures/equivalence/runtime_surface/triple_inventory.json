@@ -1,0 +1,89 @@
+{
+  "harness_id": "F2a runtime/bootstrap/fake-runtime triple inventory",
+  "capability_triples": [
+    {
+      "capability": "comment-event dispatch",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_comment_event",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:handle_comment_event",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "workflow-run dispatch",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_workflow_run_event",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:handle_workflow_run_event",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "github issue snapshot access",
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:github_api",
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapGitHubServices.get_issue_or_pr_snapshot",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:get_issue_or_pr_snapshot",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "pull request reviews access",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapGitHubServices.get_pull_request_reviews",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:get_pull_request_reviews",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "reviewer response projection",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.compute_reviewer_response_state",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:compute_reviewer_response_state",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "rebuild approval state",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": null,
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:rebuild_pr_approval_state",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "refresh reviewer review from live preferred review",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": null,
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:refresh_reviewer_review_from_live_preferred_review",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "repair missing reviewer review state",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": null,
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:repair_missing_reviewer_review_state",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "sync status labels",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapWorkflowAdapterServices.sync_status_labels_for_items",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:sync_status_labels_for_items",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "privileged branch lookup",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapAutomationAdapterServices.find_open_pr_for_branch_status",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:find_open_pr_for_branch_status",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "privileged pull request creation",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapAutomationAdapterServices.create_pull_request",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:create_pull_request",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "privileged accept-no-fls-changes execution",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapCommandAdapterServices.handle_accept_no_fls_changes_command",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:handle_accept_no_fls_changes_command",
+      "classification": "retained final surface"
+    }
+  ]
+}

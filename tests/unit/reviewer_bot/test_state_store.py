@@ -1,4 +1,4 @@
-from scripts.reviewer_bot_lib import state_store
+from scripts.reviewer_bot_lib import review_state, state_store
 from scripts.reviewer_bot_lib.config import (
     FRESHNESS_RUNTIME_EPOCH_LEGACY,
     STATE_SCHEMA_VERSION,
@@ -174,3 +174,14 @@ def test_get_state_issue_snapshot_builds_html_url_from_runtime_config_when_missi
 
     assert snapshot is not None
     assert snapshot.html_url == "https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/1"
+
+
+def test_loaded_state_remains_compatible_with_delegated_review_state_owner(monkeypatch):
+    bot = _bot(monkeypatch, get_state_issue=lambda: {"body": "active_reviews:\n  '42': ['alice']\n"})
+
+    state = state_store.load_state(bot)
+    review = review_state.ensure_review_entry(state, 42, create=False)
+
+    assert review is not None
+    assert review["skipped"] == ["alice"]
+    assert review["pending_privileged_commands"] == {}

@@ -16,6 +16,13 @@ from tests.fixtures.reviewer_bot import (
 pytestmark = pytest.mark.integration
 
 
+C4C_DELETION_MANIFEST = [
+    "inline comment classification drift decision text in reconcile.py",
+    "inline non-command text drift decision text in reconcile.py",
+    "inline command-count replay decision text in reconcile.py",
+]
+
+
 def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping_only_mutations(
     monkeypatch,
 ):
@@ -626,3 +633,35 @@ def test_deferred_comment_reconcile_fails_closed_when_comment_classification_dri
     assert state["active_reviews"]["42"]["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:202"
     assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:202"]["reason"] == "reconcile_failed_closed"
     assert "issue_comment:202" not in state["active_reviews"]["42"]["reconciled_source_events"]
+
+
+def test_c4c_reconcile_deletion_manifest_and_adapter_cleanup_are_explicit():
+    with open("scripts/reviewer_bot_lib/reconcile.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert C4C_DELETION_MANIFEST == [
+        "inline comment classification drift decision text in reconcile.py",
+        "inline non-command text drift decision text in reconcile.py",
+        "inline command-count replay decision text in reconcile.py",
+    ]
+    assert "classification changed from" not in module_text
+    assert "non-command text classification drifted" not in module_text
+    assert "no longer resolves to exactly one command" not in module_text
+    assert "reconcile_replay_policy.decide_comment_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_submitted_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in module_text
+
+
+def test_d2_reconcile_replay_path_stays_decode_read_apply_orchestration_only():
+    with open("scripts/reviewer_bot_lib/reconcile.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert "build_deferred_comment_replay_context(" in module_text
+    assert "_read_live_comment_replay_context(" in module_text
+    assert "process_comment_event(" in module_text
+    assert "record_conversation_freshness(" in module_text
+    assert "_mark_reconciled_source_event(" in module_text
+    assert "_clear_source_event_key(" in module_text
+    assert "reconcile_replay_policy.decide_comment_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_submitted_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in module_text

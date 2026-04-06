@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from scripts.reviewer_bot_lib import review_state, reviews
 from scripts.reviewer_bot_lib.config import (
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
@@ -208,3 +210,15 @@ def test_compute_reviewer_response_state_reports_permission_unavailable(monkeypa
 
     assert response_state["state"] == "projection_failed"
     assert response_state["reason"] == "live_review_state_unknown"
+
+
+def test_live_read_review_mutation_public_surfaces_delegate_to_core_owner():
+    review_state_text = Path("scripts/reviewer_bot_lib/review_state.py").read_text(encoding="utf-8")
+    reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
+
+    assert "return review_state_machine.accept_reviewer_review_from_live_review(" in review_state_text
+    assert "return review_state_machine.refresh_reviewer_review_from_live_preferred_review(" in review_state_text
+    assert "return review_state_machine.repair_missing_reviewer_review_state(" in review_state_text
+    assert "return review_state_machine.accept_reviewer_review_from_live_review(" in reviews_text
+    assert "return review_state_machine.refresh_reviewer_review_from_live_preferred_review(" in reviews_text
+    assert "return review_state_machine.repair_missing_reviewer_review_state(" in reviews_text

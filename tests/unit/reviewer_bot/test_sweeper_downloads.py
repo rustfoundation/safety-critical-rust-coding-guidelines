@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from scripts.reviewer_bot_lib import sweeper
 from tests.fixtures.fake_jitter import DeterministicJitter
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
@@ -105,3 +107,12 @@ def test_list_run_artifacts_consumes_retry_aware_success(monkeypatch):
     )
 
     assert sweeper._list_run_artifacts(runtime, 10) == [{"id": 1, "name": "artifact"}]
+
+
+def test_sweeper_artifact_correlation_surface_stays_thin_after_diagnosis_cutover():
+    module_text = Path("scripts/reviewer_bot_lib/sweeper.py").read_text(encoding="utf-8")
+
+    assert "deferred_gap_diagnosis.correlate_run_artifacts_exact(" in module_text
+    assert "deferred_gap_diagnosis.correlate_candidate_observer_runs(" in module_text
+    assert "def correlate_run_artifacts_exact(" not in module_text
+    assert "def correlate_candidate_observer_runs(" not in module_text

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from datetime import datetime, timezone
+
+from scripts.reviewer_bot_core import comment_routing_policy
 
 from .comment_application import (
     digest_comment_body,
@@ -81,61 +82,17 @@ def _digest_body(body: str) -> str:
 
 
 def _comment_line_is_command(bot, line: str) -> bool:
-    stripped = line.strip()
-    if not stripped:
-        return False
-    pattern = rf"^{re.escape(bot.BOT_MENTION)}\s+/[A-Za-z0-9?_-]+(?:\s+.*)?$"
-    return re.match(pattern, stripped) is not None
+    return comment_routing_policy.comment_line_is_command(bot.BOT_MENTION, line)
 
 
 def classify_comment_payload(bot, body: str) -> dict:
     normalized = _normalize_comment_body(bot.adapters.commands.strip_code_blocks(body))
-    if not normalized:
-        return {
-            "comment_class": "empty_or_whitespace",
-            "has_non_command_text": False,
-            "command_count": 0,
-            "command": None,
-            "args": [],
-            "normalized_body": normalized,
-        }
-    lines = [line for line in normalized.splitlines() if line.strip()]
-    command_lines = [line for line in lines if _comment_line_is_command(bot, line)]
-    non_command_lines = [line for line in lines if not _comment_line_is_command(bot, line)]
     parsed = bot.adapters.commands.parse_command(normalized)
-    command = None
-    args: list[str] = []
-    if parsed:
-        command, args = parsed
-    if command_lines and not non_command_lines:
-        comment_class = "command_only"
-    elif command_lines and non_command_lines:
-        comment_class = "command_plus_text"
-    else:
-        comment_class = "plain_text"
-    return {
-        "comment_class": comment_class,
-        "has_non_command_text": bool(non_command_lines),
-        "command_count": len(command_lines),
-        "command": command,
-        "args": args,
-        "normalized_body": normalized,
-    }
+    return comment_routing_policy.classify_comment_payload(bot.BOT_MENTION, normalized, parsed)
 
 
 def _classify_issue_comment_actor(request: CommentEventRequest) -> str:
-    comment_user_type = request.comment_user_type
-    comment_author = request.comment_author.strip()
-    sender_type = request.comment_sender_type
-    installation_id = request.comment_installation_id
-    via_github_app = request.comment_performed_via_github_app
-    if comment_user_type == "Bot" or comment_author.endswith("[bot]"):
-        return "bot_account"
-    if installation_id or via_github_app or (sender_type and sender_type not in {"User", "Bot"}):
-        return "github_app_or_other_automation"
-    if comment_user_type == "User" and comment_author and not comment_author.endswith("[bot]") and not installation_id and not via_github_app:
-        return "repo_user_principal"
-    return "unknown_actor"
+    return comment_routing_policy.classify_issue_comment_actor(request)
 
 
 def classify_issue_comment_actor(request: CommentEventRequest | None = None) -> str:
@@ -163,23 +120,19 @@ def _classify_pr_comment_processing_target(
     trust_context: PrCommentTrustContext,
 ) -> str:
     actor_class = _classify_issue_comment_actor(request)
-    if actor_class in {"bot_account", "github_app_or_other_automation"} or _is_self_comment(bot, request.comment_author):
-        return "safe_noop"
     pull_request = _fetch_pr_metadata(bot, request.issue_number)
     head_repo = pull_request.get("head", {}).get("repo", {})
     head_full_name = head_repo.get("full_name") if isinstance(head_repo, dict) else None
-    if not isinstance(head_full_name, str) or not head_full_name:
-        raise RuntimeError("Missing PR head repository metadata for trust routing")
-    is_cross_repo = head_full_name != trust_context.github_repository
     pr_author = pull_request.get("user", {}).get("login")
-    is_dependabot_restricted = pr_author == "dependabot[bot]"
-    author_association = trust_context.comment_author_association
-    trusted_principal = actor_class == "repo_user_principal" and author_association in bot.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST
-    if is_cross_repo or is_dependabot_restricted:
-        return "pr_deferred_reconcile"
-    if trusted_principal:
-        return "pr_trusted_direct"
-    raise RuntimeError("Ambiguous same-repo PR comment trust posture; failing closed")
+    return comment_routing_policy.classify_pr_comment_processing_target(
+        request,
+        trust_context,
+        actor_class=actor_class,
+        is_self_comment=_is_self_comment(bot, request.comment_author),
+        pr_head_full_name=head_full_name,
+        pr_author=pr_author if isinstance(pr_author, str) else None,
+        author_association_trust_allowlist=bot.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
+    )
 
 
 def classify_pr_comment_processing_target(
@@ -201,16 +154,14 @@ def _route_issue_comment_trust(
     request: CommentEventRequest,
     trust_context: PrCommentTrustContext,
 ) -> str:
-    if not request.is_pull_request:
-        return "issue_direct"
-    target = _classify_pr_comment_processing_target(bot, request, trust_context)
-    if target != "pr_trusted_direct":
-        return target
-    workflow_file = trust_context.current_workflow_file
-    workflow_ref = trust_context.github_ref
-    if workflow_file == ".github/workflows/reviewer-bot-pr-comment-trusted.yml" and workflow_ref == "refs/heads/main":
-        return "pr_trusted_direct"
-    raise RuntimeError("Ambiguous same-repo PR comment trust posture; failing closed")
+    processing_target = None
+    if request.is_pull_request:
+        processing_target = _classify_pr_comment_processing_target(bot, request, trust_context)
+    return comment_routing_policy.route_issue_comment_trust(
+        request,
+        trust_context,
+        processing_target=processing_target,
+    )
 
 
 def route_issue_comment_trust(
@@ -233,50 +184,19 @@ def _build_pr_comment_observer_payload(
     trust_context: PrCommentTrustContext,
 ) -> dict:
     actor_class = _classify_issue_comment_actor(request)
-    comment_id = request.comment_id
-    base_payload = {
-        "source_workflow_name": "Reviewer Bot PR Comment Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        "source_run_id": trust_context.github_run_id,
-        "source_run_attempt": trust_context.github_run_attempt,
-        "source_event_name": "issue_comment",
-        "source_event_action": "created",
-        "source_event_key": f"issue_comment:{comment_id}",
-        "pr_number": request.issue_number,
-    }
-    if actor_class in {"bot_account", "github_app_or_other_automation"} or _is_self_comment(bot, request.comment_author):
-        return {
-            "schema_version": 1,
-            "kind": "observer_noop",
-            "reason": "ignored_non_human_automation",
-            **base_payload,
-        }
     processing_target = _classify_pr_comment_processing_target(bot, request, trust_context)
-    if processing_target == "pr_trusted_direct":
-        return {
-            "schema_version": 1,
-            "kind": "observer_noop",
-            "reason": "trusted_direct_same_repo_human_comment",
-            **base_payload,
-        }
     body = request.comment_body
     payload_classification = classify_comment_payload(bot, body)
-    return {
-        "schema_version": 2,
-        **base_payload,
-        "comment_id": comment_id,
-        "comment_class": payload_classification["comment_class"],
-        "has_non_command_text": payload_classification["has_non_command_text"],
-        "source_body_digest": _digest_body(body),
-        "source_created_at": request.comment_created_at,
-        "actor_login": request.comment_author,
-        "actor_id": request.comment_author_id,
-        "actor_class": "repo_user_principal" if actor_class == "repo_user_principal" else "unknown_actor",
-        "source_artifact_name": (
-            f"reviewer-bot-comment-context-{trust_context.github_run_id}-attempt-"
-            f"{trust_context.github_run_attempt}"
-        ),
-    }
+    if _is_self_comment(bot, request.comment_author):
+        actor_class = "bot_account"
+    return comment_routing_policy.build_pr_comment_observer_payload(
+        request,
+        trust_context,
+        actor_class=actor_class,
+        processing_target=processing_target,
+        payload_classification=payload_classification,
+        body_digest=_digest_body(body),
+    )
 
 
 def build_pr_comment_observer_payload(

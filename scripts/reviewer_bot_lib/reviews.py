@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Iterable
 from urllib.parse import quote
 
 from . import review_state
@@ -14,11 +14,7 @@ from .config import (
     STATUS_LABELS,
 )
 from .reviews_projection import (
-    collect_permission_statuses,
-    compute_pr_approval_state_from_reviews,
     desired_labels_from_response_state,
-    filter_current_head_reviews_for_cycle,
-    normalize_reviews_with_parsed_timestamps,
 )
 
 
@@ -159,7 +155,7 @@ def get_latest_valid_current_reviewer_review_for_cycle(
     current_reviewer = review_data.get("current_reviewer")
     if not isinstance(current_reviewer, str) or not current_reviewer.strip():
         return None
-    boundary = _get_current_cycle_boundary(bot, review_data)
+    boundary = review_state.get_current_cycle_boundary(bot, review_data)
     if boundary is None:
         return None
     if reviews is None:
@@ -201,7 +197,7 @@ def get_valid_current_reviewer_reviews_for_cycle(
     current_reviewer = review_data.get("current_reviewer")
     if not isinstance(current_reviewer, str) or not current_reviewer.strip():
         return []
-    boundary = _get_current_cycle_boundary(bot, review_data)
+    boundary = review_state.get_current_cycle_boundary(bot, review_data)
     if boundary is None:
         return []
     if reviews is None:
@@ -282,18 +278,12 @@ def build_reviewer_review_record_from_live_review(review: dict, *, actor: str | 
 
 
 def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
-    record = build_reviewer_review_record_from_live_review(review, actor=actor)
-    if record is None:
-        return False
-    return _accept_channel_event(
+    from scripts.reviewer_bot_core import review_state_machine
+
+    return review_state_machine.accept_reviewer_review_from_live_review(
         review_data,
-        "reviewer_review",
-        semantic_key=record["semantic_key"],
-        timestamp=record["timestamp"],
-        actor=record["actor"],
-        reviewed_head_sha=record["reviewed_head_sha"],
-        source_precedence=record["source_precedence"],
-        payload=record["payload"],
+        review,
+        actor=actor,
     )
 
 
@@ -306,91 +296,16 @@ def refresh_reviewer_review_from_live_preferred_review(
     reviews: list[dict] | None = None,
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
-    if pull_request is None:
-        pull_request_result = _pull_request_read_result(bot, issue_number)
-        if not pull_request_result.get("ok"):
-            return False, None
-        pull_request = pull_request_result["pull_request"]
-    preferred_review = get_preferred_current_reviewer_review_for_cycle(
+    from scripts.reviewer_bot_core import review_state_machine
+
+    return review_state_machine.refresh_reviewer_review_from_live_preferred_review(
         bot,
         issue_number,
         review_data,
         pull_request=pull_request,
         reviews=reviews,
+        actor=actor,
     )
-    if preferred_review is None:
-        return False, None
-    record = build_reviewer_review_record_from_live_review(preferred_review, actor=actor or review_data.get("current_reviewer"))
-    if record is None:
-        return False, None
-    channel = _ensure_channel_map(review_data, "reviewer_review")
-    changed = False
-    if record["semantic_key"] not in channel["seen_keys"]:
-        channel["seen_keys"].append(record["semantic_key"])
-        changed = True
-    if channel.get("accepted") != record:
-        channel["accepted"] = record
-        changed = True
-    submitted_at = preferred_review.get("submitted_at")
-    if isinstance(submitted_at, str):
-        previous_activity = review_data.get("last_reviewer_activity")
-        previous_warning = review_data.get("transition_warning_sent")
-        previous_notice = review_data.get("transition_notice_sent_at")
-        _record_reviewer_activity(review_data, submitted_at)
-        activity_changed = (
-            previous_activity != review_data.get("last_reviewer_activity")
-            or previous_warning != review_data.get("transition_warning_sent")
-            or previous_notice != review_data.get("transition_notice_sent_at")
-        )
-        changed = changed or activity_changed
-    return changed, preferred_review
-
-
-def compute_pr_approval_state_result(
-    bot,
-    issue_number: int,
-    review_data: dict,
-    *,
-    pull_request: dict | None = None,
-    reviews: list[dict] | None = None,
-) -> dict[str, object]:
-    boundary = _get_current_cycle_boundary(bot, review_data)
-    if boundary is None:
-        return _projection_failure("pull_request_unavailable")
-    pull_request_result = _pull_request_read_result(bot, issue_number, pull_request)
-    if not pull_request_result.get("ok"):
-        return pull_request_result
-    pull_request = pull_request_result["pull_request"]
-    head = pull_request.get("head")
-    current_head = head.get("sha") if isinstance(head, dict) else None
-    if not isinstance(current_head, str) or not current_head.strip():
-        return _projection_failure("pull_request_head_unavailable", "invalid_payload")
-    reviews_result = get_pull_request_reviews_result(bot, issue_number, reviews)
-    if not reviews_result.get("ok"):
-        return reviews_result
-    reviews = reviews_result["reviews"]
-
-    normalized_reviews = normalize_reviews_with_parsed_timestamps(
-        reviews,
-        parse_timestamp=parse_github_timestamp,
-    )
-    survivors = filter_current_head_reviews_for_cycle(
-        normalized_reviews,
-        boundary=boundary,
-        current_head=current_head,
-    )
-    permission_cache = collect_permission_statuses(
-        survivors,
-        permission_status=lambda author: _permission_status(bot, author, "push"),
-    )
-    result = compute_pr_approval_state_from_reviews(
-        survivors,
-        current_head=current_head,
-        permission_statuses=permission_cache,
-    )
-    if not result.get("ok"):
-        return _projection_failure(str(result.get("reason")))
-    return result
 
 
 def resolve_pr_approval_state(
@@ -401,6 +316,8 @@ def resolve_pr_approval_state(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> tuple[dict | None, dict | None, str | None]:
+    from scripts.reviewer_bot_core import approval_policy
+
     rebuild_fn = getattr(bot, "rebuild_pr_approval_state", rebuild_pr_approval_state)
     if not _is_canonical_callable(rebuild_fn):
         completion, write_approval = rebuild_fn(
@@ -414,7 +331,7 @@ def resolve_pr_approval_state(
             return None, None, "live_review_state_unknown"
         return completion, write_approval, None
 
-    approval_result = compute_pr_approval_state_result(
+    approval_result = approval_policy.compute_pr_approval_state_result(
         bot,
         issue_number,
         review_data,
@@ -447,194 +364,14 @@ def apply_pr_approval_state(
 
 
 def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
-    changed, _ = refresh_reviewer_review_from_live_preferred_review(
+    from scripts.reviewer_bot_core import review_state_machine
+
+    return review_state_machine.repair_missing_reviewer_review_state(
         bot,
         issue_number,
         review_data,
         reviews=reviews,
-        actor=review_data.get("current_reviewer"),
     )
-    return changed
-
-
-def find_triage_approval_after(bot, reviews: list[dict], since: datetime | None) -> tuple[str, datetime] | None:
-    permission_cache: dict[str, bool] = {}
-    approvals: list[tuple[datetime, str, str]] = []
-    for review in reviews:
-        state = str(review.get("state", "")).upper()
-        if state != "APPROVED":
-            continue
-        author = review.get("user", {}).get("login")
-        if not isinstance(author, str) or not author:
-            continue
-        submitted_at = bot.parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None:
-            continue
-        if since is not None and submitted_at <= since:
-            continue
-        approvals.append((submitted_at, str(review.get("id", "")), author))
-    approvals.sort(key=lambda item: (item[0], item[1]))
-    for submitted_at, _, author in approvals:
-        cache_key = author.lower()
-        if cache_key not in permission_cache:
-            permission_cache[cache_key] = bot.is_triage_or_higher(author)
-        if permission_cache[cache_key]:
-            return author, submitted_at
-    return None
-
-
-def _ensure_channel_map(review_entry: dict, name: str) -> dict:
-    value = review_entry.get(name)
-    if not isinstance(value, dict):
-        value = {"accepted": None, "seen_keys": []}
-        review_entry[name] = value
-    if not isinstance(value.get("seen_keys"), list):
-        value["seen_keys"] = []
-    return value
-
-
-def _ensure_dict(review_entry: dict, name: str) -> dict:
-    value = review_entry.get(name)
-    if not isinstance(value, dict):
-        value = {}
-        review_entry[name] = value
-    return value
-
-
-def _ensure_review_entry(state: dict, issue_number: int, create: bool = False) -> dict | None:
-    issue_key = str(issue_number)
-    if "active_reviews" not in state or not isinstance(state.get("active_reviews"), dict):
-        state["active_reviews"] = {}
-    review_entry = state["active_reviews"].get(issue_key)
-    if review_entry is None:
-        if not create:
-            return None
-        review_entry = {}
-        state["active_reviews"][issue_key] = review_entry
-    elif isinstance(review_entry, list):
-        review_entry = {"skipped": review_entry}
-        state["active_reviews"][issue_key] = review_entry
-    if not isinstance(review_entry, dict):
-        return None
-
-    defaults: dict[str, Any] = {
-        "skipped": [],
-        "current_reviewer": None,
-        "cycle_started_at": None,
-        "active_cycle_started_at": None,
-        "assigned_at": None,
-        "active_head_sha": None,
-        "last_reviewer_activity": None,
-        "transition_warning_sent": None,
-        "transition_notice_sent_at": None,
-        "assignment_method": None,
-        "review_completed_at": None,
-        "review_completed_by": None,
-        "review_completion_source": None,
-        "mandatory_approver_required": False,
-        "mandatory_approver_label_applied_at": None,
-        "mandatory_approver_pinged_at": None,
-        "mandatory_approver_satisfied_by": None,
-        "mandatory_approver_satisfied_at": None,
-        "repair_needed": None,
-        "overdue_anchor": None,
-    }
-    for field, default in defaults.items():
-        if field not in review_entry:
-            review_entry[field] = default
-    if not isinstance(review_entry.get("skipped"), list):
-        review_entry["skipped"] = []
-
-    for channel in (
-        "reviewer_comment",
-        "reviewer_review",
-        "contributor_comment",
-        "contributor_revision",
-        "review_dismissal",
-    ):
-        _ensure_channel_map(review_entry, channel)
-    for mapping in (
-        "deferred_gaps",
-        "observer_discovery_watermarks",
-        "pending_privileged_commands",
-        "current_cycle_completion",
-        "current_cycle_write_approval",
-    ):
-        _ensure_dict(review_entry, mapping)
-    reconciled_source_events = review_entry.get("reconciled_source_events")
-    if not isinstance(reconciled_source_events, list):
-        review_entry["reconciled_source_events"] = []
-    return review_entry
-
-
-def _reset_cycle_state(review_data: dict) -> None:
-    for channel in (
-        "reviewer_comment",
-        "reviewer_review",
-        "contributor_comment",
-        "contributor_revision",
-        "review_dismissal",
-    ):
-        review_data[channel] = {"accepted": None, "seen_keys": []}
-    review_data["current_cycle_completion"] = {}
-    review_data["current_cycle_write_approval"] = {}
-    review_data["overdue_anchor"] = None
-    if isinstance(review_data.get("pending_privileged_commands"), dict):
-        review_data["pending_privileged_commands"] = {}
-
-
-def clear_transition_timers(review_data: dict) -> None:
-    review_data["transition_warning_sent"] = None
-    review_data["transition_notice_sent_at"] = None
-
-
-def _record_reviewer_activity(review_data: dict, timestamp: str) -> bool:
-    current = parse_github_timestamp(review_data.get("last_reviewer_activity"))
-    candidate = parse_github_timestamp(timestamp)
-    if candidate is None:
-        return False
-    if current is None or candidate > current:
-        review_data["last_reviewer_activity"] = timestamp
-        clear_transition_timers(review_data)
-        return True
-    return False
-
-
-def _record_transition_notice_sent(review_data: dict, timestamp: str) -> None:
-    review_data["transition_notice_sent_at"] = timestamp
-
-
-def _set_current_reviewer(
-    state: dict,
-    issue_number: int,
-    reviewer: str,
-    assignment_method: str = "round-robin",
-) -> None:
-    now = _now_iso()
-    review_data = _ensure_review_entry(state, issue_number, create=True)
-    if review_data is None:
-        return
-    review_data["current_reviewer"] = reviewer
-    review_data["cycle_started_at"] = now
-    review_data["active_cycle_started_at"] = now
-    review_data["assigned_at"] = now
-    _record_reviewer_activity(review_data, now)
-    review_data["assignment_method"] = assignment_method
-    review_data["review_completed_at"] = None
-    review_data["review_completed_by"] = None
-    review_data["review_completion_source"] = None
-    review_data["mandatory_approver_required"] = False
-    review_data["mandatory_approver_label_applied_at"] = None
-    review_data["mandatory_approver_pinged_at"] = None
-    review_data["mandatory_approver_satisfied_by"] = None
-    review_data["mandatory_approver_satisfied_at"] = None
-    review_data["active_head_sha"] = None
-    _reset_cycle_state(review_data)
-
-
-def _semantic_key_seen(review_data: dict, channel_name: str, semantic_key: str) -> bool:
-    channel = _ensure_channel_map(review_data, channel_name)
-    return semantic_key in channel["seen_keys"]
 
 
 def _compare_records(left: dict | None, right: dict | None) -> int:
@@ -657,71 +394,6 @@ def _compare_records(left: dict | None, right: dict | None) -> int:
     return 0
 
 
-def _accept_channel_event(
-    review_data: dict,
-    channel_name: str,
-    *,
-    semantic_key: str,
-    timestamp: str,
-    actor: str | None = None,
-    reviewed_head_sha: str | None = None,
-    source_precedence: int = 0,
-    payload: dict | None = None,
-    dismissal_only: bool = False,
-) -> bool:
-    channel = _ensure_channel_map(review_data, channel_name)
-    if semantic_key in channel["seen_keys"]:
-        return False
-    channel["seen_keys"].append(semantic_key)
-    if dismissal_only:
-        channel["accepted"] = channel.get("accepted") or {
-            "semantic_key": semantic_key,
-            "timestamp": timestamp,
-        }
-        return True
-    candidate = {
-        "semantic_key": semantic_key,
-        "timestamp": timestamp,
-        "actor": actor,
-        "reviewed_head_sha": reviewed_head_sha,
-        "source_precedence": source_precedence,
-        "payload": payload or {},
-    }
-    current = channel.get("accepted")
-    if _compare_records(candidate, current) >= 0:
-        channel["accepted"] = candidate
-    return True
-
-
-def _update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
-    review_data = _ensure_review_entry(state, issue_number)
-    if review_data is None:
-        return False
-    current_reviewer = review_data.get("current_reviewer")
-    if not isinstance(current_reviewer, str) or current_reviewer.lower() != reviewer.lower():
-        return False
-    _record_reviewer_activity(review_data, _now_iso())
-    return True
-
-
-def _mark_review_complete(state: dict, issue_number: int, reviewer: str | None, source: str) -> bool:
-    review_data = _ensure_review_entry(state, issue_number, create=True)
-    if review_data is None:
-        return False
-    now = _now_iso()
-    review_data["review_completed_at"] = now
-    review_data["review_completed_by"] = reviewer or None
-    review_data["review_completion_source"] = source
-    _record_reviewer_activity(review_data, now)
-    review_data["current_cycle_completion"] = {
-        "completed": True,
-        "completed_at": now,
-        "source": source,
-        "reviewer": reviewer,
-    }
-    return True
-
-
 def is_triage_or_higher(bot, username: str) -> bool:
     status = _permission_status(bot, username, "triage")
     if status == "unavailable":
@@ -730,7 +402,7 @@ def is_triage_or_higher(bot, username: str) -> bool:
 
 
 def trigger_mandatory_approver_escalation(bot, state: dict, issue_number: int) -> bool:
-    review_data = _ensure_review_entry(state, issue_number, create=True)
+    review_data = review_state.ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
     now = _now_iso()
@@ -756,7 +428,7 @@ def trigger_mandatory_approver_escalation(bot, state: dict, issue_number: int) -
 
 
 def satisfy_mandatory_approver_requirement(bot, state: dict, issue_number: int, approver: str) -> bool:
-    review_data = _ensure_review_entry(state, issue_number, create=True)
+    review_data = review_state.ensure_review_entry(state, issue_number, create=True)
     if review_data is None or not review_data.get("mandatory_approver_required"):
         return False
     if review_data.get("mandatory_approver_satisfied_at"):
@@ -797,16 +469,6 @@ def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
         if current is None or review_key >= (current[0], current[1]):
             latest_by_login[key] = (submitted_at, review_id, review)
     return {login: item[2] for login, item in latest_by_login.items()}
-
-
-def _get_current_cycle_boundary(bot, review_data: dict) -> datetime | None:
-    for field in ("active_cycle_started_at", "cycle_started_at", "assigned_at"):
-        boundary = bot.parse_iso8601_timestamp(review_data.get(field))
-        if boundary is not None:
-            return boundary
-    return None
-
-
 @_mark_canonical
 def rebuild_pr_approval_state(
     bot,
@@ -836,7 +498,9 @@ def rebuild_pr_approval_state_result(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> dict[str, object]:
-    result = compute_pr_approval_state_result(
+    from scripts.reviewer_bot_core import approval_policy
+
+    result = approval_policy.compute_pr_approval_state_result(
         bot,
         issue_number,
         review_data,
@@ -1224,7 +888,7 @@ def list_open_tracked_review_items(state: dict) -> list[int]:
 
 
 def handle_pr_approved_review(bot, state: dict, issue_number: int, review_author: str, completion_source: str) -> bool:
-    review_data = _ensure_review_entry(state, issue_number)
+    review_data = review_state.ensure_review_entry(state, issue_number)
     if review_data is None:
         return False
     current_reviewer = review_data.get("current_reviewer")
@@ -1232,7 +896,7 @@ def handle_pr_approved_review(bot, state: dict, issue_number: int, review_author
     author_is_triage = is_triage_or_higher(bot, review_author)
     state_changed = False
     if author_is_designated:
-        if _mark_review_complete(state, issue_number, review_author, completion_source):
+        if review_state.mark_review_complete(state, issue_number, review_author, completion_source):
             state_changed = True
         if author_is_triage:
             if satisfy_mandatory_approver_requirement(bot, state, issue_number, review_author):

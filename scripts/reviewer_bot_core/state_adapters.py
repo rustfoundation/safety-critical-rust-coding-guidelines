@@ -193,3 +193,10 @@ def review_entry_to_persisted(review_entry: ReviewEntryState) -> dict[str, Any]:
         "current_cycle_completion": deepcopy(review_entry.current_cycle_completion),
         "current_cycle_write_approval": deepcopy(review_entry.current_cycle_write_approval),
     }
+
+
+def apply_local_state_core_to_persisted(target: dict[str, Any], review_entry: ReviewEntryState) -> dict[str, Any]:
+    persisted = review_entry_to_persisted(review_entry)
+    for key, value in persisted.items():
+        target[key] = value
+    return target

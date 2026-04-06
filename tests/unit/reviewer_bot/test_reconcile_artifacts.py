@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from scripts.reviewer_bot_lib import reconcile, review_state
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reconcile_harness import review_comment_payload
@@ -52,3 +54,14 @@ def test_review_comment_artifact_identity_validation(monkeypatch):
     runtime.github.stub(routes)
 
     assert reconcile.handle_workflow_run_event(runtime, state) is True
+
+
+def test_reconcile_payloads_and_reads_remain_normalized_inputs_for_replay_policy():
+    payloads_text = Path("scripts/reviewer_bot_lib/reconcile_payloads.py").read_text(encoding="utf-8")
+    reads_text = Path("scripts/reviewer_bot_lib/reconcile_reads.py").read_text(encoding="utf-8")
+    policy_text = Path("scripts/reviewer_bot_core/reconcile_replay_policy.py").read_text(encoding="utf-8")
+
+    assert "def parse_deferred_context_payload(" in payloads_text
+    assert "def read_reconcile_object(" in reads_text
+    assert "github_api_request" not in policy_text
+    assert "source_workflow_file" not in policy_text

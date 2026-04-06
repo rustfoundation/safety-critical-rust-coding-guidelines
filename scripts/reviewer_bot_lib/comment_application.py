@@ -5,6 +5,12 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
+from scripts.reviewer_bot_core import (
+    comment_command_policy,
+    comment_freshness_policy,
+    privileged_command_policy,
+)
+
 from . import commands as commands_module
 from . import config as config_module
 from .context import AssignmentRequest, CommentEventRequest
@@ -40,51 +46,28 @@ def record_conversation_freshness(
     review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
-    comment_author = request.comment_author
-    created_at = request.comment_created_at
-    semantic_key = request.comment_source_event_key or f"issue_comment:{request.comment_id}"
-    if request.issue_author and request.issue_author.lower() == comment_author.lower():
-        return accept_channel_event(
-            review_data,
-            "contributor_comment",
-            semantic_key=semantic_key,
-            timestamp=created_at,
-            actor=comment_author,
-        )
-    current_reviewer = review_data.get("current_reviewer")
-    if isinstance(current_reviewer, str) and current_reviewer.lower() == comment_author.lower():
-        changed = accept_channel_event(
-            review_data,
-            "reviewer_comment",
-            semantic_key=semantic_key,
-            timestamp=created_at,
-            actor=comment_author,
-        )
+    decision = comment_freshness_policy.decide_comment_freshness(review_data, request)
+    if decision.kind != "accept_channel_event":
+        return False
+    changed = accept_channel_event(
+        review_data,
+        str(decision.channel_name),
+        semantic_key=str(decision.semantic_key),
+        timestamp=str(decision.timestamp),
+        actor=str(decision.actor),
+    )
+    if decision.update_reviewer_activity:
         previous_activity = review_data.get("last_reviewer_activity")
         previous_warning = review_data.get("transition_warning_sent")
         previous_notice = review_data.get("transition_notice_sent_at")
-        record_reviewer_activity(review_data, created_at)
+        record_reviewer_activity(review_data, str(decision.timestamp))
         activity_changed = (
             previous_activity != review_data.get("last_reviewer_activity")
             or previous_warning != review_data.get("transition_warning_sent")
             or previous_notice != review_data.get("transition_notice_sent_at")
         )
         return changed or activity_changed
-    return False
-
-
-def store_pending_privileged_command(review_data: dict, issue_number: int, source_event_key: str, command_name: str, actor: str, args: list[str]) -> bool:
-    pending = review_data.setdefault("pending_privileged_commands", {})
-    pending[source_event_key] = {
-        "source_event_key": source_event_key,
-        "command_name": command_name,
-        "issue_number": issue_number,
-        "actor": actor,
-        "args": args,
-        "status": "pending",
-        "created_at": _now_iso(),
-    }
-    return True
+    return changed
 
 
 def build_assignment_request_from_comment(request: CommentEventRequest) -> AssignmentRequest:
@@ -99,23 +82,10 @@ def validate_accept_no_fls_changes_handoff(
     bot,
     request: CommentEventRequest,
 ) -> tuple[bool, dict]:
-    if request.is_pull_request:
-        return False, {"reason": "pull_request_target_not_allowed"}
     labels = commands_module.parse_issue_labels(bot)
-    if bot.FLS_AUDIT_LABEL not in labels:
-        return False, {"reason": "missing_fls_audit_label"}
     permission_status = bot.github.get_user_permission_status(request.comment_author, "triage")
-    if permission_status == "unavailable":
-        return False, {"reason": "authorization_unavailable"}
-    if permission_status != "granted":
-        return False, {"reason": "authorization_failed"}
-    return True, {
-        "command_name": "accept-no-fls-changes",
-        "issue_number": request.issue_number,
-        "actor": request.comment_author,
-        "authorization": {"required_permission": "triage", "authorized": True},
-        "target": {"kind": "issue", "number": request.issue_number, "labels": sorted(labels)},
-    }
+    decision = privileged_command_policy.validate_accept_no_fls_changes_handoff(request, labels, permission_status)
+    return decision.kind == "handoff_allowed", dict(decision.metadata or {})
 
 
 def apply_comment_command(
@@ -126,22 +96,26 @@ def apply_comment_command(
     *,
     classify_issue_comment_actor,
 ) -> bool:
-    if not isinstance(classified, dict):
+    actor_class = classify_issue_comment_actor(request)
+    decision = comment_command_policy.decide_comment_command(
+        bot,
+        request,
+        classified,
+        actor_class=actor_class,
+        commands_help=config_module.get_commands_help(),
+    )
+    if decision["kind"] == "ignore":
         return False
+
     issue_number = request.issue_number
     comment_author = request.comment_author
     command = classified.get("command")
     args = classified.get("args") or []
-    if not isinstance(command, str):
-        return False
-    actor_class = classify_issue_comment_actor(request)
-    if actor_class in {"unknown_actor", "bot_account", "github_app_or_other_automation"}:
-        return False
     review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
     source_event_key = request.comment_source_event_key or f"issue_comment:{request.comment_id}"
-    if command == "accept-no-fls-changes":
+    if decision["kind"] == "deferred_privileged_handoff":
         is_valid, metadata = validate_accept_no_fls_changes_handoff(bot, request)
         if not is_valid:
             bot.github.post_comment(
@@ -149,112 +123,47 @@ def apply_comment_command(
                 "❌ This command is not eligible for privileged handoff from the current trusted live state.",
             )
             return False
-        stored = store_pending_privileged_command(review_data, issue_number, source_event_key, command, comment_author, list(args))
+        pending = privileged_command_policy.build_pending_privileged_command(
+            source_event_key=source_event_key,
+            command_name=str(command),
+            issue_number=issue_number,
+            actor=comment_author,
+            args=list(args),
+            created_at=_now_iso(),
+            metadata=metadata,
+        )
+        review_data.setdefault("pending_privileged_commands", {})[source_event_key] = pending.data
+        stored = True
         if stored:
-            review_data["pending_privileged_commands"][source_event_key].update(metadata)
             bot.github.post_comment(
                 issue_number,
                 "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `#314` state.",
             )
         return stored
-    if command == "_multiple_commands":
-        bot.github.post_comment(issue_number, f"⚠️ Multiple bot commands in one comment are ignored. Please post a single command per comment. For a list of commands, use `{bot.BOT_MENTION} /commands`.")
-        return False
+
     response = ""
     success = False
     state_changed = False
     assignment_request = build_assignment_request_from_comment(request)
-    if command == "pass":
-        response, success = commands_module.handle_pass_command(
-            bot,
-            state,
-            issue_number,
-            comment_author,
-            " ".join(args) if args else None,
-            request=assignment_request,
-        )
-        state_changed = success
-    elif command == "away":
-        if args:
-            response, success = commands_module.handle_pass_until_command(
-                bot,
-                state,
-                issue_number,
-                comment_author,
-                args[0],
-                " ".join(args[1:]) if len(args) > 1 else None,
-                request=assignment_request,
-            )
-            state_changed = success
+    if decision["kind"] == "handler_call":
+        handler = getattr(commands_module, decision["handler"])
+        handler_args = [bot, state, *decision["handler_args"]]
+        handler_kwargs = {}
+        if decision["needs_assignment_request"]:
+            handler_kwargs["request"] = assignment_request
+        result = handler(*handler_args, **handler_kwargs)
+        if decision["result_shape"] == "pair":
+            response, success = result
+            state_changed = success if decision.get("state_changed_from") == "success" else False
         else:
-            response = f"❌ Missing date. Usage: `{bot.BOT_MENTION} /away YYYY-MM-DD [reason]`"
-    elif command == "label":
-        response, success, state_changed = commands_module.handle_label_command(
-            bot,
-            state,
-            issue_number,
-            " ".join(args),
-            request=assignment_request,
-        )
-    elif command == "sync-members":
-        response, success = commands_module.handle_sync_members_command(bot, state)
-        state_changed = success
-    elif command == "queue":
-        response, success = commands_module.handle_queue_command(bot, state)
-    elif command == "commands":
-        response, success = commands_module.handle_commands_command(bot)
-    elif command == "claim":
-        response, success = commands_module.handle_claim_command(
-            bot,
-            state,
-            issue_number,
-            comment_author,
-            request=assignment_request,
-        )
-        state_changed = success
-    elif command == "release":
-        response, success = commands_module.handle_release_command(
-            bot,
-            state,
-            issue_number,
-            comment_author,
-            list(args),
-            request=assignment_request,
-        )
-        state_changed = success
-    elif command == "rectify":
-        from . import reconcile as reconcile_module
-
-        response, success, state_changed = reconcile_module.handle_rectify_command(bot, state, issue_number, comment_author)
-    elif command == "r?-user":
-        response, success = commands_module.handle_assign_command(
-            bot,
-            state,
-            issue_number,
-            args[0] if args else "",
-            request=assignment_request,
-        )
-        state_changed = success
-    elif command == "assign-from-queue":
-        response, success = commands_module.handle_assign_from_queue_command(
-            bot,
-            state,
-            issue_number,
-            request=assignment_request,
-        )
-        state_changed = success
-    elif command == "r?":
-        response = f"❌ Missing target. Usage:\n- `{bot.BOT_MENTION} /r? @username` - Assign a specific reviewer\n- `{bot.BOT_MENTION} /r? producers` - Assign next reviewer from queue"
-    elif command == "_malformed_known":
-        attempted = args[0] if args else "command"
-        response = f"⚠️ Did you mean `{bot.BOT_MENTION} /{attempted}`?\n\nCommands require a `/` prefix."
-    elif command == "_malformed_unknown":
-        attempted = args[0] if args else ""
-        response = f"⚠️ Unknown command `{attempted}`. Commands require a `/` prefix.\n\nTry `{bot.BOT_MENTION} /commands` to see available commands."
+            response, success, state_changed = result
     else:
-        response = f"❌ Unknown command: `/{command}`\n\nAvailable commands:\n{config_module.get_commands_help()}"
+        response = decision["response"]
+        success = decision["success"]
+        state_changed = decision["state_changed"]
+
     comment_id = request.comment_id
-    if comment_id > 0 and command != "_multiple_commands":
+    if comment_id > 0 and decision.get("react", True):
         bot.github.add_reaction(comment_id, "eyes")
         if success:
             bot.github.add_reaction(comment_id, "+1")

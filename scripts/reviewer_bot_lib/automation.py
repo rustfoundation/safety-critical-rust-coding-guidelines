@@ -4,6 +4,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts.reviewer_bot_core import privileged_command_policy
+
 from .context import PrivilegedCommandRequest
 from .event_inputs import (
     build_privileged_command_request as decode_privileged_command_request,
@@ -14,6 +16,19 @@ from .event_inputs import (
 from .event_inputs import (
     parse_issue_labels as decode_issue_labels,
 )
+
+EXECUTOR_PHASE_CHECKLIST = [
+    "audit_command_execution",
+    "spec_lock_update_command_execution",
+    "changed_file_validation_execution",
+    "branch_existence_check",
+    "branch_creation",
+    "git_add",
+    "git_commit",
+    "git_push",
+    "pull_request_create",
+    "execute_time_revalidation_checkpoints",
+]
 
 
 def run_command(command: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
@@ -98,17 +113,14 @@ def find_open_pr_for_branch(bot, branch: str) -> dict | None:
     return pr
 
 
-def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict | None:
+def create_pull_request(bot, branch: str, base: str, issue_number: int, *, title: str | None = None, body: str | None = None) -> dict | None:
     lookup_status, existing = find_open_pr_for_branch_status(bot, branch)
     if lookup_status == "found":
         return existing
     if lookup_status == "unavailable":
         raise RuntimeError(f"Unable to determine whether branch '{branch}' already has an open PR")
-    title = "chore: update spec.lock (no guideline impact)"
-    body = (
-        "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\n"
-        f"Closes #{issue_number}"
-    )
+    if title is None or body is None:
+        raise RuntimeError("PR title/body must be provided by privileged command planning")
     response = bot.github_api(
         "POST",
         "pulls",
@@ -117,6 +129,41 @@ def create_pull_request(bot, branch: str, base: str, issue_number: int) -> dict 
     if isinstance(response, dict):
         return response
     return None
+
+
+def _execute_accept_no_fls_changes_plan(bot, repo_root: Path, issue_number: int, plan: privileged_command_policy.AcceptNoFlsChangesPlan) -> tuple[str, bool]:
+    try:
+        bot.adapters.automation.run_command(["git", "checkout", "-b", plan.branch_name], cwd=repo_root)
+        bot.adapters.automation.run_command(["git", "add", *plan.add_paths], cwd=repo_root)
+        bot.adapters.automation.run_command(
+            [
+                "git",
+                "-c",
+                "user.name=guidelines-bot",
+                "-c",
+                "user.email=guidelines-bot@users.noreply.github.com",
+                "commit",
+                "-m",
+                plan.commit_message,
+            ],
+            cwd=repo_root,
+        )
+        bot.adapters.automation.run_command(["git", "push", "origin", plan.branch_name], cwd=repo_root)
+    except RuntimeError as exc:
+        return f"❌ Failed to create branch or push changes: {exc}", False
+
+    pr = create_pull_request(
+        bot,
+        plan.branch_name,
+        plan.base_branch,
+        issue_number,
+        title=plan.pull_request_title,
+        body=plan.pull_request_body,
+    )
+    if not pr or "html_url" not in pr:
+        return "❌ Failed to open a pull request for the spec.lock update.", False
+
+    return f"✅ Opened PR {pr['html_url']}", True
 
 
 def handle_accept_no_fls_changes_command(
@@ -131,20 +178,15 @@ def handle_accept_no_fls_changes_command(
         actor=comment_author,
         command_name="accept-no-fls-changes",
     )
-    if privileged_request.is_pull_request:
-        return "❌ This command can only be used on issues, not PRs.", False
-    labels = list(privileged_request.issue_labels)
-    if bot.FLS_AUDIT_LABEL not in labels:
-        return "❌ This command is only available on issues labeled `fls-audit`.", False
     permission_status = bot.github.get_user_permission_status(comment_author, "triage")
-    if permission_status == "unavailable":
-        return "❌ Unable to verify triage permissions right now; refusing to run this command.", False
-    if permission_status != "granted":
-        return "❌ You must have triage permissions to run this command.", False
-
     repo_root = Path(privileged_request.target_repo_root) if privileged_request.target_repo_root else get_target_repo_root(bot)
-    if bot.adapters.automation.list_changed_files(repo_root):
-        return "❌ Working tree is not clean; refusing to update spec.lock.", False
+    preflight = privileged_command_policy.prevalidate_accept_no_fls_changes_request(
+        privileged_request,
+        permission_status,
+        bot.adapters.automation.list_changed_files(repo_root),
+    )
+    if preflight.kind == "blocked":
+        return str(preflight.message), bool(preflight.success)
 
     audit_result = bot.adapters.automation.run_command(
         ["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
@@ -172,48 +214,40 @@ def handle_accept_no_fls_changes_command(
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
         return f"❌ Failed to update spec.lock.{detail_text}", False
 
-    changed_files = bot.adapters.automation.list_changed_files(repo_root)
-    if not changed_files:
-        return "✅ `src/spec.lock` is already up to date; no PR needed.", True
-
-    unexpected = {path for path in changed_files if path != "src/spec.lock"}
-    if unexpected:
-        paths = ", ".join(sorted(unexpected))
-        return (
-            "❌ Unexpected tracked file changes detected; refusing to open a PR. "
-            f"Please review: {paths}",
-            False,
-        )
-
     branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    changed_files_after = bot.adapters.automation.list_changed_files(repo_root)
+    planning = privileged_command_policy.plan_accept_no_fls_changes_execution(
+        issue_number=issue_number,
+        audit_returncode=audit_result.returncode,
+        audit_details=bot.adapters.automation.summarize_output(audit_result),
+        update_returncode=update_result.returncode,
+        update_details=bot.adapters.automation.summarize_output(update_result),
+        changed_files_after=changed_files_after,
+        branch_date=branch_date,
+        base_branch="main",
+        branch_exists=False,
+        branch_suffix=None,
+    )
+    if planning.kind != "execute_plan":
+        return str(planning.message), bool(planning.success)
+    assert planning.plan is not None
     base_branch = bot.adapters.automation.get_default_branch()
-    branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
-    if bot.adapters.automation.run_command(["git", "rev-parse", "--verify", branch_name], cwd=repo_root, check=False).returncode == 0:
-        suffix = datetime.now(timezone.utc).strftime("%H%M%S")
-        branch_name = f"{branch_name}-{suffix}"
-
-    try:
-        bot.adapters.automation.run_command(["git", "checkout", "-b", branch_name], cwd=repo_root)
-        bot.adapters.automation.run_command(["git", "add", "src/spec.lock"], cwd=repo_root)
-        bot.adapters.automation.run_command(
-            [
-                "git",
-                "-c",
-                "user.name=guidelines-bot",
-                "-c",
-                "user.email=guidelines-bot@users.noreply.github.com",
-                "commit",
-                "-m",
-                "chore: update spec.lock; no affected guidelines",
-            ],
-            cwd=repo_root,
-        )
-        bot.adapters.automation.run_command(["git", "push", "origin", branch_name], cwd=repo_root)
-    except RuntimeError as exc:
-        return f"❌ Failed to create branch or push changes: {exc}", False
-
-    pr = bot.adapters.automation.create_pull_request(branch_name, base_branch, issue_number)
-    if not pr or "html_url" not in pr:
-        return "❌ Failed to open a pull request for the spec.lock update.", False
-
-    return f"✅ Opened PR {pr['html_url']}", True
+    branch_exists = bot.adapters.automation.run_command(
+        ["git", "rev-parse", "--verify", planning.plan.branch_name],
+        cwd=repo_root,
+        check=False,
+    ).returncode == 0
+    branch_suffix = datetime.now(timezone.utc).strftime("%H%M%S") if branch_exists else None
+    planning = privileged_command_policy.plan_accept_no_fls_changes_execution(
+        issue_number=issue_number,
+        audit_returncode=0,
+        audit_details="",
+        update_returncode=0,
+        update_details="",
+        changed_files_after=changed_files_after,
+        branch_date=branch_date,
+        base_branch=base_branch,
+        branch_exists=branch_exists,
+        branch_suffix=branch_suffix,
+    )
+    return _execute_accept_no_fls_changes_plan(bot, repo_root, issue_number, planning.plan)

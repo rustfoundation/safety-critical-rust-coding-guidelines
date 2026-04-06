@@ -150,3 +150,29 @@ def test_observer_noop_payload_is_safe_noop(tmp_path, monkeypatch):
 
     assert reconcile.handle_workflow_run_event(harness.runtime, state) is False
     assert state["active_reviews"]["42"]["deferred_gaps"] == {}
+
+
+def test_cross_repo_pr_comment_route_remains_deferred_not_direct(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    state = make_state()
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=True,
+        issue_author="dana",
+        comment_author="alice",
+        comment_body="hello",
+    )
+    trust_context = harness.trust_context(
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
+        comment_author_association="MEMBER",
+        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+        github_ref="refs/heads/main",
+    )
+    harness.add_pull_request_metadata(
+        issue_number=42,
+        head_repo_full_name="fork/example",
+        pr_author="dana",
+    )
+
+    with pytest.raises(RuntimeError, match="Deferred PR comment events must not mutate directly"):
+        comment_routing.handle_comment_event(harness.runtime, state, request, trust_context)

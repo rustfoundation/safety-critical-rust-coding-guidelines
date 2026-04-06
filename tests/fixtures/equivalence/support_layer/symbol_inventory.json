@@ -1,0 +1,146 @@
+{
+  "harness_id": "F1a support-layer symbol inventory",
+  "symbols": [
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.parse_github_timestamp",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_core/review_state_machine.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_approval_policy_equivalence.py",
+        "tests/unit/reviewer_bot/test_review_state_equivalence.py",
+        "tests/unit/reviewer_bot/test_reviews_projection.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.build_reviewer_review_record_from_live_review",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_core/review_state_machine.py"
+      ],
+      "test_or_fixture_importers": []
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.get_preferred_current_reviewer_review_for_cycle",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_core/review_state_machine.py"
+      ],
+      "test_or_fixture_importers": []
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.rebuild_pr_approval_state",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/lifecycle.py",
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/fixtures/fake_runtime.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.rebuild_pr_approval_state_result",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/reconcile.py"
+      ],
+      "test_or_fixture_importers": []
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.refresh_reviewer_review_from_live_preferred_review",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/fixtures/fake_runtime.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.compute_pr_approval_state_result",
+      "classification": "migration-required legacy path",
+      "production_importers": [],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_approval_policy_equivalence.py",
+        "tests/unit/reviewer_bot/test_reviews_projection.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.find_triage_approval_after",
+      "classification": "migration-required legacy path",
+      "production_importers": [],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_approval_policy_equivalence.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.sweeper.sweep_deferred_gaps",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/maintenance.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_sweeper_logic.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reconcile._artifact_expected_name",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/contract/reviewer_bot/test_workflow_artifact_contracts.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reconcile._artifact_expected_payload_name",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/contract/reviewer_bot/test_workflow_artifact_contracts.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reconcile._clear_source_event_key",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_reconcile_unit.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reconcile._mark_reconciled_source_event",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_reconcile_unit.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reconcile._update_deferred_gap",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": []
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reconcile._was_reconciled_source_event",
+      "classification": "retained final surface",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": []
+    }
+  ]
+}

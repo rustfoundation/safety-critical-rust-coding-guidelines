@@ -202,3 +202,21 @@ def test_build_pr_comment_observer_payload_uses_same_comment_classification_as_p
 
     assert payload["comment_class"] == "command_plus_text"
     assert payload["has_non_command_text"] is True
+
+
+def test_comment_routing_module_delegates_routing_and_classification_to_core_policy():
+    with open("scripts/reviewer_bot_lib/comment_routing.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert "from scripts.reviewer_bot_core import comment_routing_policy" in module_text
+    assert "return comment_routing_policy.classify_issue_comment_actor(request)" in module_text
+    assert "return comment_routing_policy.classify_comment_payload(bot.BOT_MENTION, normalized, parsed)" in module_text
+    assert "return comment_routing_policy.route_issue_comment_trust(" in module_text
+
+
+def test_comment_application_delegates_freshness_decision_to_core_policy():
+    with open("scripts/reviewer_bot_lib/comment_application.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert "comment_freshness_policy" in module_text
+    assert "decision = comment_freshness_policy.decide_comment_freshness(review_data, request)" in module_text

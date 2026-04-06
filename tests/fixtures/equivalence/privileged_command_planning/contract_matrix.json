@@ -1,0 +1,62 @@
+{
+  "harness_id": "C6a privileged command planning contract matrix",
+  "ordered_execution_steps": [
+    "working_tree_clean_check",
+    "audit_no_impact_check",
+    "spec_lock_update",
+    "changed_files_validation",
+    "branch_name_derivation",
+    "branch_existence_check",
+    "branch_creation",
+    "git_add_spec_lock",
+    "git_commit",
+    "git_push",
+    "pull_request_create"
+  ],
+  "failure_categories": [
+    "pull_request_target_not_allowed",
+    "missing_fls_audit_label",
+    "authorization_unavailable",
+    "authorization_failed",
+    "working_tree_not_clean",
+    "audit_reports_guideline_impact",
+    "audit_command_failed",
+    "spec_lock_update_failed",
+    "unexpected_tracked_changes",
+    "branch_or_push_failed",
+    "pull_request_create_failed"
+  ],
+  "commit_message": "chore: update spec.lock; no affected guidelines",
+  "pull_request_title": "chore: update spec.lock (no guideline impact)",
+  "pull_request_body_lines": [
+    "Updates `src/spec.lock` after confirming the audit reported no affected guidelines.",
+    "Closes #<issue_number>"
+  ],
+  "branch_name_format": "chore/spec-lock-<YYYY-MM-DD>-issue-<issue_number>",
+  "revalidation_checkpoints": [
+    "issue_not_pull_request",
+    "fls_audit_label_present",
+    "triage_permission_granted",
+    "working_tree_clean_before_update",
+    "audit_no_impact_before_update",
+    "changed_files_exact_after_update"
+  ],
+  "handoff_fail_closed_reasons": [
+    "pull_request_target_not_allowed",
+    "missing_fls_audit_label",
+    "authorization_unavailable",
+    "authorization_failed"
+  ],
+  "pending_command_metadata_keys": [
+    "source_event_key",
+    "command_name",
+    "issue_number",
+    "actor",
+    "args",
+    "status",
+    "created_at",
+    "authorization",
+    "target"
+  ],
+  "trusted_acknowledgment_comment": "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `#314` state."
+}
