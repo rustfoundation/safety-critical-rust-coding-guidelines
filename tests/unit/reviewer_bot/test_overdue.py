@@ -1,6 +1,7 @@
 from datetime import timedelta
 
-from scripts.reviewer_bot_lib import maintenance, review_state, reviews
+from scripts.reviewer_bot_core import approval_policy
+from scripts.reviewer_bot_lib import maintenance, review_state
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import (
     accept_contributor_comment,
@@ -25,13 +26,22 @@ def _runtime(monkeypatch, routes=None):
     return runtime
 
 
+def _approval_incomplete_result(*_args, **_kwargs):
+    return {
+        "ok": True,
+        "completion": {"completed": False},
+        "write_approval": {"has_write_approval": False},
+        "current_head_sha": "head-1",
+    }
+
+
 def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="alice", assigned_at="2026-03-01T00:00:00Z", active_cycle_started_at="2026-03-01T00:00:00Z")
     accept_reviewer_review(review, semantic_key="pull_request_review:10", timestamp="2026-03-02T00:00:00Z", actor="alice", reviewed_head_sha="head-1")
     routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1"))
     runtime = _runtime(monkeypatch, routes)
-    monkeypatch.setattr(reviews, "rebuild_pr_approval_state", lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}))
+    monkeypatch.setattr(approval_policy, "compute_pr_approval_state_result", _approval_incomplete_result)
 
     assert maintenance.check_overdue_reviews(runtime, state) == []
 
@@ -72,7 +82,7 @@ def test_check_overdue_reviews_uses_contributor_comment_timestamp_when_turn_retu
     accept_contributor_comment(review, semantic_key="issue_comment:20", timestamp=contributor_comment_at, actor="bob")
     routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1"))
     runtime = _runtime(monkeypatch, routes)
-    monkeypatch.setattr(reviews, "rebuild_pr_approval_state", lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}))
+    monkeypatch.setattr(approval_policy, "compute_pr_approval_state_result", _approval_incomplete_result)
 
     overdue = maintenance.check_overdue_reviews(runtime, state)
     assert overdue[0]["issue_number"] == 42
@@ -106,7 +116,7 @@ def test_check_overdue_reviews_ignores_same_head_contributor_revision_after_vali
     accept_contributor_revision(review, semantic_key="pull_request_head_observed:42:head-1", timestamp="2026-03-12T00:00:00Z", actor="alice", head_sha="head-1")
     routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1")).add_pull_request_reviews(42, [])
     runtime = _runtime(monkeypatch, routes)
-    monkeypatch.setattr(reviews, "rebuild_pr_approval_state", lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}))
+    monkeypatch.setattr(approval_policy, "compute_pr_approval_state_result", _approval_incomplete_result)
 
     assert maintenance.check_overdue_reviews(runtime, state) == []
 
@@ -123,7 +133,7 @@ def test_check_overdue_reviews_uses_live_current_head_review_when_stored_review_
         ],
     )
     runtime = _runtime(monkeypatch, routes)
-    monkeypatch.setattr(reviews, "rebuild_pr_approval_state", lambda bot, issue_number, review_data, **kwargs: ({"completed": False}, {"has_write_approval": False}))
+    monkeypatch.setattr(approval_policy, "compute_pr_approval_state_result", _approval_incomplete_result)
 
     assert maintenance.check_overdue_reviews(runtime, state) == []
 

@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from scripts.reviewer_bot_lib import reviews as legacy_reviews
 
-from . import review_state_machine
+from . import review_state_machine, reviewer_review_helpers
 
 
 def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
-    record = legacy_reviews.build_reviewer_review_record_from_live_review(review, actor=actor)
+    record = reviewer_review_helpers.build_reviewer_review_record_from_live_review(review, actor=actor)
     if record is None:
         return False
     return review_state_machine.accept_channel_event(
@@ -49,7 +49,7 @@ def refresh_reviewer_review_from_live_preferred_review(
         if not pull_request_result.get("ok"):
             return False, None
         pull_request = pull_request_result["pull_request"]
-    preferred_review = legacy_reviews.get_preferred_current_reviewer_review_for_cycle(
+    preferred_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
         bot,
         issue_number,
         review_data,
@@ -58,7 +58,7 @@ def refresh_reviewer_review_from_live_preferred_review(
     )
     if preferred_review is None:
         return False, None
-    record = legacy_reviews.build_reviewer_review_record_from_live_review(
+    record = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
         preferred_review,
         actor=actor or review_data.get("current_reviewer"),
     )

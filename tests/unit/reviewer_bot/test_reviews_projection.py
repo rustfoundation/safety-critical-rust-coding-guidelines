@@ -60,6 +60,54 @@ def test_compute_reviewer_response_state_is_pure_for_pr_projection():
     assert review == before
 
 
+def test_compute_reviewer_response_state_keeps_mutable_approval_rebuild_support_out_of_derivation():
+    review = make_tracked_review_state(
+        make_state(),
+        42,
+        reviewer="alice",
+        active_cycle_started_at="2026-03-17T09:00:00Z",
+    )
+    review["reviewer_review"]["accepted"] = {
+        "semantic_key": "pull_request_review:10",
+        "timestamp": "2026-03-17T10:01:00Z",
+        "actor": "alice",
+        "reviewed_head_sha": "head-1",
+        "source_precedence": 1,
+        "payload": {},
+    }
+    review["reviewer_review"]["seen_keys"] = ["pull_request_review:10"]
+    before = json.loads(json.dumps(review))
+    bot = _bot(
+        github_api_request=lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
+            200,
+            pull_request_payload(42, head_sha="head-1")
+            if endpoint == "pulls/42"
+            else [
+                review_payload(
+                    11,
+                    state="APPROVED",
+                    submitted_at="2026-03-17T10:05:00Z",
+                    commit_id="head-1",
+                    author="bob",
+                )
+            ],
+            {},
+            "ok",
+            True,
+            None,
+            0,
+            None,
+        )
+    )
+    bot.github.get_user_permission_status = lambda username, required_permission="push": "denied"
+
+    response_state = reviews.compute_reviewer_response_state(bot, 42, review)
+
+    assert response_state["state"] == "awaiting_write_approval"
+    assert response_state["reason"] == "write_approval_missing"
+    assert review == before
+
+
 def test_compute_pr_approval_state_result_is_pure():
     review = make_tracked_review_state(
         make_state(),
@@ -196,7 +244,7 @@ def test_h1a_reviewer_response_matrix_fixture_exists_and_stays_reviewer_response
     )
 
     assert matrix["harness_id"] == "H1a reviewer-response derivation equivalence"
-    assert matrix["owner"] == "scripts.reviewer_bot_lib.reviews.compute_reviewer_response_state"
+    assert matrix["owner"] == "scripts.reviewer_bot_core.reviewer_response_policy.compute_reviewer_response_state"
     assert matrix["out_of_scope"] == [
         "mandatory approver escalation",
         "label writes",

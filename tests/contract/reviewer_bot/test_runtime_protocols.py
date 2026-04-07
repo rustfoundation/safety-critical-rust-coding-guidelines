@@ -73,5 +73,27 @@ def test_o3_runtime_deletion_manifest_forbids_dead_workflow_run_handler_compatib
     )
 
     assert manifest["harness_id"] == "O3 runtime compatibility deletion manifest"
+    assert manifest["artifact_classification"] == "active migration proof fixture"
+    assert manifest["proof_artifacts"] == [
+        {
+            "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
+            "classification": "rewritten final proof",
+        },
+        {
+            "path": "tests/contract/reviewer_bot/test_adapter_contract.py",
+            "classification": "rewritten final proof",
+        },
+        {
+            "path": "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+            "classification": "rewritten final proof",
+        },
+    ]
+    recorded_paths = {entry["path"] for entry in manifest["paths"]}
+    assert recorded_paths >= {
+        "scripts/reviewer_bot_lib/context.py",
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py",
+        "tests/fixtures/fake_runtime.py",
+        "tests/fixtures/focused_fake_services.py",
+    }
     assert "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_workflow_run_event" in manifest["deleted_paths"]
     assert "tests/fixtures/fake_runtime.py:FakeReviewerBotRuntime.handle_workflow_run_event" in manifest["deleted_paths"]

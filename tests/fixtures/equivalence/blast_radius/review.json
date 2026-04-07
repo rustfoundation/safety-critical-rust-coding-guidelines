@@ -1,25 +1,95 @@
 {
   "harness_id": "F3 blast radius review",
+  "locality_budgets": {
+    "ordinary policy change": {
+      "production_authority_categories": 1,
+      "legacy_same_seam_authority_files": 0,
+      "proof_families": 1
+    },
+    "support or execution change": {
+      "production_authority_categories": 2,
+      "proof_families": 1
+    },
+    "runtime or protocol change": {
+      "production_authority_categories": 3,
+      "proof_families": 2
+    },
+    "orchestration or transaction change": {
+      "production_authority_categories": 2,
+      "proof_families": 2
+    }
+  },
   "representative_changes": [
     {
-      "change": "change reviewer-response derivation",
+      "id": "RC1",
+      "change": "reviewer-response policy rule",
+      "change_class": "ordinary policy change",
+      "production_authority_categories": [
+        "core-policy"
+      ],
+      "proof_families": [
+        "unit-equivalence"
+      ],
+      "hotspot_files": [],
+      "semantic_inventory_entries": [
+        "tests/fixtures/equivalence/reviewer_response/scenario_matrix.json"
+      ],
       "expected_files": [
         "scripts/reviewer_bot_core/reviewer_response_policy.py",
-        "tests/unit/reviewer_bot/test_reviewer_response_equivalence.py",
-        "tests/unit/reviewer_bot/test_reviews_live_fetch.py"
+        "tests/unit/reviewer_bot/test_reviewer_response_equivalence.py"
       ]
     },
     {
-      "change": "change mandatory approver escalation",
+      "id": "RC4",
+      "change": "mandatory-approver policy rule",
+      "change_class": "ordinary policy change",
+      "production_authority_categories": [
+        "core-policy"
+      ],
+      "proof_families": [
+        "unit-equivalence"
+      ],
+      "hotspot_files": [],
+      "semantic_inventory_entries": [
+        "tests/fixtures/equivalence/mandatory_approver_policy/decision_matrix.json"
+      ],
       "expected_files": [
         "scripts/reviewer_bot_core/mandatory_approver_policy.py",
+        "tests/unit/reviewer_bot/test_mandatory_approver_policy_equivalence.py"
+      ]
+    },
+    {
+      "id": "RC5",
+      "change": "mandatory-approver execution flow",
+      "change_class": "support or execution change",
+      "production_authority_categories": [
+        "lib-support"
+      ],
+      "proof_families": [
+        "unit-live-fetch"
+      ],
+      "hotspot_files": [
+        "scripts/reviewer_bot_lib/reviews.py"
+      ],
+      "semantic_inventory_entries": [],
+      "expected_files": [
         "scripts/reviewer_bot_lib/reviews.py",
-        "tests/unit/reviewer_bot/test_mandatory_approver_policy_equivalence.py",
         "tests/unit/reviewer_bot/test_reviews_live_fetch.py"
       ]
     },
     {
-      "change": "change deferred replay fail-closed message",
+      "id": "RC6",
+      "change": "deferred replay fail-closed message",
+      "change_class": "orchestration or transaction change",
+      "production_authority_categories": [
+        "core-policy"
+      ],
+      "proof_families": [
+        "unit-equivalence",
+        "integration-transaction"
+      ],
+      "hotspot_files": [],
+      "semantic_inventory_entries": [],
       "expected_files": [
         "scripts/reviewer_bot_core/reconcile_replay_policy.py",
         "tests/unit/reviewer_bot/test_reconcile_replay_equivalence.py",
@@ -27,7 +97,17 @@
       ]
     },
     {
-      "change": "change one command behavior",
+      "id": "RC7",
+      "change": "ordinary command rule",
+      "change_class": "ordinary policy change",
+      "production_authority_categories": [
+        "core-policy"
+      ],
+      "proof_families": [
+        "unit-equivalence"
+      ],
+      "hotspot_files": [],
+      "semantic_inventory_entries": [],
       "expected_files": [
         "scripts/reviewer_bot_core/comment_command_policy.py",
         "tests/unit/reviewer_bot/test_comment_command_equivalence.py",
@@ -35,25 +115,121 @@
       ]
     },
     {
-      "change": "change one reconcile runtime collaborator seam",
+      "id": "RC8",
+      "change": "reconcile workflow protocol change",
+      "change_class": "runtime or protocol change",
+      "production_authority_categories": [
+        "execution-orchestration",
+        "runtime-protocol"
+      ],
+      "proof_families": [
+        "unit-equivalence",
+        "contract-inventory"
+      ],
+      "hotspot_files": [
+        "scripts/reviewer_bot_lib/context.py",
+        "scripts/reviewer_bot_lib/reconcile.py"
+      ],
+      "semantic_inventory_entries": [
+        "tests/fixtures/equivalence/runtime_surface/deletion_manifest.json"
+      ],
       "expected_files": [
         "scripts/reviewer_bot_lib/context.py",
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "tests/unit/reviewer_bot/test_reconcile_unit.py",
+        "tests/contract/reviewer_bot/test_runtime_protocols.py"
+      ]
+    },
+    {
+      "id": "RC9",
+      "change": "runtime compatibility surface change",
+      "change_class": "runtime or protocol change",
+      "production_authority_categories": [
+        "runtime-protocol",
+        "fixture-double"
+      ],
+      "proof_families": [
+        "contract-inventory"
+      ],
+      "hotspot_files": [
         "scripts/reviewer_bot_lib/runtime.py",
         "scripts/reviewer_bot_lib/bootstrap_runtime.py",
         "tests/fixtures/fake_runtime.py",
+        "tests/fixtures/focused_fake_services.py"
+      ],
+      "semantic_inventory_entries": [
+        "tests/fixtures/equivalence/runtime_surface/triple_inventory.json",
+        "tests/fixtures/equivalence/runtime_surface/deletion_manifest.json"
+      ],
+      "expected_files": [
+        "scripts/reviewer_bot_lib/runtime.py",
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py",
+        "tests/fixtures/fake_runtime.py",
+        "tests/fixtures/focused_fake_services.py",
         "tests/contract/reviewer_bot/test_adapter_contract.py",
         "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
         "tests/contract/reviewer_bot/test_runtime_protocols.py"
       ]
     },
     {
-      "change": "change one workflow-run transaction result field",
+      "id": "RC10",
+      "change": "workflow-run transaction result field change",
+      "change_class": "orchestration or transaction change",
+      "production_authority_categories": [
+        "execution-orchestration"
+      ],
+      "proof_families": [
+        "integration-transaction"
+      ],
+      "hotspot_files": [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/app.py"
+      ],
+      "semantic_inventory_entries": [],
       "expected_files": [
         "scripts/reviewer_bot_lib/reconcile.py",
         "scripts/reviewer_bot_lib/app.py",
         "tests/integration/reviewer_bot/test_app_execution.py",
         "tests/integration/reviewer_bot/test_app_workflow_run_bookkeeping.py",
         "tests/integration/reviewer_bot/test_app_workflow_run_paths.py"
+      ]
+    },
+    {
+      "id": "RC2",
+      "change": "live-repair rule",
+      "change_class": "ordinary policy change",
+      "production_authority_categories": [
+        "core-policy"
+      ],
+      "proof_families": [
+        "unit-equivalence"
+      ],
+      "hotspot_files": [],
+      "semantic_inventory_entries": [
+        "tests/fixtures/equivalence/review_state_live_repair/scenarios.json"
+      ],
+      "expected_files": [
+        "scripts/reviewer_bot_core/review_state_live_repair.py",
+        "tests/unit/reviewer_bot/test_review_state_equivalence.py"
+      ]
+    },
+    {
+      "id": "RC3",
+      "change": "approval rule",
+      "change_class": "ordinary policy change",
+      "production_authority_categories": [
+        "core-policy"
+      ],
+      "proof_families": [
+        "unit-equivalence"
+      ],
+      "hotspot_files": [],
+      "semantic_inventory_entries": [
+        "tests/fixtures/equivalence/approval_policy/in_scope_functions.json"
+      ],
+      "expected_files": [
+        "scripts/reviewer_bot_core/approval_policy.py",
+        "tests/unit/reviewer_bot/test_approval_policy_equivalence.py"
       ]
     }
   ],
@@ -79,18 +255,25 @@
       "reason": "active runtime/bootstrap/fake-runtime compatibility safety"
     }
   ],
-  "retired_migration_only_artifacts": [
+  "active_migration_proof_artifacts": [
     {
       "path": "tests/contract/reviewer_bot/test_support_layer_ownership.py",
-      "reason": "migration-only ownership inventory proof superseded by final blast-radius and deletion manifests"
+      "reason": "active migration proof that still enforces support-layer ownership inventory"
     },
     {
       "path": "tests/fixtures/equivalence/support_layer/symbol_inventory.json",
-      "reason": "migration-only importer inventory refreshed for cleanup and no longer needed as final architecture proof"
+      "reason": "active migration fixture still enforced by support-layer ownership contract proof"
     },
     {
       "path": "tests/fixtures/equivalence/runtime_surface/triple_inventory.json",
-      "reason": "migration-only runtime inventory refreshed for cleanup and superseded by final runtime compatibility contracts"
+      "reason": "active migration fixture until runtime-surface inventory and deletion proof retire together"
+    },
+    {
+      "path": "tests/fixtures/equivalence/runtime_surface/deletion_manifest.json",
+      "reason": "active migration fixture until runtime-surface inventory and deletion proof retire together"
     }
+  ],
+  "retired_migration_only_artifacts": [
+  
   ]
 }

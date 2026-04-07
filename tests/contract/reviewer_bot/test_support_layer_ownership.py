@@ -95,14 +95,18 @@ def test_f1a_support_layer_inventory_fixture_records_candidate_classifications_a
     inventory = _load_support_layer_inventory()
 
     assert inventory["harness_id"] == "F1a support-layer symbol inventory"
+    assert inventory["artifact_classification"] == "active migration proof fixture"
     assert inventory["proof_artifacts"] == [
         {
             "path": "tests/contract/reviewer_bot/test_support_layer_ownership.py",
-            "classification": "rewritten final proof",
+            "classification": "active migration proof",
         }
     ]
     symbols = {entry["symbol"]: entry for entry in inventory["symbols"]}
 
+    assert symbols["scripts.reviewer_bot_lib.reviews.build_reviewer_review_record_from_live_review"]["classification"] == "zero-importer deletion candidate"
+    assert symbols["scripts.reviewer_bot_lib.reviews.get_preferred_current_reviewer_review_for_cycle"]["classification"] == "zero-importer deletion candidate"
+    assert symbols["scripts.reviewer_bot_lib.reviews._compare_records"]["classification"] == "zero-importer deletion candidate"
     assert symbols["scripts.reviewer_bot_lib.reviews.compute_pr_approval_state_result"]["classification"] == "zero-importer deletion candidate"
     assert symbols["scripts.reviewer_bot_lib.reviews.find_triage_approval_after"]["classification"] == "zero-importer deletion candidate"
     assert symbols["scripts.reviewer_bot_lib.reviews.rebuild_pr_approval_state"]["classification"] == "retained final surface"
@@ -118,6 +122,9 @@ def test_f1a_support_layer_inventory_matches_current_active_importer_examples():
         "scripts/reviewer_bot_core/review_state_machine.py",
         "scripts/reviewer_bot_lib/runtime.py",
     ]
+    assert symbols["scripts.reviewer_bot_lib.reviews.build_reviewer_review_record_from_live_review"]["production_importers"] == []
+    assert symbols["scripts.reviewer_bot_lib.reviews.get_preferred_current_reviewer_review_for_cycle"]["production_importers"] == []
+    assert symbols["scripts.reviewer_bot_lib.reviews._compare_records"]["production_importers"] == []
     assert symbols["scripts.reviewer_bot_lib.reviews.rebuild_pr_approval_state"]["production_importers"] == [
         "scripts/reviewer_bot_lib/bootstrap_runtime.py",
         "scripts/reviewer_bot_lib/lifecycle.py",
@@ -144,6 +151,9 @@ def test_f1b_no_migration_required_production_importers_remain_for_deprecated_su
     ]
 
     assert [entry["symbol"] for entry in deletion_ready] == [
+        "scripts.reviewer_bot_lib.reviews.build_reviewer_review_record_from_live_review",
+        "scripts.reviewer_bot_lib.reviews.get_preferred_current_reviewer_review_for_cycle",
+        "scripts.reviewer_bot_lib.reviews._compare_records",
         "scripts.reviewer_bot_lib.reviews.compute_pr_approval_state_result",
         "scripts.reviewer_bot_lib.reviews.find_triage_approval_after",
     ]

@@ -2,7 +2,11 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from scripts.reviewer_bot_core import review_state_live_repair, review_state_machine
+from scripts.reviewer_bot_core import (
+    review_state_live_repair,
+    review_state_machine,
+    reviewer_review_helpers,
+)
 from scripts.reviewer_bot_lib import review_state, reviews
 from tests.fixtures.reviewer_bot import make_state
 
@@ -229,7 +233,7 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
 
     monkeypatch.setattr(reviews, "_pull_request_read_result", lambda bot, issue_number: bot.pull_request_result)
     monkeypatch.setattr(
-        reviews,
+        reviewer_review_helpers,
         "get_preferred_current_reviewer_review_for_cycle",
         lambda bot, issue_number, review_data, **kwargs: bot.preferred_review,
     )
@@ -294,6 +298,7 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
 def test_g2b_review_state_machine_no_longer_owns_live_read_repair_behavior():
     machine_text = Path("scripts/reviewer_bot_core/review_state_machine.py").read_text(encoding="utf-8")
     live_repair_text = Path("scripts/reviewer_bot_core/review_state_live_repair.py").read_text(encoding="utf-8")
+    helper_text = Path("scripts/reviewer_bot_core/reviewer_review_helpers.py").read_text(encoding="utf-8")
 
     assert "build_reviewer_review_record_from_live_review" not in machine_text
     assert "get_preferred_current_reviewer_review_for_cycle" not in machine_text
@@ -304,5 +309,11 @@ def test_g2b_review_state_machine_no_longer_owns_live_read_repair_behavior():
     assert "def accept_reviewer_review_from_live_review(" in live_repair_text
     assert "def refresh_reviewer_review_from_live_preferred_review(" in live_repair_text
     assert "def repair_missing_reviewer_review_state(" in live_repair_text
+    assert "reviewer_review_helpers.build_reviewer_review_record_from_live_review(" in live_repair_text
+    assert "reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(" in live_repair_text
+    assert "legacy_reviews.build_reviewer_review_record_from_live_review(" not in live_repair_text
+    assert "legacy_reviews.get_preferred_current_reviewer_review_for_cycle(" not in live_repair_text
     assert "bot.github" not in live_repair_text
     assert "github_api" not in live_repair_text
+    assert "def build_reviewer_review_record_from_live_review(" in helper_text
+    assert "def get_preferred_current_reviewer_review_for_cycle(" in helper_text

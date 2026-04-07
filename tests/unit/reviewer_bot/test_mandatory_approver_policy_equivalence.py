@@ -195,5 +195,26 @@ def test_h2b_reviews_module_delegates_mandatory_approver_decisions_to_policy_own
 
     assert "mandatory_approver_policy.decide_mandatory_approver_escalation(" in reviews_text
     assert "mandatory_approver_policy.decide_mandatory_approver_satisfaction(" in reviews_text
+    assert "def trigger_mandatory_approver_escalation(" in reviews_text
+    assert "def satisfy_mandatory_approver_requirement(" in reviews_text
+    assert "bot.github.post_comment(" in reviews_text
+    assert "bot.add_label_with_status(" in reviews_text
+    assert "bot.remove_label_with_status(" in reviews_text
     assert "def decide_mandatory_approver_escalation(" in policy_text
     assert "def decide_mandatory_approver_satisfaction(" in policy_text
+    assert "bot.github.post_comment(" not in policy_text
+    assert "bot.add_label_with_status(" not in policy_text
+    assert "bot.remove_label_with_status(" not in policy_text
+
+
+def test_h2c_handle_pr_approved_review_has_zero_external_callers():
+    callers = []
+
+    for path in Path("scripts").rglob("*.py"):
+        if path.as_posix() == "scripts/reviewer_bot_lib/reviews.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "handle_pr_approved_review(" in text or "from .reviews import handle_pr_approved_review" in text:
+            callers.append(path.as_posix())
+
+    assert callers == []

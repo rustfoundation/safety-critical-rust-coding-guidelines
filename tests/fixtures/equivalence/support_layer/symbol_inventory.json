@@ -1,9 +1,10 @@
 {
   "harness_id": "F1a support-layer symbol inventory",
+  "artifact_classification": "active migration proof fixture",
   "proof_artifacts": [
     {
       "path": "tests/contract/reviewer_bot/test_support_layer_ownership.py",
-      "classification": "rewritten final proof"
+      "classification": "active migration proof"
     }
   ],
   "symbols": [
@@ -25,22 +26,25 @@
     },
     {
       "symbol": "scripts.reviewer_bot_lib.reviews.build_reviewer_review_record_from_live_review",
-      "classification": "retained final surface",
-      "production_importers": [
-        "scripts/reviewer_bot_core/review_state_live_repair.py",
-        "scripts/reviewer_bot_core/reviewer_response_policy.py"
-      ],
+      "classification": "zero-importer deletion candidate",
+      "production_importers": [],
       "test_or_fixture_importers": [
         "tests/unit/reviewer_bot/test_reviewer_response_equivalence.py"
       ]
     },
     {
       "symbol": "scripts.reviewer_bot_lib.reviews.get_preferred_current_reviewer_review_for_cycle",
-      "classification": "retained final surface",
-      "production_importers": [
-        "scripts/reviewer_bot_core/review_state_live_repair.py",
-        "scripts/reviewer_bot_core/reviewer_response_policy.py"
-      ],
+      "classification": "zero-importer deletion candidate",
+      "production_importers": [],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_review_state_equivalence.py",
+        "tests/unit/reviewer_bot/test_reviewer_response_equivalence.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews._compare_records",
+      "classification": "zero-importer deletion candidate",
+      "production_importers": [],
       "test_or_fixture_importers": [
         "tests/unit/reviewer_bot/test_reviewer_response_equivalence.py"
       ]

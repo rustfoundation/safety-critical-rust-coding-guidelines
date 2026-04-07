@@ -1,5 +1,20 @@
 {
   "harness_id": "O3 runtime compatibility deletion manifest",
+  "artifact_classification": "active migration proof fixture",
+  "proof_artifacts": [
+    {
+      "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
+      "classification": "rewritten final proof"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_adapter_contract.py",
+      "classification": "rewritten final proof"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+      "classification": "rewritten final proof"
+    }
+  ],
   "paths": [
     {
       "path": "scripts/reviewer_bot_lib/context.py",

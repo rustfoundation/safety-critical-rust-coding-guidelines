@@ -234,6 +234,18 @@ def test_reviews_module_keeps_only_post_f1c_approval_surfaces():
     assert "def rebuild_pr_approval_state(" in reviews_text
 
 
+def test_reviewer_response_policy_derives_approval_state_from_core_owner_without_mutating_reviews_wrapper():
+    reviewer_response_text = Path("scripts/reviewer_bot_core/reviewer_response_policy.py").read_text(
+        encoding="utf-8"
+    )
+    reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
+
+    assert "approval_policy.compute_pr_approval_state_result(" in reviewer_response_text
+    assert "legacy_reviews.resolve_pr_approval_state(" not in reviewer_response_text
+    assert "def rebuild_pr_approval_state_result(" in reviews_text
+    assert "def rebuild_pr_approval_state(" in reviews_text
+
+
 def test_c2c_deletion_manifest_names_in_scope_legacy_derivation_paths_now_reduced_to_delegation():
     reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
 

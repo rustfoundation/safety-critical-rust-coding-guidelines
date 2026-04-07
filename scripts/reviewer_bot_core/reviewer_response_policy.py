@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from . import reviewer_review_helpers
+
 
 def _record_timestamp(record: dict | None, *, parse_timestamp) -> datetime | None:
     if not isinstance(record, dict):
@@ -102,7 +104,11 @@ def compute_reviewer_response_state(
                 "contributor_handoff": None,
             }
         latest_reviewer_response = reviewer_comment
-        if legacy_reviews._compare_records(reviewer_review, latest_reviewer_response) > 0:
+        if reviewer_review_helpers.compare_records(
+            reviewer_review,
+            latest_reviewer_response,
+            parse_timestamp=legacy_reviews.parse_github_timestamp,
+        ) > 0:
             latest_reviewer_response = reviewer_review
         completion = review_data.get("current_cycle_completion")
         if not isinstance(completion, dict) or not completion.get("completed"):
@@ -129,7 +135,7 @@ def compute_reviewer_response_state(
         if not reviews_result.get("ok"):
             return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
         reviews = reviews_result["reviews"]
-        preferred_live_review = legacy_reviews.get_preferred_current_reviewer_review_for_cycle(
+        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
             bot,
             issue_number,
             review_data,
@@ -137,7 +143,7 @@ def compute_reviewer_response_state(
             reviews=reviews,
         )
         if preferred_live_review is not None:
-            reviewer_review = legacy_reviews.build_reviewer_review_record_from_live_review(
+            reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
                 preferred_live_review,
                 actor=current_reviewer,
             )
@@ -163,7 +169,7 @@ def compute_reviewer_response_state(
         if not reviews_result.get("ok"):
             return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
         reviews = reviews_result["reviews"]
-        preferred_live_review = legacy_reviews.get_preferred_current_reviewer_review_for_cycle(
+        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
             bot,
             issue_number,
             review_data,
@@ -171,7 +177,7 @@ def compute_reviewer_response_state(
             reviews=reviews,
         )
     if preferred_live_review is not None:
-        reviewer_review = legacy_reviews.build_reviewer_review_record_from_live_review(
+        reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
             preferred_live_review,
             actor=current_reviewer,
         )
@@ -179,7 +185,11 @@ def compute_reviewer_response_state(
         reviewer_review = None
 
     latest_reviewer_response = reviewer_comment
-    if legacy_reviews._compare_records(reviewer_review, latest_reviewer_response) > 0:
+    if reviewer_review_helpers.compare_records(
+        reviewer_review,
+        latest_reviewer_response,
+        parse_timestamp=legacy_reviews.parse_github_timestamp,
+    ) > 0:
         latest_reviewer_response = reviewer_review
 
     contributor_handoff = contributor_comment
@@ -188,7 +198,11 @@ def compute_reviewer_response_state(
         current_head,
         reviewer_review if isinstance(reviewer_review, dict) else None,
     )
-    if legacy_reviews._compare_records(contributor_revision, contributor_handoff) > 0:
+    if reviewer_review_helpers.compare_records(
+        contributor_revision,
+        contributor_handoff,
+        parse_timestamp=legacy_reviews.parse_github_timestamp,
+    ) > 0:
         contributor_handoff = contributor_revision
 
     if _compare_cross_channel_conversation(
@@ -225,15 +239,19 @@ def compute_reviewer_response_state(
             "contributor_handoff": contributor_handoff,
         }
 
-    completion, write_approval, approval_failure = legacy_reviews.resolve_pr_approval_state(
+    from scripts.reviewer_bot_core import approval_policy
+
+    approval_result = approval_policy.compute_pr_approval_state_result(
         bot,
         issue_number,
         review_data,
         pull_request=pull_request,
         reviews=reviews,
     )
-    if completion is None or write_approval is None:
-        return {"state": "projection_failed", "reason": approval_failure or "live_review_state_unknown"}
+    if not approval_result.get("ok"):
+        return {"state": "projection_failed", "reason": "live_review_state_unknown"}
+    completion = approval_result["completion"]
+    write_approval = approval_result["write_approval"]
     if not completion.get("completed"):
         return {
             "state": "awaiting_contributor_response",

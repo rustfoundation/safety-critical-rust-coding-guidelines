@@ -357,6 +357,16 @@ def test_h1b_reviewer_response_policy_matches_legacy_derivation_for_frozen_matri
 def test_h1b_reviews_module_delegates_reviewer_response_to_policy_owner():
     reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
     policy_text = Path("scripts/reviewer_bot_core/reviewer_response_policy.py").read_text(encoding="utf-8")
+    helper_text = Path("scripts/reviewer_bot_core/reviewer_review_helpers.py").read_text(encoding="utf-8")
 
     assert "return reviewer_response_policy.compute_reviewer_response_state(" in reviews_text
     assert "def compute_reviewer_response_state(" in policy_text
+    assert "reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(" in policy_text
+    assert "reviewer_review_helpers.build_reviewer_review_record_from_live_review(" in policy_text
+    assert "reviewer_review_helpers.compare_records(" in policy_text
+    assert "legacy_reviews.get_preferred_current_reviewer_review_for_cycle(" not in policy_text
+    assert "legacy_reviews.build_reviewer_review_record_from_live_review(" not in policy_text
+    assert "legacy_reviews._compare_records(" not in policy_text
+    assert "def get_preferred_current_reviewer_review_for_cycle(" in helper_text
+    assert "def build_reviewer_review_record_from_live_review(" in helper_text
+    assert "def compare_records(" in helper_text

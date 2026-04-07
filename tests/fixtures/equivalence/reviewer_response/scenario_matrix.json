@@ -1,6 +1,6 @@
 {
   "harness_id": "H1a reviewer-response derivation equivalence",
-  "owner": "scripts.reviewer_bot_lib.reviews.compute_reviewer_response_state",
+  "owner": "scripts.reviewer_bot_core.reviewer_response_policy.compute_reviewer_response_state",
   "out_of_scope": [
     "mandatory approver escalation",
     "label writes"

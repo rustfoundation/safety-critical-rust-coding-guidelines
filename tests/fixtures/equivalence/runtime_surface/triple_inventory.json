@@ -1,5 +1,6 @@
 {
   "harness_id": "F2a runtime/bootstrap/fake-runtime triple inventory",
+  "artifact_classification": "active migration proof fixture",
   "proof_artifacts": [
     {
       "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
@@ -20,13 +21,6 @@
       "runtime_forwarder": null,
       "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_comment_event",
       "fake_runtime_branch": "tests/fixtures/fake_runtime.py:handle_comment_event",
-      "classification": "retained final surface"
-    },
-    {
-      "capability": "workflow-run dispatch",
-      "runtime_forwarder": null,
-      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_workflow_run_event",
-      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:handle_workflow_run_event",
       "classification": "retained final surface"
     },
     {
@@ -76,20 +70,6 @@
       "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:satisfy_mandatory_approver_requirement",
       "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.satisfy_mandatory_approver_requirement",
       "fake_runtime_branch": "tests/fixtures/fake_runtime.py:satisfy_mandatory_approver_requirement",
-      "classification": "retained final surface"
-    },
-    {
-      "capability": "refresh reviewer review from live preferred review",
-      "runtime_forwarder": null,
-      "bootstrap_adapter": null,
-      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:refresh_reviewer_review_from_live_preferred_review",
-      "classification": "retained final surface"
-    },
-    {
-      "capability": "repair missing reviewer review state",
-      "runtime_forwarder": null,
-      "bootstrap_adapter": null,
-      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:repair_missing_reviewer_review_state",
       "classification": "retained final surface"
     },
     {

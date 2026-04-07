@@ -253,6 +253,7 @@ def test_k1b_fake_runtime_contract_still_exposes_members_needed_by_frozen_reconc
     assert hasattr(runtime, "assert_lock_held")
     assert hasattr(runtime, "load_deferred_payload")
     assert hasattr(runtime, "collect_touched_item")
+    assert hasattr(runtime, "drain_touched_items")
     assert hasattr(runtime, "github_api_request")
     assert hasattr(runtime, "github_api")
     assert hasattr(runtime.adapters.review_state, "maybe_record_head_observation_repair")
@@ -334,6 +335,8 @@ def test_f2a_runtime_surface_inventory_matches_fake_runtime_branch_examples():
     assert capabilities["mandatory approver satisfaction"]["fake_runtime_branch"] == (
         "tests/fixtures/fake_runtime.py:satisfy_mandatory_approver_requirement"
     )
+    assert "refresh reviewer review from live preferred review" not in capabilities
+    assert "repair missing reviewer review state" not in capabilities
 
 
 def test_f2b_no_migration_required_runtime_surface_triples_are_recorded():

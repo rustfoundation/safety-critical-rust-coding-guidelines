@@ -100,6 +100,7 @@ def test_k1b_context_freezes_exact_reconcile_workflow_runtime_seam():
         "load_deferred_payload",
         "get_config_value",
         "collect_touched_item",
+        "drain_touched_items",
         "github_api_request",
         "github_api",
     }
@@ -493,6 +494,7 @@ def test_f2a_runtime_surface_inventory_fixture_records_retained_triples():
     inventory = _load_runtime_surface_inventory()
 
     assert inventory["harness_id"] == "F2a runtime/bootstrap/fake-runtime triple inventory"
+    assert inventory["artifact_classification"] == "active migration proof fixture"
     assert inventory["proof_artifacts"] == [
         {
             "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
@@ -510,7 +512,9 @@ def test_f2a_runtime_surface_inventory_fixture_records_retained_triples():
     capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
 
     assert capabilities["comment-event dispatch"]["classification"] == "retained final surface"
-    assert capabilities["workflow-run dispatch"]["classification"] == "retained final surface"
+    assert "workflow-run dispatch" not in capabilities
+    assert "refresh reviewer review from live preferred review" not in capabilities
+    assert "repair missing reviewer review state" not in capabilities
     assert capabilities["privileged pull request creation"]["classification"] == "retained final surface"
     assert capabilities["github timestamp parsing"]["classification"] == "retained final surface"
 
@@ -522,9 +526,7 @@ def test_f2a_runtime_surface_inventory_matches_bootstrap_adapter_examples():
     assert capabilities["comment-event dispatch"]["bootstrap_adapter"] == (
         "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_comment_event"
     )
-    assert capabilities["workflow-run dispatch"]["bootstrap_adapter"] == (
-        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_workflow_run_event"
-    )
+    assert "workflow-run dispatch" not in capabilities
     assert capabilities["sync status labels"]["bootstrap_adapter"] == (
         "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapWorkflowAdapterServices.sync_status_labels_for_items"
     )
