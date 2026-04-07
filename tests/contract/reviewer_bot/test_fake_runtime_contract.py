@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.reviewer_bot_lib import events, lifecycle
 from scripts.reviewer_bot_lib.context import (
     CommentApplicationRuntimeContext,
     CommentRoutingRuntimeContext,
@@ -323,6 +324,9 @@ def test_f2a_runtime_surface_inventory_matches_fake_runtime_branch_examples():
     assert capabilities["comment-event dispatch"]["fake_runtime_branch"] == (
         "tests/fixtures/fake_runtime.py:handle_comment_event"
     )
+    assert capabilities["pull-request-review dispatch"]["fake_runtime_branch"] == (
+        "tests/fixtures/fake_runtime.py:handle_pull_request_review_event"
+    )
     assert capabilities["privileged accept-no-fls-changes execution"]["fake_runtime_branch"] == (
         "tests/fixtures/fake_runtime.py:handle_accept_no_fls_changes_command"
     )
@@ -357,3 +361,23 @@ def test_fake_runtime_default_handlers_are_built_from_focused_fake_service_helpe
     assert set(expected) == HandlerStub.ALLOWED
     assert "handle_workflow_run_event" not in expected
     assert hasattr(runtime, "handle_workflow_run_event") is False
+
+
+def test_fake_default_pr_review_handler_does_not_imply_lifecycle_ownership(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    calls = []
+
+    def record_events_owner(bot, state):
+        calls.append((bot, state))
+        return True
+
+    def unexpected_lifecycle_owner(*_args, **_kwargs):
+        raise AssertionError("fake default PR-review handler must not imply lifecycle ownership")
+
+    monkeypatch.setattr(events, "handle_pull_request_review_event", record_events_owner)
+    monkeypatch.setattr(lifecycle, "handle_pull_request_review_event", unexpected_lifecycle_owner, raising=False)
+
+    handler = build_default_handler_map(runtime)["handle_pull_request_review_event"]
+
+    assert handler({"owner": "events"}) is True
+    assert [bot for bot, _state in calls] == [runtime]

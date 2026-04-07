@@ -31,7 +31,7 @@ def test_execute_run_schedule_status_projection_epoch_mismatch_triggers_label_re
         "handle_scheduled_check_result",
         lambda bot, current: maintenance.ScheduleHandlerResult(False, [], False, None),
     )
-    harness.runtime.list_open_items_with_status_labels = lambda: [99]
+    monkeypatch.setattr(maintenance.reviews, "list_open_items_with_status_labels", lambda bot: [99])
     harness.stub_sync_status_labels(lambda current, issue_numbers: synced_issue_numbers.extend(issue_numbers) or True)
     harness.stub_save_state(lambda current: saved_epochs.append(current.get("status_projection_epoch")) or True)
 
@@ -60,7 +60,7 @@ def test_execute_run_schedule_status_projection_epoch_not_advanced_on_label_sync
         "handle_scheduled_check_result",
         lambda bot, current: maintenance.ScheduleHandlerResult(False, [], False, None),
     )
-    harness.runtime.list_open_items_with_status_labels = lambda: [42]
+    monkeypatch.setattr(maintenance.reviews, "list_open_items_with_status_labels", lambda bot: [42])
     harness.stub_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(RuntimeError("projection exploded")))
     harness.stub_save_state(lambda current: saved_epochs.append(current.get("status_projection_epoch")) or True)
 
@@ -185,12 +185,3 @@ def test_h4a_review_submission_gap_fixture_keeps_only_one_repair_flow():
 
     assert len(matrix["scenarios"]) == 1
     assert matrix["scenarios"][0]["expected_repair_category"] == "review_submission_repair"
-
-
-def test_m2_app_consumes_typed_schedule_result_without_global_result_framework():
-    app_text = Path("scripts/reviewer_bot_lib/app.py").read_text(encoding="utf-8")
-
-    assert "schedule_result: maintenance.ScheduleHandlerResult | None = None" in app_text
-    assert "schedule_result = maintenance.handle_scheduled_check_result(bot, state)" in app_text
-    assert "state_changed = schedule_result.state_changed" in app_text
-    assert "workflow_run_result" in app_text

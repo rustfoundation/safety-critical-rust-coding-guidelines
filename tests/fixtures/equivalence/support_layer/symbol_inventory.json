@@ -10,10 +10,8 @@
   "symbols": [
     {
       "symbol": "scripts.reviewer_bot_lib.reviews.parse_github_timestamp",
-      "classification": "retained final surface",
+      "classification": "retained compatibility forwarder",
       "production_importers": [
-        "scripts/reviewer_bot_core/approval_policy.py",
-        "scripts/reviewer_bot_core/review_state_machine.py",
         "scripts/reviewer_bot_lib/runtime.py"
       ],
       "test_or_fixture_importers": [
@@ -22,6 +20,72 @@
         "tests/unit/reviewer_bot/test_review_state_equivalence.py",
         "tests/unit/reviewer_bot/test_reviewer_response_equivalence.py",
         "tests/unit/reviewer_bot/test_reviews_projection.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.review_read_support._projection_failure",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_core/approval_policy.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_review_read_support.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.review_read_support._pull_request_read_result",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_core/approval_policy.py",
+        "scripts/reviewer_bot_core/review_state_live_repair.py",
+        "scripts/reviewer_bot_core/reviewer_response_policy.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_review_read_support.py",
+        "tests/unit/reviewer_bot/test_review_state_equivalence.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.review_read_support.get_pull_request_reviews_result",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_core/approval_policy.py",
+        "scripts/reviewer_bot_core/reviewer_response_policy.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_review_read_support.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.review_read_support._permission_status",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_core/approval_policy.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_review_read_support.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.review_read_support.parse_github_timestamp",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_core/approval_policy.py",
+        "scripts/reviewer_bot_core/review_state_machine.py",
+        "scripts/reviewer_bot_core/reviewer_response_policy.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_review_read_support.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.reviews.list_open_items_with_status_labels",
+      "classification": "retained support behavior",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/maintenance.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_reviews_api_contract.py"
       ]
     },
     {
@@ -71,17 +135,6 @@
       "test_or_fixture_importers": []
     },
     {
-      "symbol": "scripts.reviewer_bot_lib.reviews.refresh_reviewer_review_from_live_preferred_review",
-      "classification": "retained final surface",
-      "production_importers": [
-        "scripts/reviewer_bot_lib/reconcile.py",
-        "scripts/reviewer_bot_lib/sweeper.py"
-      ],
-      "test_or_fixture_importers": [
-        "tests/fixtures/fake_runtime.py"
-      ]
-    },
-    {
       "symbol": "scripts.reviewer_bot_lib.reviews.compute_pr_approval_state_result",
       "classification": "zero-importer deletion candidate",
       "production_importers": [],
@@ -129,40 +182,47 @@
       ]
     },
     {
-      "symbol": "scripts.reviewer_bot_lib.reconcile._clear_source_event_key",
-      "classification": "retained final surface",
+      "symbol": "scripts.reviewer_bot_lib.deferred_gap_bookkeeping._clear_source_event_key",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_deferred_gap_bookkeeping.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.deferred_gap_bookkeeping._mark_reconciled_source_event",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_deferred_gap_bookkeeping.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.deferred_gap_bookkeeping._update_deferred_gap",
+      "classification": "retained support owner",
+      "production_importers": [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/sweeper.py"
+      ],
+      "test_or_fixture_importers": [
+        "tests/unit/reviewer_bot/test_deferred_gap_bookkeeping.py"
+      ]
+    },
+    {
+      "symbol": "scripts.reviewer_bot_lib.deferred_gap_bookkeeping._was_reconciled_source_event",
+      "classification": "retained support owner",
       "production_importers": [
         "scripts/reviewer_bot_lib/sweeper.py"
       ],
       "test_or_fixture_importers": [
-        "tests/unit/reviewer_bot/test_reconcile_unit.py"
+        "tests/unit/reviewer_bot/test_deferred_gap_bookkeeping.py"
       ]
-    },
-    {
-      "symbol": "scripts.reviewer_bot_lib.reconcile._mark_reconciled_source_event",
-      "classification": "retained final surface",
-      "production_importers": [
-        "scripts/reviewer_bot_lib/sweeper.py"
-      ],
-      "test_or_fixture_importers": [
-        "tests/unit/reviewer_bot/test_reconcile_unit.py"
-      ]
-    },
-    {
-      "symbol": "scripts.reviewer_bot_lib.reconcile._update_deferred_gap",
-      "classification": "retained final surface",
-      "production_importers": [
-        "scripts/reviewer_bot_lib/sweeper.py"
-      ],
-      "test_or_fixture_importers": []
-    },
-    {
-      "symbol": "scripts.reviewer_bot_lib.reconcile._was_reconciled_source_event",
-      "classification": "retained final surface",
-      "production_importers": [
-        "scripts/reviewer_bot_lib/sweeper.py"
-      ],
-      "test_or_fixture_importers": []
     }
   ]
 }

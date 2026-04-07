@@ -7,7 +7,7 @@ from scripts.reviewer_bot_core import (
     review_state_machine,
     reviewer_review_helpers,
 )
-from scripts.reviewer_bot_lib import review_state, reviews
+from scripts.reviewer_bot_lib import review_read_support, review_state, reviews
 from tests.fixtures.reviewer_bot import make_state
 
 
@@ -231,7 +231,7 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
         def parse_iso8601_timestamp(value):
             return reviews.parse_github_timestamp(value)
 
-    monkeypatch.setattr(reviews, "_pull_request_read_result", lambda bot, issue_number: bot.pull_request_result)
+    monkeypatch.setattr(review_read_support, "_pull_request_read_result", lambda bot, issue_number: bot.pull_request_result)
     monkeypatch.setattr(
         reviewer_review_helpers,
         "get_preferred_current_reviewer_review_for_cycle",
@@ -293,6 +293,49 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
         owner_review,
     )
     assert delegated_review == owner_review
+
+
+def test_review_state_live_repair_behavior_no_longer_depends_on_reviews_parallel_bridge(monkeypatch):
+    class Bot:
+        pull_request_result = {"ok": True, "pull_request": {"head": {"sha": "head-1"}}}
+        preferred_review = {
+            "id": 10,
+            "submitted_at": "2026-03-17T10:01:00Z",
+            "commit_id": "head-1",
+            "user": {"login": "alice"},
+        }
+
+        @staticmethod
+        def parse_iso8601_timestamp(value):
+            return reviews.parse_github_timestamp(value)
+
+    monkeypatch.setattr(review_read_support, "_pull_request_read_result", lambda bot, issue_number: bot.pull_request_result)
+    monkeypatch.setattr(
+        reviewer_review_helpers,
+        "get_preferred_current_reviewer_review_for_cycle",
+        lambda bot, issue_number, review_data, **kwargs: bot.preferred_review,
+    )
+
+    if hasattr(reviews, "refresh_reviewer_review_from_live_preferred_review"):
+        monkeypatch.setattr(
+            reviews,
+            "refresh_reviewer_review_from_live_preferred_review",
+            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("review_state bridge must not depend on reviews parallel bridge")),
+        )
+
+    review = {
+        "current_reviewer": "alice",
+        "reviewer_review": {"accepted": None, "seen_keys": []},
+        "last_reviewer_activity": None,
+        "transition_warning_sent": None,
+        "transition_notice_sent_at": None,
+    }
+
+    changed, preferred_review = review_state.refresh_reviewer_review_from_live_preferred_review(Bot(), 42, review)
+
+    assert changed is True
+    assert preferred_review is not None
+    assert review["reviewer_review"]["accepted"]["semantic_key"] == "pull_request_review:10"
 
 
 def test_g2b_review_state_machine_no_longer_owns_live_read_repair_behavior():

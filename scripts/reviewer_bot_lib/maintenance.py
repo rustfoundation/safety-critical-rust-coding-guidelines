@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import yaml
 
-from . import automation
+from . import automation, reviews
 from .context import PrivilegedCommandRequest
 from .event_inputs import build_manual_dispatch_request
 from .lifecycle import handle_transition_notice, maybe_record_head_observation_repair
@@ -109,13 +109,125 @@ def _record_maintenance_repair_marker(
     return True
 
 
+def _run_deferred_gap_sweep(bot, state: dict) -> bool:
+    return sweep_deferred_gaps(bot, state)
+
+
+def _run_tracked_pr_repair(bot, issue_number: int, review_data: dict) -> bool:
+    changed = False
+    try:
+        if repair_missing_reviewer_review_state(bot, issue_number, review_data):
+            changed = True
+            bot.collect_touched_item(issue_number)
+        if _clear_maintenance_repair_marker(review_data, "review_repair"):
+            changed = True
+    except Exception as exc:
+        _log(
+            bot,
+            "warning",
+            f"Scheduled repair failed for #{issue_number} during review_repair: {exc}",
+            issue_number=issue_number,
+            phase="review_repair",
+            error=str(exc),
+        )
+        if _record_maintenance_repair_marker(
+            bot,
+            review_data,
+            phase="review_repair",
+            reason=str(exc),
+            failure_kind=None,
+        ):
+            changed = True
+        return changed
+
+    try:
+        repair_result = maybe_record_head_observation_repair(bot, issue_number, review_data)
+    except Exception as exc:
+        _log(
+            bot,
+            "warning",
+            f"Scheduled repair failed for #{issue_number} during head_observation_repair: {exc}",
+            issue_number=issue_number,
+            phase="head_observation_repair",
+            error=str(exc),
+        )
+        if _record_maintenance_repair_marker(
+            bot,
+            review_data,
+            phase="head_observation_repair",
+            reason=str(exc),
+            failure_kind=None,
+        ):
+            changed = True
+        return changed
+
+    if repair_result.changed:
+        changed = True
+        bot.collect_touched_item(issue_number)
+    if repair_result.outcome in {"skipped_unavailable", "skipped_not_found", "invalid_live_payload"}:
+        if _record_maintenance_repair_marker(
+            bot,
+            review_data,
+            phase="head_observation_repair",
+            reason=repair_result.reason or repair_result.outcome,
+            failure_kind=repair_result.failure_kind,
+        ):
+            changed = True
+    elif _clear_maintenance_repair_marker(review_data, "head_observation_repair"):
+        changed = True
+    return changed
+
+
+def _run_tracked_pr_repairs(bot, state: dict) -> bool:
+    changed = False
+    active_reviews = state.get("active_reviews")
+    if not isinstance(active_reviews, dict):
+        return False
+    for issue_key, review_data in active_reviews.items():
+        if not isinstance(review_data, dict) or not review_data.get("current_reviewer"):
+            continue
+        issue_number = int(issue_key)
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
+        if not isinstance(issue_snapshot, dict) or not isinstance(issue_snapshot.get("pull_request"), dict):
+            continue
+        changed = _run_tracked_pr_repair(bot, issue_number, review_data) or changed
+    return changed
+
+
+def _run_overdue_pass(bot, state: dict) -> bool:
+    changed = False
+    overdue_reviews = check_overdue_reviews(bot, state)
+    for review in overdue_reviews:
+        issue_number = review["issue_number"]
+        reviewer = review["reviewer"]
+        if review["needs_warning"]:
+            if handle_overdue_review_warning(bot, state, issue_number, reviewer):
+                changed = True
+        elif review["needs_transition"]:
+            if backfill_transition_notice_if_present(bot, state, issue_number):
+                changed = True
+            elif handle_transition_notice(bot, state, issue_number, reviewer):
+                changed = True
+    return changed
+
+
+def _finalize_schedule_result(bot, state_changed: bool) -> ScheduleHandlerResult:
+    touched_items = bot.drain_touched_items()
+    return ScheduleHandlerResult(
+        state_changed=state_changed,
+        touched_items=touched_items,
+        projection_followup_needed=bool(touched_items),
+        projection_failure_message=None,
+    )
+
+
 def status_projection_repair_needed(bot, state: dict) -> bool:
     current_epoch = state.get("status_projection_epoch")
     return current_epoch != bot.STATUS_PROJECTION_EPOCH
 
 
 def collect_status_projection_repair_items(bot, state: dict) -> list[int]:
-    numbers = set(bot.list_open_items_with_status_labels())
+    numbers = set(reviews.list_open_items_with_status_labels(bot))
     numbers.update(list_open_tracked_review_items(state))
     return sorted(number for number in numbers if isinstance(number, int) and number > 0)
 
@@ -168,7 +280,7 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
         _, changes = bot.adapters.workflow.sync_members_with_queue(state)
         return bool(changes)
     if action == "repair-review-status-labels":
-        for issue_number in bot.list_open_items_with_status_labels():
+        for issue_number in reviews.list_open_items_with_status_labels(bot):
             bot.collect_touched_item(issue_number)
         return False
     if action == "check-overdue":
@@ -243,103 +355,10 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
 
 def handle_scheduled_check_result(bot, state: dict) -> ScheduleHandlerResult:
     bot.assert_lock_held("handle_scheduled_check")
-    changed = sweep_deferred_gaps(bot, state)
-    active_reviews = state.get("active_reviews")
-    if isinstance(active_reviews, dict):
-        for issue_key, review_data in active_reviews.items():
-            if not isinstance(review_data, dict) or not review_data.get("current_reviewer"):
-                continue
-            issue_number = int(issue_key)
-            issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
-            if not isinstance(issue_snapshot, dict) or not isinstance(issue_snapshot.get("pull_request"), dict):
-                continue
-            try:
-                if repair_missing_reviewer_review_state(bot, issue_number, review_data):
-                    changed = True
-                    bot.collect_touched_item(issue_number)
-                if _clear_maintenance_repair_marker(review_data, "review_repair"):
-                    changed = True
-            except Exception as exc:
-                _log(
-                    bot,
-                    "warning",
-                    f"Scheduled repair failed for #{issue_number} during review_repair: {exc}",
-                    issue_number=issue_number,
-                    phase="review_repair",
-                    error=str(exc),
-                )
-                if _record_maintenance_repair_marker(
-                    bot,
-                    review_data,
-                    phase="review_repair",
-                    reason=str(exc),
-                    failure_kind=None,
-                ):
-                    changed = True
-                continue
-
-            try:
-                repair_result = maybe_record_head_observation_repair(bot, issue_number, review_data)
-            except Exception as exc:
-                _log(
-                    bot,
-                    "warning",
-                    f"Scheduled repair failed for #{issue_number} during head_observation_repair: {exc}",
-                    issue_number=issue_number,
-                    phase="head_observation_repair",
-                    error=str(exc),
-                )
-                if _record_maintenance_repair_marker(
-                    bot,
-                    review_data,
-                    phase="head_observation_repair",
-                    reason=str(exc),
-                    failure_kind=None,
-                ):
-                    changed = True
-                continue
-
-            if repair_result.changed:
-                changed = True
-                bot.collect_touched_item(issue_number)
-            if repair_result.outcome in {"skipped_unavailable", "skipped_not_found", "invalid_live_payload"}:
-                if _record_maintenance_repair_marker(
-                    bot,
-                    review_data,
-                    phase="head_observation_repair",
-                    reason=repair_result.reason or repair_result.outcome,
-                    failure_kind=repair_result.failure_kind,
-                ):
-                    changed = True
-            elif _clear_maintenance_repair_marker(review_data, "head_observation_repair"):
-                changed = True
-    overdue_reviews = check_overdue_reviews(bot, state)
-    if not overdue_reviews:
-        touched_items = bot.drain_touched_items()
-        return ScheduleHandlerResult(
-            state_changed=changed,
-            touched_items=touched_items,
-            projection_followup_needed=bool(touched_items),
-            projection_failure_message=None,
-        )
-    for review in overdue_reviews:
-        issue_number = review["issue_number"]
-        reviewer = review["reviewer"]
-        if review["needs_warning"]:
-            if handle_overdue_review_warning(bot, state, issue_number, reviewer):
-                changed = True
-        elif review["needs_transition"]:
-            if backfill_transition_notice_if_present(bot, state, issue_number):
-                changed = True
-            elif handle_transition_notice(bot, state, issue_number, reviewer):
-                changed = True
-    touched_items = bot.drain_touched_items()
-    return ScheduleHandlerResult(
-        state_changed=changed,
-        touched_items=touched_items,
-        projection_followup_needed=bool(touched_items),
-        projection_failure_message=None,
-    )
+    changed = _run_deferred_gap_sweep(bot, state)
+    changed = _run_tracked_pr_repairs(bot, state) or changed
+    changed = _run_overdue_pass(bot, state) or changed
+    return _finalize_schedule_result(bot, changed)
 
 
 def handle_scheduled_check(bot, state: dict) -> bool:

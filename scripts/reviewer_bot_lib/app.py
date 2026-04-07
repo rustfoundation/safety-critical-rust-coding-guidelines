@@ -92,7 +92,10 @@ def _classify_event_intent_from_context(bot: AppEventContextRuntime, context: Ev
     if event_name == "workflow_run":
         if event_action != "completed":
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
-        if context.workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
+        if reconcile.supports_mutating_workflow_run_source_action(
+            context.workflow_run_event,
+            context.workflow_run_event_action,
+        ):
             return bot.EVENT_INTENT_MUTATING
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
@@ -233,15 +236,21 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
 
         elif event_name == "workflow_run":
             if event_action == "completed":
-                if context.workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
+                if reconcile.supports_mutating_workflow_run_source_action(
+                    context.workflow_run_event,
+                    context.workflow_run_event_action,
+                ):
                     workflow_run_result = reconcile.handle_workflow_run_event_result(bot, state)
                     state_changed = workflow_run_result.state_changed
                 else:
                     _log(
                         bot,
                         "info",
-                        f"Ignoring workflow_run event with unsupported source event: {context.workflow_run_event or '<missing>'}",
+                        "Ignoring workflow_run event with unsupported source-action pair: "
+                        f"{context.workflow_run_event or '<missing>'}/"
+                        f"{context.workflow_run_event_action or '<missing>'}",
                         workflow_run_event=context.workflow_run_event or "<missing>",
+                        workflow_run_event_action=context.workflow_run_event_action or "<missing>",
                     )
 
         if workflow_run_result is not None:

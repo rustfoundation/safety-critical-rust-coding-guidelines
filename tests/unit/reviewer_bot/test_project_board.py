@@ -67,6 +67,25 @@ def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypat
     assert preview.desired.reviewer == "alice"
 
 
+def test_preview_board_projection_consumes_only_stable_reviewer_response_fields(monkeypatch):
+    state = make_state()
+    make_tracked_review_state(state, 42, reviewer="alice", assigned_at="2026-03-20T12:34:56Z", active_cycle_started_at="2026-03-20T12:34:56Z")
+    runtime = _runtime(monkeypatch)
+    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.adapters.review_state.compute_reviewer_response_state = lambda issue_number, review_data, **kwargs: {
+        "state": "awaiting_reviewer_response",
+        "anchor_timestamp": "2026-03-21T08:00:00Z",
+        "reason": "review_head_stale",
+        "ignored": {"contributor_handoff": "not consumed"},
+    }
+
+    preview = project_board.preview_board_projection_for_item(runtime, state, 42)
+
+    assert preview.desired is not None
+    assert preview.desired.review_state == "Awaiting Reviewer"
+    assert preview.desired.waiting_since == "2026-03-21"
+
+
 def test_preview_board_projection_tracked_unassigned_maps_to_unassigned(monkeypatch):
     state = make_state()
     make_tracked_review_state(state, 42)

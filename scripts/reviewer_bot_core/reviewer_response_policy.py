@@ -16,7 +16,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from scripts.reviewer_bot_lib import review_read_support
+
 from . import reviewer_review_helpers
+
+_UNSET = object()
 
 
 def _record_timestamp(record: dict | None, *, parse_timestamp) -> datetime | None:
@@ -68,31 +72,29 @@ def _contributor_revision_handoff_record(review_data: dict, current_head: str | 
     return contributor_revision
 
 
-def compute_reviewer_response_state(
-    bot,
-    issue_number: int,
+def derive_reviewer_response_state(
     review_data: dict,
     *,
-    issue_snapshot: dict | None = None,
-    pull_request: dict | None = None,
-    reviews: list[dict] | None = None,
+    issue_is_pull_request: bool,
+    current_head: str | None = None,
+    reviewer_comment: dict | None | object = _UNSET,
+    reviewer_review: dict | None | object = _UNSET,
+    contributor_comment: dict | None | object = _UNSET,
+    had_reviewer_review: bool = False,
+    approval_result: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    from scripts.reviewer_bot_lib import reviews as legacy_reviews
-
-    if issue_snapshot is None:
-        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
-    if not isinstance(issue_snapshot, dict):
-        return {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
-    is_pr = isinstance(issue_snapshot.get("pull_request"), dict)
     current_reviewer = review_data.get("current_reviewer")
     if not isinstance(current_reviewer, str) or not current_reviewer.strip():
         return {"state": "untracked", "reason": "no_current_reviewer"}
 
-    reviewer_comment = review_data.get("reviewer_comment", {}).get("accepted")
-    reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
-    contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
+    if reviewer_comment is _UNSET:
+        reviewer_comment = review_data.get("reviewer_comment", {}).get("accepted")
+    if reviewer_review is _UNSET:
+        reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
+    if contributor_comment is _UNSET:
+        contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
 
-    if not is_pr:
+    if not issue_is_pull_request:
         if not reviewer_comment and not reviewer_review:
             return {
                 "state": "awaiting_reviewer_response",
@@ -107,7 +109,7 @@ def compute_reviewer_response_state(
         if reviewer_review_helpers.compare_records(
             reviewer_review,
             latest_reviewer_response,
-            parse_timestamp=legacy_reviews.parse_github_timestamp,
+            parse_timestamp=review_read_support.parse_github_timestamp,
         ) > 0:
             latest_reviewer_response = reviewer_review
         completion = review_data.get("current_cycle_completion")
@@ -121,33 +123,11 @@ def compute_reviewer_response_state(
             }
         return {"state": "done", "reason": None}
 
-    pull_request_result = legacy_reviews._pull_request_read_result(bot, issue_number, pull_request)
-    if not pull_request_result.get("ok"):
-        return {"state": "projection_failed", "reason": str(pull_request_result.get("reason"))}
-    pull_request = pull_request_result["pull_request"]
-    head = pull_request.get("head")
-    current_head = head.get("sha") if isinstance(head, dict) else None
     if not isinstance(current_head, str) or not current_head.strip():
         return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
 
     if not reviewer_comment and not reviewer_review:
-        reviews_result = legacy_reviews.get_pull_request_reviews_result(bot, issue_number, reviews)
-        if not reviews_result.get("ok"):
-            return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
-        reviews = reviews_result["reviews"]
-        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
-            bot,
-            issue_number,
-            review_data,
-            pull_request=pull_request,
-            reviews=reviews,
-        )
-        if preferred_live_review is not None:
-            reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
-                preferred_live_review,
-                actor=current_reviewer,
-            )
-        else:
+        if not had_reviewer_review:
             return {
                 "state": "awaiting_reviewer_response",
                 "reason": "no_reviewer_activity",
@@ -158,37 +138,11 @@ def compute_reviewer_response_state(
                 "contributor_handoff": None,
             }
 
-    stored_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
-    refresh_live_review = reviews is not None or reviewer_review is None
-    if not refresh_live_review:
-        refresh_live_review = not isinstance(stored_review_head, str) or stored_review_head != current_head
-
-    preferred_live_review = None
-    if refresh_live_review:
-        reviews_result = legacy_reviews.get_pull_request_reviews_result(bot, issue_number, reviews)
-        if not reviews_result.get("ok"):
-            return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
-        reviews = reviews_result["reviews"]
-        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
-            bot,
-            issue_number,
-            review_data,
-            pull_request=pull_request,
-            reviews=reviews,
-        )
-    if preferred_live_review is not None:
-        reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
-            preferred_live_review,
-            actor=current_reviewer,
-        )
-    elif refresh_live_review:
-        reviewer_review = None
-
     latest_reviewer_response = reviewer_comment
     if reviewer_review_helpers.compare_records(
         reviewer_review,
         latest_reviewer_response,
-        parse_timestamp=legacy_reviews.parse_github_timestamp,
+        parse_timestamp=review_read_support.parse_github_timestamp,
     ) > 0:
         latest_reviewer_response = reviewer_review
 
@@ -201,14 +155,14 @@ def compute_reviewer_response_state(
     if reviewer_review_helpers.compare_records(
         contributor_revision,
         contributor_handoff,
-        parse_timestamp=legacy_reviews.parse_github_timestamp,
+        parse_timestamp=review_read_support.parse_github_timestamp,
     ) > 0:
         contributor_handoff = contributor_revision
 
     if _compare_cross_channel_conversation(
         contributor_handoff,
         latest_reviewer_response,
-        parse_timestamp=legacy_reviews.parse_github_timestamp,
+        parse_timestamp=review_read_support.parse_github_timestamp,
     ) > 0:
         reason = "contributor_comment_newer"
         if isinstance(contributor_handoff, dict) and str(contributor_handoff.get("semantic_key", "")).startswith(
@@ -239,17 +193,9 @@ def compute_reviewer_response_state(
             "contributor_handoff": contributor_handoff,
         }
 
-    from scripts.reviewer_bot_core import approval_policy
-
-    approval_result = approval_policy.compute_pr_approval_state_result(
-        bot,
-        issue_number,
-        review_data,
-        pull_request=pull_request,
-        reviews=reviews,
-    )
-    if not approval_result.get("ok"):
+    if not isinstance(approval_result, dict) or not approval_result.get("ok"):
         return {"state": "projection_failed", "reason": "live_review_state_unknown"}
+
     completion = approval_result["completion"]
     write_approval = approval_result["write_approval"]
     if not completion.get("completed"):
@@ -284,3 +230,111 @@ def compute_reviewer_response_state(
         "contributor_comment": contributor_comment,
         "contributor_handoff": contributor_handoff,
     }
+
+
+def compute_reviewer_response_state(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    issue_snapshot: dict | None = None,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict[str, object]:
+    if issue_snapshot is None:
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
+    if not isinstance(issue_snapshot, dict):
+        return {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
+    is_pr = isinstance(issue_snapshot.get("pull_request"), dict)
+
+    reviewer_comment = review_data.get("reviewer_comment", {}).get("accepted")
+    reviewer_review = review_data.get("reviewer_review", {}).get("accepted")
+    contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
+    had_reviewer_review = isinstance(reviewer_review, dict)
+
+    if not is_pr:
+        return derive_reviewer_response_state(
+            review_data,
+            issue_is_pull_request=False,
+            reviewer_comment=reviewer_comment,
+            reviewer_review=reviewer_review,
+            contributor_comment=contributor_comment,
+            had_reviewer_review=had_reviewer_review,
+        )
+
+    pull_request_result = review_read_support._pull_request_read_result(bot, issue_number, pull_request)
+    if not pull_request_result.get("ok"):
+        return {"state": "projection_failed", "reason": str(pull_request_result.get("reason"))}
+    pull_request = pull_request_result["pull_request"]
+    head = pull_request.get("head")
+    current_head = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(current_head, str) or not current_head.strip():
+        return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
+
+    if not reviewer_comment and not reviewer_review:
+        reviews_result = review_read_support.get_pull_request_reviews_result(bot, issue_number, reviews)
+        if not reviews_result.get("ok"):
+            return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
+        reviews = reviews_result["reviews"]
+        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
+            bot,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
+        if preferred_live_review is not None:
+            reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
+                preferred_live_review,
+                actor=review_data.get("current_reviewer"),
+            )
+
+    stored_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    refresh_live_review = reviews is not None or reviewer_review is None
+    if not refresh_live_review:
+        refresh_live_review = not isinstance(stored_review_head, str) or stored_review_head != current_head
+
+    preferred_live_review = None
+    if refresh_live_review:
+        reviews_result = review_read_support.get_pull_request_reviews_result(bot, issue_number, reviews)
+        if not reviews_result.get("ok"):
+            return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
+        reviews = reviews_result["reviews"]
+        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
+            bot,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
+    if preferred_live_review is not None:
+        reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
+            preferred_live_review,
+            actor=review_data.get("current_reviewer"),
+        )
+    elif refresh_live_review:
+        reviewer_review = None
+
+    approval_result = None
+    reviewed_head_sha = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
+    if isinstance(reviewed_head_sha, str) and reviewed_head_sha == current_head:
+        from scripts.reviewer_bot_core import approval_policy
+
+        approval_result = approval_policy.compute_pr_approval_state_result(
+            bot,
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
+
+    return derive_reviewer_response_state(
+        review_data,
+        issue_is_pull_request=True,
+        current_head=current_head,
+        reviewer_comment=reviewer_comment,
+        reviewer_review=reviewer_review,
+        contributor_comment=contributor_comment,
+        had_reviewer_review=had_reviewer_review,
+        approval_result=approval_result,
+    )

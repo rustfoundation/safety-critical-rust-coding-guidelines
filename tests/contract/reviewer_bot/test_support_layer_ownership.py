@@ -104,11 +104,22 @@ def test_f1a_support_layer_inventory_fixture_records_candidate_classifications_a
     ]
     symbols = {entry["symbol"]: entry for entry in inventory["symbols"]}
 
+    assert symbols["scripts.reviewer_bot_lib.reviews.parse_github_timestamp"]["classification"] == "retained compatibility forwarder"
+    assert symbols["scripts.reviewer_bot_lib.review_read_support._projection_failure"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.review_read_support._pull_request_read_result"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.review_read_support.get_pull_request_reviews_result"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.review_read_support._permission_status"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.review_read_support.parse_github_timestamp"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._clear_source_event_key"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._mark_reconciled_source_event"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._update_deferred_gap"]["classification"] == "retained support owner"
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._was_reconciled_source_event"]["classification"] == "retained support owner"
     assert symbols["scripts.reviewer_bot_lib.reviews.build_reviewer_review_record_from_live_review"]["classification"] == "zero-importer deletion candidate"
     assert symbols["scripts.reviewer_bot_lib.reviews.get_preferred_current_reviewer_review_for_cycle"]["classification"] == "zero-importer deletion candidate"
     assert symbols["scripts.reviewer_bot_lib.reviews._compare_records"]["classification"] == "zero-importer deletion candidate"
     assert symbols["scripts.reviewer_bot_lib.reviews.compute_pr_approval_state_result"]["classification"] == "zero-importer deletion candidate"
     assert symbols["scripts.reviewer_bot_lib.reviews.find_triage_approval_after"]["classification"] == "zero-importer deletion candidate"
+    assert symbols["scripts.reviewer_bot_lib.reviews.list_open_items_with_status_labels"]["classification"] == "retained support behavior"
     assert symbols["scripts.reviewer_bot_lib.reviews.rebuild_pr_approval_state"]["classification"] == "retained final surface"
     assert symbols["scripts.reviewer_bot_lib.sweeper.sweep_deferred_gaps"]["classification"] == "retained final surface"
 
@@ -118,9 +129,45 @@ def test_f1a_support_layer_inventory_matches_current_active_importer_examples():
     symbols = {entry["symbol"]: entry for entry in inventory["symbols"]}
 
     assert symbols["scripts.reviewer_bot_lib.reviews.parse_github_timestamp"]["production_importers"] == [
+        "scripts/reviewer_bot_lib/runtime.py",
+    ]
+    assert symbols["scripts.reviewer_bot_lib.review_read_support._projection_failure"]["production_importers"] == [
+        "scripts/reviewer_bot_core/approval_policy.py"
+    ]
+    assert symbols["scripts.reviewer_bot_lib.review_read_support._pull_request_read_result"]["production_importers"] == [
+        "scripts/reviewer_bot_core/approval_policy.py",
+        "scripts/reviewer_bot_core/review_state_live_repair.py",
+        "scripts/reviewer_bot_core/reviewer_response_policy.py",
+    ]
+    assert symbols["scripts.reviewer_bot_lib.review_read_support.get_pull_request_reviews_result"]["production_importers"] == [
+        "scripts/reviewer_bot_core/approval_policy.py",
+        "scripts/reviewer_bot_core/reviewer_response_policy.py",
+    ]
+    assert symbols["scripts.reviewer_bot_lib.review_read_support._permission_status"]["production_importers"] == [
+        "scripts/reviewer_bot_core/approval_policy.py"
+    ]
+    assert symbols["scripts.reviewer_bot_lib.review_read_support.parse_github_timestamp"]["production_importers"] == [
         "scripts/reviewer_bot_core/approval_policy.py",
         "scripts/reviewer_bot_core/review_state_machine.py",
-        "scripts/reviewer_bot_lib/runtime.py",
+        "scripts/reviewer_bot_core/reviewer_response_policy.py",
+    ]
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._clear_source_event_key"]["production_importers"] == [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/sweeper.py",
+    ]
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._mark_reconciled_source_event"]["production_importers"] == [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/sweeper.py",
+    ]
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._update_deferred_gap"]["production_importers"] == [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/sweeper.py",
+    ]
+    assert symbols["scripts.reviewer_bot_lib.deferred_gap_bookkeeping._was_reconciled_source_event"]["production_importers"] == [
+        "scripts/reviewer_bot_lib/sweeper.py"
+    ]
+    assert symbols["scripts.reviewer_bot_lib.reviews.list_open_items_with_status_labels"]["production_importers"] == [
+        "scripts/reviewer_bot_lib/maintenance.py"
     ]
     assert symbols["scripts.reviewer_bot_lib.reviews.build_reviewer_review_record_from_live_review"]["production_importers"] == []
     assert symbols["scripts.reviewer_bot_lib.reviews.get_preferred_current_reviewer_review_for_cycle"]["production_importers"] == []
@@ -133,10 +180,6 @@ def test_f1a_support_layer_inventory_matches_current_active_importer_examples():
     ]
     assert symbols["scripts.reviewer_bot_lib.reviews.rebuild_pr_approval_state_result"]["production_importers"] == [
         "scripts/reviewer_bot_lib/reconcile.py"
-    ]
-    assert symbols["scripts.reviewer_bot_lib.reviews.refresh_reviewer_review_from_live_preferred_review"]["production_importers"] == [
-        "scripts/reviewer_bot_lib/reconcile.py",
-        "scripts/reviewer_bot_lib/sweeper.py",
     ]
     assert symbols["scripts.reviewer_bot_lib.sweeper.sweep_deferred_gaps"]["production_importers"] == [
         "scripts/reviewer_bot_lib/maintenance.py"

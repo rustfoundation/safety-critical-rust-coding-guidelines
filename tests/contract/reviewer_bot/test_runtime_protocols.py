@@ -6,6 +6,7 @@ import pytest
 pytestmark = pytest.mark.contract
 
 from scripts import reviewer_bot
+from scripts.reviewer_bot_lib import events, lifecycle
 from scripts.reviewer_bot_lib.context import (
     AppEventContextRuntime,
     AppExecutionRuntime,
@@ -65,6 +66,26 @@ def test_fake_runtime_satisfies_app_execution_runtime_protocol(monkeypatch):
     assert isinstance(runtime, ReconcileWorkflowRuntimeContext)
     assert isinstance(runtime, ReconcileRectifyRuntimeContext)
     _assert_core_runtime_surface(runtime)
+
+
+def test_pr_review_handler_wiring_routes_fake_and_bootstrap_runtimes_to_events_owner(monkeypatch):
+    fake_runtime = FakeReviewerBotRuntime(monkeypatch)
+    bootstrap_runtime = reviewer_bot._runtime_bot()
+    calls = []
+
+    def record_events_owner(bot, state):
+        calls.append((bot, state))
+        return bot is fake_runtime
+
+    def unexpected_lifecycle_owner(*_args, **_kwargs):
+        raise AssertionError("pull_request_review handlers must route through events")
+
+    monkeypatch.setattr(events, "handle_pull_request_review_event", record_events_owner)
+    monkeypatch.setattr(lifecycle, "handle_pull_request_review_event", unexpected_lifecycle_owner, raising=False)
+
+    assert fake_runtime.handlers.handle_pull_request_review_event({"owner": "fake"}) is True
+    assert bootstrap_runtime.handlers.handle_pull_request_review_event({"owner": "bootstrap"}) is False
+    assert [bot for bot, _state in calls] == [fake_runtime, bootstrap_runtime]
 
 
 def test_o3_runtime_deletion_manifest_forbids_dead_workflow_run_handler_compatibility_surface():

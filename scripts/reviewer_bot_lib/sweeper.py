@@ -12,15 +12,10 @@ from urllib.parse import quote
 
 from scripts.reviewer_bot_core import deferred_gap_diagnosis
 
+from . import deferred_gap_bookkeeping as gap_bookkeeping
 from . import retrying
 from .config import REVIEW_FRESHNESS_RUNBOOK_PATH
 from .context import SweeperContext
-from .reconcile import (
-    _clear_source_event_key,
-    _mark_reconciled_source_event,
-    _update_deferred_gap,
-    _was_reconciled_source_event,
-)
 from .reconcile_payloads import artifact_expected_name as _artifact_expected_name
 from .reconcile_payloads import (
     artifact_expected_payload_name as _artifact_expected_payload_name,
@@ -382,6 +377,21 @@ def _list_issue_comments_paginated(bot, issue_number: int) -> tuple[list[dict] |
         page += 1
 
 
+def _list_review_comments_paginated(bot, issue_number: int) -> tuple[list[dict] | None, bool]:
+    comments: list[dict] = []
+    page = 1
+    while True:
+        response, _ = _read_api_payload(bot, f"pulls/{issue_number}/comments?per_page=100&page={page}")
+        if response is None:
+            return None, False
+        if not isinstance(response, list):
+            return None, False
+        comments.extend([comment for comment in response if isinstance(comment, dict)])
+        if len(response) < 100:
+            return comments, True
+        page += 1
+
+
 def _is_automation_comment(comment: dict) -> bool:
     user = comment.get("user") if isinstance(comment, dict) else None
     login = user.get("login") if isinstance(user, dict) else None
@@ -458,8 +468,8 @@ def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source
     )[0] or changed
     record_reviewer_activity(review_data, submitted_at)
     completion, _ = rebuild_pr_approval_state(bot, issue_number, review_data)
-    reconciled_changed = _mark_reconciled_source_event(review_data, source_event_key)
-    gap_cleared_changed = _clear_source_event_key(review_data, source_event_key)
+    reconciled_changed = gap_bookkeeping._mark_reconciled_source_event(review_data, source_event_key)
+    gap_cleared_changed = gap_bookkeeping._clear_source_event_key(review_data, source_event_key)
     return changed or completion is not None or reconciled_changed or gap_cleared_changed
 
 
@@ -531,10 +541,8 @@ def _discover_visible_review_events(bot, issue_number: int, review_data: dict) -
 def _discover_visible_review_comment_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
     watermark = _load_surface_watermark(review_data, "review_comments")
     watermark["last_scan_started_at"] = _now_iso()
-    comments, _ = _read_api_payload(bot, f"pulls/{issue_number}/comments?per_page=100")
+    comments, complete = _list_review_comments_paginated(bot, issue_number)
     if comments is None:
-        return None, False
-    if not isinstance(comments, list):
         return None, False
     floor = _surface_scan_floor(bot, watermark)
     discovered: list[dict] = []
@@ -559,7 +567,7 @@ def _discover_visible_review_comment_events(bot, issue_number: int, review_data:
                 "comment": comment,
             }
         )
-    return discovered, True
+    return discovered, complete
 
 
 def _discover_visible_review_dismissal_events(bot, issue_number: int, review_data: dict) -> tuple[list[dict] | None, bool]:
@@ -612,7 +620,7 @@ def _record_gap_diagnostics(
     reason: str,
     diagnostic_reason: str,
 ) -> None:
-    _update_deferred_gap(
+    gap_bookkeeping._update_deferred_gap(
         bot,
         review_data,
         {
@@ -652,7 +660,7 @@ def _record_gap_diagnostics(
 
 
 def _should_skip_discovered_key(bot, review_data: dict, source_event_key: str, channels: tuple[str, ...]) -> bool:
-    if _was_reconciled_source_event(review_data, source_event_key):
+    if gap_bookkeeping._was_reconciled_source_event(review_data, source_event_key):
         return True
     if source_event_key in review_data.get("deferred_gaps", {}):
         existing_gap = review_data["deferred_gaps"].get(source_event_key)

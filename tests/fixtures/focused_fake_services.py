@@ -500,6 +500,7 @@ class WorkflowBehaviorStub:
 
 def build_default_handler_map(runtime) -> dict[str, Callable[[dict], bool]]:
     from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
+    from scripts.reviewer_bot_lib import events as events_module
     from scripts.reviewer_bot_lib import lifecycle as lifecycle_module
     from scripts.reviewer_bot_lib import maintenance as maintenance_module
 
@@ -509,7 +510,7 @@ def build_default_handler_map(runtime) -> dict[str, Callable[[dict], bool]]:
         "handle_issue_edited_event": lambda state: lifecycle_module.handle_issue_edited_event(runtime, state),
         "handle_closed_event": lambda state: lifecycle_module.handle_closed_event(runtime, state),
         "handle_pull_request_target_synchronize": lambda state: lifecycle_module.handle_pull_request_target_synchronize(runtime, state),
-        "handle_pull_request_review_event": lambda state: lifecycle_module.handle_pull_request_review_event(runtime, state),
+        "handle_pull_request_review_event": lambda state: events_module.handle_pull_request_review_event(runtime, state),
         "handle_comment_event": lambda state: comment_routing_module.handle_comment_event(runtime, state),
         "handle_manual_dispatch": lambda state: maintenance_module.handle_manual_dispatch(runtime, state),
         "handle_scheduled_check": lambda state: maintenance_module.handle_scheduled_check(runtime, state),

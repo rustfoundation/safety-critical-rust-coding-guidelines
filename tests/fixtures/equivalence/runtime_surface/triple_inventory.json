@@ -24,6 +24,13 @@
       "classification": "retained final surface"
     },
     {
+      "capability": "pull-request-review dispatch",
+      "runtime_forwarder": null,
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_pull_request_review_event",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:handle_pull_request_review_event",
+      "classification": "retained final surface"
+    },
+    {
       "capability": "github issue snapshot access",
       "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:github_api",
       "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapGitHubServices.get_issue_or_pr_snapshot",

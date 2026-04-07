@@ -189,25 +189,48 @@ def test_h2b_mandatory_approver_policy_matches_legacy_decision_rows():
             ) == _legacy_satisfaction_decision(review_data, approver=str(kwargs["approver"]), now=now)
 
 
-def test_h2b_reviews_module_delegates_mandatory_approver_decisions_to_policy_owner():
-    reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
-    policy_text = Path("scripts/reviewer_bot_core/mandatory_approver_policy.py").read_text(encoding="utf-8")
+def test_h2b_mandatory_approver_execution_support_uses_core_decision_and_retains_side_effects(monkeypatch):
+    state = make_state()
+    make_tracked_review_state(state, 42, reviewer="alice")
+    bot, comments, labels_added, _ = _make_bot()
+    decision_inputs = {}
 
-    assert "mandatory_approver_policy.decide_mandatory_approver_escalation(" in reviews_text
-    assert "mandatory_approver_policy.decide_mandatory_approver_satisfaction(" in reviews_text
-    assert "def trigger_mandatory_approver_escalation(" in reviews_text
-    assert "def satisfy_mandatory_approver_requirement(" in reviews_text
-    assert "bot.github.post_comment(" in reviews_text
-    assert "bot.add_label_with_status(" in reviews_text
-    assert "bot.remove_label_with_status(" in reviews_text
-    assert "def decide_mandatory_approver_escalation(" in policy_text
-    assert "def decide_mandatory_approver_satisfaction(" in policy_text
-    assert "bot.github.post_comment(" not in policy_text
-    assert "bot.add_label_with_status(" not in policy_text
-    assert "bot.remove_label_with_status(" not in policy_text
+    monkeypatch.setattr(reviews, "_now_iso", lambda: "2026-03-21T12:00:00+00:00")
+    monkeypatch.setattr(
+        mandatory_approver_policy,
+        "decide_mandatory_approver_escalation",
+        lambda review_data, *, now, label_exists: decision_inputs.update(
+            {
+                "current_required": review_data.get("mandatory_approver_required"),
+                "now": now,
+                "label_exists": label_exists,
+            }
+        )
+        or {
+            "allow": True,
+            "require_escalation": True,
+            "clear_satisfaction": True,
+            "attempt_label_apply": True,
+            "record_label_applied_at": True,
+            "post_ping": True,
+            "now": now,
+        },
+    )
+
+    changed = reviews.trigger_mandatory_approver_escalation(bot, state, 42)
+
+    assert changed is True
+    assert decision_inputs == {
+        "current_required": False,
+        "now": "2026-03-21T12:00:00+00:00",
+        "label_exists": True,
+    }
+    assert labels_added == [(42, reviews.MANDATORY_TRIAGE_APPROVER_LABEL)]
+    assert comments == [(42, reviews.MANDATORY_TRIAGE_ESCALATION_TEMPLATE)]
 
 
 def test_h2c_handle_pr_approved_review_has_zero_external_callers():
+    reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
     callers = []
 
     for path in Path("scripts").rglob("*.py"):
@@ -218,3 +241,4 @@ def test_h2c_handle_pr_approved_review_has_zero_external_callers():
             callers.append(path.as_posix())
 
     assert callers == []
+    assert "def handle_pr_approved_review(" not in reviews_text

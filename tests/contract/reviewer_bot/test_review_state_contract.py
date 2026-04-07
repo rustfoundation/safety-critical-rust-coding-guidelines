@@ -255,6 +255,30 @@ def test_production_modules_do_not_import_mutable_review_state_api_from_reviews_
         assert f"bot.{name}(" not in reviews_text
 
 
+def test_production_modules_use_review_state_as_live_repair_bridge_home():
+    review_state_text = _read("scripts/reviewer_bot_lib/review_state.py")
+    maintenance_text = _read("scripts/reviewer_bot_lib/maintenance.py")
+    reconcile_text = _read("scripts/reviewer_bot_lib/reconcile.py")
+    sweeper_text = _read("scripts/reviewer_bot_lib/sweeper.py")
+    reviews_text = _read("scripts/reviewer_bot_lib/reviews.py")
+
+    for name in [
+        "accept_reviewer_review_from_live_review",
+        "refresh_reviewer_review_from_live_preferred_review",
+        "repair_missing_reviewer_review_state",
+    ]:
+        assert f"def {name}(" in review_state_text
+        assert f"def {name}(" not in reviews_text
+
+    assert "repair_missing_reviewer_review_state," in maintenance_text
+    assert "refresh_reviewer_review_from_live_preferred_review," in reconcile_text
+    assert "accept_reviewer_review_from_live_review," in sweeper_text
+    assert "refresh_reviewer_review_from_live_preferred_review," in sweeper_text
+    assert "from .reviews import refresh_reviewer_review_from_live_preferred_review" not in reconcile_text
+    assert "from .reviews import accept_reviewer_review_from_live_review" not in sweeper_text
+    assert "from .reviews import refresh_reviewer_review_from_live_preferred_review" not in sweeper_text
+
+
 def test_runtime_and_bootstrap_forwarders_are_explicit_adapter_compatibility_surface_only():
     runtime_text = _read("scripts/reviewer_bot_lib/runtime.py")
     bootstrap_text = _read("scripts/reviewer_bot_lib/bootstrap_runtime.py")

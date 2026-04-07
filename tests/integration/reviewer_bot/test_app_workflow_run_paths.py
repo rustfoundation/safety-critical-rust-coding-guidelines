@@ -51,9 +51,25 @@ def test_execute_run_same_repo_review_does_not_acquire_lock(monkeypatch):
 
     assert acquire_called["value"] is False
 
-def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
+@pytest.mark.parametrize(
+    ("workflow_run_event", "workflow_run_event_action"),
+    [
+        ("issue_comment", "created"),
+        ("pull_request_review", "submitted"),
+        ("pull_request_review", "dismissed"),
+        ("pull_request_review_comment", "created"),
+    ],
+)
+def test_execute_run_supported_workflow_run_source_action_pairs_acquire_lock(
+    monkeypatch, workflow_run_event, workflow_run_event_action
+):
     harness = AppHarness(monkeypatch)
-    harness.set_event(EVENT_NAME="workflow_run", EVENT_ACTION="completed", WORKFLOW_RUN_EVENT="pull_request_review")
+    harness.set_event(
+        EVENT_NAME="workflow_run",
+        EVENT_ACTION="completed",
+        WORKFLOW_RUN_EVENT=workflow_run_event,
+        WORKFLOW_RUN_EVENT_ACTION=workflow_run_event_action,
+    )
 
     acquire_called = {"value": False}
 
@@ -84,38 +100,35 @@ def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
     assert acquire_called["value"] is True
     assert result.exit_code == 0
 
-def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeypatch):
+
+def test_execute_run_unsupported_workflow_run_source_action_pair_stays_read_only(monkeypatch):
     harness = AppHarness(monkeypatch)
-    harness.set_event(EVENT_NAME="workflow_run", EVENT_ACTION="completed", WORKFLOW_RUN_EVENT="pull_request_review_comment")
+    harness.set_event(
+        EVENT_NAME="workflow_run",
+        EVENT_ACTION="completed",
+        WORKFLOW_RUN_EVENT="pull_request_review",
+        WORKFLOW_RUN_EVENT_ACTION="edited",
+    )
 
     acquire_called = {"value": False}
 
-    def fake_acquire():
+    def fail_if_called():
         acquire_called["value"] = True
-        return LeaseContext(
-            lock_token="token",
-            lock_owner_run_id="run",
-            lock_owner_workflow="workflow",
-            lock_owner_job="job",
-            state_issue_url="https://example.com/issues/314",
-            lock_ref="refs/heads/reviewer-bot-state-lock",
-            lock_expires_at="2999-01-01T00:00:00+00:00",
-        )
+        raise AssertionError("unsupported workflow_run source-action pairs must stay read-only")
 
-    harness.stub_lock(acquire=fake_acquire, release=lambda: True)
+    harness.stub_lock(acquire=fail_if_called)
     harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
-    harness.stub_pass_until(lambda state: (state, []))
-    harness.stub_sync_members(lambda state: (state, []))
     monkeypatch.setattr(
         reconcile,
         "handle_workflow_run_event_result",
-        lambda bot, state: reconcile.WorkflowRunHandlerResult(False, [], False, None, False, False),
+        lambda bot, state: pytest.fail("unsupported workflow_run source-action pairs must not reach reconcile"),
     )
 
     result = harness.run_execute()
 
-    assert acquire_called["value"] is True
+    assert acquire_called["value"] is False
     assert result.exit_code == 0
+    assert result.state_changed is False
 
 
 def test_d4a_phase_map_records_workflow_run_and_non_mutating_branches_explicitly():

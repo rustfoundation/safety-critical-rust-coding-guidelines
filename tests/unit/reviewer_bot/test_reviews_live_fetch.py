@@ -1,6 +1,6 @@
-from pathlib import Path
 from types import SimpleNamespace
 
+from scripts.reviewer_bot_core import approval_policy
 from scripts.reviewer_bot_lib import review_state, reviews
 from scripts.reviewer_bot_lib.config import (
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
@@ -44,18 +44,6 @@ def test_project_status_labels_uses_live_current_reviewer_review_when_channel_st
 
     assert desired_labels == {STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}
     assert metadata["reason"] == "completion_missing"
-
-
-def test_l1_reviews_module_uses_explicit_runtime_collaborators_instead_of_canonical_fallback_markers():
-    reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
-    runtime_text = Path("scripts/reviewer_bot_lib/runtime.py").read_text(encoding="utf-8")
-
-    assert "_mark_canonical" not in reviews_text
-    assert "_is_canonical_callable" not in reviews_text
-    assert "bot.get_pull_request_reviews(issue_number)" in reviews_text
-    assert "bot.rebuild_pr_approval_state(" in reviews_text
-    assert "def get_pull_request_reviews(" in runtime_text
-    assert "def rebuild_pr_approval_state(" in runtime_text
 
 
 def test_compute_reviewer_response_state_refreshes_stale_stored_review_from_live_current_head(monkeypatch):
@@ -334,26 +322,6 @@ def test_compute_reviewer_response_state_reports_permission_unavailable(monkeypa
     assert response_state["reason"] == "live_review_state_unknown"
 
 
-def test_live_read_review_mutation_public_surfaces_delegate_to_core_owner():
-    review_state_text = Path("scripts/reviewer_bot_lib/review_state.py").read_text(encoding="utf-8")
-    machine_text = Path("scripts/reviewer_bot_core/review_state_machine.py").read_text(encoding="utf-8")
-    live_repair_text = Path("scripts/reviewer_bot_core/review_state_live_repair.py").read_text(encoding="utf-8")
-    reviews_text = Path("scripts/reviewer_bot_lib/reviews.py").read_text(encoding="utf-8")
-
-    assert "return review_state_live_repair.accept_reviewer_review_from_live_review(" in review_state_text
-    assert "return review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(" in review_state_text
-    assert "return review_state_live_repair.repair_missing_reviewer_review_state(" in review_state_text
-    assert "return review_state_live_repair.accept_reviewer_review_from_live_review(" in machine_text
-    assert "return review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(" in machine_text
-    assert "return review_state_live_repair.repair_missing_reviewer_review_state(" in machine_text
-    assert "def accept_reviewer_review_from_live_review(" in live_repair_text
-    assert "def refresh_reviewer_review_from_live_preferred_review(" in live_repair_text
-    assert "def repair_missing_reviewer_review_state(" in live_repair_text
-    assert "return review_state_machine.accept_reviewer_review_from_live_review(" in reviews_text
-    assert "return review_state_machine.refresh_reviewer_review_from_live_preferred_review(" in reviews_text
-    assert "return review_state_machine.repair_missing_reviewer_review_state(" in reviews_text
-
-
 def test_trigger_mandatory_approver_escalation_sets_required_label_and_ping(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="alice")
@@ -377,6 +345,28 @@ def test_trigger_mandatory_approver_escalation_sets_required_label_and_ping(monk
     assert review["mandatory_approver_pinged_at"] == "2026-03-21T10:00:00+00:00"
     assert labels == [(42, reviews.MANDATORY_TRIAGE_APPROVER_LABEL)]
     assert comments == [(42, reviews.MANDATORY_TRIAGE_ESCALATION_TEMPLATE)]
+
+
+def test_rebuild_pr_approval_state_applies_core_result_as_retained_execution_support(monkeypatch):
+    state = make_state()
+    review = make_tracked_review_state(state, 42, reviewer="alice")
+    monkeypatch.setattr(
+        approval_policy,
+        "compute_pr_approval_state_result",
+        lambda bot, issue_number, review_data, **kwargs: {
+            "ok": True,
+            "completion": {"completed": True},
+            "write_approval": {"has_write_approval": True},
+            "current_head_sha": "head-1",
+        },
+    )
+
+    completion, write_approval = reviews.rebuild_pr_approval_state(SimpleNamespace(), 42, review)
+
+    assert completion == {"completed": True}
+    assert write_approval == {"has_write_approval": True}
+    assert review["active_head_sha"] == "head-1"
+    assert review["review_completion_source"] == "live_review_rebuild"
 
 
 def test_satisfy_mandatory_approver_requirement_clears_required_and_records_satisfaction(monkeypatch):

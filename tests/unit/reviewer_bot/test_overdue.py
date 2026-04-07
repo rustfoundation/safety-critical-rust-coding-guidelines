@@ -46,6 +46,33 @@ def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkey
     assert maintenance.check_overdue_reviews(runtime, state) == []
 
 
+def test_check_overdue_reviews_consumes_only_stable_reviewer_response_fields(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    now = runtime.datetime.now(runtime.timezone.utc)
+    anchor_timestamp = iso_z(now - timedelta(days=runtime.REVIEW_DEADLINE_DAYS + 1))
+    state = make_state()
+    make_tracked_review_state(state, 42, reviewer="alice", assigned_at=anchor_timestamp, active_cycle_started_at=anchor_timestamp)
+    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.adapters.review_state.compute_reviewer_response_state = lambda issue_number, review_data, **kwargs: {
+        "state": "awaiting_reviewer_response",
+        "anchor_timestamp": anchor_timestamp,
+        "ignored": {"reviewer_review": "not consumed"},
+    }
+
+    overdue = maintenance.check_overdue_reviews(runtime, state)
+
+    assert overdue == [
+        {
+            "issue_number": 42,
+            "reviewer": "alice",
+            "days_overdue": 1,
+            "days_since_warning": 0,
+            "needs_warning": True,
+            "needs_transition": False,
+        }
+    ]
+
+
 def test_check_overdue_reviews_skips_item_when_snapshot_unavailable(monkeypatch):
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)

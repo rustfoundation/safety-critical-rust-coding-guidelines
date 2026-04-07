@@ -334,6 +334,25 @@ def expected_observer_identity(payload: dict) -> tuple[str, str]:
     raise RuntimeError("Unsupported deferred workflow identity")
 
 
+def validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
+    expected_name, expected_file = expected_observer_identity(payload)
+    if payload.get("source_workflow_name") != expected_name:
+        raise RuntimeError("Deferred artifact workflow name mismatch")
+    if payload.get("source_workflow_file") != expected_file:
+        raise RuntimeError("Deferred artifact workflow file mismatch")
+    triggering_name = bot.get_config_value("WORKFLOW_RUN_TRIGGERING_NAME").strip()
+    if triggering_name and triggering_name != expected_name:
+        raise RuntimeError("Triggering workflow name mismatch")
+    triggering_id = bot.get_config_value("WORKFLOW_RUN_TRIGGERING_ID").strip()
+    if triggering_id and str(payload.get("source_run_id")) != triggering_id:
+        raise RuntimeError("Deferred artifact run_id mismatch")
+    triggering_attempt = bot.get_config_value("WORKFLOW_RUN_TRIGGERING_ATTEMPT").strip()
+    if triggering_attempt and str(payload.get("source_run_attempt")) != triggering_attempt:
+        raise RuntimeError("Deferred artifact run_attempt mismatch")
+    if bot.get_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION").strip() != "success":
+        raise RuntimeError("Triggering observer workflow did not conclude successfully")
+
+
 def artifact_expected_name(payload: dict) -> str:
     event_name = payload.get("source_event_name")
     event_action = payload.get("source_event_action")

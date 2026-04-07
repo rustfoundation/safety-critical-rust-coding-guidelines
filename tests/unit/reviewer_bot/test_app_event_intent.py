@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.reviewer_bot_lib import app
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 
@@ -45,20 +47,43 @@ def test_classify_event_intent_review_comment_is_non_mutating_defer(monkeypatch)
     assert intent == runtime.EVENT_INTENT_NON_MUTATING_DEFER
 
 
-def test_classify_event_intent_workflow_run_dismissed_review_is_mutating(monkeypatch):
+@pytest.mark.parametrize(
+    ("workflow_run_event", "workflow_run_event_action"),
+    [
+        ("pull_request_review", "submitted"),
+        ("pull_request_review", "dismissed"),
+        ("issue_comment", "created"),
+        ("pull_request_review_comment", "created"),
+    ],
+)
+def test_classify_event_intent_supported_workflow_run_source_action_pairs_are_mutating(
+    monkeypatch, workflow_run_event, workflow_run_event_action
+):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.set_config_value("WORKFLOW_RUN_EVENT", "pull_request_review")
-    runtime.set_config_value("WORKFLOW_RUN_EVENT_ACTION", "dismissed")
+    runtime.set_config_value("WORKFLOW_RUN_EVENT", workflow_run_event)
+    runtime.set_config_value("WORKFLOW_RUN_EVENT_ACTION", workflow_run_event_action)
     intent = app.classify_event_intent(runtime, "workflow_run", "completed")
     assert intent == runtime.EVENT_INTENT_MUTATING
 
 
-def test_classify_event_intent_treats_supported_workflow_run_sources_as_mutating(monkeypatch):
+@pytest.mark.parametrize(
+    ("workflow_run_event", "workflow_run_event_action"),
+    [
+        ("pull_request_review", "edited"),
+        ("issue_comment", "deleted"),
+        ("pull_request_review_comment", "edited"),
+        ("pull_request_review", ""),
+        ("workflow_dispatch", "completed"),
+    ],
+)
+def test_classify_event_intent_unsupported_workflow_run_source_action_pairs_are_read_only(
+    monkeypatch, workflow_run_event, workflow_run_event_action
+):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.set_config_value("WORKFLOW_RUN_EVENT", "issue_comment")
-    assert app.classify_event_intent(runtime, "workflow_run", "completed") == runtime.EVENT_INTENT_MUTATING
-    runtime.set_config_value("WORKFLOW_RUN_EVENT", "pull_request_review_comment")
-    assert app.classify_event_intent(runtime, "workflow_run", "completed") == runtime.EVENT_INTENT_MUTATING
+    runtime.set_config_value("WORKFLOW_RUN_EVENT", workflow_run_event)
+    runtime.set_config_value("WORKFLOW_RUN_EVENT_ACTION", workflow_run_event_action)
+
+    assert app.classify_event_intent(runtime, "workflow_run", "completed") == runtime.EVENT_INTENT_NON_MUTATING_READONLY
 
 
 def test_d4a_transaction_phase_map_fixture_exists_and_lists_all_required_phases():
@@ -80,11 +105,3 @@ def test_d4a_transaction_phase_map_fixture_exists_and_lists_all_required_phases(
         "projection failure repair marker persistence",
         "lock release",
     ]
-
-
-def test_d4b_app_event_intent_classification_remains_explicit_transaction_orchestration():
-    app_text = Path("scripts/reviewer_bot_lib/app.py").read_text(encoding="utf-8")
-
-    assert "def _classify_event_intent_from_context(" in app_text
-    assert "if event_name == \"issue_comment\":" in app_text
-    assert "if event_name == \"workflow_run\":" in app_text

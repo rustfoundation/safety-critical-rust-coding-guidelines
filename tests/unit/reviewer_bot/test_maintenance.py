@@ -108,6 +108,48 @@ def test_record_maintenance_repair_marker_ignores_recorded_at_for_identical_fail
     assert review["repair_needed"]["recorded_at"] == "2026-03-01T00:00:00Z"
 
 
+def test_tracked_pr_repair_pass_collects_touched_items_and_clears_review_repair_marker(monkeypatch):
+    state = make_state()
+    review = review_state.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["repair_needed"] = {
+        "kind": "live_read_failure",
+        "phase": "review_repair",
+        "reason": "stale",
+        "failure_kind": None,
+        "recorded_at": "2026-03-01T00:00:00Z",
+    }
+    bot = FakeReviewerBotRuntime(monkeypatch)
+    bot.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
+    monkeypatch.setattr(maintenance, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data: True)
+    monkeypatch.setattr(
+        maintenance,
+        "maybe_record_head_observation_repair",
+        lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(changed=False, outcome="unchanged"),
+    )
+
+    assert maintenance._run_tracked_pr_repairs(bot, state) is True
+    assert bot.drain_touched_items() == [42]
+    assert review["repair_needed"] is None
+
+
+def test_finalize_schedule_result_drains_touched_items_for_projection_followup(monkeypatch):
+    bot = FakeReviewerBotRuntime(monkeypatch)
+    bot.collect_touched_item(42)
+    bot.collect_touched_item(99)
+
+    result = maintenance._finalize_schedule_result(bot, True)
+
+    assert result == maintenance.ScheduleHandlerResult(
+        state_changed=True,
+        touched_items=[42, 99],
+        projection_followup_needed=True,
+        projection_failure_message=None,
+    )
+    assert bot.drain_touched_items() == []
+
+
 def test_scheduled_check_clears_head_observation_repair_marker_after_success(monkeypatch):
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)

@@ -331,6 +331,34 @@ def _legacy_contributor_revision_handoff_record(review_data: dict, current_head:
     return contributor_revision
 
 
+def test_reviewer_response_derivation_supports_pure_inputs_without_live_reads():
+    state = make_state()
+    review = make_tracked_review_state(state, 42, reviewer="alice", active_cycle_started_at="2026-03-17T09:00:00Z")
+    accept_reviewer_review(
+        review,
+        semantic_key="pull_request_review:10",
+        timestamp="2026-03-17T10:01:00Z",
+        actor="alice",
+        reviewed_head_sha="head-1",
+        source_precedence=1,
+    )
+
+    result = reviewer_response_policy.derive_reviewer_response_state(
+        review,
+        issue_is_pull_request=True,
+        current_head="head-1",
+        approval_result={
+            "ok": True,
+            "completion": {"completed": False},
+            "write_approval": {"has_write_approval": False},
+        },
+    )
+
+    assert result["state"] == "awaiting_contributor_response"
+    assert result["reason"] == "completion_missing"
+    assert result["reviewer_review"]["semantic_key"] == "pull_request_review:10"
+
+
 def test_h1a_reviewer_response_scenario_matrix_matches_frozen_outputs(monkeypatch):
     matrix = _load_matrix()
 

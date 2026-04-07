@@ -482,6 +482,13 @@ def test_bootstrap_runtime_wires_explicit_adapter_services():
     assert hasattr(runtime.adapters.state_lock, "render_state_issue_body")
 
 
+def test_status_label_sync_contract_stays_on_workflow_adapter_surface():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert hasattr(runtime.adapters.workflow, "sync_status_labels_for_items")
+    assert hasattr(runtime, "list_open_items_with_status_labels") is False
+
+
 def _load_runtime_surface_inventory() -> dict:
     return json.loads(
         Path("tests/fixtures/equivalence/runtime_surface/triple_inventory.json").read_text(
@@ -512,6 +519,7 @@ def test_f2a_runtime_surface_inventory_fixture_records_retained_triples():
     capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
 
     assert capabilities["comment-event dispatch"]["classification"] == "retained final surface"
+    assert capabilities["pull-request-review dispatch"]["classification"] == "retained final surface"
     assert "workflow-run dispatch" not in capabilities
     assert "refresh reviewer review from live preferred review" not in capabilities
     assert "repair missing reviewer review state" not in capabilities
@@ -525,6 +533,9 @@ def test_f2a_runtime_surface_inventory_matches_bootstrap_adapter_examples():
 
     assert capabilities["comment-event dispatch"]["bootstrap_adapter"] == (
         "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_comment_event"
+    )
+    assert capabilities["pull-request-review dispatch"]["bootstrap_adapter"] == (
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_pull_request_review_event"
     )
     assert "workflow-run dispatch" not in capabilities
     assert capabilities["sync status labels"]["bootstrap_adapter"] == (

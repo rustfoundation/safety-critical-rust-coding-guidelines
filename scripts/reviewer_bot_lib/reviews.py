@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 from urllib.parse import quote
 
-from . import review_state
+from . import review_read_support, review_state
 from .config import (
     MANDATORY_TRIAGE_APPROVER_LABEL,
     MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
@@ -26,93 +26,11 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _projection_failure(reason: str, failure_kind: str | None = None) -> dict[str, object]:
-    return {"ok": False, "reason": reason, "failure_kind": failure_kind}
-
-
-def _fallback_pull_request_payload(bot, issue_number: int) -> dict[str, object]:
-    payload = bot.github_api("GET", f"pulls/{issue_number}")
-    if isinstance(payload, dict):
-        return {"ok": True, "pull_request": payload}
-    return _projection_failure("pull_request_unavailable")
-
-
-def _pull_request_read_result(bot, issue_number: int, pull_request: dict | None = None) -> dict[str, object]:
-    if pull_request is not None:
-        if isinstance(pull_request, dict):
-            return {"ok": True, "pull_request": pull_request}
-        return _projection_failure("pull_request_unavailable", "invalid_payload")
-    try:
-        response = bot.github_api_request("GET", f"pulls/{issue_number}", retry_policy="idempotent_read")
-    except SystemExit:
-        return _fallback_pull_request_payload(bot, issue_number)
-    if not response.ok:
-        if response.failure_kind == "not_found":
-            return _projection_failure("pull_request_not_found", response.failure_kind)
-        return _projection_failure("pull_request_unavailable", response.failure_kind)
-    if not isinstance(response.payload, dict):
-        return _projection_failure("pull_request_unavailable", "invalid_payload")
-    return {"ok": True, "pull_request": response.payload}
-
-
-def _fallback_pull_request_reviews_result(bot, issue_number: int) -> dict[str, object]:
-    fallback_reviews = bot.get_pull_request_reviews(issue_number)
-    if isinstance(fallback_reviews, list):
-        return {"ok": True, "reviews": fallback_reviews}
-
-    collected_reviews: list[dict] = []
-    page = 1
-    while True:
-        payload = bot.github_api("GET", f"pulls/{issue_number}/reviews?per_page=100&page={page}")
-        if not isinstance(payload, list):
-            return _projection_failure("reviews_unavailable")
-        page_reviews = [review for review in payload if isinstance(review, dict)]
-        collected_reviews.extend(page_reviews)
-        if len(payload) < 100:
-            return {"ok": True, "reviews": collected_reviews}
-        page += 1
-
-
-def get_pull_request_reviews_result(bot, issue_number: int, reviews: list[dict] | None = None) -> dict[str, object]:
-    if reviews is not None:
-        return {"ok": True, "reviews": reviews}
-    collected_reviews: list[dict] = []
-    page = 1
-    while True:
-        try:
-            response = bot.github_api_request(
-                "GET",
-                f"pulls/{issue_number}/reviews?per_page=100&page={page}",
-                retry_policy="idempotent_read",
-            )
-        except SystemExit:
-            return _fallback_pull_request_reviews_result(bot, issue_number)
-        if not response.ok:
-            return _projection_failure("reviews_unavailable", response.failure_kind)
-        payload = response.payload
-        if not isinstance(payload, list):
-            return _projection_failure("reviews_unavailable", "invalid_payload")
-        page_reviews = [review for review in payload if isinstance(review, dict)]
-        collected_reviews.extend(page_reviews)
-        if len(payload) < 100:
-            return {"ok": True, "reviews": collected_reviews}
-        page += 1
-
-
-def _permission_status(bot, username: str, permission: str) -> str:
-    status = bot.github.get_user_permission_status(username, permission)
-    if status not in {"granted", "denied", "unavailable"}:
-        return "unavailable"
-    return status
-
-
-def parse_github_timestamp(value: str | None) -> datetime | None:
-    if not isinstance(value, str) or not value:
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
+_projection_failure = review_read_support._projection_failure
+_pull_request_read_result = review_read_support._pull_request_read_result
+get_pull_request_reviews_result = review_read_support.get_pull_request_reviews_result
+_permission_status = review_read_support._permission_status
+parse_github_timestamp = review_read_support.parse_github_timestamp
 
 
 def get_latest_review_by_reviewer(bot, reviews: list[dict], reviewer: str) -> dict | None:
@@ -203,37 +121,6 @@ def build_reviewer_review_record_from_live_review(review: dict, *, actor: str | 
     )
 
 
-def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
-    from scripts.reviewer_bot_core import review_state_machine
-
-    return review_state_machine.accept_reviewer_review_from_live_review(
-        review_data,
-        review,
-        actor=actor,
-    )
-
-
-def refresh_reviewer_review_from_live_preferred_review(
-    bot,
-    issue_number: int,
-    review_data: dict,
-    *,
-    pull_request: dict | None = None,
-    reviews: list[dict] | None = None,
-    actor: str | None = None,
-) -> tuple[bool, dict | None]:
-    from scripts.reviewer_bot_core import review_state_machine
-
-    return review_state_machine.refresh_reviewer_review_from_live_preferred_review(
-        bot,
-        issue_number,
-        review_data,
-        pull_request=pull_request,
-        reviews=reviews,
-        actor=actor,
-    )
-
-
 def resolve_pr_approval_state(
     bot,
     issue_number: int,
@@ -271,17 +158,6 @@ def apply_pr_approval_state(
         review_data["review_completed_at"] = None
         review_data["review_completed_by"] = None
         review_data["review_completion_source"] = None
-
-
-def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
-    from scripts.reviewer_bot_core import review_state_machine
-
-    return review_state_machine.repair_missing_reviewer_review_state(
-        bot,
-        issue_number,
-        review_data,
-        reviews=reviews,
-    )
 
 
 def _compare_records(left: dict | None, right: dict | None) -> int:
@@ -588,27 +464,3 @@ def list_open_tracked_review_items(state: dict) -> list[int]:
         if issue_number > 0:
             numbers.add(issue_number)
     return sorted(numbers)
-
-
-def handle_pr_approved_review(bot, state: dict, issue_number: int, review_author: str, completion_source: str) -> bool:
-    review_data = review_state.ensure_review_entry(state, issue_number)
-    if review_data is None:
-        return False
-    current_reviewer = review_data.get("current_reviewer")
-    author_is_designated = isinstance(current_reviewer, str) and current_reviewer.lower() == review_author.lower()
-    author_is_triage = is_triage_or_higher(bot, review_author)
-    state_changed = False
-    if author_is_designated:
-        if review_state.mark_review_complete(state, issue_number, review_author, completion_source):
-            state_changed = True
-        if author_is_triage:
-            if satisfy_mandatory_approver_requirement(bot, state, issue_number, review_author):
-                state_changed = True
-            return state_changed
-        if trigger_mandatory_approver_escalation(bot, state, issue_number):
-            state_changed = True
-        return state_changed
-    if review_data.get("mandatory_approver_required") and author_is_triage:
-        if satisfy_mandatory_approver_requirement(bot, state, issue_number, review_author):
-            state_changed = True
-    return state_changed

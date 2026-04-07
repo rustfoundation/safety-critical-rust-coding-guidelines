@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from scripts.reviewer_bot_lib.reviews import parse_github_timestamp
+from scripts.reviewer_bot_lib.review_read_support import parse_github_timestamp
 
 from . import state_adapters
 

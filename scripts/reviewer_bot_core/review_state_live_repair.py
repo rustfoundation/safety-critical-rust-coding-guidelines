@@ -14,7 +14,7 @@ Old module no longer preferred for these live-read-assisted repair changes:
 
 from __future__ import annotations
 
-from scripts.reviewer_bot_lib import reviews as legacy_reviews
+from scripts.reviewer_bot_lib import review_read_support
 
 from . import review_state_machine, reviewer_review_helpers
 
@@ -45,7 +45,7 @@ def refresh_reviewer_review_from_live_preferred_review(
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
     if pull_request is None:
-        pull_request_result = legacy_reviews._pull_request_read_result(bot, issue_number)
+        pull_request_result = review_read_support._pull_request_read_result(bot, issue_number)
         if not pull_request_result.get("ok"):
             return False, None
         pull_request = pull_request_result["pull_request"]

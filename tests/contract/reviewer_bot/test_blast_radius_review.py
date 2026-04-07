@@ -247,21 +247,26 @@ def test_f3_blast_radius_review_matches_current_owner_locations():
     assert "legacy_reviews.get_preferred_current_reviewer_review_for_cycle(" not in reviewer_response_policy_text
     assert "legacy_reviews.build_reviewer_review_record_from_live_review(" not in reviewer_response_policy_text
     assert "legacy_reviews._compare_records(" not in reviewer_response_policy_text
+    assert "review_read_support._pull_request_read_result(" in reviewer_response_policy_text
+    assert "review_read_support.get_pull_request_reviews_result(" in reviewer_response_policy_text
     assert "reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(" in live_repair_text
     assert "reviewer_review_helpers.build_reviewer_review_record_from_live_review(" in live_repair_text
     assert "legacy_reviews.get_preferred_current_reviewer_review_for_cycle(" not in live_repair_text
     assert "legacy_reviews.build_reviewer_review_record_from_live_review(" not in live_repair_text
+    assert "review_read_support._pull_request_read_result(" in live_repair_text
     assert "mandatory_approver_policy.decide_mandatory_approver_escalation(" in reviews_text
     assert "mandatory_approver_policy.decide_mandatory_approver_satisfaction(" in reviews_text
     assert "def trigger_mandatory_approver_escalation(" in reviews_text
     assert "def satisfy_mandatory_approver_requirement(" in reviews_text
+    assert "def refresh_reviewer_review_from_live_preferred_review(" not in reviews_text
+    assert "def repair_missing_reviewer_review_state(" not in reviews_text
     assert "def decide_mandatory_approver_escalation(" in mandatory_approver_policy_text
     assert "def decide_mandatory_approver_satisfaction(" in mandatory_approver_policy_text
-    assert "legacy_reviews._projection_failure(" in approval_policy_text
-    assert "legacy_reviews._pull_request_read_result(" in approval_policy_text
-    assert "legacy_reviews.get_pull_request_reviews_result(" in approval_policy_text
-    assert "legacy_reviews._permission_status(" in approval_policy_text
-    assert "legacy_reviews.parse_github_timestamp" in approval_policy_text
+    assert "review_read_support._projection_failure(" in approval_policy_text
+    assert "review_read_support._pull_request_read_result(" in approval_policy_text
+    assert "review_read_support.get_pull_request_reviews_result(" in approval_policy_text
+    assert "review_read_support._permission_status(" in approval_policy_text
+    assert "review_read_support.parse_github_timestamp" in approval_policy_text
     assert "def get_preferred_current_reviewer_review_for_cycle(" in helper_text
     assert "def build_reviewer_review_record_from_live_review(" in helper_text
     assert "def compare_records(" in helper_text

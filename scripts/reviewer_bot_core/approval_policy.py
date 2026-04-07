@@ -16,6 +16,8 @@ Old module no longer preferred for these derivation changes:
 
 from __future__ import annotations
 
+from scripts.reviewer_bot_lib import review_read_support
+
 
 def compute_pr_approval_state_result(
     bot,
@@ -26,7 +28,6 @@ def compute_pr_approval_state_result(
     reviews: list[dict] | None = None,
 ) -> dict[str, object]:
     from scripts.reviewer_bot_core import review_state_machine
-    from scripts.reviewer_bot_lib import reviews as legacy_reviews
     from scripts.reviewer_bot_lib.reviews_projection import (
         collect_permission_statuses,
         compute_pr_approval_state_from_reviews,
@@ -36,23 +37,23 @@ def compute_pr_approval_state_result(
 
     boundary = review_state_machine.get_current_cycle_boundary(bot, review_data)
     if boundary is None:
-        return legacy_reviews._projection_failure("pull_request_unavailable")
-    pull_request_result = legacy_reviews._pull_request_read_result(bot, issue_number, pull_request)
+        return review_read_support._projection_failure("pull_request_unavailable")
+    pull_request_result = review_read_support._pull_request_read_result(bot, issue_number, pull_request)
     if not pull_request_result.get("ok"):
         return pull_request_result
     pull_request = pull_request_result["pull_request"]
     head = pull_request.get("head")
     current_head = head.get("sha") if isinstance(head, dict) else None
     if not isinstance(current_head, str) or not current_head.strip():
-        return legacy_reviews._projection_failure("pull_request_head_unavailable", "invalid_payload")
-    reviews_result = legacy_reviews.get_pull_request_reviews_result(bot, issue_number, reviews)
+        return review_read_support._projection_failure("pull_request_head_unavailable", "invalid_payload")
+    reviews_result = review_read_support.get_pull_request_reviews_result(bot, issue_number, reviews)
     if not reviews_result.get("ok"):
         return reviews_result
     reviews = reviews_result["reviews"]
 
     normalized_reviews = normalize_reviews_with_parsed_timestamps(
         reviews,
-        parse_timestamp=legacy_reviews.parse_github_timestamp,
+        parse_timestamp=review_read_support.parse_github_timestamp,
     )
     survivors = filter_current_head_reviews_for_cycle(
         normalized_reviews,
@@ -61,7 +62,7 @@ def compute_pr_approval_state_result(
     )
     permission_cache = collect_permission_statuses(
         survivors,
-        permission_status=lambda author: legacy_reviews._permission_status(bot, author, "push"),
+        permission_status=lambda author: review_read_support._permission_status(bot, author, "push"),
     )
     result = compute_pr_approval_state_from_reviews(
         survivors,
@@ -69,7 +70,7 @@ def compute_pr_approval_state_result(
         permission_statuses=permission_cache,
     )
     if not result.get("ok"):
-        return legacy_reviews._projection_failure(str(result.get("reason")))
+        return review_read_support._projection_failure(str(result.get("reason")))
     return result
 
 
