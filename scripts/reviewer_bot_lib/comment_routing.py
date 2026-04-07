@@ -12,7 +12,11 @@ from .comment_application import (
     normalize_comment_body,
     process_comment_event,
 )
-from .context import CommentEventRequest, PrCommentTrustContext
+from .context import (
+    CommentEventRequest,
+    CommentRoutingRuntimeContext,
+    PrCommentTrustContext,
+)
 from .event_inputs import (
     build_comment_event_request as decode_comment_event_request,
 )
@@ -21,7 +25,7 @@ from .event_inputs import (
 )
 
 
-def _log(bot, level: str, message: str, **fields) -> None:
+def _log(bot: CommentRoutingRuntimeContext, level: str, message: str, **fields) -> None:
     bot.logger.event(level, message, **fields)
 
 
@@ -37,23 +41,23 @@ def _runtime_epoch(state: dict) -> str:
     return str(state.get("freshness_runtime_epoch", "")).strip() or "legacy_v14"
 
 
-def build_comment_event_request(bot, *, issue_number: int | None = None) -> CommentEventRequest:
+def build_comment_event_request(bot: CommentRoutingRuntimeContext, *, issue_number: int | None = None) -> CommentEventRequest:
     return decode_comment_event_request(bot, issue_number=issue_number)
 
 
-def build_pr_comment_trust_context(bot) -> PrCommentTrustContext:
+def build_pr_comment_trust_context(bot: CommentRoutingRuntimeContext) -> PrCommentTrustContext:
     return decode_pr_comment_trust_context(bot)
 
 
-def _resolve_comment_request(bot, request: CommentEventRequest | None, *, issue_number: int | None = None) -> CommentEventRequest:
+def _resolve_comment_request(bot: CommentRoutingRuntimeContext, request: CommentEventRequest | None, *, issue_number: int | None = None) -> CommentEventRequest:
     return request or build_comment_event_request(bot, issue_number=issue_number)
 
 
-def _resolve_trust_context(bot, trust_context: PrCommentTrustContext | None) -> PrCommentTrustContext:
+def _resolve_trust_context(bot: CommentRoutingRuntimeContext, trust_context: PrCommentTrustContext | None) -> PrCommentTrustContext:
     return trust_context or build_pr_comment_trust_context(bot)
 
 
-def _require_v18_for_pr(bot, state: dict, request: CommentEventRequest, context: str) -> bool:
+def _require_v18_for_pr(bot: CommentRoutingRuntimeContext, state: dict, request: CommentEventRequest, context: str) -> bool:
     if not request.is_pull_request:
         return True
     epoch = _runtime_epoch(state)
@@ -81,11 +85,11 @@ def _digest_body(body: str) -> str:
     return digest_comment_body(body)
 
 
-def _comment_line_is_command(bot, line: str) -> bool:
+def _comment_line_is_command(bot: CommentRoutingRuntimeContext, line: str) -> bool:
     return comment_routing_policy.comment_line_is_command(bot.BOT_MENTION, line)
 
 
-def classify_comment_payload(bot, body: str) -> dict:
+def classify_comment_payload(bot: CommentRoutingRuntimeContext, body: str) -> dict:
     normalized = _normalize_comment_body(bot.adapters.commands.strip_code_blocks(body))
     parsed = bot.adapters.commands.parse_command(normalized)
     return comment_routing_policy.classify_comment_payload(bot.BOT_MENTION, normalized, parsed)
@@ -101,11 +105,11 @@ def classify_issue_comment_actor(request: CommentEventRequest | None = None) -> 
     return _classify_issue_comment_actor(request)
 
 
-def _is_self_comment(bot, author: str) -> bool:
+def _is_self_comment(bot: CommentRoutingRuntimeContext, author: str) -> bool:
     return author.strip().lower() == bot.BOT_NAME.lower() or author.strip().lower() == bot.BOT_MENTION.lstrip("@").lower()
 
 
-def _fetch_pr_metadata(bot, issue_number: int) -> dict:
+def _fetch_pr_metadata(bot: CommentRoutingRuntimeContext, issue_number: int) -> dict:
     pull_request = bot.github_api("GET", f"pulls/{issue_number}")
     if not isinstance(pull_request, dict):
         raise RuntimeError(f"Failed to fetch live PR metadata for #{issue_number}")
@@ -115,7 +119,7 @@ def _fetch_pr_metadata(bot, issue_number: int) -> dict:
 
 
 def _classify_pr_comment_processing_target(
-    bot,
+    bot: CommentRoutingRuntimeContext,
     request: CommentEventRequest,
     trust_context: PrCommentTrustContext,
 ) -> str:
@@ -136,7 +140,7 @@ def _classify_pr_comment_processing_target(
 
 
 def classify_pr_comment_processing_target(
-    bot,
+    bot: CommentRoutingRuntimeContext,
     issue_number: int,
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
@@ -150,7 +154,7 @@ def classify_pr_comment_processing_target(
 
 
 def _route_issue_comment_trust(
-    bot,
+    bot: CommentRoutingRuntimeContext,
     request: CommentEventRequest,
     trust_context: PrCommentTrustContext,
 ) -> str:
@@ -165,7 +169,7 @@ def _route_issue_comment_trust(
 
 
 def route_issue_comment_trust(
-    bot,
+    bot: CommentRoutingRuntimeContext,
     issue_number: int,
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
@@ -179,7 +183,7 @@ def route_issue_comment_trust(
 
 
 def _build_pr_comment_observer_payload(
-    bot,
+    bot: CommentRoutingRuntimeContext,
     request: CommentEventRequest,
     trust_context: PrCommentTrustContext,
 ) -> dict:
@@ -200,7 +204,7 @@ def _build_pr_comment_observer_payload(
 
 
 def build_pr_comment_observer_payload(
-    bot,
+    bot: CommentRoutingRuntimeContext,
     issue_number: int,
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,
@@ -213,7 +217,7 @@ def build_pr_comment_observer_payload(
     )
 
 
-def _process_comment_event(bot, state: dict, request: CommentEventRequest) -> bool:
+def _process_comment_event(bot: CommentRoutingRuntimeContext, state: dict, request: CommentEventRequest) -> bool:
     return process_comment_event(
         bot,
         state,
@@ -224,7 +228,7 @@ def _process_comment_event(bot, state: dict, request: CommentEventRequest) -> bo
 
 
 def handle_comment_event(
-    bot,
+    bot: CommentRoutingRuntimeContext,
     state: dict,
     request: CommentEventRequest | None = None,
     trust_context: PrCommentTrustContext | None = None,

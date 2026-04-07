@@ -272,3 +272,11 @@ def test_f1c_deleted_legacy_derivation_paths_are_no_longer_imported_by_unit_test
 
     assert "reviews.compute_pr_approval_state_result(" not in projection_text
     assert "approval_policy.compute_pr_approval_state_result(" in projection_text
+
+
+def test_g1_approval_policy_owns_cycle_boundary_without_review_state_wrapper_dependency():
+    approval_policy_text = Path("scripts/reviewer_bot_core/approval_policy.py").read_text(encoding="utf-8")
+
+    assert "from scripts.reviewer_bot_lib import review_state" not in approval_policy_text
+    assert "review_state.get_current_cycle_boundary" not in approval_policy_text
+    assert "review_state_machine.get_current_cycle_boundary" in approval_policy_text

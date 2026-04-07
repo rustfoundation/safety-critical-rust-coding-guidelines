@@ -188,3 +188,26 @@ def test_approval_policy_classification_table_marks_projection_helpers_as_remain
         "- `desired_labels_from_response_state`",
     ]:
         assert line in table
+
+
+def test_h1a_reviewer_response_matrix_fixture_exists_and_stays_reviewer_response_only():
+    matrix = json.loads(
+        Path("tests/fixtures/equivalence/reviewer_response/scenario_matrix.json").read_text(encoding="utf-8")
+    )
+
+    assert matrix["harness_id"] == "H1a reviewer-response derivation equivalence"
+    assert matrix["owner"] == "scripts.reviewer_bot_lib.reviews.compute_reviewer_response_state"
+    assert matrix["out_of_scope"] == [
+        "mandatory approver escalation",
+        "label writes",
+    ]
+    assert [scenario["id"] for scenario in matrix["scenarios"]] == [
+        "awaiting_reviewer_response_no_reviewer_activity",
+        "awaiting_reviewer_response_review_head_stale",
+        "awaiting_reviewer_response_contributor_revision_newer",
+        "awaiting_contributor_response_completion_missing",
+        "awaiting_write_approval_write_approval_missing",
+        "projection_failed_pull_request_unavailable",
+        "projection_failed_pull_request_head_unavailable",
+        "projection_failed_live_review_state_unknown",
+    ]

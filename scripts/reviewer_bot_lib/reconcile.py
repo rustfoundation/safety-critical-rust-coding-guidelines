@@ -14,7 +14,11 @@ from .comment_application import (
     record_conversation_freshness,
 )
 from .comment_routing import classify_comment_payload, classify_issue_comment_actor
-from .context import CommentEventRequest
+from .context import (
+    CommentEventRequest,
+    ReconcileRectifyRuntimeContext,
+    ReconcileWorkflowRuntimeContext,
+)
 from .reconcile_payloads import (
     DeferredCommentPayload,
     DeferredCommentReplayContext,
@@ -62,19 +66,22 @@ _artifact_expected_name = _reconcile_payloads.artifact_expected_name
 _artifact_expected_payload_name = _reconcile_payloads.artifact_expected_payload_name
 
 
-def _log(bot, level: str, message: str, **fields) -> None:
+@dataclass(frozen=True)
+class WorkflowRunHandlerResult:
+    state_changed: bool
+    touched_items: list[int]
+    projection_followup_needed: bool
+    projection_failure_message: str | None
+    deferred_gap_changed: bool
+    reconciled_source_events_changed: bool
+
+
+def _log(bot: ReconcileWorkflowRuntimeContext, level: str, message: str, **fields) -> None:
     bot.logger.event(level, message, **fields)
 
 
-def _now_iso(bot) -> str:
+def _now_iso(bot: ReconcileWorkflowRuntimeContext) -> str:
     return bot.clock.now().isoformat()
-
-
-@dataclass(frozen=True)
-class LiveCommentReplayValidationResult:
-    live_classified: dict | None
-    changed: bool
-    failed_closed: bool
 
 
 def _ensure_source_event_key(review_data: dict, source_event_key: str, payload: dict | None = None) -> None:
@@ -107,7 +114,7 @@ def _was_reconciled_source_event(review_data: dict, source_event_key: str) -> bo
     return isinstance(reconciled, list) and source_event_key in reconciled
 
 
-def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dict) -> bool:
+def _record_review_rebuild(bot: ReconcileRectifyRuntimeContext, state: dict, issue_number: int, review_data: dict) -> bool:
     pull_request = _read_reconcile_object(bot, f"pulls/{issue_number}", label=f"pull request #{issue_number}")
     reviews = _read_reconcile_reviews(bot, issue_number)
     before = {
@@ -153,7 +160,7 @@ def _record_review_rebuild(bot, state: dict, issue_number: int, review_data: dic
 
 
 def reconcile_active_review_entry(
-    bot,
+    bot: ReconcileRectifyRuntimeContext,
     state: dict,
     issue_number: int,
     *,
@@ -207,7 +214,12 @@ def reconcile_active_review_entry(
     return f"ℹ️ Rectify checked PR #{issue_number}: {'; '.join(messages) or 'no reconciliation transitions applied'}.", True, False
 
 
-def handle_rectify_command(bot, state: dict, issue_number: int, comment_author: str) -> tuple[str, bool, bool]:
+def handle_rectify_command(
+    bot: ReconcileRectifyRuntimeContext,
+    state: dict,
+    issue_number: int,
+    comment_author: str,
+) -> tuple[str, bool, bool]:
     review_data = ensure_review_entry(state, issue_number)
     current_reviewer = review_data.get("current_reviewer") if review_data else None
 
@@ -327,11 +339,11 @@ def _validate_deferred_review_comment_artifact(payload: dict) -> None:
         raise RuntimeError("Deferred review-comment artifact source digest or timestamp is malformed")
 
 
-def _load_deferred_context(bot) -> dict:
+def _load_deferred_context(bot: ReconcileWorkflowRuntimeContext) -> dict:
     return bot.load_deferred_payload()
 
 
-def _validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
+def _validate_workflow_run_artifact_identity(bot: ReconcileWorkflowRuntimeContext, payload: dict) -> None:
     expected_name, expected_file = _expected_observer_identity(payload)
     if payload.get("source_workflow_name") != expected_name:
         raise RuntimeError("Deferred artifact workflow name mismatch")
@@ -351,7 +363,7 @@ def _validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
 
 
 def _reconcile_deferred_comment(
-    bot,
+    bot: ReconcileWorkflowRuntimeContext,
     state: dict,
     review_data: dict,
     context: DeferredCommentReplayContext,
@@ -439,19 +451,32 @@ def _reconcile_deferred_comment(
             str(decision.diagnostic_summary),
         )
         return changed or gap_changed
-    changed = False
-    if source_freshness_eligible:
-        changed = record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body)) or changed
-    validation_result = _validate_live_comment_replay_contract(
-        bot,
-        review_data,
-        payload,
-        live_body,
+    live_classified = classify_comment_payload(bot, live_body)
+    decision = reconcile_replay_policy.decide_comment_replay(
+        comment_id=int(payload["comment_id"]),
+        source_comment_class=str(payload.get("comment_class", "")),
+        source_has_non_command_text=bool(payload.get("has_non_command_text")),
+        source_freshness_eligible=source_freshness_eligible,
+        live_comment_found=True,
+        live_body_digest_matches=True,
+        live_classified=live_classified,
+        live_failure_kind=None,
+        runbook_path=bot.REVIEW_FRESHNESS_RUNBOOK_PATH,
     )
-    if validation_result.live_classified is None:
-        return changed or validation_result.changed
-    live_classified = validation_result.live_classified
-    if context.payload.comment_class in {"command_only", "command_plus_text"}:
+    changed = False
+    if decision.record_source_freshness:
+        changed = record_conversation_freshness(bot, state, replay_request(comment_context, comment_body=live_body)) or changed
+    if decision.failed_closed_reason is not None:
+        gap_changed = _update_deferred_gap(
+            bot,
+            review_data,
+            payload,
+            decision.failed_closed_reason,
+            str(decision.diagnostic_summary),
+            failure_kind=decision.failure_kind,
+        )
+        return changed or gap_changed
+    if decision.replay_comment_command:
         changed = process_comment_event(
             bot,
             state,
@@ -459,13 +484,17 @@ def _reconcile_deferred_comment(
             classify_comment_payload=lambda _bot, _body: live_classified,
             classify_issue_comment_actor=classify_issue_comment_actor,
         ) or changed
-    reconciled_changed = _mark_reconciled_source_event(review_data, str(payload.get("source_event_key", "")))
-    gap_cleared_changed = _clear_source_event_key(review_data, str(payload.get("source_event_key", "")))
+    reconciled_changed = False
+    if decision.mark_reconciled:
+        reconciled_changed = _mark_reconciled_source_event(review_data, str(payload.get("source_event_key", "")))
+    gap_cleared_changed = False
+    if decision.clear_gap:
+        gap_cleared_changed = _clear_source_event_key(review_data, str(payload.get("source_event_key", "")))
     return changed or reconciled_changed or gap_cleared_changed
 
 
 def _update_deferred_gap(
-    bot,
+    bot: ReconcileWorkflowRuntimeContext,
     review_data: dict,
     payload: dict,
     reason: str,
@@ -504,42 +533,26 @@ def _update_deferred_gap(
     return changed
 
 
-def _validate_live_comment_replay_contract(
-    bot,
-    review_data: dict,
-    payload: dict,
-    live_body: str,
-) -> LiveCommentReplayValidationResult:
-    live_classified = classify_comment_payload(bot, live_body)
-    decision = reconcile_replay_policy.decide_comment_replay(
-        comment_id=int(payload["comment_id"]),
-        source_comment_class=str(payload.get("comment_class", "")),
-        source_has_non_command_text=bool(payload.get("has_non_command_text")),
-        source_freshness_eligible=False,
-        live_comment_found=True,
-        live_body_digest_matches=True,
-        live_classified=live_classified,
-        live_failure_kind=None,
-        runbook_path=bot.REVIEW_FRESHNESS_RUNBOOK_PATH,
-    )
-    if decision.failed_closed_reason is not None:
-        changed = _update_deferred_gap(
-            bot,
-            review_data,
-            payload,
-            decision.failed_closed_reason,
-            str(decision.diagnostic_summary),
-            failure_kind=decision.failure_kind,
-        )
-        return LiveCommentReplayValidationResult(None, changed, True)
-    return LiveCommentReplayValidationResult(live_classified, False, False)
-
-
-def handle_workflow_run_event(bot, state: dict) -> bool:
+def handle_workflow_run_event_result(bot: ReconcileWorkflowRuntimeContext, state: dict) -> WorkflowRunHandlerResult:
     bot.assert_lock_held("handle_workflow_run_event")
     if str(state.get("freshness_runtime_epoch", "")).strip() != "freshness_v15":
         _log(bot, "info", "V18 workflow_run reconcile safe-noop before epoch flip")
-        return False
+        return WorkflowRunHandlerResult(False, [], False, None, False, False)
+    active_reviews_before = deepcopy(state.get("active_reviews", {}))
+
+    def _build_result(state_changed: bool, pr_number: int) -> WorkflowRunHandlerResult:
+        touched_items = bot.drain_touched_items()
+        after = state.get("active_reviews", {}).get(str(pr_number), {})
+        before = active_reviews_before.get(str(pr_number), {}) if isinstance(active_reviews_before, dict) else {}
+        return WorkflowRunHandlerResult(
+            state_changed=state_changed,
+            touched_items=touched_items,
+            projection_followup_needed=bool(touched_items),
+            projection_failure_message=None,
+            deferred_gap_changed=before.get("deferred_gaps") != after.get("deferred_gaps"),
+            reconciled_source_events_changed=before.get("reconciled_source_events") != after.get("reconciled_source_events"),
+        )
+
     payload = _load_deferred_context(bot)
     parsed_payload = parse_deferred_context_payload(payload)
     pr_number = parsed_payload.pr_number
@@ -566,7 +579,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 source_event_key=decision.source_event_key,
                 reason=decision.reason,
             )
-            return False
+            return _build_result(False, pr_number)
 
         if event_name == "issue_comment" and isinstance(parsed_payload, DeferredCommentPayload):
             _validate_workflow_run_artifact_identity(bot, parsed_payload.raw_payload)
@@ -575,12 +588,12 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 expected_event_name="issue_comment",
                 live_comment_endpoint=f"issues/comments/{parsed_payload.comment_id}",
             )
-            return _reconcile_deferred_comment(
+            return _build_result(_reconcile_deferred_comment(
                 bot,
                 state,
                 review_data,
                 context,
-            )
+            ), pr_number)
 
         if event_name == "pull_request_review_comment" and event_action == "created" and isinstance(parsed_payload, DeferredCommentPayload):
             _validate_workflow_run_artifact_identity(bot, parsed_payload.raw_payload)
@@ -589,12 +602,12 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 expected_event_name="pull_request_review_comment",
                 live_comment_endpoint=f"pulls/comments/{parsed_payload.comment_id}",
             )
-            return _reconcile_deferred_comment(
+            return _build_result(_reconcile_deferred_comment(
                 bot,
                 state,
                 review_data,
                 context,
-            )
+            ), pr_number)
 
         if event_name == "pull_request_review" and event_action == "submitted" and isinstance(parsed_payload, DeferredReviewPayload):
             _validate_workflow_run_artifact_identity(bot, parsed_payload.raw_payload)
@@ -639,7 +652,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 state_changed = True
             reconciled_changed = _mark_reconciled_source_event(review_data, source_event_key)
             gap_cleared_changed = _clear_source_event_key(review_data, source_event_key)
-            return state_changed or reconciled_changed or gap_cleared_changed
+            return _build_result(state_changed or reconciled_changed or gap_cleared_changed, pr_number)
 
         if event_name == "pull_request_review" and event_action == "dismissed" and isinstance(parsed_payload, DeferredReviewPayload):
             _validate_workflow_run_artifact_identity(bot, parsed_payload.raw_payload)
@@ -664,7 +677,7 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
                 state_changed = True
             _mark_reconciled_source_event(review_data, source_event_key)
             _clear_source_event_key(review_data, source_event_key)
-            return True
+            return _build_result(True, pr_number)
     except RuntimeError as exc:
         failure_kind = exc.failure_kind if isinstance(exc, ReconcileReadError) else None
         gap_changed = _update_deferred_gap(
@@ -676,6 +689,10 @@ def handle_workflow_run_event(bot, state: dict) -> bool:
             failure_kind=failure_kind,
         )
         if gap_changed:
-            return True
+            return _build_result(True, pr_number)
         raise
     raise RuntimeError("Unsupported deferred workflow_run payload")
+
+
+def handle_workflow_run_event(bot: ReconcileWorkflowRuntimeContext, state: dict) -> bool:
+    return handle_workflow_run_event_result(bot, state).state_changed

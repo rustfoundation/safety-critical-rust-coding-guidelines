@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -348,7 +349,22 @@ def test_sweeper_delegates_diagnosis_and_narrow_recommendation_to_core_owner():
     assert "def evaluate_deferred_gap_state(" not in module_text
     assert "def _can_repair_visible_review(" not in module_text
     assert "deferred_gap_diagnosis.evaluate_deferred_gap_state(" in module_text
-    assert "deferred_gap_diagnosis.recommend_visible_review_repair(" in module_text
+    assert "deferred_gap_diagnosis.recommend_review_submission_gap_repair(" in module_text
+
+
+def test_h4a_review_submission_gap_fixture_stays_narrow_and_explicit():
+    matrix = json.loads(
+        Path("tests/fixtures/equivalence/review_submission_gap_repair/scenario_matrix.json").read_text(encoding="utf-8")
+    )
+
+    assert matrix["harness_id"] == "H4a review-submitted gap repair flow equivalence"
+    assert matrix["out_of_scope"] == [
+        "production cutover",
+        "other sweeper repair flows",
+    ]
+    assert [scenario["scenario_id"] for scenario in matrix["scenarios"]] == [
+        "submitted_review_visible_without_exact_artifact",
+    ]
 
 
 def test_stage_a_candidate_run_correlation_is_exact_to_workflow_event_pr_and_window(monkeypatch):

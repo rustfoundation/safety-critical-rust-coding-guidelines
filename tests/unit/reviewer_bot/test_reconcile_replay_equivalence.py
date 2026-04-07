@@ -81,7 +81,25 @@ def test_reconcile_replay_policy_covers_noop_freshness_and_fail_closed_rows():
     assert missing_live.record_source_freshness is True
     assert missing_live.failed_closed_reason == "reconcile_failed_closed"
     assert drift.failed_closed_reason == "reconcile_failed_closed"
+    assert drift.record_source_freshness is False
     assert drift.replay_comment_command is False
+
+
+def test_h3_reconcile_replay_policy_preserves_freshness_for_classification_drift_when_source_was_eligible():
+    drift = reconcile_replay_policy.decide_comment_replay(
+        comment_id=211,
+        source_comment_class="plain_text",
+        source_has_non_command_text=True,
+        source_freshness_eligible=True,
+        live_comment_found=True,
+        live_body_digest_matches=True,
+        live_classified={"comment_class": "command_plus_text", "has_non_command_text": True, "command_count": 1},
+        live_failure_kind=None,
+        runbook_path="runbook/path.md",
+    )
+
+    assert drift.record_source_freshness is True
+    assert drift.failed_closed_reason == "reconcile_failed_closed"
 
 
 def test_reconcile_replay_policy_covers_submitted_and_dismissed_review_rows():
@@ -101,3 +119,14 @@ def test_reconcile_replay_policy_covers_submitted_and_dismissed_review_rows():
     assert submitted.mark_reconciled is True
     assert dismissed.accept_review_dismissal is True
     assert dismissed.clear_gap is True
+
+
+def test_h3_deferred_comment_replay_success_path_stays_policy_owned():
+    reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
+    policy_text = Path("scripts/reviewer_bot_core/reconcile_replay_policy.py").read_text(encoding="utf-8")
+
+    assert "if context.payload.comment_class in {\"command_only\", \"command_plus_text\"}:" not in reconcile_text
+    assert "if decision.replay_comment_command:" in reconcile_text
+    assert "if decision.mark_reconciled:" in reconcile_text
+    assert "if decision.clear_gap:" in reconcile_text
+    assert "def decide_comment_replay(" in policy_text

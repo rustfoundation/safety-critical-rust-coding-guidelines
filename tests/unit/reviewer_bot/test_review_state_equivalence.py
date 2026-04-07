@@ -2,7 +2,7 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from scripts.reviewer_bot_core import review_state_machine
+from scripts.reviewer_bot_core import review_state_live_repair, review_state_machine
 from scripts.reviewer_bot_lib import review_state, reviews
 from tests.fixtures.reviewer_bot import make_state
 
@@ -13,10 +13,17 @@ def _load_review_state_fixture(name: str) -> dict:
     )
 
 
+def _load_live_read_repair_fixture() -> dict:
+    return json.loads(
+        Path("tests/fixtures/equivalence/review_state_live_repair/scenarios.json").read_text(encoding="utf-8")
+    )
+
+
 def test_review_state_equivalence_harness_shell_and_fixture_inventory_exist():
     assert Path("tests/fixtures/equivalence/review_state/api_inventory.md").exists()
     assert Path("tests/fixtures/equivalence/review_state/local_state_only_scenarios.json").exists()
-    assert Path("tests/fixtures/equivalence/review_state/live_read_assisted_scenarios.json").exists()
+    assert Path("tests/fixtures/equivalence/review_state_live_repair/api_inventory.md").exists()
+    assert Path("tests/fixtures/equivalence/review_state_live_repair/scenarios.json").exists()
 
 
 def test_review_state_equivalence_harness_shell_documents_future_scope():
@@ -25,7 +32,35 @@ def test_review_state_equivalence_harness_shell_documents_future_scope():
     )
 
     assert "local_state_only_scenarios.json" in module_text
-    assert "live_read_assisted_scenarios.json" in module_text
+    assert "review_state_live_repair/scenarios.json" in module_text
+
+
+def test_g2a_live_read_repair_inventory_freezes_exact_public_apis_and_scenarios():
+    inventory = Path("tests/fixtures/equivalence/review_state_live_repair/api_inventory.md").read_text(
+        encoding="utf-8"
+    )
+    fixture = _load_live_read_repair_fixture()
+
+    assert "accept_reviewer_review_from_live_review" in inventory
+    assert "refresh_reviewer_review_from_live_preferred_review" in inventory
+    assert "repair_missing_reviewer_review_state" in inventory
+
+    assert fixture["harness_id"] == "G2a live-read-assisted review repair inventory"
+    assert fixture["scope"] == "live-read-assisted review repair"
+    assert fixture["apis"] == [
+        "accept_reviewer_review_from_live_review",
+        "refresh_reviewer_review_from_live_preferred_review",
+        "repair_missing_reviewer_review_state",
+    ]
+    assert "ensure_review_entry" not in fixture["apis"]
+    assert "accept_channel_event" not in fixture["apis"]
+    assert fixture["scenarios"] == [
+        "matching current reviewer and valid submitted review",
+        "reviewer mismatch",
+        "no preferred review found",
+        "head repair without review acceptance",
+        "no-op repair path",
+    ]
 
 
 def test_local_state_only_post_deletion_fixture_driven_proof(monkeypatch):
@@ -176,7 +211,7 @@ def test_get_current_cycle_boundary_post_deletion_fixture_driven_proof():
 
 
 def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
-    fixture = _load_review_state_fixture("live_read_assisted_scenarios.json")
+    fixture = _load_live_read_repair_fixture()
 
     class Bot:
         def __init__(self):
@@ -199,8 +234,7 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
         lambda bot, issue_number, review_data, **kwargs: bot.preferred_review,
     )
 
-    assert fixture["harness_id"] == "C1b/C1c mutable review-state mutation equivalence"
-    assert fixture["scope"] == "live-read-assisted mutation"
+    assert fixture["scope"] == "live-read-assisted review repair"
 
     delegated_review = {
         "current_reviewer": "alice",
@@ -217,7 +251,7 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
         delegated_review,
         delegated_bot.preferred_review,
         actor="alice",
-    ) == review_state_machine.accept_reviewer_review_from_live_review(
+    ) == review_state_live_repair.accept_reviewer_review_from_live_review(
         owner_review,
         owner_bot.preferred_review,
         actor="alice",
@@ -236,7 +270,7 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
         delegated_bot,
         42,
         delegated_review,
-    ) == review_state_machine.refresh_reviewer_review_from_live_preferred_review(
+    ) == review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(
         owner_bot,
         42,
         owner_review,
@@ -249,9 +283,26 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
         delegated_bot,
         42,
         delegated_review,
-    ) == review_state_machine.repair_missing_reviewer_review_state(
+    ) == review_state_live_repair.repair_missing_reviewer_review_state(
         owner_bot,
         42,
         owner_review,
     )
     assert delegated_review == owner_review
+
+
+def test_g2b_review_state_machine_no_longer_owns_live_read_repair_behavior():
+    machine_text = Path("scripts/reviewer_bot_core/review_state_machine.py").read_text(encoding="utf-8")
+    live_repair_text = Path("scripts/reviewer_bot_core/review_state_live_repair.py").read_text(encoding="utf-8")
+
+    assert "build_reviewer_review_record_from_live_review" not in machine_text
+    assert "get_preferred_current_reviewer_review_for_cycle" not in machine_text
+    assert "_pull_request_read_result" not in machine_text
+    assert "return review_state_live_repair.accept_reviewer_review_from_live_review(" in machine_text
+    assert "return review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(" in machine_text
+    assert "return review_state_live_repair.repair_missing_reviewer_review_state(" in machine_text
+    assert "def accept_reviewer_review_from_live_review(" in live_repair_text
+    assert "def refresh_reviewer_review_from_live_preferred_review(" in live_repair_text
+    assert "def repair_missing_reviewer_review_state(" in live_repair_text
+    assert "bot.github" not in live_repair_text
+    assert "github_api" not in live_repair_text

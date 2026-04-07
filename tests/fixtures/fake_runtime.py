@@ -510,6 +510,18 @@ class FakeReviewerBotRuntime:
     def load_deferred_payload(self) -> dict:
         return self.deferred_payloads.load()
 
+    def parse_iso8601_timestamp(self, value: Any):
+        return self.compat.state_lock.parse_iso8601_timestamp(value)
+
+    def parse_github_timestamp(self, value: Any):
+        return reviews_module.parse_github_timestamp(value)
+
+    def is_triage_or_higher(self, username: str) -> bool:
+        return reviews_module.is_triage_or_higher(self, username)
+
+    def satisfy_mandatory_approver_requirement(self, state: dict, issue_number: int, approver: str) -> bool:
+        return reviews_module.satisfy_mandatory_approver_requirement(self, state, issue_number, approver)
+
     def load_state(self, *, fail_on_unavailable: bool = False) -> dict:
         return self.state_store.load_state(fail_on_unavailable=fail_on_unavailable)
 
@@ -634,9 +646,6 @@ class FakeReviewerBotRuntime:
     def reposition_member_as_next(self, state: dict, username: str) -> bool:
         return self.compat.review.reposition_member_as_next(state, username)
 
-    def parse_iso8601_timestamp(self, value: Any):
-        return self.compat.state_lock.parse_iso8601_timestamp(value)
-
     def compute_reviewer_response_state(self, issue_number: int, state: dict, *, issue_snapshot=None):
         return self.compat.review.compute_reviewer_response_state(issue_number, state, issue_snapshot=issue_snapshot)
 
@@ -753,9 +762,6 @@ class FakeReviewerBotRuntime:
 
     def handle_scheduled_check(self, state: dict) -> bool:
         return self.handlers.call("handle_scheduled_check", state)
-
-    def handle_workflow_run_event(self, state: dict) -> bool:
-        return self.handlers.call("handle_workflow_run_event", state)
 
     def github_api(self, method: str, endpoint: str, data=None):
         override = runtime_instance_override(self, "github_api")

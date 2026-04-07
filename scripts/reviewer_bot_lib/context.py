@@ -476,6 +476,99 @@ class SweeperContext(Protocol):
 
 
 @runtime_checkable
+class ReconcileReviewStateAdapterContext(Protocol):
+    def maybe_record_head_observation_repair(
+        self,
+        issue_number: int,
+        review_data: dict,
+    ) -> HeadObservationRepairResult: ...
+
+
+@runtime_checkable
+class ReconcileAdaptersContext(Protocol):
+    review_state: ReconcileReviewStateAdapterContext
+
+
+@runtime_checkable
+class ReconcileWorkflowRuntimeContext(Protocol):
+    REVIEW_FRESHNESS_RUNBOOK_PATH: str
+    logger: Logger
+    clock: Clock
+    adapters: ReconcileAdaptersContext
+
+    def assert_lock_held(self, context: str) -> None: ...
+    def load_deferred_payload(self) -> dict: ...
+    def get_config_value(self, name: str, default: str = "") -> str: ...
+    def collect_touched_item(self, issue_number: int | None) -> None: ...
+    def github_api_request(self, *args, **kwargs) -> Any: ...
+    def github_api(self, *args, **kwargs) -> Any | None: ...
+
+
+@runtime_checkable
+class ReconcileRectifyGitHubContext(Protocol):
+    def get_pull_request_reviews(self, issue_number: int) -> list[dict] | None: ...
+    def get_user_permission_status(self, username: str, required_permission: str = "triage") -> str: ...
+
+
+@runtime_checkable
+class ReconcileRectifyRuntimeContext(Protocol):
+    github: ReconcileRectifyGitHubContext
+    adapters: ReconcileAdaptersContext
+
+    def get_config_value(self, name: str, default: str = "") -> str: ...
+    def parse_iso8601_timestamp(self, value: Any) -> datetime | None: ...
+    def parse_github_timestamp(self, value: Any) -> datetime | None: ...
+    def is_triage_or_higher(self, username: str) -> bool: ...
+    def github_api_request(self, *args, **kwargs) -> Any: ...
+    def github_api(self, *args, **kwargs) -> Any | None: ...
+    def satisfy_mandatory_approver_requirement(
+        self,
+        state: dict,
+        issue_number: int,
+        approver: str,
+    ) -> bool: ...
+
+
+@runtime_checkable
+class CommentGitHubWriteContext(Protocol):
+    def get_user_permission_status(self, username: str, required_permission: str = "triage") -> str: ...
+    def post_comment(self, issue_number: int, body: str) -> bool: ...
+    def add_reaction(self, comment_id: int, reaction: str) -> bool: ...
+
+
+@runtime_checkable
+class CommentCommandsAdapterContext(Protocol):
+    def strip_code_blocks(self, comment_body: str) -> str: ...
+    def parse_command(self, comment_body: str): ...
+
+
+@runtime_checkable
+class CommentRoutingAdaptersContext(Protocol):
+    commands: CommentCommandsAdapterContext
+
+
+@runtime_checkable
+class CommentApplicationRuntimeContext(Protocol):
+    BOT_MENTION: str
+    github: CommentGitHubWriteContext
+
+    def get_config_value(self, name: str, default: str = "") -> str: ...
+
+
+@runtime_checkable
+class CommentRoutingRuntimeContext(Protocol):
+    BOT_NAME: str
+    BOT_MENTION: str
+    AUTHOR_ASSOCIATION_TRUST_ALLOWLIST: tuple[str, ...]
+    logger: Logger
+    adapters: CommentRoutingAdaptersContext
+
+    def assert_lock_held(self, context: str) -> None: ...
+    def collect_touched_item(self, issue_number: int | None) -> None: ...
+    def github_api(self, *args, **kwargs) -> Any | None: ...
+
+
+@runtime_checkable
 class ReviewerBotContext(GitHubTransportContext, StateStoreContext, LeaseLockContext, Protocol):
     """Broader runtime surface expected by orchestration-heavy extracted modules.
 
@@ -510,7 +603,6 @@ class ReviewerBotContext(GitHubTransportContext, StateStoreContext, LeaseLockCon
     def handle_comment_event(self, state: dict) -> bool: ...
     def handle_manual_dispatch(self, state: dict) -> bool: ...
     def handle_scheduled_check(self, state: dict) -> bool: ...
-    def handle_workflow_run_event(self, state: dict) -> bool: ...
     def maybe_record_head_observation_repair(
         self, issue_number: int, review_data: dict
     ) -> HeadObservationRepairResult: ...

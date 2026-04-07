@@ -1,10 +1,11 @@
 import json
+from pathlib import Path
 
 import pytest
 
 pytestmark = pytest.mark.integration
 
-from scripts.reviewer_bot_lib import comment_routing, review_state
+from scripts.reviewer_bot_lib import comment_routing, reconcile, review_state
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -61,13 +62,13 @@ def test_execute_run_workflow_run_bookkeeping_only_reconcile_still_saves_state(t
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
-    harness.stub_handler(
-        "handle_workflow_run_event",
-        lambda current: harness.runtime.collect_touched_item(42)
-        or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review:11")
-        or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review:11", None)
-        or True,
-    )
+    def fake_workflow_run_result(bot, current):
+        harness.runtime.collect_touched_item(42)
+        current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review:11")
+        current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review:11", None)
+        return reconcile.WorkflowRunHandlerResult(True, [42], True, None, True, True)
+
+    monkeypatch.setattr(reconcile, "handle_workflow_run_event_result", fake_workflow_run_result)
     harness.stub_save_state(
         lambda current: save_snapshots.append(
             {
@@ -139,13 +140,13 @@ def test_execute_run_workflow_run_deferred_comment_bookkeeping_only_reconcile_st
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
-    harness.stub_handler(
-        "handle_workflow_run_event",
-        lambda current: harness.runtime.collect_touched_item(42)
-        or current["active_reviews"]["42"]["reconciled_source_events"].append("issue_comment:210")
-        or current["active_reviews"]["42"]["deferred_gaps"].pop("issue_comment:210", None)
-        or True,
-    )
+    def fake_comment_workflow_run_result(bot, current):
+        harness.runtime.collect_touched_item(42)
+        current["active_reviews"]["42"]["reconciled_source_events"].append("issue_comment:210")
+        current["active_reviews"]["42"]["deferred_gaps"].pop("issue_comment:210", None)
+        return reconcile.WorkflowRunHandlerResult(True, [42], True, None, True, True)
+
+    monkeypatch.setattr(reconcile, "handle_workflow_run_event_result", fake_comment_workflow_run_result)
     harness.stub_save_state(
         lambda current: save_snapshots.append(
             {
@@ -217,13 +218,13 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
 
-    harness.stub_handler(
-        "handle_workflow_run_event",
-        lambda current: harness.runtime.collect_touched_item(42)
-        or current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review_comment:310")
-        or current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review_comment:310", None)
-        or True,
-    )
+    def fake_review_comment_workflow_run_result(bot, current):
+        harness.runtime.collect_touched_item(42)
+        current["active_reviews"]["42"]["reconciled_source_events"].append("pull_request_review_comment:310")
+        current["active_reviews"]["42"]["deferred_gaps"].pop("pull_request_review_comment:310", None)
+        return reconcile.WorkflowRunHandlerResult(True, [42], True, None, True, True)
+
+    monkeypatch.setattr(reconcile, "handle_workflow_run_event_result", fake_review_comment_workflow_run_result)
     harness.stub_save_state(
         lambda current: save_snapshots.append(
             {
@@ -242,3 +243,18 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
     assert save_snapshots == [
         {"reconciled": ["pull_request_review_comment:310"], "gap_present": False}
     ]
+
+
+def test_m1_reconcile_exposes_typed_workflow_run_result_shape():
+    reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
+
+    assert "class WorkflowRunHandlerResult:" in reconcile_text
+    for field in [
+        "state_changed",
+        "touched_items",
+        "projection_followup_needed",
+        "projection_failure_message",
+        "deferred_gap_changed",
+        "reconciled_source_events_changed",
+    ]:
+        assert field in reconcile_text

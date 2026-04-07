@@ -201,6 +201,24 @@ def test_handle_accept_no_fls_changes_command_fails_closed_when_permission_unava
     assert "Unable to verify triage permissions right now" in message
 
 
+def test_i1_comment_application_consumes_typed_ordinary_command_result(monkeypatch):
+    module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+
+    assert "decision.kind == \"handler_call\"" in module_text
+    assert "decision.handler_name" in module_text
+    assert "decision.handler_args" in module_text
+    assert "decision.needs_assignment_request" in module_text
+    assert "decision.result_shape" in module_text
+    assert "decision.react" in module_text
+
+
+def test_k2_comment_application_entrypoints_use_narrow_comment_runtime_protocol():
+    module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+
+    assert "CommentApplicationRuntimeContext" in module_text
+    assert "bot: CommentApplicationRuntimeContext" in module_text
+
+
 def test_pass_command_fails_closed_when_assignees_unavailable(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()

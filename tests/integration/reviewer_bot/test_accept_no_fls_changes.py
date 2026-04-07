@@ -6,6 +6,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 from builder import build_cli
+from scripts.reviewer_bot_core import privileged_command_policy
 from scripts.reviewer_bot_lib import automation
 from scripts.reviewer_bot_lib.config import FLS_AUDIT_LABEL
 from tests.fixtures.commands_harness import CommandHarness
@@ -227,6 +228,54 @@ def test_accept_no_fls_changes_freezes_ordered_execution_plan_branch_name_and_pr
     ]
 
 
+def test_j1_executor_consumes_richer_plan_command_lists_without_rederiving_git_steps(monkeypatch, tmp_path):
+    harness = CommandHarness(monkeypatch)
+    plan = privileged_command_policy.AcceptNoFlsChangesPlan(
+        ordered_steps=list(privileged_command_policy.ORDERED_EXECUTION_STEPS),
+        revalidation_checkpoints=list(privileged_command_policy.REVALIDATION_CHECKPOINTS),
+        expected_changed_files=["src/spec.lock"],
+        branch_probe_name="chore/spec-lock-2026-04-06-issue-42",
+        branch_name="chore/spec-lock-2026-04-06-issue-42",
+        base_branch="main",
+        add_paths=["src/spec.lock"],
+        git_checkout_args=["git", "checkout", "-b", "chore/spec-lock-2026-04-06-issue-42"],
+        git_commit_args=[
+            "git",
+            "-c",
+            "user.name=guidelines-bot",
+            "-c",
+            "user.email=guidelines-bot@users.noreply.github.com",
+            "commit",
+            "-m",
+            "chore: update spec.lock; no affected guidelines",
+        ],
+        git_push_args=["git", "push", "origin", "chore/spec-lock-2026-04-06-issue-42"],
+        commit_message="chore: update spec.lock; no affected guidelines",
+        pull_request_title="chore: update spec.lock (no guideline impact)",
+        pull_request_body="Updates `src/spec.lock` after confirming the audit reported no affected guidelines.\n\nCloses #42",
+    )
+    runner = harness.automation_runner()
+    runner.when(plan.git_checkout_args)
+    runner.when(["git", "add", "src/spec.lock"])
+    runner.when(plan.git_commit_args)
+    runner.when(plan.git_push_args)
+    monkeypatch.setattr(
+        automation,
+        "create_pull_request",
+        lambda bot, branch, base, issue_number, title=None, body=None: {"html_url": "https://example.invalid/pr/2"},
+    )
+
+    message, success = automation._execute_accept_no_fls_changes_plan(harness.runtime, tmp_path, 42, plan)
+
+    assert (message, success) == ("✅ Opened PR https://example.invalid/pr/2", True)
+    assert [command for command, _cwd, _check in runner.calls] == [
+        plan.git_checkout_args,
+        ["git", "add", "src/spec.lock"],
+        plan.git_commit_args,
+        plan.git_push_args,
+    ]
+
+
 def test_automation_executor_phase_checklist_and_plan_execution_helper_are_explicit():
     module_text = Path("scripts/reviewer_bot_lib/automation.py").read_text(encoding="utf-8")
 
@@ -236,5 +285,6 @@ def test_automation_executor_phase_checklist_and_plan_execution_helper_are_expli
     assert '"changed_file_validation_execution"' in module_text
     assert '"branch_existence_check"' in module_text
     assert '"pull_request_create"' in module_text
+    assert "def _resolve_accept_no_fls_changes_plan(" in module_text
     assert "def _execute_accept_no_fls_changes_plan(" in module_text
     assert "return _execute_accept_no_fls_changes_plan(bot, repo_root, issue_number, planning.plan)" in module_text

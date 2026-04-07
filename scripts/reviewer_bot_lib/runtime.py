@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from . import reviews
 from .config import (
     AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
     BOT_MENTION,
@@ -382,6 +383,36 @@ class ReviewerBotRuntime:
 
     def github_graphql(self, query: str, variables=None, *, token=None):
         return self.adapters.github.github_graphql(query, variables, token=token)
+
+    def get_pull_request_reviews(self, issue_number: int):
+        return self.github.get_pull_request_reviews(issue_number)
+
+    def rebuild_pr_approval_state(
+        self,
+        issue_number: int,
+        review_data: dict,
+        *,
+        pull_request: dict | None = None,
+        reviews: list[dict] | None = None,
+    ):
+        return self.adapters.review_state.rebuild_pr_approval_state(
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
+
+    def parse_iso8601_timestamp(self, value: Any):
+        return self.adapters.state_lock.parse_iso8601_timestamp(value)
+
+    def parse_github_timestamp(self, value: Any):
+        return reviews.parse_github_timestamp(value)
+
+    def is_triage_or_higher(self, username: str) -> bool:
+        return self.adapters.review_state.is_triage_or_higher(username)
+
+    def satisfy_mandatory_approver_requirement(self, current_state: dict, issue_number: int, approver: str) -> bool:
+        return self.adapters.review_state.satisfy_mandatory_approver_requirement(current_state, issue_number, approver)
 
     # Adapter-only mutable review-state compatibility surface.
     def normalize_lock_metadata(self, lock_meta: dict | None):

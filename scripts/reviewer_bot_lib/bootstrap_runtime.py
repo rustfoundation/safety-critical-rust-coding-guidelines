@@ -157,9 +157,6 @@ class _BootstrapHandlerServices:
     def handle_scheduled_check(self, current_state):
         return maintenance.handle_scheduled_check(self._runtime_getter(), current_state)
 
-    def handle_workflow_run_event(self, current_state):
-        return reconcile.handle_workflow_run_event(self._runtime_getter(), current_state)
-
 
 class _BootstrapReviewStateAdapterServices:
     def __init__(self, runtime_getter):
@@ -198,6 +195,15 @@ class _BootstrapReviewStateAdapterServices:
 
     def compute_reviewer_response_state(self, issue_number, review_data, *, issue_snapshot=None):
         return reviews.compute_reviewer_response_state(self._runtime(), issue_number, review_data, issue_snapshot=issue_snapshot)
+
+    def rebuild_pr_approval_state(self, issue_number, review_data, *, pull_request=None, reviews=None):
+        return reviews.rebuild_pr_approval_state(
+            self._runtime(),
+            issue_number,
+            review_data,
+            pull_request=pull_request,
+            reviews=reviews,
+        )
 
 
 class _BootstrapCommandAdapterServices:

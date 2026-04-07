@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -101,6 +102,16 @@ def test_handle_transition_notice_message_does_not_claim_reassignment(monkeypatc
     assert lifecycle.handle_transition_notice(runtime, state, 42, "alice") is True
     assert "reassigned to the next person in the queue" not in posted[0]
     assert "/pass" in posted[0]
+
+
+def test_l1_fake_runtime_and_bootstrap_keep_override_wiring_explicit_without_canonical_introspection():
+    fake_runtime_text = Path("tests/fixtures/fake_runtime.py").read_text(encoding="utf-8")
+    bootstrap_text = Path("scripts/reviewer_bot_lib/bootstrap_runtime.py").read_text(encoding="utf-8")
+
+    assert "def get_pull_request_reviews(" in fake_runtime_text
+    assert "def rebuild_pr_approval_state(" in fake_runtime_text
+    assert "def rebuild_pr_approval_state(" in bootstrap_text
+    assert "_mark_canonical" not in bootstrap_text
 
 
 def test_reviewer_comment_clears_warning_and_transition_notice_markers(monkeypatch):

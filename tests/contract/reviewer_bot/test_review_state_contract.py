@@ -222,7 +222,7 @@ def test_review_state_module_exposes_named_mutation_surface():
 def test_review_state_local_mutation_surface_delegates_to_core_owner():
     review_state_text = _read("scripts/reviewer_bot_lib/review_state.py")
 
-    assert "from scripts.reviewer_bot_core import review_state_machine" in review_state_text
+    assert "from scripts.reviewer_bot_core import review_state_live_repair, review_state_machine" in review_state_text
     assert "return review_state_machine.ensure_review_entry(state, issue_number, create=create)" in review_state_text
     assert "return review_state_machine.accept_channel_event(" in review_state_text
     assert "return review_state_machine.mark_review_complete(state, issue_number, reviewer, source)" in review_state_text

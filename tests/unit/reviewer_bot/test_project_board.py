@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from scripts.reviewer_bot_lib import project_board, reviews
 from scripts.reviewer_bot_lib.config import (
     REVIEWER_BOARD_FIELD_NEEDS_ATTENTION,
@@ -171,3 +174,15 @@ def test_reviewer_board_manifest_includes_projection_repair_attention_option():
     options = project_board.REVIEWER_BOARD_PROJECT_MANIFEST[REVIEWER_BOARD_FIELD_NEEDS_ATTENTION]["options"]
 
     assert REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED in options
+
+
+def test_h2a_mandatory_approver_matrix_stays_focused_on_mandatory_approver_decisions():
+    matrix = json.loads(
+        Path("tests/fixtures/equivalence/mandatory_approver_policy/decision_matrix.json").read_text(encoding="utf-8")
+    )
+
+    assert matrix["harness_id"] == "H2a mandatory-approver decision equivalence"
+    assert matrix["out_of_scope"] == [
+        "reviewer-response derivation",
+        "label writes outside mandatory approver decisions",
+    ]

@@ -437,15 +437,18 @@ def _maybe_fetch_single_candidate_run_detail(bot, run_correlation: dict, artifac
 
 
 def _repair_visible_review_gap(bot, review_data: dict, issue_number: int, source_event_key: str, review: dict) -> bool:
-    repair = deferred_gap_diagnosis.recommend_visible_review_repair(
+    repair = deferred_gap_diagnosis.recommend_review_submission_gap_repair(
         review_data,
         review,
         source_event_key,
+        artifact_status=None,
         current_cycle_boundary=get_current_cycle_boundary(bot, review_data),
     )
     if repair is None:
         return False
-    author, submitted_at, commit_id = repair
+    payload = repair["payload"]
+    author = str(payload["author"])
+    submitted_at = str(payload["submitted_at"])
     changed = accept_reviewer_review_from_live_review(review_data, review, actor=author)
     changed = refresh_reviewer_review_from_live_preferred_review(
         bot,
@@ -747,10 +750,19 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                     run_detail = _maybe_fetch_single_candidate_run_detail(bot, run_correlation, artifact_correlation)
                 review_payload = discovered.get("review") if isinstance(discovered.get("review"), dict) else None
                 artifact_status = artifact_correlation.get("status") if isinstance(artifact_correlation, dict) else None
-                if (
-                    review_payload is not None
-                    and artifact_status != "exact_artifact_match"
-                    and _repair_visible_review_gap(bot, review_data, issue_number, source_event_key, review_payload)
+                repair_recommendation = deferred_gap_diagnosis.recommend_review_submission_gap_repair(
+                    review_data,
+                    review_payload,
+                    source_event_key,
+                    artifact_status=artifact_status,
+                    current_cycle_boundary=get_current_cycle_boundary(bot, review_data),
+                )
+                if repair_recommendation is not None and _repair_visible_review_gap(
+                    bot,
+                    review_data,
+                    issue_number,
+                    source_event_key,
+                    review_payload,
                 ):
                     changed = True
                     continue

@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.reviewer_bot_core import comment_command_policy
 from scripts.reviewer_bot_lib import comment_application, comment_routing, review_state
 from scripts.reviewer_bot_lib.config import FLS_AUDIT_LABEL
 from tests.fixtures.comment_routing_harness import CommentRoutingHarness
@@ -110,7 +111,7 @@ def test_comment_application_freezes_pending_privileged_command_metadata_shape_a
 def test_c3b2_comment_application_deletion_manifest_leaves_only_privileged_branching():
     module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
 
-    assert 'if decision["kind"] == "deferred_privileged_handoff":' in module_text
+    assert 'if isinstance(decision, dict) and decision["kind"] == "deferred_privileged_handoff":' in module_text
     for command_name in [
         '"pass"',
         '"away"',
@@ -130,12 +131,51 @@ def test_c3b2_comment_application_deletion_manifest_leaves_only_privileged_branc
         assert f"command == {command_name}" not in module_text
 
 
-def test_c3b2_comment_application_is_cleanup_only_for_ordinary_command_decision():
-    module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+def test_n1_comment_application_obeys_policy_selected_handler_without_inline_command_branching(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    state = make_state()
+    review = review_state.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_author="dana",
+        comment_author="alice",
+        comment_body="@guidelines-bot /claim",
+    )
+    calls = []
 
-    assert "decision = comment_command_policy.decide_comment_command(" in module_text
-    assert "if decision[\"kind\"] == \"handler_call\":" in module_text
-    assert "if decision[\"kind\"] == \"deferred_privileged_handoff\":" in module_text
+    monkeypatch.setattr(
+        comment_command_policy,
+        "decide_comment_command",
+        lambda *args, **kwargs: comment_command_policy.OrdinaryCommentUseCaseResult(
+            kind="handler_call",
+            handler_name="handle_queue_command",
+            handler_args=[],
+            needs_assignment_request=False,
+            result_shape="pair",
+            state_changed_from="never",
+            response=None,
+            success=None,
+            react=False,
+        ),
+    )
+    monkeypatch.setattr(
+        comment_application.commands_module,
+        "handle_queue_command",
+        lambda bot, current_state: calls.append((bot, current_state)) or ("", True),
+    )
+
+    changed = comment_application.process_comment_event(
+        harness.runtime,
+        state,
+        request,
+        classify_comment_payload=lambda bot, body: {"comment_class": "command_only", "command_count": 1, "command": "claim", "args": []},
+        classify_issue_comment_actor=comment_routing.classify_issue_comment_actor,
+    )
+
+    assert changed is False
+    assert calls == [(harness.runtime, state)]
 
 
 def test_comment_application_no_longer_owns_privileged_handoff_validation_or_metadata_shaping():
@@ -154,11 +194,43 @@ def test_comment_application_no_longer_owns_direct_comment_freshness_decision_br
     assert "if isinstance(current_reviewer, str) and current_reviewer.lower() == comment_author.lower():" not in module_text
 
 
-def test_d1b_comment_application_remaining_branches_are_classification_driven_application_only():
-    module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+def test_n1_comment_application_obeys_routing_result_without_text_shape_contract(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    state = make_state()
+    review = review_state.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_author="dana",
+        comment_author="dana",
+        comment_body="plain text",
+    )
+    calls = {"freshness": 0, "command": 0}
 
-    assert "comment_class = classified[\"comment_class\"]" in module_text
-    assert 'if comment_class in {"plain_text", "command_plus_text"} and comment_id > 0:' in module_text
-    assert 'if comment_class in {"command_only", "command_plus_text"} and int(classified.get("command_count", 0)) == 1:' in module_text
-    assert "if command == " not in module_text
-    assert "if request.issue_author and request.issue_author.lower() == comment_author.lower():" not in module_text
+    monkeypatch.setattr(
+        comment_application,
+        "_route_comment_application",
+        lambda classified, *, comment_id: comment_application.CommentApplicationRoutingResult("freshness_only"),
+    )
+    monkeypatch.setattr(
+        comment_application,
+        "record_conversation_freshness",
+        lambda bot, current_state, current_request: calls.__setitem__("freshness", calls["freshness"] + 1) or True,
+    )
+    monkeypatch.setattr(
+        comment_application,
+        "apply_comment_command",
+        lambda *args, **kwargs: calls.__setitem__("command", calls["command"] + 1) or False,
+    )
+
+    changed = comment_application.process_comment_event(
+        harness.runtime,
+        state,
+        request,
+        classify_comment_payload=lambda bot, body: {"comment_class": "plain_text", "command_count": 0, "command": None, "args": []},
+        classify_issue_comment_actor=comment_routing.classify_issue_comment_actor,
+    )
+
+    assert changed is True
+    assert calls == {"freshness": 1, "command": 0}

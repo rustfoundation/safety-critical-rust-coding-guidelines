@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 pytestmark = pytest.mark.contract
@@ -10,6 +13,8 @@ from scripts.reviewer_bot_lib.context import (
     EventInputsContext,
     ProjectBoardMetadataContext,
     ProjectBoardProjectionContext,
+    ReconcileRectifyRuntimeContext,
+    ReconcileWorkflowRuntimeContext,
 )
 from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
@@ -46,6 +51,8 @@ def test_runtime_object_satisfies_runtime_context_protocols():
     assert isinstance(runtime, EventHandlerContext)
     assert isinstance(runtime, ProjectBoardMetadataContext)
     assert isinstance(runtime, ProjectBoardProjectionContext)
+    assert isinstance(runtime, ReconcileWorkflowRuntimeContext)
+    assert isinstance(runtime, ReconcileRectifyRuntimeContext)
     _assert_core_runtime_surface(runtime)
 
 
@@ -55,4 +62,16 @@ def test_fake_runtime_satisfies_app_execution_runtime_protocol(monkeypatch):
     assert isinstance(runtime, AppEventContextRuntime)
     assert isinstance(runtime, AppExecutionRuntime)
     assert isinstance(runtime, EventInputsContext)
+    assert isinstance(runtime, ReconcileWorkflowRuntimeContext)
+    assert isinstance(runtime, ReconcileRectifyRuntimeContext)
     _assert_core_runtime_surface(runtime)
+
+
+def test_o3_runtime_deletion_manifest_forbids_dead_workflow_run_handler_compatibility_surface():
+    manifest = json.loads(
+        Path("tests/fixtures/equivalence/runtime_surface/deletion_manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert manifest["harness_id"] == "O3 runtime compatibility deletion manifest"
+    assert "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_workflow_run_event" in manifest["deleted_paths"]
+    assert "tests/fixtures/fake_runtime.py:FakeReviewerBotRuntime.handle_workflow_run_event" in manifest["deleted_paths"]

@@ -1,9 +1,15 @@
 from pathlib import Path
+from types import SimpleNamespace
+from typing import get_type_hints
 
 import pytest
 
 from scripts.reviewer_bot_lib import commands, lifecycle, reconcile, review_state
 from scripts.reviewer_bot_lib.config import GitHubApiResult
+from scripts.reviewer_bot_lib.context import (
+    ReconcileRectifyRuntimeContext,
+    ReconcileWorkflowRuntimeContext,
+)
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reconcile_harness import ReconcileHarness, review_submitted_payload
 from tests.fixtures.reviewer_bot import make_state
@@ -250,10 +256,12 @@ def test_handle_workflow_run_event_collects_touched_item_for_projection_followup
     )
     state = make_state(epoch="freshness_v15")
 
-    changed = reconcile.handle_workflow_run_event(runtime, state)
+    result = reconcile.handle_workflow_run_event_result(runtime, state)
 
-    assert changed is False
-    assert runtime.drain_touched_items() == [42]
+    assert result.state_changed is False
+    assert result.touched_items == [42]
+    assert result.projection_followup_needed is True
+    assert runtime.drain_touched_items() == []
     assert "42" in state["active_reviews"]
 
 
@@ -281,23 +289,67 @@ def test_parse_deferred_context_payload_rejects_unsupported_payload():
         reconcile.parse_deferred_context_payload({"schema_version": 2})
 
 
-def test_validate_live_comment_replay_contract_reports_changed_for_command_ambiguity(monkeypatch):
-    review = review_state.ensure_review_entry(make_state(), 42, create=True)
+def test_reconcile_deferred_comment_fail_closes_for_command_ambiguity(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    state = make_state()
+    review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
-    payload = {
-        "comment_id": 201,
-        "comment_class": "command_only",
-        "has_non_command_text": False,
-        "source_event_key": "issue_comment:201",
-        "source_event_name": "issue_comment",
-        "source_event_action": "created",
-        "source_created_at": "2026-03-17T10:00:00Z",
-        "pr_number": 42,
-        "source_run_id": 603,
-        "source_run_attempt": 1,
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        "source_artifact_name": "reviewer-bot-comment-context-603-attempt-1",
-    }
+    comment_body = "@guidelines-bot /claim"
+    payload = reconcile.DeferredCommentPayload(
+        identity=reconcile.DeferredArtifactIdentity(
+            schema_version=2,
+            source_workflow_name="Reviewer Bot PR Comment Observer",
+            source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            source_run_id=603,
+            source_run_attempt=1,
+            source_event_name="issue_comment",
+            source_event_action="created",
+            source_event_key="issue_comment:201",
+        ),
+        pr_number=42,
+        comment_id=201,
+        comment_class="command_only",
+        has_non_command_text=False,
+        source_body_digest=reconcile.digest_comment_body(comment_body),
+        source_created_at="2026-03-17T10:00:00Z",
+        actor_login="alice",
+        raw_payload={
+            "comment_id": 201,
+            "comment_class": "command_only",
+            "has_non_command_text": False,
+            "source_event_key": "issue_comment:201",
+            "source_event_name": "issue_comment",
+            "source_event_action": "created",
+            "source_created_at": "2026-03-17T10:00:00Z",
+            "pr_number": 42,
+            "source_run_id": 603,
+            "source_run_attempt": 1,
+            "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            "source_artifact_name": "reviewer-bot-comment-context-603-attempt-1",
+            "source_body_digest": reconcile.digest_comment_body(comment_body),
+            "actor_login": "alice",
+        },
+    )
+    context = reconcile.build_deferred_comment_replay_context(
+        payload,
+        expected_event_name="issue_comment",
+        live_comment_endpoint="issues/comments/201",
+    )
+    monkeypatch.setattr(
+        reconcile,
+        "_read_live_pr_replay_context",
+        lambda bot, pr_number: SimpleNamespace(issue_author="dana", issue_labels=()),
+    )
+    monkeypatch.setattr(
+        reconcile,
+        "_read_reconcile_object",
+        lambda bot, endpoint, *, label: {
+            "body": comment_body,
+            "user": {"login": "alice", "type": "User"},
+            "author_association": "MEMBER",
+            "performed_via_github_app": False,
+        },
+    )
     monkeypatch.setattr(
         reconcile,
         "classify_comment_payload",
@@ -310,18 +362,17 @@ def test_validate_live_comment_replay_contract_reports_changed_for_command_ambig
             "normalized_body": body,
         },
     )
-
-    result = reconcile._validate_live_comment_replay_contract(
-        FakeReviewerBotRuntime(monkeypatch),
-        review,
-        payload,
-        "@guidelines-bot /claim",
+    monkeypatch.setattr(
+        reconcile,
+        "process_comment_event",
+        lambda *args, **kwargs: pytest.fail("ambiguous replay must fail closed before command application"),
     )
 
-    assert result.live_classified is None
-    assert result.changed is True
-    assert result.failed_closed is True
+    changed = reconcile._reconcile_deferred_comment(runtime, state, review, context)
+
+    assert changed is True
     assert review["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
+    assert "no longer resolves to exactly one command" in review["deferred_gaps"]["issue_comment:201"]["diagnostic_summary"]
 
 
 def test_resolve_workflow_run_pr_number_fails_closed_when_pr_unavailable(monkeypatch):
@@ -401,8 +452,65 @@ def test_d2_reconcile_remaining_replay_branches_are_decode_read_or_apply_only():
     assert 'if event_name == "pull_request_review_comment" and event_action == "created" and isinstance(parsed_payload, DeferredCommentPayload):' in reconcile_text
     assert 'if event_name == "pull_request_review" and event_action == "submitted" and isinstance(parsed_payload, DeferredReviewPayload):' in reconcile_text
     assert 'if event_name == "pull_request_review" and event_action == "dismissed" and isinstance(parsed_payload, DeferredReviewPayload):' in reconcile_text
-    assert "if validation_result.live_classified is None:" in reconcile_text
+    assert "if decision.failed_closed_reason is not None:" in reconcile_text
+    assert "if decision.replay_comment_command:" in reconcile_text
+    assert "if decision.mark_reconciled:" in reconcile_text
+    assert "if decision.clear_gap:" in reconcile_text
     assert "if decision.accept_reviewer_review:" in reconcile_text
     assert "if decision.accept_review_dismissal:" in reconcile_text
     assert "classification changed from" not in reconcile_text
     assert "no longer resolves to exactly one command" not in reconcile_text
+
+
+def test_k1b_context_module_freezes_two_reconcile_runtime_subseams_not_one_mega_protocol():
+    context_text = Path("scripts/reviewer_bot_lib/context.py").read_text(encoding="utf-8")
+
+    assert "class ReconcileWorkflowRuntimeContext(Protocol):" in context_text
+    assert "class ReconcileRectifyRuntimeContext(Protocol):" in context_text
+    assert "class ReconcileAdaptersContext(Protocol):" in context_text
+    assert "class ReconcileReviewStateAdapterContext(Protocol):" in context_text
+    assert "class ReconcileWorkflowRuntimeContext(ReviewerBotContext, Protocol):" not in context_text
+    assert "class ReconcileRectifyRuntimeContext(ReviewerBotContext, Protocol):" not in context_text
+
+
+def test_k1c_workflow_run_reconcile_entrypoint_uses_frozen_workflow_runtime_protocol():
+    hints = get_type_hints(reconcile.handle_workflow_run_event)
+
+    assert hints["bot"] is ReconcileWorkflowRuntimeContext
+
+
+def test_k1g_rectify_reconcile_entrypoints_use_finalized_rectify_runtime_protocol():
+    reconcile_hints = get_type_hints(reconcile.reconcile_active_review_entry)
+    rectify_hints = get_type_hints(reconcile.handle_rectify_command)
+    rebuild_hints = get_type_hints(reconcile._record_review_rebuild)
+
+    assert reconcile_hints["bot"] is ReconcileRectifyRuntimeContext
+    assert rectify_hints["bot"] is ReconcileRectifyRuntimeContext
+    assert rebuild_hints["bot"] is ReconcileRectifyRuntimeContext
+
+
+def test_k1d_rectify_refresh_keeps_retained_owner_boundaries_explicit_in_reconcile_source():
+    reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
+    context_text = Path("scripts/reviewer_bot_lib/context.py").read_text(encoding="utf-8")
+
+    assert "refresh_reviewer_review_from_live_preferred_review(" in reconcile_text
+    assert "rebuild_pr_approval_state_result(" in reconcile_text
+    assert "approval_policy.find_triage_approval_after(" in reconcile_text
+    assert "def github_api_request(self, *args, **kwargs) -> Any: ..." in context_text
+    assert "def github_api(self, *args, **kwargs) -> Any | None: ..." in context_text
+    assert "def parse_github_timestamp(self, value: Any) -> datetime | None: ..." in context_text
+    assert "def is_triage_or_higher(self, username: str) -> bool: ..." in context_text
+
+
+def test_k1e_rectify_finalization_keeps_retained_approval_support_explicit_but_workflow_seam_unchanged():
+    reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
+    context_text = Path("scripts/reviewer_bot_lib/context.py").read_text(encoding="utf-8")
+
+    assert "approval_policy.find_triage_approval_after(" in reconcile_text
+    assert "bot.parse_github_timestamp(" in reconcile_text or "bot.parse_github_timestamp(" in Path("scripts/reviewer_bot_core/approval_policy.py").read_text(encoding="utf-8")
+    assert "bot.is_triage_or_higher(" in Path("scripts/reviewer_bot_core/approval_policy.py").read_text(encoding="utf-8")
+    assert "def parse_github_timestamp(self, value: Any) -> datetime | None: ..." in context_text
+    assert "def is_triage_or_higher(self, username: str) -> bool: ..." in context_text
+    workflow_block = context_text.split("class ReconcileWorkflowRuntimeContext(Protocol):", 1)[1].split("class ReconcileRectifyGitHubContext(Protocol):", 1)[0]
+    assert "parse_github_timestamp" not in workflow_block
+    assert "is_triage_or_higher" not in workflow_block

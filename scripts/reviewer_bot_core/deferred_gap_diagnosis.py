@@ -285,3 +285,32 @@ def recommend_visible_review_repair(
     if source_event_key != f"pull_request_review:{review_id}":
         return None
     return author, submitted_at, commit_id
+
+
+def recommend_review_submission_gap_repair(
+    review_data: dict,
+    review: dict | None,
+    source_event_key: str,
+    *,
+    artifact_status: str | None,
+    current_cycle_boundary,
+) -> dict[str, object] | None:
+    if review is None or artifact_status == "exact_artifact_match":
+        return None
+    repair = recommend_visible_review_repair(
+        review_data,
+        review,
+        source_event_key,
+        current_cycle_boundary=current_cycle_boundary,
+    )
+    if repair is None:
+        return None
+    author, submitted_at, commit_id = repair
+    return {
+        "category": "review_submission_repair",
+        "payload": {
+            "author": author,
+            "submitted_at": submitted_at,
+            "commit_id": commit_id,
+        },
+    }

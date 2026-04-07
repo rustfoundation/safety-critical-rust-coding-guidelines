@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from scripts.reviewer_bot_core import (
@@ -13,7 +14,11 @@ from scripts.reviewer_bot_core import (
 
 from . import commands as commands_module
 from . import config as config_module
-from .context import AssignmentRequest, CommentEventRequest
+from .context import (
+    AssignmentRequest,
+    CommentApplicationRuntimeContext,
+    CommentEventRequest,
+)
 from .review_state import (
     accept_channel_event,
     ensure_review_entry,
@@ -29,6 +34,23 @@ def _now_iso() -> str:
     return _now().isoformat()
 
 
+@dataclass(frozen=True)
+class CommentApplicationRoutingResult:
+    kind: str
+
+
+def _route_comment_application(classified: dict, *, comment_id: int) -> CommentApplicationRoutingResult:
+    comment_class = str(classified.get("comment_class", ""))
+    command_count = int(classified.get("command_count", 0))
+    if comment_class in {"plain_text", "command_plus_text"} and comment_id > 0:
+        if comment_class in {"command_only", "command_plus_text"} and command_count == 1:
+            return CommentApplicationRoutingResult(kind="both")
+        return CommentApplicationRoutingResult(kind="freshness_only")
+    if comment_class in {"command_only", "command_plus_text"} and command_count == 1:
+        return CommentApplicationRoutingResult(kind="command_only")
+    return CommentApplicationRoutingResult(kind="noop")
+
+
 def normalize_comment_body(body: str) -> str:
     return "\n".join(line.rstrip() for line in body.replace("\r\n", "\n").split("\n")).strip()
 
@@ -38,7 +60,7 @@ def digest_comment_body(body: str) -> str:
 
 
 def record_conversation_freshness(
-    bot,
+    bot: CommentApplicationRuntimeContext,
     state: dict,
     request: CommentEventRequest,
 ) -> bool:
@@ -79,7 +101,7 @@ def build_assignment_request_from_comment(request: CommentEventRequest) -> Assig
 
 
 def validate_accept_no_fls_changes_handoff(
-    bot,
+    bot: CommentApplicationRuntimeContext,
     request: CommentEventRequest,
 ) -> tuple[bool, dict]:
     labels = commands_module.parse_issue_labels(bot)
@@ -89,7 +111,7 @@ def validate_accept_no_fls_changes_handoff(
 
 
 def apply_comment_command(
-    bot,
+    bot: CommentApplicationRuntimeContext,
     state: dict,
     request: CommentEventRequest,
     classified: dict,
@@ -104,7 +126,7 @@ def apply_comment_command(
         actor_class=actor_class,
         commands_help=config_module.get_commands_help(),
     )
-    if decision["kind"] == "ignore":
+    if isinstance(decision, dict) and decision["kind"] == "ignore":
         return False
 
     issue_number = request.issue_number
@@ -115,7 +137,7 @@ def apply_comment_command(
     if review_data is None:
         return False
     source_event_key = request.comment_source_event_key or f"issue_comment:{request.comment_id}"
-    if decision["kind"] == "deferred_privileged_handoff":
+    if isinstance(decision, dict) and decision["kind"] == "deferred_privileged_handoff":
         is_valid, metadata = validate_accept_no_fls_changes_handoff(bot, request)
         if not is_valid:
             bot.github.post_comment(
@@ -145,25 +167,25 @@ def apply_comment_command(
     success = False
     state_changed = False
     assignment_request = build_assignment_request_from_comment(request)
-    if decision["kind"] == "handler_call":
-        handler = getattr(commands_module, decision["handler"])
-        handler_args = [bot, state, *decision["handler_args"]]
+    if decision.kind == "handler_call":
+        handler = getattr(commands_module, str(decision.handler_name))
+        handler_args = [bot, state, *(decision.handler_args or [])]
         handler_kwargs = {}
-        if decision["needs_assignment_request"]:
+        if decision.needs_assignment_request:
             handler_kwargs["request"] = assignment_request
         result = handler(*handler_args, **handler_kwargs)
-        if decision["result_shape"] == "pair":
+        if decision.result_shape == "pair":
             response, success = result
-            state_changed = success if decision.get("state_changed_from") == "success" else False
+            state_changed = success if decision.state_changed_from == "success" else False
         else:
             response, success, state_changed = result
     else:
-        response = decision["response"]
-        success = decision["success"]
-        state_changed = decision["state_changed"]
+        response = str(decision.response or "")
+        success = bool(decision.success)
+        state_changed = False
 
     comment_id = request.comment_id
-    if comment_id > 0 and decision.get("react", True):
+    if comment_id > 0 and decision.react:
         bot.github.add_reaction(comment_id, "eyes")
         if success:
             bot.github.add_reaction(comment_id, "+1")
@@ -173,7 +195,7 @@ def apply_comment_command(
 
 
 def process_comment_event(
-    bot,
+    bot: CommentApplicationRuntimeContext,
     state: dict,
     request: CommentEventRequest,
     *,
@@ -184,11 +206,11 @@ def process_comment_event(
     comment_created_at = request.comment_created_at or _now_iso()
     comment_request = CommentEventRequest(**{**request.__dict__, "comment_created_at": comment_created_at})
     classified = classify_comment_payload(bot, comment_request.comment_body)
-    comment_class = classified["comment_class"]
+    routing = _route_comment_application(classified, comment_id=comment_id)
     state_changed = False
-    if comment_class in {"plain_text", "command_plus_text"} and comment_id > 0:
+    if routing.kind in {"freshness_only", "both"}:
         state_changed = record_conversation_freshness(bot, state, comment_request) or state_changed
-    if comment_class in {"command_only", "command_plus_text"} and int(classified.get("command_count", 0)) == 1:
+    if routing.kind in {"command_only", "both"}:
         state_changed = apply_comment_command(
             bot,
             state,

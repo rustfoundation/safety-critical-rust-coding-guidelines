@@ -37,13 +37,26 @@ def _load_fixture() -> dict:
 
 
 def _legacy_decide_comment_command(bot, request, classified, *, actor_class: str, commands_help: str) -> dict:
-    return comment_command_policy.decide_comment_command(
+    decision = comment_command_policy.decide_comment_command(
         bot,
         request,
         classified,
         actor_class=actor_class,
         commands_help=commands_help,
     )
+    if isinstance(decision, dict):
+        return decision
+    return {
+        "kind": decision.kind,
+        "handler": decision.handler_name,
+        "handler_args": decision.handler_args,
+        "needs_assignment_request": decision.needs_assignment_request,
+        "result_shape": decision.result_shape,
+        "state_changed_from": decision.state_changed_from,
+        "response": decision.response,
+        "success": decision.success,
+        "react": decision.react,
+    }
 
 
 def _legacy_apply_ordinary_decision(bot, state: dict, request, decision: dict) -> bool:
@@ -67,7 +80,7 @@ def _legacy_apply_ordinary_decision(bot, state: dict, request, decision: dict) -
     else:
         response = decision["response"]
         success = decision["success"]
-        state_changed = decision["state_changed"]
+        state_changed = bool(decision.get("state_changed", False))
 
     if request.comment_id > 0 and decision.get("react", True):
         bot.github.add_reaction(request.comment_id, "eyes")
@@ -76,6 +89,22 @@ def _legacy_apply_ordinary_decision(bot, state: dict, request, decision: dict) -
     if response:
         bot.github.post_comment(issue_number, response)
     return state_changed
+
+
+def _normalize_decision(decision):
+    if isinstance(decision, dict):
+        return decision
+    return {
+        "kind": decision.kind,
+        "handler": decision.handler_name,
+        "handler_args": decision.handler_args,
+        "needs_assignment_request": decision.needs_assignment_request,
+        "result_shape": decision.result_shape,
+        "state_changed_from": decision.state_changed_from,
+        "response": decision.response,
+        "success": decision.success,
+        "react": decision.react,
+    }
 
 
 def _stub_common_handlers(monkeypatch):
@@ -116,6 +145,46 @@ def test_command_policy_explicitly_defers_privileged_handoff_path(monkeypatch):
     )
 
     assert decision == {"kind": "deferred_privileged_handoff"}
+
+
+def test_i1_comment_policy_types_ordinary_command_output_shape(monkeypatch):
+    harness = CommandHarness(monkeypatch)
+    request = harness.typed_comment_request(
+        issue_number=42,
+        actor="alice",
+        body="@guidelines-bot /queue",
+        issue_author="dana",
+        is_pull_request=False,
+    )
+
+    decision = comment_command_policy.decide_comment_command(
+        harness.runtime,
+        request,
+        {"command": "queue", "args": [], "command_count": 1},
+        actor_class="repo_user_principal",
+        commands_help="help text",
+    )
+
+    assert isinstance(decision, comment_command_policy.OrdinaryCommentUseCaseResult)
+    assert list(decision.__dataclass_fields__) == [
+        "kind",
+        "handler_name",
+        "handler_args",
+        "needs_assignment_request",
+        "result_shape",
+        "state_changed_from",
+        "response",
+        "success",
+        "react",
+    ]
+
+
+def test_i2_comment_application_routing_does_not_reopen_command_semantics_in_adapter():
+    module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+
+    assert 'if routing.kind in {"freshness_only", "both"}:' in module_text
+    assert 'if routing.kind in {"command_only", "both"}:' in module_text
+    assert "if command == " not in module_text
 
 
 def test_c3b2_deletion_manifest_keeps_privileged_handoff_outside_ordinary_scope():
@@ -222,7 +291,7 @@ def test_command_decision_equivalence_matches_legacy_for_ordinary_paths(monkeypa
             classify_issue_comment_actor=lambda current_request: "repo_user_principal",
         )
 
-        assert new_decision == old_decision, scenario_name
+        assert _normalize_decision(new_decision) == _normalize_decision(old_decision), scenario_name
         assert new_changed == old_changed, scenario_name
         assert new_state == old_state, scenario_name
         assert new_effects.comments == old_comments, scenario_name

@@ -3,6 +3,12 @@ from pathlib import Path
 
 import pytest
 
+from scripts.reviewer_bot_lib.context import (
+    CommentApplicationRuntimeContext,
+    CommentRoutingRuntimeContext,
+    ReconcileRectifyRuntimeContext,
+    ReconcileWorkflowRuntimeContext,
+)
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.focused_fake_services import (
     ArtifactDownloadTransportStub,
@@ -241,6 +247,66 @@ def test_fake_runtime_exposes_compatibility_groups_for_thin_delegation(monkeypat
     assert hasattr(runtime.compat, "automation")
 
 
+def test_k1b_fake_runtime_contract_still_exposes_members_needed_by_frozen_reconcile_seams(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime, "assert_lock_held")
+    assert hasattr(runtime, "load_deferred_payload")
+    assert hasattr(runtime, "collect_touched_item")
+    assert hasattr(runtime, "github_api_request")
+    assert hasattr(runtime, "github_api")
+    assert hasattr(runtime.adapters.review_state, "maybe_record_head_observation_repair")
+    assert hasattr(runtime.github, "get_pull_request_reviews")
+    assert hasattr(runtime.github, "get_user_permission_status")
+    assert hasattr(runtime, "parse_iso8601_timestamp")
+    assert hasattr(runtime, "satisfy_mandatory_approver_requirement")
+    assert hasattr(runtime, "reconcile_workflow_runtime") is False
+    assert hasattr(runtime, "reconcile_rectify_runtime") is False
+    assert isinstance(ReconcileWorkflowRuntimeContext, type)
+    assert isinstance(ReconcileRectifyRuntimeContext, type)
+
+
+def test_k1c_fake_runtime_satisfies_frozen_workflow_reconcile_protocol(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime, ReconcileWorkflowRuntimeContext)
+
+
+def test_k1d_fake_runtime_contract_keeps_rectify_read_helpers_explicit_without_new_mega_surface(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime, "github_api_request")
+    assert hasattr(runtime, "github_api")
+    assert hasattr(runtime, "parse_iso8601_timestamp")
+    assert hasattr(runtime.github, "get_pull_request_reviews")
+    assert hasattr(runtime.github, "get_user_permission_status")
+    assert hasattr(runtime.adapters.review_state, "maybe_record_head_observation_repair")
+    assert hasattr(runtime, "reconcile_rectify_runtime") is False
+
+
+def test_k1e_fake_runtime_contract_exposes_retained_approval_support_for_rectify_only(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime, "parse_github_timestamp")
+    assert hasattr(runtime, "is_triage_or_higher")
+    assert hasattr(runtime, "satisfy_mandatory_approver_requirement")
+    assert hasattr(runtime, "reconcile_workflow_runtime") is False
+    assert hasattr(runtime, "reconcile_rectify_runtime") is False
+
+
+def test_k1f_fake_runtime_satisfies_finalized_rectify_runtime_protocol(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime, ReconcileRectifyRuntimeContext)
+
+
+def test_k2_fake_runtime_satisfies_narrow_comment_runtime_protocols(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime, CommentApplicationRuntimeContext)
+    assert isinstance(runtime, CommentRoutingRuntimeContext)
+
+
 def _load_runtime_surface_inventory() -> dict:
     return json.loads(
         Path("tests/fixtures/equivalence/runtime_surface/triple_inventory.json").read_text(
@@ -256,11 +322,17 @@ def test_f2a_runtime_surface_inventory_matches_fake_runtime_branch_examples():
     assert capabilities["comment-event dispatch"]["fake_runtime_branch"] == (
         "tests/fixtures/fake_runtime.py:handle_comment_event"
     )
-    assert capabilities["workflow-run dispatch"]["fake_runtime_branch"] == (
-        "tests/fixtures/fake_runtime.py:handle_workflow_run_event"
-    )
     assert capabilities["privileged accept-no-fls-changes execution"]["fake_runtime_branch"] == (
         "tests/fixtures/fake_runtime.py:handle_accept_no_fls_changes_command"
+    )
+    assert capabilities["github timestamp parsing"]["fake_runtime_branch"] == (
+        "tests/fixtures/fake_runtime.py:parse_github_timestamp"
+    )
+    assert capabilities["rectify triage permission check"]["fake_runtime_branch"] == (
+        "tests/fixtures/fake_runtime.py:is_triage_or_higher"
+    )
+    assert capabilities["mandatory approver satisfaction"]["fake_runtime_branch"] == (
+        "tests/fixtures/fake_runtime.py:satisfy_mandatory_approver_requirement"
     )
 
 
@@ -280,3 +352,5 @@ def test_fake_runtime_default_handlers_are_built_from_focused_fake_service_helpe
     expected = build_default_handler_map(runtime)
 
     assert set(expected) == HandlerStub.ALLOWED
+    assert "handle_workflow_run_event" not in expected
+    assert hasattr(runtime, "handle_workflow_run_event") is False

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from scripts.reviewer_bot_core import review_state_machine
+from scripts.reviewer_bot_core import review_state_live_repair, review_state_machine
 
 
 def ensure_review_entry(state: dict, issue_number: int, create: bool = False) -> dict | None:
@@ -79,7 +79,7 @@ def get_current_cycle_boundary(bot, review_data: dict) -> datetime | None:
 
 
 def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
-    return review_state_machine.accept_reviewer_review_from_live_review(
+    return review_state_live_repair.accept_reviewer_review_from_live_review(
         review_data,
         review,
         actor=actor,
@@ -95,7 +95,7 @@ def refresh_reviewer_review_from_live_preferred_review(
     reviews: list[dict] | None = None,
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
-    return review_state_machine.refresh_reviewer_review_from_live_preferred_review(
+    return review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(
         bot,
         issue_number,
         review_data,
@@ -106,7 +106,7 @@ def refresh_reviewer_review_from_live_preferred_review(
 
 
 def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
-    return review_state_machine.repair_missing_reviewer_review_state(
+    return review_state_live_repair.repair_missing_reviewer_review_state(
         bot,
         issue_number,
         review_data,

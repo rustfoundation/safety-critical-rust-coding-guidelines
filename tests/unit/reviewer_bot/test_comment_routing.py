@@ -220,3 +220,11 @@ def test_comment_application_delegates_freshness_decision_to_core_policy():
 
     assert "comment_freshness_policy" in module_text
     assert "decision = comment_freshness_policy.decide_comment_freshness(review_data, request)" in module_text
+
+
+def test_k2_comment_routing_entrypoints_use_narrow_comment_runtime_protocol():
+    with open("scripts/reviewer_bot_lib/comment_routing.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert "CommentRoutingRuntimeContext" in module_text
+    assert "bot: CommentRoutingRuntimeContext" in module_text

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.reviewer_bot_lib import reconcile
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state, make_tracked_review_state
 
@@ -171,7 +172,11 @@ def test_execute_run_returns_failure_for_invalid_workflow_run_context(monkeypatc
     harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
     harness.stub_pass_until(lambda state: (state, []))
     harness.stub_sync_members(lambda state: (state, []))
-    harness.stub_handler("handle_workflow_run_event", lambda state: (_ for _ in ()).throw(RuntimeError("invalid deferred context")))
+    monkeypatch.setattr(
+        reconcile,
+        "handle_workflow_run_event_result",
+        lambda bot, state: (_ for _ in ()).throw(RuntimeError("invalid deferred context")),
+    )
 
     result = harness.run_execute()
 
@@ -186,6 +191,10 @@ def test_d4a_app_branch_to_phase_map_is_frozen_pre_edit():
     assert "state = bot.state_store.load_state(fail_on_unavailable=lock_required)" in app_text
     assert "state, restored = bot.adapters.workflow.process_pass_until_expirations(state)" in app_text
     assert "state, sync_changes = bot.adapters.workflow.sync_members_with_queue(state)" in app_text
+    assert "if workflow_run_result is not None:" in app_text
+    assert "touched_items = workflow_run_result.touched_items" in app_text
+    assert "elif schedule_result is not None:" in app_text
+    assert "touched_items = schedule_result.touched_items" in app_text
     assert "touched_items = bot.drain_touched_items()" in app_text
     assert '_revalidate_epoch(bot, loaded_epoch, "authoritative save")' in app_text
     assert "if not bot.state_store.save_state(state):" in app_text
@@ -201,3 +210,15 @@ def test_d4b_post_edit_phase_map_matches_pre_edit_transaction_shape():
 
     assert post_map["harness_id"] == "D4b app post-edit transaction phase map"
     assert post_map["branch_to_phase"] == pre_map["branch_to_phase"]
+
+
+def test_m1_app_consumes_typed_workflow_run_result_instead_of_boolean_only_signal():
+    app_text = Path("scripts/reviewer_bot_lib/app.py").read_text(encoding="utf-8")
+
+    assert "workflow_run_result: reconcile.WorkflowRunHandlerResult | None = None" in app_text
+    assert "workflow_run_result = reconcile.handle_workflow_run_event_result(bot, state)" in app_text
+    assert "state_changed = workflow_run_result.state_changed" in app_text
+    assert "if workflow_run_result is not None:" in app_text
+    assert "touched_items = workflow_run_result.touched_items" in app_text
+    assert "elif schedule_result is not None:" in app_text
+    assert "touched_items = schedule_result.touched_items" in app_text

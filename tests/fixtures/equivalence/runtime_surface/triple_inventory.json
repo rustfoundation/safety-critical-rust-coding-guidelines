@@ -1,5 +1,19 @@
 {
   "harness_id": "F2a runtime/bootstrap/fake-runtime triple inventory",
+  "proof_artifacts": [
+    {
+      "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
+      "classification": "rewritten final proof"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_adapter_contract.py",
+      "classification": "rewritten final proof"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+      "classification": "rewritten final proof"
+    }
+  ],
   "capability_triples": [
     {
       "capability": "comment-event dispatch",
@@ -24,7 +38,7 @@
     },
     {
       "capability": "pull request reviews access",
-      "runtime_forwarder": null,
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:get_pull_request_reviews",
       "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapGitHubServices.get_pull_request_reviews",
       "fake_runtime_branch": "tests/fixtures/fake_runtime.py:get_pull_request_reviews",
       "classification": "retained final surface"
@@ -38,9 +52,30 @@
     },
     {
       "capability": "rebuild approval state",
-      "runtime_forwarder": null,
-      "bootstrap_adapter": null,
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:rebuild_pr_approval_state",
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.rebuild_pr_approval_state",
       "fake_runtime_branch": "tests/fixtures/fake_runtime.py:rebuild_pr_approval_state",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "github timestamp parsing",
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:parse_github_timestamp",
+      "bootstrap_adapter": null,
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:parse_github_timestamp",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "rectify triage permission check",
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:is_triage_or_higher",
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.is_triage_or_higher",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:is_triage_or_higher",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "mandatory approver satisfaction",
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:satisfy_mandatory_approver_requirement",
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.satisfy_mandatory_approver_requirement",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:satisfy_mandatory_approver_requirement",
       "classification": "retained final surface"
     },
     {

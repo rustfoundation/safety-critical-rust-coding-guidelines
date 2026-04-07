@@ -40,9 +40,14 @@ class PendingPrivilegedCommandRecord:
 class AcceptNoFlsChangesPlan:
     ordered_steps: list[str]
     revalidation_checkpoints: list[str]
+    expected_changed_files: list[str]
+    branch_probe_name: str
     branch_name: str
     base_branch: str
     add_paths: list[str]
+    git_checkout_args: list[str]
+    git_commit_args: list[str]
+    git_push_args: list[str]
     commit_message: str
     pull_request_title: str
     pull_request_body: str
@@ -118,18 +123,25 @@ def prevalidate_accept_no_fls_changes_request(request, permission_status: str, c
     return PrivilegedDecision(kind="continue")
 
 
-def plan_accept_no_fls_changes_execution(
+def derive_accept_no_fls_changes_branch_name(
     *,
     issue_number: int,
+    branch_date: str,
+    branch_suffix: str | None = None,
+) -> str:
+    branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
+    if branch_suffix:
+        branch_name = f"{branch_name}-{branch_suffix}"
+    return branch_name
+
+
+def assess_accept_no_fls_changes_post_update(
+    *,
     audit_returncode: int,
     audit_details: str,
     update_returncode: int,
     update_details: str,
     changed_files_after: list[str],
-    branch_date: str,
-    base_branch: str,
-    branch_exists: bool,
-    branch_suffix: str | None = None,
 ) -> PrivilegedDecision:
     if audit_returncode == 2:
         return PrivilegedDecision(
@@ -158,15 +170,61 @@ def plan_accept_no_fls_changes_execution(
             ),
             success=False,
         )
-    branch_name = f"chore/spec-lock-{branch_date}-issue-{issue_number}"
-    if branch_exists and branch_suffix:
-        branch_name = f"{branch_name}-{branch_suffix}"
+    return PrivilegedDecision(kind="continue")
+
+
+def plan_accept_no_fls_changes_execution(
+    *,
+    issue_number: int,
+    audit_returncode: int,
+    audit_details: str,
+    update_returncode: int,
+    update_details: str,
+    changed_files_after: list[str],
+    branch_date: str,
+    base_branch: str,
+    branch_exists: bool,
+    branch_suffix: str | None = None,
+) -> PrivilegedDecision:
+    assessment = assess_accept_no_fls_changes_post_update(
+        audit_returncode=audit_returncode,
+        audit_details=audit_details,
+        update_returncode=update_returncode,
+        update_details=update_details,
+        changed_files_after=changed_files_after,
+    )
+    if assessment.kind != "continue":
+        return assessment
+    branch_probe_name = derive_accept_no_fls_changes_branch_name(
+        issue_number=issue_number,
+        branch_date=branch_date,
+    )
+    effective_suffix = branch_suffix if branch_exists else None
+    branch_name = derive_accept_no_fls_changes_branch_name(
+        issue_number=issue_number,
+        branch_date=branch_date,
+        branch_suffix=effective_suffix,
+    )
     plan = AcceptNoFlsChangesPlan(
         ordered_steps=list(ORDERED_EXECUTION_STEPS),
         revalidation_checkpoints=list(REVALIDATION_CHECKPOINTS),
+        expected_changed_files=["src/spec.lock"],
+        branch_probe_name=branch_probe_name,
         branch_name=branch_name,
         base_branch=base_branch,
         add_paths=["src/spec.lock"],
+        git_checkout_args=["git", "checkout", "-b", branch_name],
+        git_commit_args=[
+            "git",
+            "-c",
+            "user.name=guidelines-bot",
+            "-c",
+            "user.email=guidelines-bot@users.noreply.github.com",
+            "commit",
+            "-m",
+            COMMIT_MESSAGE,
+        ],
+        git_push_args=["git", "push", "origin", branch_name],
         commit_message=COMMIT_MESSAGE,
         pull_request_title=PR_TITLE,
         pull_request_body=(

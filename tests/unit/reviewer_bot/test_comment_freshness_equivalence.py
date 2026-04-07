@@ -156,3 +156,13 @@ def test_comment_freshness_equivalence_matches_legacy_mutation_and_activity_beha
 
         assert new_changed == legacy_changed, scenario_name
         assert new_state == legacy_state, scenario_name
+
+
+def test_i2_comment_application_uses_typed_local_routing_shapes():
+    module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
+
+    assert "class CommentApplicationRoutingResult:" in module_text
+    assert 'return CommentApplicationRoutingResult(kind="freshness_only")' in module_text
+    assert 'return CommentApplicationRoutingResult(kind="command_only")' in module_text
+    assert 'return CommentApplicationRoutingResult(kind="both")' in module_text
+    assert 'return CommentApplicationRoutingResult(kind="noop")' in module_text

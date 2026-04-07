@@ -436,7 +436,6 @@ class HandlerStub:
         "handle_comment_event",
         "handle_manual_dispatch",
         "handle_scheduled_check",
-        "handle_workflow_run_event",
     }
 
     def __init__(self, defaults: dict[str, Callable[[dict], bool]]):
@@ -503,7 +502,6 @@ def build_default_handler_map(runtime) -> dict[str, Callable[[dict], bool]]:
     from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
     from scripts.reviewer_bot_lib import lifecycle as lifecycle_module
     from scripts.reviewer_bot_lib import maintenance as maintenance_module
-    from scripts.reviewer_bot_lib import reconcile as reconcile_module
 
     return {
         "handle_issue_or_pr_opened": lambda state: lifecycle_module.handle_issue_or_pr_opened(runtime, state),
@@ -515,5 +513,4 @@ def build_default_handler_map(runtime) -> dict[str, Callable[[dict], bool]]:
         "handle_comment_event": lambda state: comment_routing_module.handle_comment_event(runtime, state),
         "handle_manual_dispatch": lambda state: maintenance_module.handle_manual_dispatch(runtime, state),
         "handle_scheduled_check": lambda state: maintenance_module.handle_scheduled_check(runtime, state),
-        "handle_workflow_run_event": lambda state: reconcile_module.handle_workflow_run_event(runtime, state),
     }

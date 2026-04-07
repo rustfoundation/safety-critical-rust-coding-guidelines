@@ -237,22 +237,12 @@ def get_current_cycle_boundary(bot, review_data: dict):
 
 
 def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
-    from scripts.reviewer_bot_lib.reviews import (
-        build_reviewer_review_record_from_live_review,
-    )
+    from . import review_state_live_repair
 
-    record = build_reviewer_review_record_from_live_review(review, actor=actor)
-    if record is None:
-        return False
-    return accept_channel_event(
+    return review_state_live_repair.accept_reviewer_review_from_live_review(
         review_data,
-        "reviewer_review",
-        semantic_key=record["semantic_key"],
-        timestamp=record["timestamp"],
-        actor=record["actor"],
-        reviewed_head_sha=record["reviewed_head_sha"],
-        source_precedence=record["source_precedence"],
-        payload=record["payload"],
+        review,
+        actor=actor,
     )
 
 
@@ -265,61 +255,24 @@ def refresh_reviewer_review_from_live_preferred_review(
     reviews: list[dict] | None = None,
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
-    from scripts.reviewer_bot_lib.reviews import (
-        _pull_request_read_result,
-        build_reviewer_review_record_from_live_review,
-        get_preferred_current_reviewer_review_for_cycle,
-    )
+    from . import review_state_live_repair
 
-    if pull_request is None:
-        pull_request_result = _pull_request_read_result(bot, issue_number)
-        if not pull_request_result.get("ok"):
-            return False, None
-        pull_request = pull_request_result["pull_request"]
-    preferred_review = get_preferred_current_reviewer_review_for_cycle(
+    return review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(
         bot,
         issue_number,
         review_data,
         pull_request=pull_request,
         reviews=reviews,
+        actor=actor,
     )
-    if preferred_review is None:
-        return False, None
-    record = build_reviewer_review_record_from_live_review(
-        preferred_review,
-        actor=actor or review_data.get("current_reviewer"),
-    )
-    if record is None:
-        return False, None
-    channel = _ensure_channel_map(review_data, "reviewer_review")
-    changed = False
-    if record["semantic_key"] not in channel["seen_keys"]:
-        channel["seen_keys"].append(record["semantic_key"])
-        changed = True
-    if channel.get("accepted") != record:
-        channel["accepted"] = record
-        changed = True
-    submitted_at = preferred_review.get("submitted_at")
-    if isinstance(submitted_at, str):
-        previous_activity = review_data.get("last_reviewer_activity")
-        previous_warning = review_data.get("transition_warning_sent")
-        previous_notice = review_data.get("transition_notice_sent_at")
-        record_reviewer_activity(review_data, submitted_at)
-        activity_changed = (
-            previous_activity != review_data.get("last_reviewer_activity")
-            or previous_warning != review_data.get("transition_warning_sent")
-            or previous_notice != review_data.get("transition_notice_sent_at")
-        )
-        changed = changed or activity_changed
-    return changed, preferred_review
 
 
 def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
-    changed, _ = refresh_reviewer_review_from_live_preferred_review(
+    from . import review_state_live_repair
+
+    return review_state_live_repair.repair_missing_reviewer_review_state(
         bot,
         issue_number,
         review_data,
         reviews=reviews,
-        actor=review_data.get("current_reviewer"),
     )
-    return changed

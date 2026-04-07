@@ -133,22 +133,10 @@ def create_pull_request(bot, branch: str, base: str, issue_number: int, *, title
 
 def _execute_accept_no_fls_changes_plan(bot, repo_root: Path, issue_number: int, plan: privileged_command_policy.AcceptNoFlsChangesPlan) -> tuple[str, bool]:
     try:
-        bot.adapters.automation.run_command(["git", "checkout", "-b", plan.branch_name], cwd=repo_root)
+        bot.adapters.automation.run_command(plan.git_checkout_args, cwd=repo_root)
         bot.adapters.automation.run_command(["git", "add", *plan.add_paths], cwd=repo_root)
-        bot.adapters.automation.run_command(
-            [
-                "git",
-                "-c",
-                "user.name=guidelines-bot",
-                "-c",
-                "user.email=guidelines-bot@users.noreply.github.com",
-                "commit",
-                "-m",
-                plan.commit_message,
-            ],
-            cwd=repo_root,
-        )
-        bot.adapters.automation.run_command(["git", "push", "origin", plan.branch_name], cwd=repo_root)
+        bot.adapters.automation.run_command(plan.git_commit_args, cwd=repo_root)
+        bot.adapters.automation.run_command(plan.git_push_args, cwd=repo_root)
     except RuntimeError as exc:
         return f"❌ Failed to create branch or push changes: {exc}", False
 
@@ -164,6 +152,61 @@ def _execute_accept_no_fls_changes_plan(bot, repo_root: Path, issue_number: int,
         return "❌ Failed to open a pull request for the spec.lock update.", False
 
     return f"✅ Opened PR {pr['html_url']}", True
+
+
+def _resolve_accept_no_fls_changes_plan(
+    bot,
+    repo_root: Path,
+    issue_number: int,
+    *,
+    audit_result: subprocess.CompletedProcess,
+    update_result: subprocess.CompletedProcess,
+    changed_files_after: list[str],
+) -> privileged_command_policy.PrivilegedDecision:
+    post_update = privileged_command_policy.assess_accept_no_fls_changes_post_update(
+        audit_returncode=audit_result.returncode,
+        audit_details=bot.adapters.automation.summarize_output(audit_result),
+        update_returncode=update_result.returncode,
+        update_details=bot.adapters.automation.summarize_output(update_result),
+        changed_files_after=changed_files_after,
+    )
+    if post_update.kind != "continue":
+        return post_update
+    base_branch = bot.adapters.automation.get_default_branch()
+    branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    provisional = privileged_command_policy.plan_accept_no_fls_changes_execution(
+        issue_number=issue_number,
+        audit_returncode=0,
+        audit_details="",
+        update_returncode=0,
+        update_details="",
+        changed_files_after=changed_files_after,
+        branch_date=branch_date,
+        base_branch=base_branch,
+        branch_exists=False,
+        branch_suffix=None,
+    )
+    if provisional.kind != "execute_plan":
+        return provisional
+    assert provisional.plan is not None
+    branch_exists = bot.adapters.automation.run_command(
+        ["git", "rev-parse", "--verify", provisional.plan.branch_probe_name],
+        cwd=repo_root,
+        check=False,
+    ).returncode == 0
+    branch_suffix = datetime.now(timezone.utc).strftime("%H%M%S") if branch_exists else None
+    return privileged_command_policy.plan_accept_no_fls_changes_execution(
+        issue_number=issue_number,
+        audit_returncode=0,
+        audit_details="",
+        update_returncode=0,
+        update_details="",
+        changed_files_after=changed_files_after,
+        branch_date=branch_date,
+        base_branch=base_branch,
+        branch_exists=branch_exists,
+        branch_suffix=branch_suffix,
+    )
 
 
 def handle_accept_no_fls_changes_command(
@@ -214,40 +257,16 @@ def handle_accept_no_fls_changes_command(
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
         return f"❌ Failed to update spec.lock.{detail_text}", False
 
-    branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     changed_files_after = bot.adapters.automation.list_changed_files(repo_root)
-    planning = privileged_command_policy.plan_accept_no_fls_changes_execution(
-        issue_number=issue_number,
-        audit_returncode=audit_result.returncode,
-        audit_details=bot.adapters.automation.summarize_output(audit_result),
-        update_returncode=update_result.returncode,
-        update_details=bot.adapters.automation.summarize_output(update_result),
+    planning = _resolve_accept_no_fls_changes_plan(
+        bot,
+        repo_root,
+        issue_number,
+        audit_result=audit_result,
+        update_result=update_result,
         changed_files_after=changed_files_after,
-        branch_date=branch_date,
-        base_branch="main",
-        branch_exists=False,
-        branch_suffix=None,
     )
     if planning.kind != "execute_plan":
         return str(planning.message), bool(planning.success)
     assert planning.plan is not None
-    base_branch = bot.adapters.automation.get_default_branch()
-    branch_exists = bot.adapters.automation.run_command(
-        ["git", "rev-parse", "--verify", planning.plan.branch_name],
-        cwd=repo_root,
-        check=False,
-    ).returncode == 0
-    branch_suffix = datetime.now(timezone.utc).strftime("%H%M%S") if branch_exists else None
-    planning = privileged_command_policy.plan_accept_no_fls_changes_execution(
-        issue_number=issue_number,
-        audit_returncode=0,
-        audit_details="",
-        update_returncode=0,
-        update_details="",
-        changed_files_after=changed_files_after,
-        branch_date=branch_date,
-        base_branch=base_branch,
-        branch_exists=branch_exists,
-        branch_suffix=branch_suffix,
-    )
     return _execute_accept_no_fls_changes_plan(bot, repo_root, issue_number, planning.plan)

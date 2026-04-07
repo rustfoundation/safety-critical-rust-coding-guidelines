@@ -9,7 +9,16 @@ pytestmark = pytest.mark.contract
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import event_inputs, lease_lock, review_state
-from scripts.reviewer_bot_lib.context import ReviewerBotContext
+from scripts.reviewer_bot_lib.context import (
+    CommentApplicationRuntimeContext,
+    CommentRoutingRuntimeContext,
+    ReconcileAdaptersContext,
+    ReconcileRectifyGitHubContext,
+    ReconcileRectifyRuntimeContext,
+    ReconcileReviewStateAdapterContext,
+    ReconcileWorkflowRuntimeContext,
+    ReviewerBotContext,
+)
 from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime, StdErrLogger
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
@@ -67,6 +76,100 @@ def test_runtime_head_repair_contract_is_runtime_scoped():
     hints = get_type_hints(ReviewerBotContext.maybe_record_head_observation_repair)
 
     assert hints["return"].__name__ == "HeadObservationRepairResult"
+
+
+def _protocol_member_names(protocol_type) -> set[str]:
+    return set(protocol_type.__annotations__) | {
+        name
+        for name, value in protocol_type.__dict__.items()
+        if not name.startswith("_") and callable(value)
+    }
+
+
+def test_k1b_context_freezes_exact_reconcile_workflow_runtime_seam():
+    assert _protocol_member_names(ReconcileReviewStateAdapterContext) == {
+        "maybe_record_head_observation_repair",
+    }
+    assert _protocol_member_names(ReconcileAdaptersContext) == {"review_state"}
+    assert _protocol_member_names(ReconcileWorkflowRuntimeContext) == {
+        "REVIEW_FRESHNESS_RUNBOOK_PATH",
+        "logger",
+        "clock",
+        "adapters",
+        "assert_lock_held",
+        "load_deferred_payload",
+        "get_config_value",
+        "collect_touched_item",
+        "github_api_request",
+        "github_api",
+    }
+
+
+def test_k1b_context_freezes_exact_reconcile_rectify_runtime_seam():
+    assert _protocol_member_names(ReconcileRectifyGitHubContext) == {
+        "get_pull_request_reviews",
+        "get_user_permission_status",
+    }
+    assert _protocol_member_names(ReconcileRectifyRuntimeContext) == {
+        "github",
+        "adapters",
+        "get_config_value",
+        "parse_iso8601_timestamp",
+        "parse_github_timestamp",
+        "is_triage_or_higher",
+        "github_api_request",
+        "github_api",
+        "satisfy_mandatory_approver_requirement",
+    }
+
+
+def test_k1d_rectify_context_refresh_keeps_live_pr_reads_in_runtime_seam_but_not_approval_owners():
+    assert _protocol_member_names(ReconcileRectifyRuntimeContext) == {
+        "github",
+        "adapters",
+        "get_config_value",
+        "parse_iso8601_timestamp",
+        "parse_github_timestamp",
+        "is_triage_or_higher",
+        "github_api_request",
+        "github_api",
+        "satisfy_mandatory_approver_requirement",
+    }
+
+
+def test_k1e_rectify_context_finalization_captures_retained_approval_support_without_broadening_workflow_seam():
+    assert _protocol_member_names(ReconcileRectifyRuntimeContext) == {
+        "github",
+        "adapters",
+        "get_config_value",
+        "parse_iso8601_timestamp",
+        "parse_github_timestamp",
+        "is_triage_or_higher",
+        "github_api_request",
+        "github_api",
+        "satisfy_mandatory_approver_requirement",
+    }
+    assert "parse_github_timestamp" not in _protocol_member_names(ReconcileWorkflowRuntimeContext)
+    assert "is_triage_or_higher" not in _protocol_member_names(ReconcileWorkflowRuntimeContext)
+
+
+def test_k1c_bootstrap_runtime_satisfies_frozen_workflow_reconcile_protocol():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert isinstance(runtime, ReconcileWorkflowRuntimeContext)
+
+
+def test_k1f_runtime_satisfies_finalized_rectify_runtime_protocol():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert isinstance(runtime, ReconcileRectifyRuntimeContext)
+
+
+def test_k2_runtime_satisfies_narrow_comment_runtime_protocols():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert isinstance(runtime, CommentApplicationRuntimeContext)
+    assert isinstance(runtime, CommentRoutingRuntimeContext)
 
 
 def test_runtime_review_state_adapter_mutates_active_reviews():
@@ -357,7 +460,7 @@ def test_bootstrap_runtime_wires_explicit_handler_services():
 
     assert hasattr(runtime.handlers, "handle_issue_or_pr_opened")
     assert hasattr(runtime.handlers, "handle_comment_event")
-    assert hasattr(runtime.handlers, "handle_workflow_run_event")
+    assert hasattr(runtime.handlers, "handle_workflow_run_event") is False
 
 
 def test_bootstrap_runtime_wires_explicit_adapter_services():
@@ -390,11 +493,26 @@ def test_f2a_runtime_surface_inventory_fixture_records_retained_triples():
     inventory = _load_runtime_surface_inventory()
 
     assert inventory["harness_id"] == "F2a runtime/bootstrap/fake-runtime triple inventory"
+    assert inventory["proof_artifacts"] == [
+        {
+            "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
+            "classification": "rewritten final proof",
+        },
+        {
+            "path": "tests/contract/reviewer_bot/test_adapter_contract.py",
+            "classification": "rewritten final proof",
+        },
+        {
+            "path": "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+            "classification": "rewritten final proof",
+        },
+    ]
     capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
 
     assert capabilities["comment-event dispatch"]["classification"] == "retained final surface"
     assert capabilities["workflow-run dispatch"]["classification"] == "retained final surface"
     assert capabilities["privileged pull request creation"]["classification"] == "retained final surface"
+    assert capabilities["github timestamp parsing"]["classification"] == "retained final surface"
 
 
 def test_f2a_runtime_surface_inventory_matches_bootstrap_adapter_examples():
@@ -409,6 +527,18 @@ def test_f2a_runtime_surface_inventory_matches_bootstrap_adapter_examples():
     )
     assert capabilities["sync status labels"]["bootstrap_adapter"] == (
         "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapWorkflowAdapterServices.sync_status_labels_for_items"
+    )
+    assert capabilities["rebuild approval state"]["runtime_forwarder"] == (
+        "scripts/reviewer_bot_lib/runtime.py:rebuild_pr_approval_state"
+    )
+    assert capabilities["rebuild approval state"]["bootstrap_adapter"] == (
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.rebuild_pr_approval_state"
+    )
+    assert capabilities["rectify triage permission check"]["bootstrap_adapter"] == (
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.is_triage_or_higher"
+    )
+    assert capabilities["mandatory approver satisfaction"]["bootstrap_adapter"] == (
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapReviewStateAdapterServices.satisfy_mandatory_approver_requirement"
     )
 
 

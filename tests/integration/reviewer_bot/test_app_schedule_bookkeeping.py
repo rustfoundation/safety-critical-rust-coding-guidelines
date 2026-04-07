@@ -1,6 +1,8 @@
+from pathlib import Path
+
 import pytest
 
-from scripts.reviewer_bot_lib import lifecycle, maintenance, review_state
+from scripts.reviewer_bot_lib import maintenance, review_state
 from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
@@ -27,18 +29,11 @@ def test_execute_run_schedule_sweeper_bookkeeping_only_mutation_still_saves_stat
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
-    monkeypatch.setattr(maintenance, "sweep_deferred_gaps", fake_sweep)
-    monkeypatch.setattr(maintenance, "check_overdue_reviews", lambda bot, current: [])
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
-    monkeypatch.setattr(review_state, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data, *, reviews=None: False)
-    monkeypatch.setattr(
-        maintenance,
-        "maybe_record_head_observation_repair",
-        lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(
-            changed=False,
-            outcome="unchanged",
-        ),
-    )
+    def fake_schedule_result(bot, current):
+        fake_sweep(bot, current)
+        return maintenance.ScheduleHandlerResult(True, [], False, None)
+
+    monkeypatch.setattr(maintenance, "handle_scheduled_check_result", fake_schedule_result)
     harness.stub_save_state(lambda current: save_calls.append(list(current["active_reviews"]["42"]["reconciled_source_events"])) or True)
     harness.stub_sync_status_labels(lambda current, issue_numbers: True)
 
@@ -109,18 +104,14 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: (current, []))
     harness.stub_sync_members(lambda current: (current, []))
-    monkeypatch.setattr(maintenance, "sweep_deferred_gaps", lambda bot, current: False)
-    monkeypatch.setattr(maintenance, "check_overdue_reviews", lambda bot, current: [])
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
-    harness.runtime.github_api_request = fake_github_api_request
-    monkeypatch.setattr(
-        maintenance,
-        "maybe_record_head_observation_repair",
-        lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(
-            changed=False,
-            outcome="unchanged",
-        ),
-    )
+    def fake_schedule_result(bot, current):
+        current_review = current["active_reviews"]["42"]
+        current_review["last_reviewer_activity"] = "2026-03-17T10:01:00Z"
+        current_review["transition_warning_sent"] = None
+        current_review["transition_notice_sent_at"] = None
+        return maintenance.ScheduleHandlerResult(True, [], False, None)
+
+    monkeypatch.setattr(maintenance, "handle_scheduled_check_result", fake_schedule_result)
     harness.stub_save_state(
         lambda current: save_calls.append(
             {
@@ -143,3 +134,11 @@ def test_execute_run_schedule_reviewer_review_activity_only_repair_still_saves_s
             "transition_notice_sent_at": None,
         }
     ]
+
+
+def test_m2_schedule_handler_exposes_typed_result_shape():
+    maintenance_text = Path("scripts/reviewer_bot_lib/maintenance.py").read_text(encoding="utf-8")
+
+    assert "class ScheduleHandlerResult:" in maintenance_text
+    for field in ["state_changed", "touched_items", "projection_followup_needed", "projection_failure_message"]:
+        assert field in maintenance_text

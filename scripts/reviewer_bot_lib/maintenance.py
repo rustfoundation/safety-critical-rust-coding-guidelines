@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import yaml
 
 from . import automation
@@ -31,6 +33,14 @@ def _log(bot, level: str, message: str, **fields) -> None:
 
 def _now_iso(bot) -> str:
     return bot.datetime.now(bot.timezone.utc).isoformat()
+
+
+@dataclass(frozen=True)
+class ScheduleHandlerResult:
+    state_changed: bool
+    touched_items: list[int]
+    projection_followup_needed: bool
+    projection_failure_message: str | None
 
 
 def build_revalidated_privileged_command_request(
@@ -231,7 +241,7 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
     return False
 
 
-def handle_scheduled_check(bot, state: dict) -> bool:
+def handle_scheduled_check_result(bot, state: dict) -> ScheduleHandlerResult:
     bot.assert_lock_held("handle_scheduled_check")
     changed = sweep_deferred_gaps(bot, state)
     active_reviews = state.get("active_reviews")
@@ -305,7 +315,13 @@ def handle_scheduled_check(bot, state: dict) -> bool:
                 changed = True
     overdue_reviews = check_overdue_reviews(bot, state)
     if not overdue_reviews:
-        return changed
+        touched_items = bot.drain_touched_items()
+        return ScheduleHandlerResult(
+            state_changed=changed,
+            touched_items=touched_items,
+            projection_followup_needed=bool(touched_items),
+            projection_failure_message=None,
+        )
     for review in overdue_reviews:
         issue_number = review["issue_number"]
         reviewer = review["reviewer"]
@@ -317,4 +333,14 @@ def handle_scheduled_check(bot, state: dict) -> bool:
                 changed = True
             elif handle_transition_notice(bot, state, issue_number, reviewer):
                 changed = True
-    return changed
+    touched_items = bot.drain_touched_items()
+    return ScheduleHandlerResult(
+        state_changed=changed,
+        touched_items=touched_items,
+        projection_followup_needed=bool(touched_items),
+        projection_failure_message=None,
+    )
+
+
+def handle_scheduled_check(bot, state: dict) -> bool:
+    return handle_scheduled_check_result(bot, state).state_changed

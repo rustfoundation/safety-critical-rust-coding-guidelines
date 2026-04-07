@@ -2,6 +2,7 @@
 
 import sys
 
+from . import maintenance, reconcile
 from .context import (
     AppEventContextRuntime,
     AppExecutionRuntime,
@@ -172,6 +173,8 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
     projection_failure: RuntimeError | None = None
     loaded_epoch: str | None = None
     projection_epoch_repair = False
+    workflow_run_result: reconcile.WorkflowRunHandlerResult | None = None
+    schedule_result: maintenance.ScheduleHandlerResult | None = None
 
     try:
         if lock_required:
@@ -225,12 +228,14 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             state_changed = bot.handlers.handle_manual_dispatch(state)
 
         elif event_name == "schedule":
-            state_changed = bot.handlers.handle_scheduled_check(state)
+            schedule_result = maintenance.handle_scheduled_check_result(bot, state)
+            state_changed = schedule_result.state_changed
 
         elif event_name == "workflow_run":
             if event_action == "completed":
                 if context.workflow_run_event in {"pull_request_review", "issue_comment", "pull_request_review_comment"}:
-                    state_changed = bot.handlers.handle_workflow_run_event(state)
+                    workflow_run_result = reconcile.handle_workflow_run_event_result(bot, state)
+                    state_changed = workflow_run_result.state_changed
                 else:
                     _log(
                         bot,
@@ -239,7 +244,12 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                         workflow_run_event=context.workflow_run_event or "<missing>",
                     )
 
-        touched_items = bot.drain_touched_items()
+        if workflow_run_result is not None:
+            touched_items = workflow_run_result.touched_items
+        elif schedule_result is not None:
+            touched_items = schedule_result.touched_items
+        else:
+            touched_items = bot.drain_touched_items()
         if lock_required and event_name in {"schedule", "workflow_dispatch"} and status_projection_repair_needed(bot, state):
             touched_items = sorted(
                 {

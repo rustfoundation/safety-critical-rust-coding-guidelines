@@ -94,7 +94,7 @@ def decide_comment_replay(
 
     if live_comment_class != source_comment_class:
         return CommentReplayDecision(
-            record_source_freshness=False,
+            record_source_freshness=source_freshness_eligible,
             replay_comment_command=False,
             mark_reconciled=False,
             clear_gap=False,
@@ -105,7 +105,7 @@ def decide_comment_replay(
         )
     if live_has_non_command_text != source_has_non_command_text:
         return CommentReplayDecision(
-            record_source_freshness=False,
+            record_source_freshness=source_freshness_eligible,
             replay_comment_command=False,
             mark_reconciled=False,
             clear_gap=False,
@@ -116,7 +116,7 @@ def decide_comment_replay(
         )
     if source_comment_class in {"command_only", "command_plus_text"} and int(live_classified.get("command_count", 0)) != 1:
         return CommentReplayDecision(
-            record_source_freshness=False,
+            record_source_freshness=source_freshness_eligible,
             replay_comment_command=False,
             mark_reconciled=False,
             clear_gap=False,

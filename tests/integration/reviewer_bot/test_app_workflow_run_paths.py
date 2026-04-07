@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.reviewer_bot_lib import reconcile
 from scripts.reviewer_bot_lib.context import LeaseContext
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
@@ -72,7 +73,11 @@ def test_execute_run_workflow_run_reconcile_acquires_lock(monkeypatch):
     harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
     harness.stub_pass_until(lambda state: (state, []))
     harness.stub_sync_members(lambda state: (state, []))
-    harness.stub_handler("handle_workflow_run_event", lambda state: False)
+    monkeypatch.setattr(
+        reconcile,
+        "handle_workflow_run_event_result",
+        lambda bot, state: reconcile.WorkflowRunHandlerResult(False, [], False, None, False, False),
+    )
 
     result = harness.run_execute()
 
@@ -101,7 +106,11 @@ def test_execute_run_workflow_run_review_comment_reconcile_acquires_lock(monkeyp
     harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
     harness.stub_pass_until(lambda state: (state, []))
     harness.stub_sync_members(lambda state: (state, []))
-    harness.stub_handler("handle_workflow_run_event", lambda state: False)
+    monkeypatch.setattr(
+        reconcile,
+        "handle_workflow_run_event_result",
+        lambda bot, state: reconcile.WorkflowRunHandlerResult(False, [], False, None, False, False),
+    )
 
     result = harness.run_execute()
 
@@ -127,3 +136,11 @@ def test_d4c_deletion_manifest_is_explicit_and_remaining_app_branches_stay_trans
     assert 'if state_changed or sync_changes or restored:' in app_text
     assert 'if touched_items:' in app_text
     assert 'if projection_failure is not None:' in app_text
+
+
+def test_m1_typed_workflow_run_result_keeps_public_bool_entrypoint_present():
+    reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
+
+    assert "def handle_workflow_run_event_result(" in reconcile_text
+    assert "def handle_workflow_run_event(bot: ReconcileWorkflowRuntimeContext, state: dict) -> bool:" in reconcile_text
+    assert "return handle_workflow_run_event_result(bot, state).state_changed" in reconcile_text

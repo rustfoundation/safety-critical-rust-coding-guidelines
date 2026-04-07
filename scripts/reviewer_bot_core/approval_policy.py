@@ -25,7 +25,7 @@ def compute_pr_approval_state_result(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> dict[str, object]:
-    from scripts.reviewer_bot_lib import review_state
+    from scripts.reviewer_bot_core import review_state_machine
     from scripts.reviewer_bot_lib import reviews as legacy_reviews
     from scripts.reviewer_bot_lib.reviews_projection import (
         collect_permission_statuses,
@@ -34,7 +34,7 @@ def compute_pr_approval_state_result(
         normalize_reviews_with_parsed_timestamps,
     )
 
-    boundary = review_state.get_current_cycle_boundary(bot, review_data)
+    boundary = review_state_machine.get_current_cycle_boundary(bot, review_data)
     if boundary is None:
         return legacy_reviews._projection_failure("pull_request_unavailable")
     pull_request_result = legacy_reviews._pull_request_read_result(bot, issue_number, pull_request)

@@ -1,0 +1,50 @@
+{
+  "harness_id": "H1a reviewer-response derivation equivalence",
+  "owner": "scripts.reviewer_bot_lib.reviews.compute_reviewer_response_state",
+  "out_of_scope": [
+    "mandatory approver escalation",
+    "label writes"
+  ],
+  "scenarios": [
+    {
+      "id": "awaiting_reviewer_response_no_reviewer_activity",
+      "state": "awaiting_reviewer_response",
+      "reason": "no_reviewer_activity"
+    },
+    {
+      "id": "awaiting_reviewer_response_review_head_stale",
+      "state": "awaiting_reviewer_response",
+      "reason": "review_head_stale"
+    },
+    {
+      "id": "awaiting_reviewer_response_contributor_revision_newer",
+      "state": "awaiting_reviewer_response",
+      "reason": "contributor_revision_newer"
+    },
+    {
+      "id": "awaiting_contributor_response_completion_missing",
+      "state": "awaiting_contributor_response",
+      "reason": "completion_missing"
+    },
+    {
+      "id": "awaiting_write_approval_write_approval_missing",
+      "state": "awaiting_write_approval",
+      "reason": "write_approval_missing"
+    },
+    {
+      "id": "projection_failed_pull_request_unavailable",
+      "state": "projection_failed",
+      "reason": "pull_request_unavailable"
+    },
+    {
+      "id": "projection_failed_pull_request_head_unavailable",
+      "state": "projection_failed",
+      "reason": "pull_request_head_unavailable"
+    },
+    {
+      "id": "projection_failed_live_review_state_unknown",
+      "state": "projection_failed",
+      "reason": "live_review_state_unknown"
+    }
+  ]
+}

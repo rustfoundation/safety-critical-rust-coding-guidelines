@@ -121,8 +121,36 @@ def test_privileged_command_policy_produces_frozen_handoff_metadata_and_ordered_
     assert plan.plan is not None
     assert plan.plan.ordered_steps == privileged_command_policy.ORDERED_EXECUTION_STEPS
     assert plan.plan.revalidation_checkpoints == privileged_command_policy.REVALIDATION_CHECKPOINTS
+    assert plan.plan.expected_changed_files == ["src/spec.lock"]
+    assert plan.plan.branch_probe_name == "chore/spec-lock-2026-04-06-issue-42"
     assert plan.plan.commit_message == privileged_command_policy.COMMIT_MESSAGE
     assert plan.plan.pull_request_title == privileged_command_policy.PR_TITLE
+    assert plan.plan.git_checkout_args == ["git", "checkout", "-b", "chore/spec-lock-2026-04-06-issue-42"]
+    assert plan.plan.git_push_args == ["git", "push", "origin", "chore/spec-lock-2026-04-06-issue-42"]
+
+
+def test_j1_privileged_policy_derives_branch_probe_and_final_plan_names_explicitly():
+    assert privileged_command_policy.derive_accept_no_fls_changes_branch_name(
+        issue_number=42,
+        branch_date="2026-04-06",
+    ) == "chore/spec-lock-2026-04-06-issue-42"
+    assert privileged_command_policy.derive_accept_no_fls_changes_branch_name(
+        issue_number=42,
+        branch_date="2026-04-06",
+        branch_suffix="123456",
+    ) == "chore/spec-lock-2026-04-06-issue-42-123456"
+
+
+def test_j1_privileged_policy_separates_post_update_assessment_from_final_plan_construction():
+    assessment = privileged_command_policy.assess_accept_no_fls_changes_post_update(
+        audit_returncode=0,
+        audit_details="",
+        update_returncode=0,
+        update_details="",
+        changed_files_after=["src/spec.lock"],
+    )
+
+    assert assessment.kind == "continue"
 
 
 def test_c6d_deletion_manifest_proves_automation_no_longer_embeds_removed_planning_logic():
@@ -134,4 +162,5 @@ def test_c6d_deletion_manifest_proves_automation_no_longer_embeds_removed_planni
     ]
     assert "title = title or privileged_command_policy.PR_TITLE" not in module_text
     assert 'f"chore/spec-lock-{branch_date}-issue-{issue_number}"' not in module_text
-    assert '["git", "rev-parse", "--verify", planning.plan.branch_name]' in module_text
+    assert "def _resolve_accept_no_fls_changes_plan(" in module_text
+    assert '["git", "rev-parse", "--verify", provisional.plan.branch_probe_name]' in module_text

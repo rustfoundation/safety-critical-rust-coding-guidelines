@@ -4,16 +4,17 @@
     {
       "change": "change reviewer-response derivation",
       "expected_files": [
-        "scripts/reviewer_bot_lib/reviews.py",
-        "scripts/reviewer_bot_lib/reviews_projection.py",
-        "tests/unit/reviewer_bot/test_reviews_projection.py",
+        "scripts/reviewer_bot_core/reviewer_response_policy.py",
+        "tests/unit/reviewer_bot/test_reviewer_response_equivalence.py",
         "tests/unit/reviewer_bot/test_reviews_live_fetch.py"
       ]
     },
     {
       "change": "change mandatory approver escalation",
       "expected_files": [
+        "scripts/reviewer_bot_core/mandatory_approver_policy.py",
         "scripts/reviewer_bot_lib/reviews.py",
+        "tests/unit/reviewer_bot/test_mandatory_approver_policy_equivalence.py",
         "tests/unit/reviewer_bot/test_reviews_live_fetch.py"
       ]
     },
@@ -32,6 +33,64 @@
         "tests/unit/reviewer_bot/test_comment_command_equivalence.py",
         "tests/unit/reviewer_bot/test_commands.py"
       ]
+    },
+    {
+      "change": "change one reconcile runtime collaborator seam",
+      "expected_files": [
+        "scripts/reviewer_bot_lib/context.py",
+        "scripts/reviewer_bot_lib/runtime.py",
+        "scripts/reviewer_bot_lib/bootstrap_runtime.py",
+        "tests/fixtures/fake_runtime.py",
+        "tests/contract/reviewer_bot/test_adapter_contract.py",
+        "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+        "tests/contract/reviewer_bot/test_runtime_protocols.py"
+      ]
+    },
+    {
+      "change": "change one workflow-run transaction result field",
+      "expected_files": [
+        "scripts/reviewer_bot_lib/reconcile.py",
+        "scripts/reviewer_bot_lib/app.py",
+        "tests/integration/reviewer_bot/test_app_execution.py",
+        "tests/integration/reviewer_bot/test_app_workflow_run_bookkeeping.py",
+        "tests/integration/reviewer_bot/test_app_workflow_run_paths.py"
+      ]
+    }
+  ],
+  "surviving_final_proof_artifacts": [
+    {
+      "path": "tests/contract/reviewer_bot/test_blast_radius_review.py",
+      "reason": "active blast-radius risk for future change"
+    },
+    {
+      "path": "tests/fixtures/equivalence/blast_radius/review.json",
+      "reason": "active blast-radius risk for future change"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
+      "reason": "active runtime/bootstrap/fake-runtime compatibility safety"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_adapter_contract.py",
+      "reason": "active runtime/bootstrap/fake-runtime compatibility safety"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+      "reason": "active runtime/bootstrap/fake-runtime compatibility safety"
+    }
+  ],
+  "retired_migration_only_artifacts": [
+    {
+      "path": "tests/contract/reviewer_bot/test_support_layer_ownership.py",
+      "reason": "migration-only ownership inventory proof superseded by final blast-radius and deletion manifests"
+    },
+    {
+      "path": "tests/fixtures/equivalence/support_layer/symbol_inventory.json",
+      "reason": "migration-only importer inventory refreshed for cleanup and no longer needed as final architecture proof"
+    },
+    {
+      "path": "tests/fixtures/equivalence/runtime_surface/triple_inventory.json",
+      "reason": "migration-only runtime inventory refreshed for cleanup and superseded by final runtime compatibility contracts"
     }
   ]
 }

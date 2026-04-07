@@ -1,0 +1,16 @@
+{
+  "harness_id": "G2a live-read-assisted review repair inventory",
+  "scope": "live-read-assisted review repair",
+  "apis": [
+    "accept_reviewer_review_from_live_review",
+    "refresh_reviewer_review_from_live_preferred_review",
+    "repair_missing_reviewer_review_state"
+  ],
+  "scenarios": [
+    "matching current reviewer and valid submitted review",
+    "reviewer mismatch",
+    "no preferred review found",
+    "head repair without review acceptance",
+    "no-op repair path"
+  ]
+}

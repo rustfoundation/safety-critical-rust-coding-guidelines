@@ -1,5 +1,6 @@
 import pytest
 
+from scripts.reviewer_bot_lib import reconcile
 from tests.fixtures.reconcile_harness import (
     ReconcileHarness,
     issue_comment_payload,
@@ -110,8 +111,12 @@ def test_handle_workflow_run_event_treats_observer_noop_payload_as_no_mutation(m
         },
     )
 
-    assert harness.run(state) is False
-    assert harness.runtime.drain_touched_items() == [42]
+    result = reconcile.handle_workflow_run_event_result(harness.runtime, state)
+
+    assert result.state_changed is False
+    assert result.touched_items == [42]
+    assert result.projection_followup_needed is True
+    assert harness.runtime.drain_touched_items() == []
     assert state["active_reviews"]["42"]["reconciled_source_events"] == []
 
 
