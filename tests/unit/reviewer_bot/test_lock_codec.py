@@ -8,8 +8,8 @@ def test_lock_codec_round_trips_marked_issue_block_metadata():
         "lock_owner_run_id": "run-1",
     }
 
-    rendered = lock_codec.render_marked_lock_block(lock_meta)
-    parsed = lock_codec.parse_lock_metadata_block(rendered)
+    rendered = lock_codec.render_lock_commit_message(lock_meta)
+    parsed = lock_codec.parse_lock_commit_message(rendered)
 
     assert parsed["lock_state"] == "locked"
     assert parsed["lock_token"] == "token-123"
@@ -31,7 +31,16 @@ def test_lock_codec_round_trips_commit_message_metadata():
     assert parsed["lock_owner_run_id"] == "run-1"
 
 
-def test_lock_codec_returns_unlocked_metadata_for_invalid_commit_message():
-    parsed = lock_codec.parse_lock_commit_message("not a lock commit")
+def test_lock_codec_normalizes_missing_metadata_keys():
+    parsed = lock_codec.normalize_lock_metadata({"lock_state": "locked"})
 
-    assert parsed["lock_state"] == "unlocked"
+    assert parsed["lock_state"] == "locked"
+    assert parsed["lock_token"] is None
+    assert parsed["lock_owner_run_id"] is None
+
+
+def test_lock_codec_rejects_invalid_commit_message():
+    import pytest
+
+    with pytest.raises(RuntimeError, match="invalid reviewer-bot lock commit message"):
+        lock_codec.parse_lock_commit_message("not a lock commit")

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scripts.reviewer_bot_lib import sweeper
+from scripts.reviewer_bot_lib import sweeper_observer_correlation
 from tests.fixtures.fake_jitter import DeterministicJitter
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.fake_sleeper import RecordingSleeper
@@ -21,14 +21,13 @@ def test_download_artifact_payload_retries_429_then_succeeds(monkeypatch):
     runtime.sleeper = RecordingSleeper()
     runtime.artifact_download_transport.stub_sequence([*responses, success_response])
 
-    status, artifact_payload = sweeper._download_artifact_payload(
+    status, artifact_payloads = sweeper_observer_correlation._download_artifact_payloads(
         runtime,
         {"archive_download_url": "https://example.com/artifact.zip", "expired": False},
-        "deferred-comment.json",
     )
 
     assert status == "ok"
-    assert artifact_payload == payload
+    assert artifact_payloads == [payload]
     assert runtime.sleeper.calls == [2.5]
     assert runtime.artifact_download_transport.calls[0]["url"] == "https://example.com/artifact.zip"
 
@@ -37,9 +36,9 @@ def test_download_retry_delay_uses_shared_backoff_with_jitter(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.jitter = DeterministicJitter([0.25, 0.5, 0.75])
 
-    assert sweeper._download_retry_delay(runtime, 1) == 2.25
-    assert sweeper._download_retry_delay(runtime, 2) == 4.5
-    assert sweeper._download_retry_delay(runtime, 3) == 8.75
+    assert sweeper_observer_correlation._download_retry_delay(runtime, 1) == 2.25
+    assert sweeper_observer_correlation._download_retry_delay(runtime, 2) == 4.5
+    assert sweeper_observer_correlation._download_retry_delay(runtime, 3) == 8.75
 
 
 def test_download_artifact_payload_reports_request_exception_unavailable(monkeypatch):
@@ -49,10 +48,9 @@ def test_download_artifact_payload_reports_request_exception_unavailable(monkeyp
     runtime.sleeper = RecordingSleeper()
     runtime.artifact_download_transport.stub_sequence([RuntimeError("timeout")])
 
-    status, payload = sweeper._download_artifact_payload(
+    status, payload = sweeper_observer_correlation._download_artifact_payloads(
         runtime,
         {"archive_download_url": "https://example.com/artifact.zip", "expired": False},
-        "deferred-comment.json",
     )
 
     assert status == "download_unavailable"
@@ -66,10 +64,9 @@ def test_download_artifact_payload_reports_retry_exhaustion_unavailable(monkeypa
     runtime.sleeper = RecordingSleeper()
     runtime.artifact_download_transport.stub_sequence([FakeGitHubResponse(429, {"message": "slow down"}, "slow down")] * 6)
 
-    status, payload = sweeper._download_artifact_payload(
+    status, payload = sweeper_observer_correlation._download_artifact_payloads(
         runtime,
         {"archive_download_url": "https://example.com/artifact.zip", "expired": False},
-        "deferred-comment.json",
     )
 
     assert status == "download_unavailable"
@@ -90,7 +87,7 @@ def test_list_run_artifacts_returns_none_when_api_payload_unavailable(monkeypatc
         transport_error=None,
     )
 
-    assert sweeper._list_run_artifacts(runtime, 42) is None
+    assert sweeper_observer_correlation._list_run_artifacts(runtime, 42) is None
 
 
 def test_list_run_artifacts_consumes_retry_aware_success(monkeypatch):
@@ -106,13 +103,15 @@ def test_list_run_artifacts_consumes_retry_aware_success(monkeypatch):
         transport_error=None,
     )
 
-    assert sweeper._list_run_artifacts(runtime, 10) == [{"id": 1, "name": "artifact"}]
+    assert sweeper_observer_correlation._list_run_artifacts(runtime, 10) == [{"id": 1, "name": "artifact"}]
 
 
 def test_sweeper_artifact_correlation_surface_stays_thin_after_diagnosis_cutover():
-    module_text = Path("scripts/reviewer_bot_lib/sweeper.py").read_text(encoding="utf-8")
+    sweeper_text = Path("scripts/reviewer_bot_lib/sweeper.py").read_text(encoding="utf-8")
+    observer_text = Path("scripts/reviewer_bot_lib/sweeper_observer_correlation.py").read_text(encoding="utf-8")
 
-    assert "deferred_gap_diagnosis.correlate_run_artifacts_exact(" in module_text
-    assert "deferred_gap_diagnosis.correlate_candidate_observer_runs(" in module_text
-    assert "def correlate_run_artifacts_exact(" not in module_text
-    assert "def correlate_candidate_observer_runs(" not in module_text
+    assert "deferred_gap_diagnosis.correlate_run_artifacts_exact(" in observer_text
+    assert "deferred_gap_diagnosis.correlate_candidate_observer_runs(" not in observer_text
+    assert "inspect_run_artifact_payloads = observer_correlation.inspect_run_artifact_payloads" in sweeper_text
+    assert "def correlate_run_artifacts_exact(" not in sweeper_text
+    assert "def correlate_candidate_observer_runs(" not in sweeper_text

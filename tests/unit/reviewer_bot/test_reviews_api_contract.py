@@ -1,5 +1,6 @@
 import pytest
 
+from scripts.reviewer_bot_core import live_review_support
 from scripts.reviewer_bot_lib import maintenance, review_state, reviews
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
@@ -34,85 +35,26 @@ def test_collect_status_projection_repair_items_uses_review_support_listing_not_
     assert maintenance.collect_status_projection_repair_items(runtime, state) == [42, 99]
 
 
-def test_get_pull_request_reviews_result_paginates(monkeypatch):
+def test_get_pull_request_reviews_delegates_to_live_review_support(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    routes = (
-        RouteGitHubApi()
-        .add_request(
-            "GET",
-            "pulls/42/reviews?per_page=100&page=1",
-            status_code=200,
-            payload=[{"id": index} for index in range(100)],
-        )
-        .add_request(
-            "GET",
-            "pulls/42/reviews?per_page=100&page=2",
-            status_code=200,
-            payload=[{"id": 100}],
-        )
-    )
-    runtime.github.stub(routes)
+    observed = {}
 
-    result = reviews.get_pull_request_reviews_result(runtime, 42)
+    def fake_read(bot, issue_number, reviews=None):
+        observed.update({"bot": bot, "issue_number": issue_number, "reviews": reviews})
+        return {"ok": True, "reviews": [{"id": 10}]}
 
-    assert result["ok"] is True
-    assert len(result["reviews"]) == 101
+    monkeypatch.setattr(live_review_support, "read_pull_request_reviews_result", fake_read)
+
+    assert reviews.get_pull_request_reviews(runtime, 42) == [{"id": 10}]
+    assert observed == {"bot": runtime, "issue_number": 42, "reviews": None}
 
 
-def test_get_pull_request_reviews_result_uses_fallback_loader_after_system_exit(monkeypatch):
+def test_get_pull_request_reviews_fails_closed_when_live_review_read_fails(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    routes = RouteGitHubApi().raise_system_exit_on_request().add_api(
-        "GET",
-        "pulls/42/reviews?per_page=100&page=1",
-        [{"id": 10}],
+    monkeypatch.setattr(
+        live_review_support,
+        "read_pull_request_reviews_result",
+        lambda bot, issue_number, reviews=None: {"ok": False, "reason": "reviews_unavailable", "failure_kind": "server_error"},
     )
-    runtime.github.stub(routes)
-    runtime.get_pull_request_reviews = lambda issue_number: [{"id": 10}]
 
-    result = reviews.get_pull_request_reviews_result(runtime, 42)
-
-    assert result == {"ok": True, "reviews": [{"id": 10}]}
-
-
-def test_get_pull_request_reviews_result_reports_invalid_payload(monkeypatch):
-    runtime = FakeReviewerBotRuntime(monkeypatch)
-    routes = RouteGitHubApi().add_request(
-        "GET",
-        "pulls/42/reviews?per_page=100&page=1",
-        status_code=200,
-        payload={"not": "a list"},
-    )
-    runtime.github.stub(routes)
-
-    result = reviews.get_pull_request_reviews_result(runtime, 42)
-
-    assert result == {"ok": False, "reason": "reviews_unavailable", "failure_kind": "invalid_payload"}
-
-
-def test_pull_request_read_result_reports_not_found(monkeypatch):
-    runtime = FakeReviewerBotRuntime(monkeypatch)
-    routes = RouteGitHubApi().add_request(
-        "GET",
-        "pulls/42",
-        result=github_result(404, {"message": "missing"}),
-    )
-    runtime.github.stub(routes)
-
-    result = reviews._pull_request_read_result(runtime, 42)
-
-    assert result == {"ok": False, "reason": "pull_request_not_found", "failure_kind": "not_found"}
-
-
-def test_pull_request_read_result_reports_invalid_payload(monkeypatch):
-    runtime = FakeReviewerBotRuntime(monkeypatch)
-    routes = RouteGitHubApi().add_request(
-        "GET",
-        "pulls/42",
-        status_code=200,
-        payload=["not", "a", "dict"],
-    )
-    runtime.github.stub(routes)
-
-    result = reviews._pull_request_read_result(runtime, 42)
-
-    assert result == {"ok": False, "reason": "pull_request_unavailable", "failure_kind": "invalid_payload"}
+    assert reviews.get_pull_request_reviews(runtime, 42) is None

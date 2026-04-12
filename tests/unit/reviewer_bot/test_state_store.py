@@ -30,7 +30,8 @@ def test_load_state_sets_schema_and_epoch_defaults(monkeypatch):
 
 
 def test_load_state_materializes_missing_top_level_persisted_keys(monkeypatch):
-    bot = _bot(monkeypatch, get_state_issue=lambda: {"body": "schema_version: 5\n"})
+    body = state_store.render_state_issue_body({"schema_version": 5})
+    bot = _bot(monkeypatch, get_state_issue=lambda: {"body": body})
 
     state = state_store.load_state(bot)
 
@@ -141,7 +142,7 @@ def test_save_state_retries_precondition_failed_conflict_uses_injected_time_serv
     bot.locks.stub(refresh=lambda: True)
     bot.get_state_issue_snapshot = lambda: snapshot
     bot.parse_lock_metadata_from_issue_body = lambda body: {}
-    bot.render_state_issue_body = lambda state_obj, lock_meta, base_body: "updated"
+    bot.render_state_issue_body = lambda state_obj, base_body: "updated"
     bot.conditional_patch_state_issue = lambda body, etag=None: next(responses)
 
     assert state_store.save_state(bot, state) is True
@@ -176,12 +177,10 @@ def test_get_state_issue_snapshot_builds_html_url_from_runtime_config_when_missi
     assert snapshot.html_url == "https://github.com/rustfoundation/safety-critical-rust-coding-guidelines/issues/1"
 
 
-def test_loaded_state_remains_compatible_with_delegated_review_state_owner(monkeypatch):
+def test_loaded_state_fails_closed_for_invalid_legacy_review_entry_shape(monkeypatch):
     bot = _bot(monkeypatch, get_state_issue=lambda: {"body": "active_reviews:\n  '42': ['alice']\n"})
 
     state = state_store.load_state(bot)
     review = review_state.ensure_review_entry(state, 42, create=False)
 
-    assert review is not None
-    assert review["skipped"] == ["alice"]
-    assert review["pending_privileged_commands"] == {}
+    assert review is None

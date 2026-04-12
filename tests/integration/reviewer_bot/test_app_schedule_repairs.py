@@ -29,7 +29,7 @@ def test_execute_run_schedule_status_projection_epoch_mismatch_triggers_label_re
     monkeypatch.setattr(
         maintenance,
         "handle_scheduled_check_result",
-        lambda bot, current: maintenance.ScheduleHandlerResult(False, [], False, None),
+        lambda bot, current: maintenance.ScheduleHandlerResult(False, []),
     )
     monkeypatch.setattr(maintenance.reviews, "list_open_items_with_status_labels", lambda bot: [99])
     harness.stub_sync_status_labels(lambda current, issue_numbers: synced_issue_numbers.extend(issue_numbers) or True)
@@ -58,7 +58,7 @@ def test_execute_run_schedule_status_projection_epoch_not_advanced_on_label_sync
     monkeypatch.setattr(
         maintenance,
         "handle_scheduled_check_result",
-        lambda bot, current: maintenance.ScheduleHandlerResult(False, [], False, None),
+        lambda bot, current: maintenance.ScheduleHandlerResult(False, []),
     )
     monkeypatch.setattr(maintenance.reviews, "list_open_items_with_status_labels", lambda bot: [42])
     harness.stub_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(RuntimeError("projection exploded")))
@@ -81,11 +81,15 @@ def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tm
         IS_PULL_REQUEST="false",
         ISSUE_NUMBER="42",
         ISSUE_AUTHOR="dana",
+        ISSUE_STATE="open",
         COMMENT_USER_TYPE="User",
+        COMMENT_SENDER_TYPE="User",
         COMMENT_AUTHOR="dana",
+        COMMENT_AUTHOR_ID="101",
         COMMENT_ID="100",
         COMMENT_CREATED_AT="2026-03-17T10:00:00Z",
         COMMENT_BODY="plain text",
+        COMMENT_PERFORMED_VIA_GITHUB_APP="false",
     )
     harness.stub_lock(acquire=lambda: None, release=lambda: True)
     saved_states = []
@@ -147,7 +151,7 @@ def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repai
     monkeypatch.setattr(
         maintenance,
         "handle_scheduled_check_result",
-        lambda bot, current: maintenance.ScheduleHandlerResult(False, [], False, None),
+        lambda bot, current: maintenance.ScheduleHandlerResult(False, []),
     )
     harness.runtime.post_comment = lambda issue_number, body: posted_comments.append((issue_number, body)) or True
     harness.stub_save_state(

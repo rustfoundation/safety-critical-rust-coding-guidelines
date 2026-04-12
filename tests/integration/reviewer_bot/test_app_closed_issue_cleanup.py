@@ -17,10 +17,13 @@ def test_execute_run_closed_issue_comment_cleanup_persists_removed_review_entry(
         ISSUE_STATE="closed",
         ISSUE_AUTHOR="dana",
         COMMENT_USER_TYPE="User",
+        COMMENT_SENDER_TYPE="User",
         COMMENT_AUTHOR="dana",
+        COMMENT_AUTHOR_ID=101,
         COMMENT_ID=100,
         COMMENT_CREATED_AT="2026-03-17T10:00:00Z",
         COMMENT_BODY="reviewer-bot validation close-path comment",
+        COMMENT_PERFORMED_VIA_GITHUB_APP="false",
     )
 
     initial_state = make_state()
@@ -63,10 +66,13 @@ def test_execute_run_closed_issue_comment_without_entry_skips_save(monkeypatch):
         ISSUE_STATE="closed",
         ISSUE_AUTHOR="dana",
         COMMENT_USER_TYPE="User",
+        COMMENT_SENDER_TYPE="User",
         COMMENT_AUTHOR="dana",
+        COMMENT_AUTHOR_ID=101,
         COMMENT_ID=100,
         COMMENT_CREATED_AT="2026-03-17T10:00:00Z",
         COMMENT_BODY="reviewer-bot validation close-path comment",
+        COMMENT_PERFORMED_VIA_GITHUB_APP="false",
     )
 
     state = make_state()
