@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from scripts.reviewer_bot_core.comment_routing_policy import PrCommentRouterOutcome
 from scripts.reviewer_bot_lib import comment_application, comment_routing, review_state
 from scripts.reviewer_bot_lib.context import CommentEventRequest
 from tests.fixtures.comment_routing_harness import CommentRoutingHarness
@@ -101,18 +102,12 @@ def test_route_issue_comment_trust_allows_only_same_repo_repo_user_principal(mon
         comment_author="alice",
         comment_body="hello",
     )
-    trust_context = harness.trust_context(
+    pr_admission = harness.pr_admission(
         github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-        comment_author_association="MEMBER",
-        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
-        github_ref="refs/heads/main",
-    )
-    harness.add_pull_request_metadata(
-        issue_number=42,
-        head_repo_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_head_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
         pr_author="carol",
     )
-    assert comment_routing.route_issue_comment_trust(harness.runtime, 42, request, trust_context) == "pr_trusted_direct"
+    assert comment_routing.route_issue_comment_trust(harness.runtime, 42, request, pr_admission) == PrCommentRouterOutcome.TRUSTED_DIRECT
 
 
 def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypatch):
@@ -125,83 +120,13 @@ def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypa
         comment_body="hello",
         comment_user_type="",
     )
-    trust_context = harness.trust_context(
+    pr_admission = harness.pr_admission(
         github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-        comment_author_association="MEMBER",
-        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
-        github_ref="refs/heads/main",
-    )
-    harness.add_pull_request_metadata(
-        issue_number=42,
-        head_repo_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_head_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
         pr_author="carol",
     )
     with pytest.raises(RuntimeError, match="Ambiguous same-repo PR comment trust posture"):
-        comment_routing.route_issue_comment_trust(harness.runtime, 42, request, trust_context)
-
-
-def test_build_pr_comment_observer_payload_wrapper_uses_explicit_env_facts(monkeypatch):
-    harness = CommentRoutingHarness(monkeypatch)
-    harness.wrapper_apply_inputs(
-        issue_number=42,
-        is_pull_request=True,
-        issue_author="dana",
-        comment_author="alice",
-        comment_body="@guidelines-bot /queue",
-        comment_author_association="MEMBER",
-        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
-        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-        github_ref="refs/heads/main",
-    )
-    harness.config.set("GITHUB_RUN_ID", 777)
-    harness.config.set("GITHUB_RUN_ATTEMPT", 2)
-    harness.add_pull_request_metadata(
-        issue_number=42,
-        head_repo_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
-        pr_author="dana",
-    )
-
-    payload = harness.build_observer_payload(42)
-
-    assert payload["kind"] == "observer_noop"
-    assert payload["reason"] == "trusted_direct_same_repo_human_comment"
-    assert payload["source_run_id"] == 777
-    assert payload["source_run_attempt"] == 2
-    assert payload["pr_number"] == 42
-
-
-def test_build_pr_comment_observer_payload_uses_same_comment_classification_as_payload_parser(monkeypatch):
-    harness = CommentRoutingHarness(monkeypatch)
-    request = harness.request(
-        issue_number=42,
-        is_pull_request=True,
-        issue_author="dana",
-        comment_author="alice",
-        comment_body="hello\n@guidelines-bot /queue",
-    )
-    trust_context = harness.trust_context(
-        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-        comment_author_association="MEMBER",
-        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
-        github_ref="refs/heads/main",
-        github_run_id=777,
-        github_run_attempt=2,
-    )
-    harness.add_pull_request_metadata(
-        issue_number=42,
-        head_repo_full_name="fork/example",
-        pr_author="dana",
-    )
-
-    payload = comment_routing.build_pr_comment_observer_payload(
-        harness.runtime,
-        42,
-        request,
-        trust_context,
-    )
-
-    assert payload["comment_class"] == "command_plus_text"
-    assert payload["has_non_command_text"] is True
+        comment_routing.route_issue_comment_trust(harness.runtime, 42, request, pr_admission)
 
 
 def test_comment_routing_module_delegates_routing_and_classification_to_core_policy():

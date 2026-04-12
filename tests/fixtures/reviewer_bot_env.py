@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from scripts.reviewer_bot_lib.context import LeaseContext
+import json
+import tempfile
+from pathlib import Path
+
+from scripts.reviewer_bot_lib.config import LeaseContext
 
 CLEAR_REVIEWER_BOT_ENV_VARS = {
     "ALLOW_EMPTY_ACTIVE_REVIEWS_WRITE",
@@ -10,6 +14,7 @@ CLEAR_REVIEWER_BOT_ENV_VARS = {
     "COMMENT_SOURCE_EVENT_KEY",
     "EVENT_ACTION",
     "EVENT_NAME",
+    "GITHUB_EVENT_PATH",
     "IS_PULL_REQUEST",
     "ISSUE_AUTHOR",
     "ISSUE_LABELS",
@@ -55,3 +60,11 @@ def set_env_values(config, **values) -> None:
 def set_process_env_values(monkeypatch, **values) -> None:
     for name, value in values.items():
         monkeypatch.setenv(name, str(value))
+
+
+def set_workflow_run_event_payload(config, workflow_name: str) -> str:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+        json.dump({"workflow_run": {"name": workflow_name}}, handle)
+        path = Path(handle.name)
+    config.set("GITHUB_EVENT_PATH", str(path))
+    return str(path)

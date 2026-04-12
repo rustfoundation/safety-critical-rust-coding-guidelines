@@ -7,15 +7,6 @@ from pathlib import Path
 from scripts.reviewer_bot_core import privileged_command_policy
 
 from .context import PrivilegedCommandRequest
-from .event_inputs import (
-    build_privileged_command_request as decode_privileged_command_request,
-)
-from .event_inputs import (
-    get_target_repo_root as decode_target_repo_root,
-)
-from .event_inputs import (
-    parse_issue_labels as decode_issue_labels,
-)
 
 EXECUTOR_PHASE_CHECKLIST = [
     "audit_command_execution",
@@ -58,25 +49,10 @@ def list_changed_files(repo_root: Path) -> list[str]:
 
 
 def get_target_repo_root(bot) -> Path:
-    configured = decode_target_repo_root(bot)
-    if configured is not None:
-        return configured
+    configured = bot.get_config_value("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip()
+    if configured:
+        return Path(configured)
     return Path(__file__).resolve().parents[2]
-
-
-def build_privileged_command_request(bot, *, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
-    return decode_privileged_command_request(
-        bot,
-        issue_number=issue_number,
-        actor=actor,
-        command_name=command_name,
-    )
-
-
-def bot_parse_issue_labels(bot) -> list[str]:
-    return decode_issue_labels(bot)
-
-
 def get_default_branch(bot) -> str:
     repo_info = bot.github_api("GET", "")
     if isinstance(repo_info, dict):
@@ -131,14 +107,23 @@ def create_pull_request(bot, branch: str, base: str, issue_number: int, *, title
     return None
 
 
-def _execute_accept_no_fls_changes_plan(bot, repo_root: Path, issue_number: int, plan: privileged_command_policy.AcceptNoFlsChangesPlan) -> tuple[str, bool]:
+def _execute_accept_no_fls_changes_plan(
+    bot,
+    repo_root: Path,
+    issue_number: int,
+    plan: privileged_command_policy.AcceptNoFlsChangesPlan,
+) -> privileged_command_policy.CompletePrivilegedExecution:
     try:
         bot.adapters.automation.run_command(plan.git_checkout_args, cwd=repo_root)
         bot.adapters.automation.run_command(["git", "add", *plan.add_paths], cwd=repo_root)
         bot.adapters.automation.run_command(plan.git_commit_args, cwd=repo_root)
         bot.adapters.automation.run_command(plan.git_push_args, cwd=repo_root)
     except RuntimeError as exc:
-        return f"❌ Failed to create branch or push changes: {exc}", False
+        return privileged_command_policy.CompletePrivilegedExecution(
+            status="failed_closed",
+            result_code="branch_or_push_failed",
+            result_message=f"❌ Failed to create branch or push changes: {exc}",
+        )
 
     pr = create_pull_request(
         bot,
@@ -149,9 +134,18 @@ def _execute_accept_no_fls_changes_plan(bot, repo_root: Path, issue_number: int,
         body=plan.pull_request_body,
     )
     if not pr or "html_url" not in pr:
-        return "❌ Failed to open a pull request for the spec.lock update.", False
+        return privileged_command_policy.CompletePrivilegedExecution(
+            status="failed_closed",
+            result_code="pull_request_creation_failed",
+            result_message="❌ Failed to open a pull request for the spec.lock update.",
+        )
 
-    return f"✅ Opened PR {pr['html_url']}", True
+    return privileged_command_policy.CompletePrivilegedExecution(
+        status="executed",
+        result_code="opened_pull_request",
+        result_message=f"✅ Opened PR {pr['html_url']}",
+        opened_pr_url=pr["html_url"],
+    )
 
 
 def _resolve_accept_no_fls_changes_plan(
@@ -162,7 +156,7 @@ def _resolve_accept_no_fls_changes_plan(
     audit_result: subprocess.CompletedProcess,
     update_result: subprocess.CompletedProcess,
     changed_files_after: list[str],
-) -> privileged_command_policy.PrivilegedDecision:
+ ) -> privileged_command_policy.CompletePrivilegedExecution | privileged_command_policy.AcceptNoFlsChangesPlan:
     post_update = privileged_command_policy.assess_accept_no_fls_changes_post_update(
         audit_returncode=audit_result.returncode,
         audit_details=bot.adapters.automation.summarize_output(audit_result),
@@ -170,7 +164,7 @@ def _resolve_accept_no_fls_changes_plan(
         update_details=bot.adapters.automation.summarize_output(update_result),
         changed_files_after=changed_files_after,
     )
-    if post_update.kind != "continue":
+    if post_update is not None:
         return post_update
     base_branch = bot.adapters.automation.get_default_branch()
     branch_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -186,11 +180,10 @@ def _resolve_accept_no_fls_changes_plan(
         branch_exists=False,
         branch_suffix=None,
     )
-    if provisional.kind != "execute_plan":
+    if not isinstance(provisional, privileged_command_policy.AcceptNoFlsChangesPlan):
         return provisional
-    assert provisional.plan is not None
     branch_exists = bot.adapters.automation.run_command(
-        ["git", "rev-parse", "--verify", provisional.plan.branch_probe_name],
+        ["git", "rev-parse", "--verify", provisional.branch_probe_name],
         cwd=repo_root,
         check=False,
     ).returncode == 0
@@ -214,22 +207,41 @@ def handle_accept_no_fls_changes_command(
     issue_number: int,
     comment_author: str,
     request: PrivilegedCommandRequest | None = None,
-) -> tuple[str, bool]:
-    privileged_request = request or build_privileged_command_request(
-        bot,
-        issue_number=issue_number,
-        actor=comment_author,
-        command_name="accept-no-fls-changes",
-    )
-    permission_status = bot.github.get_user_permission_status(comment_author, "triage")
-    repo_root = Path(privileged_request.target_repo_root) if privileged_request.target_repo_root else get_target_repo_root(bot)
-    preflight = privileged_command_policy.prevalidate_accept_no_fls_changes_request(
-        privileged_request,
-        permission_status,
-        bot.adapters.automation.list_changed_files(repo_root),
-    )
-    if preflight.kind == "blocked":
-        return str(preflight.message), bool(preflight.success)
+    execution_plan: privileged_command_policy.ExecutePrivilegedPlan | None = None,
+) -> privileged_command_policy.CompletePrivilegedExecution:
+    if execution_plan is None:
+        if request is None:
+            raise RuntimeError("handle_accept_no_fls_changes_command requires a canonical privileged request")
+        permission_status = bot.github.get_user_permission_status(comment_author, "triage")
+        repo_root = get_target_repo_root(bot)
+        preflight = privileged_command_policy.prevalidate_accept_no_fls_changes_request(
+            request,
+            permission_status,
+            bot.adapters.automation.list_changed_files(repo_root),
+        )
+        if isinstance(preflight, privileged_command_policy.BlockedPrivilegedExecution):
+            return privileged_command_policy.CompletePrivilegedExecution(
+                status="failed_closed",
+                result_code=preflight.result_code,
+                result_message=preflight.result_message,
+            )
+        execution_plan = privileged_command_policy.ExecutePrivilegedPlan(
+            record=preflight.record,
+            execution_context=privileged_command_policy.PrivilegedExecutionContext(
+                target_repo_root=str(repo_root),
+                base_branch=preflight.execution_context.base_branch,
+                branch_probe_name=preflight.execution_context.branch_probe_name,
+                branch_name=preflight.execution_context.branch_name,
+                expected_changed_files=preflight.execution_context.expected_changed_files,
+                existing_open_pr_url=preflight.execution_context.existing_open_pr_url,
+            ),
+        )
+    if execution_plan.record.command_name != privileged_command_policy.PrivilegedCommandId.ACCEPT_NO_FLS_CHANGES.value:
+        return privileged_command_policy.CompletePrivilegedExecution(
+            status="failed_closed",
+            result_code="unsupported_command",
+        )
+    repo_root = Path(execution_plan.execution_context.target_repo_root)
 
     audit_result = bot.adapters.automation.run_command(
         ["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
@@ -237,15 +249,22 @@ def handle_accept_no_fls_changes_command(
         check=False,
     )
     if audit_result.returncode == 2:
-        return (
-            "❌ The audit reports affected guidelines. Please review and open a PR with "
-            "the necessary guideline updates instead.",
-            False,
+        return privileged_command_policy.CompletePrivilegedExecution(
+            status="failed_closed",
+            result_code="audit_reported_guideline_impact",
+            result_message=(
+                "❌ The audit reports affected guidelines. Please review and open a PR with "
+                "the necessary guideline updates instead."
+            ),
         )
     if audit_result.returncode != 0:
         details = bot.adapters.automation.summarize_output(audit_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
-        return f"❌ Audit command failed.{detail_text}", False
+        return privileged_command_policy.CompletePrivilegedExecution(
+            status="failed_closed",
+            result_code="audit_failed",
+            result_message=f"❌ Audit command failed.{detail_text}",
+        )
 
     update_result = bot.adapters.automation.run_command(
         ["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"],
@@ -255,18 +274,21 @@ def handle_accept_no_fls_changes_command(
     if update_result.returncode != 0:
         details = bot.adapters.automation.summarize_output(update_result)
         detail_text = f"\n\nDetails:\n```\n{details}\n```" if details else ""
-        return f"❌ Failed to update spec.lock.{detail_text}", False
+        return privileged_command_policy.CompletePrivilegedExecution(
+            status="failed_closed",
+            result_code="update_failed",
+            result_message=f"❌ Failed to update spec.lock.{detail_text}",
+        )
 
     changed_files_after = bot.adapters.automation.list_changed_files(repo_root)
     planning = _resolve_accept_no_fls_changes_plan(
         bot,
         repo_root,
-        issue_number,
+        execution_plan.record.issue_number,
         audit_result=audit_result,
         update_result=update_result,
         changed_files_after=changed_files_after,
     )
-    if planning.kind != "execute_plan":
-        return str(planning.message), bool(planning.success)
-    assert planning.plan is not None
-    return _execute_accept_no_fls_changes_plan(bot, repo_root, issue_number, planning.plan)
+    if not isinstance(planning, privileged_command_policy.AcceptNoFlsChangesPlan):
+        return planning
+    return _execute_accept_no_fls_changes_plan(bot, repo_root, execution_plan.record.issue_number, planning)

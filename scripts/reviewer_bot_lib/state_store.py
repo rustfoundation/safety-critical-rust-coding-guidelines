@@ -9,15 +9,13 @@ import yaml
 from . import lock_codec, retrying
 from .config import (
     FRESHNESS_RUNTIME_EPOCH_LEGACY,
-    LOCK_BLOCK_END_MARKER,
-    LOCK_BLOCK_START_MARKER,
     STATE_BLOCK_END_MARKER,
     STATE_BLOCK_START_MARKER,
     STATE_SCHEMA_VERSION,
     StateIssueBodyParts,
     StateIssueSnapshot,
 )
-from .context import StateStoreContext, StateStoreRuntimeContext
+from .runtime_protocols import StateStoreContext, StateStoreRuntimeContext
 
 
 def _log(bot: StateStoreRuntimeContext, level: str, message: str, **fields: Any) -> None:
@@ -162,27 +160,22 @@ def split_state_issue_body(body: str) -> StateIssueBodyParts:
 
     state_start = body.find(STATE_BLOCK_START_MARKER)
     state_end = body.find(STATE_BLOCK_END_MARKER)
-    lock_start = body.find(LOCK_BLOCK_START_MARKER)
-    lock_end = body.find(LOCK_BLOCK_END_MARKER)
-
     has_state_markers = state_start >= 0 and state_end > state_start
-    has_lock_markers = lock_start >= 0 and lock_end > lock_start
-
-    if has_state_markers and has_lock_markers and state_end < lock_start:
+    if has_state_markers:
         return StateIssueBodyParts(
             prefix=body[:state_start],
             state_block_inner=body[state_start + len(STATE_BLOCK_START_MARKER) : state_end],
-            between_state_and_lock=body[state_end + len(STATE_BLOCK_END_MARKER) : lock_start],
-            lock_block_inner=body[lock_start + len(LOCK_BLOCK_START_MARKER) : lock_end],
-            suffix=body[lock_end + len(LOCK_BLOCK_END_MARKER) :],
+            between_state_and_lock="",
+            lock_block_inner=None,
+            suffix=body[state_end + len(STATE_BLOCK_END_MARKER) :],
             has_state_markers=True,
-            has_lock_markers=True,
+            has_lock_markers=False,
         )
 
     return StateIssueBodyParts(
-        prefix=default_state_issue_prefix(),
+        prefix=body,
         state_block_inner=None,
-        between_state_and_lock="\n\n",
+        between_state_and_lock="",
         lock_block_inner=None,
         suffix="\n",
         has_state_markers=False,
@@ -212,11 +205,7 @@ def parse_state_yaml_from_issue_body(body: str) -> dict:
         yaml_content = extract_fenced_block(parts.state_block_inner, "ya?ml")
 
     if yaml_content is None:
-        yaml_match = re.search(r"```ya?ml\n(.*?)\n```", body, re.DOTALL)
-        if yaml_match:
-            yaml_content = yaml_match.group(1)
-        else:
-            yaml_content = body
+        return {}
 
     try:
         state = yaml.safe_load(yaml_content) or {}
@@ -226,15 +215,6 @@ def parse_state_yaml_from_issue_body(body: str) -> dict:
     if not isinstance(state, dict):
         return {}
     return state
-
-
-def parse_lock_metadata_from_issue_body(body: str) -> dict:
-    parts = split_state_issue_body(body)
-    if not parts.has_lock_markers or parts.lock_block_inner is None:
-        return normalize_lock_metadata(None)
-    return lock_codec.parse_lock_metadata_block(parts.lock_block_inner)
-
-
 def render_marked_fenced_block(start_marker: str, end_marker: str, language: str, content: str) -> str:
     normalized = content.rstrip("\n")
     return f"{start_marker}\n```{language}\n{normalized}\n```\n{end_marker}"
@@ -242,7 +222,6 @@ def render_marked_fenced_block(start_marker: str, end_marker: str, language: str
 
 def render_state_issue_body(
     state: dict,
-    lock_meta: dict,
     base_body: str | None = None,
     *,
     preserve_state_block: bool = False,
@@ -265,13 +244,10 @@ def render_state_issue_body(
             yaml_content,
         )
 
-    lock_section = lock_codec.render_marked_lock_block(lock_meta)
-
     prefix = parts.prefix or default_state_issue_prefix()
-    between = parts.between_state_and_lock if parts.has_state_markers and parts.has_lock_markers else "\n\n"
-    suffix = parts.suffix if parts.has_lock_markers else "\n"
+    suffix = parts.suffix or "\n"
 
-    return f"{prefix}{state_section}{between}{lock_section}{suffix}"
+    return f"{prefix}{state_section}{suffix}"
 
 
 def parse_state_from_issue(issue: dict) -> dict:
@@ -401,8 +377,7 @@ def save_state(bot: StateStoreContext, state: dict) -> bool:
         if snapshot is None:
             return False
 
-        lock_meta = bot.parse_lock_metadata_from_issue_body(snapshot.body)
-        body = bot.render_state_issue_body(state, lock_meta, snapshot.body)
+        body = bot.render_state_issue_body(state, snapshot.body)
 
         response = bot.conditional_patch_state_issue(body, snapshot.etag)
         if response.status_code == 200:

@@ -11,12 +11,14 @@ Stays in `reviews.py`
 Moves to `approval_policy.py`
 - `compute_pr_approval_state_result`
 - `find_triage_approval_after`
+- `compute_pr_approval_state_from_reviews`
 
-Remains in `reviews_projection.py`
+Moves to `live_review_support.py`
 - `filter_current_head_reviews_for_cycle`
 - `normalize_reviews_with_parsed_timestamps`
 - `collect_permission_statuses`
-- `compute_pr_approval_state_from_reviews`
+
+Remains in `reviews_projection.py`
 - `desired_labels_from_response_state`
 
 Out of scope

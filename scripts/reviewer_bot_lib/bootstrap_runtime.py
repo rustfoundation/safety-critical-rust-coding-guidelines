@@ -7,7 +7,6 @@ from . import (
     commands,
     comment_routing,
     config,
-    events,
     github_api,
     lease_lock,
     lifecycle,
@@ -81,23 +80,20 @@ class _BootstrapGitHubServices:
     def get_issue_assignees(self, issue_number):
         return github_api.get_issue_assignees(self._runtime_getter(), issue_number)
 
-    def request_reviewer_assignment(self, issue_number, username):
-        return github_api.request_reviewer_assignment(self._runtime_getter(), issue_number, username)
+    def request_pr_reviewer_assignment(self, issue_number, username):
+        return github_api.request_pr_reviewer_assignment(self._runtime_getter(), issue_number, username)
 
-    def get_assignment_failure_comment(self, reviewer, attempt):
-        return github_api.get_assignment_failure_comment(self._runtime_getter(), reviewer, attempt)
+    def assign_issue_assignee(self, issue_number, username):
+        return github_api.assign_issue_assignee(self._runtime_getter(), issue_number, username)
 
     def add_reaction(self, comment_id, reaction):
         return github_api.add_reaction(self._runtime_getter(), comment_id, reaction)
 
-    def remove_assignee(self, issue_number, username):
-        return github_api.remove_assignee(self._runtime_getter(), issue_number, username)
+    def remove_issue_assignee(self, issue_number, username):
+        return github_api.remove_issue_assignee(self._runtime_getter(), issue_number, username)
 
     def remove_pr_reviewer(self, issue_number, username):
         return github_api.remove_pr_reviewer(self._runtime_getter(), issue_number, username)
-
-    def unassign_reviewer(self, issue_number, username):
-        return github_api.unassign_reviewer(self._runtime_getter(), issue_number, username)
 
     def get_user_permission_status(self, username, required_permission="triage"):
         return github_api.get_user_permission_status(self._runtime_getter(), username, required_permission)
@@ -145,17 +141,14 @@ class _BootstrapHandlerServices:
     def handle_pull_request_target_synchronize(self, current_state):
         return lifecycle.handle_pull_request_target_synchronize(self._runtime_getter(), current_state)
 
-    def handle_pull_request_review_event(self, current_state):
-        return events.handle_pull_request_review_event(self._runtime_getter(), current_state)
-
     def handle_comment_event(self, current_state):
         return comment_routing.handle_comment_event(self._runtime_getter(), current_state)
 
     def handle_manual_dispatch(self, current_state):
         return maintenance.handle_manual_dispatch(self._runtime_getter(), current_state)
 
-    def handle_scheduled_check(self, current_state):
-        return maintenance.handle_scheduled_check(self._runtime_getter(), current_state)
+    def handle_scheduled_check_result(self, current_state):
+        return maintenance.handle_scheduled_check_result(self._runtime_getter(), current_state)
 
 
 class _BootstrapReviewStateAdapterServices:
@@ -315,10 +308,6 @@ class _BootstrapAutomationAdapterServices:
     def create_pull_request(self, branch, base, issue_number):
         return automation.create_pull_request(self._runtime(), branch, base, issue_number)
 
-    def parse_issue_labels(self):
-        return automation.bot_parse_issue_labels(self._runtime())
-
-
 class _BootstrapStateLockAdapterServices:
     def __init__(self, runtime_getter, lock_services):
         self._runtime_getter = runtime_getter
@@ -345,11 +334,8 @@ class _BootstrapStateLockAdapterServices:
     def conditional_patch_state_issue(self, body, etag=None):
         return state_store.conditional_patch_state_issue(self._runtime(), body, etag)
 
-    def parse_lock_metadata_from_issue_body(self, body):
-        return state_store.parse_lock_metadata_from_issue_body(body)
-
-    def render_state_issue_body(self, current_state, lock_meta, base_body=None, *, preserve_state_block=False):
-        return state_store.render_state_issue_body(current_state, lock_meta, base_body, preserve_state_block=preserve_state_block)
+    def render_state_issue_body(self, current_state, base_body=None, *, preserve_state_block=False):
+        return state_store.render_state_issue_body(current_state, base_body, preserve_state_block=preserve_state_block)
 
     def get_state_issue_html_url(self):
         return lease_lock.get_state_issue_html_url(self._runtime())

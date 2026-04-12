@@ -3,11 +3,12 @@ from copy import deepcopy
 from pathlib import Path
 
 from scripts.reviewer_bot_core import (
+    live_review_support,
     review_state_live_repair,
     review_state_machine,
     reviewer_review_helpers,
 )
-from scripts.reviewer_bot_lib import review_read_support, review_state, reviews
+from scripts.reviewer_bot_lib import review_state, reviews
 from tests.fixtures.reviewer_bot import make_state
 
 
@@ -70,7 +71,7 @@ def test_g2a_live_read_repair_inventory_freezes_exact_public_apis_and_scenarios(
 def test_local_state_only_post_deletion_fixture_driven_proof(monkeypatch):
     fixture = _load_review_state_fixture("local_state_only_scenarios.json")
     fixed_now = "2026-03-17T10:00:00+00:00"
-    monkeypatch.setattr(review_state_machine, "_now_iso", lambda: fixed_now)
+    monkeypatch.setattr(review_state, "_now_iso", lambda: fixed_now)
 
     assert fixture["harness_id"] == "C1b/C1c mutable review-state mutation equivalence"
     assert fixture["scope"] == "local-state-only mutation"
@@ -145,13 +146,13 @@ def test_local_state_only_post_deletion_fixture_driven_proof(monkeypatch):
                 state, 42, "alice", assignment_method="manual"
             ),
             lambda state: review_state_machine.set_current_reviewer(
-                state, 42, "alice", assignment_method="manual"
+                state, 42, "alice", now=fixed_now, assignment_method="manual"
             ),
             {
                 **make_state(),
                 "active_reviews": {
                     "42": {
-                        "pending_privileged_commands": {"issue_comment:10": {"status": "pending"}},
+                        "sidecars": {"pending_privileged_commands": {"issue_comment:10": {"status": "pending"}}},
                         "current_cycle_completion": {"completed": True},
                         "current_cycle_write_approval": {"approved": True},
                     }
@@ -161,13 +162,19 @@ def test_local_state_only_post_deletion_fixture_driven_proof(monkeypatch):
         (
             "update_reviewer_activity_case_insensitive",
             lambda state: review_state.update_reviewer_activity(state, 42, "ALICE"),
-            lambda state: review_state_machine.update_reviewer_activity(state, 42, "ALICE"),
+            lambda state: review_state_machine.update_reviewer_activity(state, 42, "ALICE", now=fixed_now),
             {**make_state(), "active_reviews": {"42": {"current_reviewer": "alice"}}},
         ),
         (
             "mark_review_complete",
             lambda state: review_state.mark_review_complete(state, 42, "alice", "unit-test"),
-            lambda state: review_state_machine.mark_review_complete(state, 42, "alice", "unit-test"),
+            lambda state: review_state_machine.mark_review_complete(
+                state,
+                42,
+                "alice",
+                "unit-test",
+                completed_at=fixed_now,
+            ),
             make_state(),
         ),
         (
@@ -208,9 +215,9 @@ def test_get_current_cycle_boundary_post_deletion_fixture_driven_proof():
     }
 
     assert fixture["scope"] == "local-state-only mutation"
-    assert review_state.get_current_cycle_boundary(Bot(), deepcopy(review_data)) == review_state_machine.get_current_cycle_boundary(
-        Bot(),
+    assert review_state.get_current_cycle_boundary(Bot(), deepcopy(review_data)) == live_review_support.get_current_cycle_boundary(
         deepcopy(review_data),
+        parse_timestamp=Bot.parse_iso8601_timestamp,
     )
 
 
@@ -231,7 +238,7 @@ def test_live_read_assisted_post_deletion_fixture_driven_proof(monkeypatch):
         def parse_iso8601_timestamp(value):
             return reviews.parse_github_timestamp(value)
 
-    monkeypatch.setattr(review_read_support, "_pull_request_read_result", lambda bot, issue_number: bot.pull_request_result)
+    monkeypatch.setattr(live_review_support, "read_pull_request_result", lambda bot, issue_number: bot.pull_request_result)
     monkeypatch.setattr(
         reviewer_review_helpers,
         "get_preferred_current_reviewer_review_for_cycle",
@@ -309,7 +316,7 @@ def test_review_state_live_repair_behavior_no_longer_depends_on_reviews_parallel
         def parse_iso8601_timestamp(value):
             return reviews.parse_github_timestamp(value)
 
-    monkeypatch.setattr(review_read_support, "_pull_request_read_result", lambda bot, issue_number: bot.pull_request_result)
+    monkeypatch.setattr(live_review_support, "read_pull_request_result", lambda bot, issue_number: bot.pull_request_result)
     monkeypatch.setattr(
         reviewer_review_helpers,
         "get_preferred_current_reviewer_review_for_cycle",
@@ -345,15 +352,17 @@ def test_g2b_review_state_machine_no_longer_owns_live_read_repair_behavior():
 
     assert "build_reviewer_review_record_from_live_review" not in machine_text
     assert "get_preferred_current_reviewer_review_for_cycle" not in machine_text
-    assert "_pull_request_read_result" not in machine_text
-    assert "return review_state_live_repair.accept_reviewer_review_from_live_review(" in machine_text
-    assert "return review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(" in machine_text
-    assert "return review_state_live_repair.repair_missing_reviewer_review_state(" in machine_text
+    assert "read_pull_request_result" not in machine_text
+    assert "def accept_reviewer_review_from_live_review(" not in machine_text
+    assert "def refresh_reviewer_review_from_live_preferred_review(" not in machine_text
+    assert "def repair_missing_reviewer_review_state(" not in machine_text
+    assert "def upsert_channel_accepted_record(" in machine_text
     assert "def accept_reviewer_review_from_live_review(" in live_repair_text
     assert "def refresh_reviewer_review_from_live_preferred_review(" in live_repair_text
     assert "def repair_missing_reviewer_review_state(" in live_repair_text
     assert "reviewer_review_helpers.build_reviewer_review_record_from_live_review(" in live_repair_text
     assert "reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(" in live_repair_text
+    assert "review_state_machine.upsert_channel_accepted_record(" in live_repair_text
     assert "legacy_reviews.build_reviewer_review_record_from_live_review(" not in live_repair_text
     assert "legacy_reviews.get_preferred_current_reviewer_review_for_cycle(" not in live_repair_text
     assert "bot.github" not in live_repair_text

@@ -5,6 +5,7 @@ import pytest
 
 from scripts.reviewer_bot_lib import app
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+from tests.fixtures.reviewer_bot_env import set_workflow_run_event_payload
 
 
 def _load_phase_map() -> dict:
@@ -15,11 +16,11 @@ def _load_phase_map() -> dict:
     )
 
 
-def test_classify_event_intent_cross_repo_review_is_non_mutating_defer(monkeypatch):
+def test_classify_event_intent_cross_repo_review_is_read_only(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("PR_IS_CROSS_REPOSITORY", "true")
     intent = app.classify_event_intent(runtime, "pull_request_review", "submitted")
-    assert intent == runtime.EVENT_INTENT_NON_MUTATING_DEFER
+    assert intent == runtime.EVENT_INTENT_NON_MUTATING_READONLY
 
 
 def test_classify_event_intent_preview_reviewer_board_is_non_mutating(monkeypatch):
@@ -29,16 +30,16 @@ def test_classify_event_intent_preview_reviewer_board_is_non_mutating(monkeypatc
     assert intent == runtime.EVENT_INTENT_NON_MUTATING_READONLY
 
 
-def test_classify_event_intent_same_repo_review_is_non_mutating_defer(monkeypatch):
+def test_classify_event_intent_same_repo_review_is_read_only(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     intent = app.classify_event_intent(runtime, "pull_request_review", "submitted")
-    assert intent == runtime.EVENT_INTENT_NON_MUTATING_DEFER
+    assert intent == runtime.EVENT_INTENT_NON_MUTATING_READONLY
 
 
-def test_classify_event_intent_same_repo_dismissed_review_is_non_mutating_defer(monkeypatch):
+def test_classify_event_intent_same_repo_dismissed_review_is_read_only(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     intent = app.classify_event_intent(runtime, "pull_request_review", "dismissed")
-    assert intent == runtime.EVENT_INTENT_NON_MUTATING_DEFER
+    assert intent == runtime.EVENT_INTENT_NON_MUTATING_READONLY
 
 
 def test_classify_event_intent_review_comment_is_non_mutating_defer(monkeypatch):
@@ -60,8 +61,9 @@ def test_classify_event_intent_supported_workflow_run_source_action_pairs_are_mu
     monkeypatch, workflow_run_event, workflow_run_event_action
 ):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.set_config_value("WORKFLOW_RUN_EVENT", workflow_run_event)
-    runtime.set_config_value("WORKFLOW_RUN_EVENT_ACTION", workflow_run_event_action)
+    runtime.set_config_value("REVIEWER_BOT_WORKFLOW_KIND", "reconcile")
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    set_workflow_run_event_payload(runtime.config, "Reviewer Bot PR Review Submitted Observer")
     intent = app.classify_event_intent(runtime, "workflow_run", "completed")
     assert intent == runtime.EVENT_INTENT_MUTATING
 
@@ -80,8 +82,8 @@ def test_classify_event_intent_unsupported_workflow_run_source_action_pairs_are_
     monkeypatch, workflow_run_event, workflow_run_event_action
 ):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.set_config_value("WORKFLOW_RUN_EVENT", workflow_run_event)
-    runtime.set_config_value("WORKFLOW_RUN_EVENT_ACTION", workflow_run_event_action)
+    runtime.set_config_value("REVIEWER_BOT_WORKFLOW_KIND", workflow_run_event)
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION", workflow_run_event_action)
 
     assert app.classify_event_intent(runtime, "workflow_run", "completed") == runtime.EVENT_INTENT_NON_MUTATING_READONLY
 

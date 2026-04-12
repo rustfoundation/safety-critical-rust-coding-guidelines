@@ -14,9 +14,7 @@ Old module no longer preferred for these live-read-assisted repair changes:
 
 from __future__ import annotations
 
-from scripts.reviewer_bot_lib import review_read_support
-
-from . import review_state_machine, reviewer_review_helpers
+from . import live_review_support, review_state_machine, reviewer_review_helpers
 
 
 def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
@@ -45,7 +43,7 @@ def refresh_reviewer_review_from_live_preferred_review(
     actor: str | None = None,
 ) -> tuple[bool, dict | None]:
     if pull_request is None:
-        pull_request_result = review_read_support._pull_request_read_result(bot, issue_number)
+        pull_request_result = live_review_support.read_pull_request_result(bot, issue_number)
         if not pull_request_result.get("ok"):
             return False, None
         pull_request = pull_request_result["pull_request"]
@@ -64,14 +62,7 @@ def refresh_reviewer_review_from_live_preferred_review(
     )
     if record is None:
         return False, None
-    channel = review_state_machine._ensure_channel_map(review_data, "reviewer_review")
-    changed = False
-    if record["semantic_key"] not in channel["seen_keys"]:
-        channel["seen_keys"].append(record["semantic_key"])
-        changed = True
-    if channel.get("accepted") != record:
-        channel["accepted"] = record
-        changed = True
+    changed = review_state_machine.upsert_channel_accepted_record(review_data, "reviewer_review", record)
     submitted_at = preferred_review.get("submitted_at")
     if isinstance(submitted_at, str):
         previous_activity = review_data.get("last_reviewer_activity")

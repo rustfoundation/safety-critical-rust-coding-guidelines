@@ -46,11 +46,12 @@ def test_main_builds_event_context_for_preview_wrapper(monkeypatch):
 
 def test_main_builds_workflow_run_context_before_execution(monkeypatch):
     harness = AppHarness(monkeypatch)
+    harness.set_workflow_run_name("Reviewer Bot PR Review Dismissed Observer")
     harness.set_event(
         EVENT_NAME="workflow_run",
         EVENT_ACTION="completed",
-        WORKFLOW_RUN_EVENT="pull_request_review",
-        WORKFLOW_RUN_EVENT_ACTION="dismissed",
+        REVIEWER_BOT_WORKFLOW_KIND="reconcile",
+        WORKFLOW_RUN_TRIGGERING_CONCLUSION="success",
     )
     captured = harness.stub_execute_run(
         reviewer_bot.ExecutionResult(exit_code=0, state_changed=False)
@@ -62,8 +63,9 @@ def test_main_builds_workflow_run_context_before_execution(monkeypatch):
     assert captured.context is not None
     assert captured.context.event_name == "workflow_run"
     assert captured.context.event_action == "completed"
-    assert captured.context.workflow_run_event == "pull_request_review"
-    assert captured.context.workflow_run_event_action == "dismissed"
+    assert captured.context.workflow_kind == "reconcile"
+    assert captured.context.workflow_run_triggering_conclusion == "success"
+    assert captured.context.workflow_artifact_contract == "artifact_required"
 
 
 def test_main_exits_with_nonzero_execution_result(monkeypatch):

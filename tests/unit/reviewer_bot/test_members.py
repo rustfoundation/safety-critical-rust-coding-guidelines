@@ -23,7 +23,10 @@ def test_fetch_members_parses_producers_from_members_table(monkeypatch):
         )
     )
 
-    assert members.fetch_members(runtime) == [
+    result = members.fetch_members(runtime)
+
+    assert result.ok is True
+    assert result.producers == [
         {"github": "alice", "name": "Alice Example"},
         {"github": "carol", "name": "Carol Example"},
     ]
@@ -33,9 +36,10 @@ def test_fetch_members_logs_warning_and_returns_empty_list_on_failure(monkeypatc
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.rest_transport.stub(lambda **kwargs: (_ for _ in ()).throw(RuntimeError("timeout")))
 
-    assert members.fetch_members(runtime) == []
-    assert runtime.logger.records[-1]["level"] == "warning"
-    assert "Failed to fetch members file" in runtime.logger.records[-1]["message"]
+    result = members.fetch_members(runtime)
+
+    assert result.ok is False
+    assert result.producers == []
 
 
 def test_queue_sync_members_with_queue_uses_runtime_fetch_members(monkeypatch):

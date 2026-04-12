@@ -34,13 +34,13 @@ def test_list_changed_files_reports_tracked_changes_only(monkeypatch, tmp_path):
 
 def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp_path):
     harness = CommandHarness(monkeypatch)
+    harness.set_privileged_context(labels=[FLS_AUDIT_LABEL], target_repo_root=str(tmp_path))
     request = harness.typed_privileged_request(
         issue_number=42,
         actor="alice",
         command_name="accept-no-fls-changes",
         is_pull_request=False,
         issue_labels=(FLS_AUDIT_LABEL,),
-        target_repo_root=str(tmp_path),
     )
     harness.stub_permission("granted")
     observed = {"cwd": None}
@@ -58,13 +58,13 @@ def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp
 
 def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_path):
     harness = CommandHarness(monkeypatch)
+    harness.set_privileged_context(labels=[FLS_AUDIT_LABEL], target_repo_root=str(tmp_path))
     request = harness.typed_privileged_request(
         issue_number=42,
         actor="alice",
         command_name="accept-no-fls-changes",
         is_pull_request=False,
         issue_labels=(FLS_AUDIT_LABEL,),
-        target_repo_root=str(tmp_path),
     )
     harness.stub_permission("granted")
     list_calls = {"count": 0}
@@ -91,13 +91,13 @@ def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_p
 
 def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, tmp_path):
     harness = CommandHarness(monkeypatch)
+    harness.set_privileged_context(labels=[FLS_AUDIT_LABEL], target_repo_root=str(tmp_path))
     request = harness.typed_privileged_request(
         issue_number=42,
         actor="alice",
         command_name="accept-no-fls-changes",
         is_pull_request=False,
         issue_labels=(FLS_AUDIT_LABEL,),
-        target_repo_root=str(tmp_path),
     )
     harness.stub_permission("granted")
     harness.runtime.list_changed_files = lambda repo_root: []
@@ -148,13 +148,13 @@ def test_update_spec_lock_file_mode_exits_before_build_docs(monkeypatch, tmp_pat
 
 def test_accept_no_fls_changes_freezes_ordered_execution_plan_branch_name_and_pr_metadata(monkeypatch, tmp_path):
     harness = CommandHarness(monkeypatch)
+    harness.set_privileged_context(labels=[FLS_AUDIT_LABEL], target_repo_root=str(tmp_path))
     request = harness.typed_privileged_request(
         issue_number=42,
         actor="alice",
         command_name="accept-no-fls-changes",
         is_pull_request=False,
         issue_labels=(FLS_AUDIT_LABEL,),
-        target_repo_root=str(tmp_path),
     )
     harness.stub_permission("granted")
     list_calls = {"count": 0}
@@ -265,9 +265,14 @@ def test_j1_executor_consumes_richer_plan_command_lists_without_rederiving_git_s
         lambda bot, branch, base, issue_number, title=None, body=None: {"html_url": "https://example.invalid/pr/2"},
     )
 
-    message, success = automation._execute_accept_no_fls_changes_plan(harness.runtime, tmp_path, 42, plan)
+    result = automation._execute_accept_no_fls_changes_plan(harness.runtime, tmp_path, 42, plan)
 
-    assert (message, success) == ("✅ Opened PR https://example.invalid/pr/2", True)
+    assert result == privileged_command_policy.CompletePrivilegedExecution(
+        status="executed",
+        result_code="opened_pull_request",
+        result_message="✅ Opened PR https://example.invalid/pr/2",
+        opened_pr_url="https://example.invalid/pr/2",
+    )
     assert [command for command, _cwd, _check in runner.calls] == [
         plan.git_checkout_args,
         ["git", "add", "src/spec.lock"],
@@ -287,4 +292,4 @@ def test_automation_executor_phase_checklist_and_plan_execution_helper_are_expli
     assert '"pull_request_create"' in module_text
     assert "def _resolve_accept_no_fls_changes_plan(" in module_text
     assert "def _execute_accept_no_fls_changes_plan(" in module_text
-    assert "return _execute_accept_no_fls_changes_plan(bot, repo_root, issue_number, planning.plan)" in module_text
+    assert "return _execute_accept_no_fls_changes_plan(bot, repo_root, execution_plan.record.issue_number, planning)" in module_text

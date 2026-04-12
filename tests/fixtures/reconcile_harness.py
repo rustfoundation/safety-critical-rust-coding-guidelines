@@ -6,7 +6,7 @@ from scripts.reviewer_bot_lib import comment_application, lifecycle, reconcile
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import pull_request_payload, review_payload
-from .reviewer_bot_env import set_env_values
+from .reviewer_bot_env import set_env_values, set_workflow_run_event_payload
 from .reviewer_bot_fakes import RouteGitHubApi, github_result
 
 
@@ -23,7 +23,8 @@ def review_submitted_payload(
     source_run_attempt: int,
 ) -> dict:
     return {
-        "schema_version": 2,
+        "payload_kind": "deferred_review_submitted",
+        "schema_version": 3,
         "source_workflow_name": "Reviewer Bot PR Review Submitted Observer",
         "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
         "source_run_id": source_run_id,
@@ -53,10 +54,12 @@ def issue_comment_payload(
     source_run_id: int,
     source_run_attempt: int,
 ) -> dict:
+    del comment_class, has_non_command_text
     return {
-        "schema_version": 2,
-        "source_workflow_name": "Reviewer Bot PR Comment Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+        "payload_kind": "deferred_comment",
+        "schema_version": 3,
+        "source_workflow_name": "Reviewer Bot PR Comment Router",
+        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-router.yml",
         "source_run_id": source_run_id,
         "source_run_attempt": source_run_attempt,
         "source_event_name": "issue_comment",
@@ -64,11 +67,17 @@ def issue_comment_payload(
         "source_event_key": source_event_key,
         "pr_number": pr_number,
         "comment_id": comment_id,
-        "comment_class": comment_class,
-        "has_non_command_text": has_non_command_text,
-        "source_body_digest": comment_application.digest_comment_body(body),
-        "source_created_at": source_created_at,
-        "actor_login": actor_login,
+        "comment_body": body,
+        "comment_created_at": source_created_at,
+        "comment_author": actor_login,
+        "comment_author_id": 7001,
+        "comment_user_type": "User",
+        "comment_sender_type": "User",
+        "comment_installation_id": None,
+        "comment_performed_via_github_app": False,
+        "issue_author": "dana",
+        "issue_state": "open",
+        "issue_labels": ["coding guideline"],
     }
 
 
@@ -89,8 +98,10 @@ def review_comment_payload(
     source_run_id: int,
     source_run_attempt: int,
 ) -> dict:
+    del comment_class, has_non_command_text, actor_class, pull_request_review_id, in_reply_to_id
     return {
-        "schema_version": 2,
+        "payload_kind": "deferred_review_comment",
+        "schema_version": 3,
         "source_workflow_name": "Reviewer Bot PR Review Comment Observer",
         "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
         "source_run_id": source_run_id,
@@ -100,18 +111,17 @@ def review_comment_payload(
         "source_event_key": source_event_key,
         "pr_number": pr_number,
         "comment_id": comment_id,
-        "comment_class": comment_class,
-        "has_non_command_text": has_non_command_text,
-        "source_body_digest": comment_application.digest_comment_body(body),
-        "source_created_at": source_created_at,
-        "actor_login": actor_login,
-        "actor_id": actor_id,
-        "actor_class": actor_class,
-        "pull_request_review_id": pull_request_review_id,
-        "in_reply_to_id": in_reply_to_id,
-        "source_artifact_name": (
-            f"reviewer-bot-review-comment-context-{source_run_id}-attempt-{source_run_attempt}"
-        ),
+        "comment_body": body,
+        "comment_created_at": source_created_at,
+        "comment_author": actor_login,
+        "comment_author_id": actor_id,
+        "comment_user_type": "User",
+        "comment_sender_type": "User",
+        "comment_installation_id": None,
+        "comment_performed_via_github_app": False,
+        "issue_author": "dana",
+        "issue_state": "open",
+        "issue_labels": ["coding guideline"],
     }
 
 
@@ -123,13 +133,14 @@ class ReconcileHarness:
     def __post_init__(self) -> None:
         self.github = RouteGitHubApi()
         self.runtime = FakeReviewerBotRuntime(self.monkeypatch, github=self.github)
+        self.runtime.ACTIVE_LEASE_CONTEXT = object()
         self.config = self.runtime.config
         self.deferred_payloads = self.runtime.deferred_payloads
         self.runtime.stub_deferred_payload(self.payload)
         self.wrapper_set_trigger_from_payload(self.payload)
 
-    def handle_workflow_run_event(self, state: dict) -> bool:
-        return reconcile.handle_workflow_run_event(self.runtime, state)
+    def handle_workflow_run_event_result(self, state: dict) -> reconcile.WorkflowRunHandlerResult:
+        return reconcile.handle_workflow_run_event_result(self.runtime, state)
 
     def set_payload(self, payload: dict) -> dict:
         self.payload = payload
@@ -138,9 +149,9 @@ class ReconcileHarness:
         return payload
 
     def wrapper_set_trigger_from_payload(self, payload: dict, *, conclusion: str = "success") -> None:
+        set_workflow_run_event_payload(self.config, payload["source_workflow_name"])
         set_env_values(
             self.config,
-            WORKFLOW_RUN_TRIGGERING_NAME=payload["source_workflow_name"],
             WORKFLOW_RUN_TRIGGERING_ID=payload["source_run_id"],
             WORKFLOW_RUN_TRIGGERING_ATTEMPT=payload["source_run_attempt"],
             WORKFLOW_RUN_TRIGGERING_CONCLUSION=conclusion,
@@ -300,4 +311,4 @@ class ReconcileHarness:
         self.monkeypatch.setattr(comment_application, "apply_comment_command", func)
 
     def run(self, state: dict) -> bool:
-        return self.handle_workflow_run_event(state)
+        return self.handle_workflow_run_event_result(state).state_changed

@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
-from .guidance import get_fls_audit_guidance, get_issue_guidance, get_pr_guidance
+from .config import TRANSITION_NOTICE_MARKER_PREFIX
+from .guidance import (
+    get_assignment_failure_comment,
+    get_fls_audit_guidance,
+    get_issue_guidance,
+    get_pr_guidance,
+)
 from .review_state import (
     accept_channel_event,
     ensure_review_entry,
@@ -49,13 +57,34 @@ def _semantic_digest(value: str) -> str:
     return hashlib.sha256(_normalize_comment_body(value).encode("utf-8")).hexdigest()
 
 
+def _write_transition_notice_marker_cutover(bot) -> None:
+    config_dir = Path(bot.get_config_value("OPENCODE_CONFIG_DIR") or "")
+    if not config_dir:
+        return
+    artifact_path = config_dir / "reviewer-bot" / "maintainability-remediation" / "transition-notice-marker-cutover.json"
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "artifact_id": "transition-notice-marker-cutover",
+                "completed_at": bot.clock.now().isoformat(),
+                "state_issue_number": bot.state_issue_number(),
+            },
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+
+
 def handle_transition_notice(bot, state: dict, issue_number: int, reviewer: str) -> bool:
     review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
     if review_data.get("transition_notice_sent_at"):
         return False
-    notice_message = f"""🔔 **Transition Period Ended**
+    notice_message = f"""<!-- {TRANSITION_NOTICE_MARKER_PREFIX} issue={issue_number} reviewer={reviewer} -->
+
+🔔 **Transition Period Ended**
 
 @{reviewer}, the {bot.TRANSITION_PERIOD_DAYS}-day transition period has passed without activity on this review.
 
@@ -66,6 +95,7 @@ You may still continue this review, or use `{bot.BOT_MENTION} /pass`, `{bot.BOT_
 _If you believe this is in error or have extenuating circumstances, please reach out to the subcommittee._"""
     if not bot.github.post_comment(issue_number, notice_message):
         return False
+    _write_transition_notice_marker_cutover(bot)
     record_transition_notice_sent(
         review_data,
         bot.datetime.now(bot.timezone.utc).isoformat(),
@@ -104,7 +134,10 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
         bot.github.post_comment(issue_number, f"⚠️ No reviewers available in the queue. Please use `{bot.BOT_MENTION} /sync-members` to update the queue.")
         return False
     is_pr = request.is_pull_request
-    assignment_attempt = bot.github.request_reviewer_assignment(issue_number, reviewer)
+    if is_pr:
+        assignment_attempt = bot.github.request_pr_reviewer_assignment(issue_number, reviewer)
+    else:
+        assignment_attempt = bot.github.assign_issue_assignee(issue_number, reviewer)
     set_current_reviewer(state, issue_number, reviewer)
     review_data = ensure_review_entry(state, issue_number, create=True)
     if is_pr and isinstance(review_data, dict):
@@ -112,7 +145,11 @@ def handle_issue_or_pr_opened(bot, state: dict) -> bool:
         if head_sha:
             review_data["active_head_sha"] = head_sha
     bot.adapters.queue.record_assignment(state, reviewer, issue_number, "pr" if is_pr else "issue")
-    failure_comment = bot.github.get_assignment_failure_comment(reviewer, assignment_attempt)
+    failure_comment = get_assignment_failure_comment(
+        reviewer,
+        assignment_attempt,
+        is_pull_request=is_pr,
+    )
     if failure_comment:
         bot.github.post_comment(issue_number, failure_comment)
     if is_pr and assignment_attempt.success:
@@ -205,6 +242,8 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     head_sha = request.head_sha
     if not head_sha:
         raise RuntimeError("Missing PR_HEAD_SHA for synchronize event")
+    if not request.event_created_at:
+        raise RuntimeError("Missing EVENT_CREATED_AT for synchronize event")
     bot.collect_touched_item(issue_number)
     previous_head_sha = review_data.get("active_head_sha")
     previous_completion = deepcopy(review_data.get("current_cycle_completion"))
@@ -213,7 +252,7 @@ def handle_pull_request_target_synchronize(bot, state: dict) -> bool:
     previous_review_completed_by = review_data.get("review_completed_by")
     previous_review_completion_source = review_data.get("review_completion_source")
     review_data["active_head_sha"] = head_sha
-    timestamp = request.event_created_at or _now_iso()
+    timestamp = request.event_created_at
     changed = accept_channel_event(
         review_data,
         "contributor_revision",

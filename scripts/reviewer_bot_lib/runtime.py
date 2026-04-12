@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import reviews
 from .config import (
     AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
     BOT_MENTION,
@@ -405,12 +404,6 @@ class ReviewerBotRuntime:
     def parse_iso8601_timestamp(self, value: Any):
         return self.adapters.state_lock.parse_iso8601_timestamp(value)
 
-    def parse_github_timestamp(self, value: Any):
-        return reviews.parse_github_timestamp(value)
-
-    def is_triage_or_higher(self, username: str) -> bool:
-        return self.adapters.review_state.is_triage_or_higher(username)
-
     def satisfy_mandatory_approver_requirement(self, current_state: dict, issue_number: int, approver: str) -> bool:
         return self.adapters.review_state.satisfy_mandatory_approver_requirement(current_state, issue_number, approver)
 
@@ -430,13 +423,9 @@ class ReviewerBotRuntime:
     def conditional_patch_state_issue(self, body: str, etag: str | None = None):
         return self.adapters.state_lock.conditional_patch_state_issue(body, etag)
 
-    def parse_lock_metadata_from_issue_body(self, body: str):
-        return self.adapters.state_lock.parse_lock_metadata_from_issue_body(body)
-
-    def render_state_issue_body(self, state: dict, lock_meta: dict, base_body: str | None = None, *, preserve_state_block: bool = False):
+    def render_state_issue_body(self, state: dict, base_body: str | None = None, *, preserve_state_block: bool = False):
         return self.adapters.state_lock.render_state_issue_body(
             state,
-            lock_meta,
             base_body,
             preserve_state_block=preserve_state_block,
         )

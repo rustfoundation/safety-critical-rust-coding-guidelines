@@ -2,39 +2,25 @@
 
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime, timezone
-
 from scripts.reviewer_bot_core import comment_routing_policy
+from scripts.reviewer_bot_core.comment_routing_policy import PrCommentRouterOutcome
 
 from .comment_application import (
-    digest_comment_body,
     normalize_comment_body,
     process_comment_event,
 )
-from .context import (
-    CommentEventRequest,
-    CommentRoutingRuntimeContext,
-    PrCommentTrustContext,
-)
+from .context import CommentEventRequest, PrCommentAdmission
 from .event_inputs import (
     build_comment_event_request as decode_comment_event_request,
 )
 from .event_inputs import (
-    build_pr_comment_trust_context as decode_pr_comment_trust_context,
+    build_pr_comment_admission as decode_pr_comment_admission,
 )
+from .runtime_protocols import CommentRoutingRuntimeContext
 
 
 def _log(bot: CommentRoutingRuntimeContext, level: str, message: str, **fields) -> None:
     bot.logger.event(level, message, **fields)
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _now_iso() -> str:
-    return _now().isoformat()
 
 
 def _runtime_epoch(state: dict) -> str:
@@ -45,16 +31,24 @@ def build_comment_event_request(bot: CommentRoutingRuntimeContext, *, issue_numb
     return decode_comment_event_request(bot, issue_number=issue_number)
 
 
-def build_pr_comment_trust_context(bot: CommentRoutingRuntimeContext) -> PrCommentTrustContext:
-    return decode_pr_comment_trust_context(bot)
+def build_pr_comment_admission(bot: CommentRoutingRuntimeContext) -> PrCommentAdmission | None:
+    return decode_pr_comment_admission(bot)
 
 
 def _resolve_comment_request(bot: CommentRoutingRuntimeContext, request: CommentEventRequest | None, *, issue_number: int | None = None) -> CommentEventRequest:
     return request or build_comment_event_request(bot, issue_number=issue_number)
 
 
-def _resolve_trust_context(bot: CommentRoutingRuntimeContext, trust_context: PrCommentTrustContext | None) -> PrCommentTrustContext:
-    return trust_context or build_pr_comment_trust_context(bot)
+def _resolve_pr_admission(bot: CommentRoutingRuntimeContext, pr_admission: PrCommentAdmission | None) -> PrCommentAdmission | None:
+    return pr_admission or build_pr_comment_admission(bot)
+
+
+def _resolve_pr_admission_for_request(
+    bot: CommentRoutingRuntimeContext,
+    request: CommentEventRequest,
+    pr_admission: PrCommentAdmission | None,
+) -> PrCommentAdmission | None:
+    return pr_admission or decode_pr_comment_admission(bot, request)
 
 
 def _require_v18_for_pr(bot: CommentRoutingRuntimeContext, state: dict, request: CommentEventRequest, context: str) -> bool:
@@ -75,14 +69,6 @@ def _require_v18_for_pr(bot: CommentRoutingRuntimeContext, state: dict, request:
 
 def _normalize_comment_body(body: str) -> str:
     return normalize_comment_body(body)
-
-
-def _semantic_digest(value: str) -> str:
-    return hashlib.sha256(_normalize_comment_body(value).encode("utf-8")).hexdigest()
-
-
-def _digest_body(body: str) -> str:
-    return digest_comment_body(body)
 
 
 def _comment_line_is_command(bot: CommentRoutingRuntimeContext, line: str) -> bool:
@@ -109,33 +95,17 @@ def _is_self_comment(bot: CommentRoutingRuntimeContext, author: str) -> bool:
     return author.strip().lower() == bot.BOT_NAME.lower() or author.strip().lower() == bot.BOT_MENTION.lstrip("@").lower()
 
 
-def _fetch_pr_metadata(bot: CommentRoutingRuntimeContext, issue_number: int) -> dict:
-    pull_request = bot.github_api("GET", f"pulls/{issue_number}")
-    if not isinstance(pull_request, dict):
-        raise RuntimeError(f"Failed to fetch live PR metadata for #{issue_number}")
-    if not isinstance(pull_request.get("head"), dict) or not isinstance(pull_request.get("user"), dict):
-        raise RuntimeError(f"Unusable PR metadata for #{issue_number}")
-    return pull_request
-
-
 def _classify_pr_comment_processing_target(
     bot: CommentRoutingRuntimeContext,
     request: CommentEventRequest,
-    trust_context: PrCommentTrustContext,
-) -> str:
+    pr_admission: PrCommentAdmission,
+):
     actor_class = _classify_issue_comment_actor(request)
-    pull_request = _fetch_pr_metadata(bot, request.issue_number)
-    head_repo = pull_request.get("head", {}).get("repo", {})
-    head_full_name = head_repo.get("full_name") if isinstance(head_repo, dict) else None
-    pr_author = pull_request.get("user", {}).get("login")
     return comment_routing_policy.classify_pr_comment_processing_target(
         request,
-        trust_context,
+        pr_admission,
         actor_class=actor_class,
         is_self_comment=_is_self_comment(bot, request.comment_author),
-        pr_head_full_name=head_full_name,
-        pr_author=pr_author if isinstance(pr_author, str) else None,
-        author_association_trust_allowlist=bot.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
     )
 
 
@@ -143,27 +113,32 @@ def classify_pr_comment_processing_target(
     bot: CommentRoutingRuntimeContext,
     issue_number: int,
     request: CommentEventRequest | None = None,
-    trust_context: PrCommentTrustContext | None = None,
-) -> str:
+    pr_admission: PrCommentAdmission | None = None,
+):
     comment_request = _resolve_comment_request(bot, request, issue_number=issue_number)
+    resolved_admission = _resolve_pr_admission_for_request(bot, comment_request, pr_admission)
+    if resolved_admission is None:
+        raise RuntimeError("Trusted direct PR comment handling requires pr_admission")
     return _classify_pr_comment_processing_target(
         bot,
         comment_request,
-        _resolve_trust_context(bot, trust_context),
+        resolved_admission,
     )
 
 
 def _route_issue_comment_trust(
     bot: CommentRoutingRuntimeContext,
     request: CommentEventRequest,
-    trust_context: PrCommentTrustContext,
-) -> str:
+    pr_admission: PrCommentAdmission | None,
+):
     processing_target = None
     if request.is_pull_request:
-        processing_target = _classify_pr_comment_processing_target(bot, request, trust_context)
+        if pr_admission is None:
+            raise RuntimeError("Trusted direct PR comment handling requires pr_admission")
+        processing_target = _classify_pr_comment_processing_target(bot, request, pr_admission)
     return comment_routing_policy.route_issue_comment_trust(
         request,
-        trust_context,
+        pr_admission,
         processing_target=processing_target,
     )
 
@@ -172,48 +147,13 @@ def route_issue_comment_trust(
     bot: CommentRoutingRuntimeContext,
     issue_number: int,
     request: CommentEventRequest | None = None,
-    trust_context: PrCommentTrustContext | None = None,
-) -> str:
+    pr_admission: PrCommentAdmission | None = None,
+):
     comment_request = _resolve_comment_request(bot, request, issue_number=issue_number)
     return _route_issue_comment_trust(
         bot,
         comment_request,
-        _resolve_trust_context(bot, trust_context),
-    )
-
-
-def _build_pr_comment_observer_payload(
-    bot: CommentRoutingRuntimeContext,
-    request: CommentEventRequest,
-    trust_context: PrCommentTrustContext,
-) -> dict:
-    actor_class = _classify_issue_comment_actor(request)
-    processing_target = _classify_pr_comment_processing_target(bot, request, trust_context)
-    body = request.comment_body
-    payload_classification = classify_comment_payload(bot, body)
-    if _is_self_comment(bot, request.comment_author):
-        actor_class = "bot_account"
-    return comment_routing_policy.build_pr_comment_observer_payload(
-        request,
-        trust_context,
-        actor_class=actor_class,
-        processing_target=processing_target,
-        payload_classification=payload_classification,
-        body_digest=_digest_body(body),
-    )
-
-
-def build_pr_comment_observer_payload(
-    bot: CommentRoutingRuntimeContext,
-    issue_number: int,
-    request: CommentEventRequest | None = None,
-    trust_context: PrCommentTrustContext | None = None,
-) -> dict:
-    comment_request = _resolve_comment_request(bot, request, issue_number=issue_number)
-    return _build_pr_comment_observer_payload(
-        bot,
-        comment_request,
-        _resolve_trust_context(bot, trust_context),
+        _resolve_pr_admission_for_request(bot, comment_request, pr_admission),
     )
 
 
@@ -231,7 +171,7 @@ def handle_comment_event(
     bot: CommentRoutingRuntimeContext,
     state: dict,
     request: CommentEventRequest | None = None,
-    trust_context: PrCommentTrustContext | None = None,
+    pr_admission: PrCommentAdmission | None = None,
 ) -> bool:
     bot.assert_lock_held("handle_comment_event")
     comment_request = _resolve_comment_request(bot, request)
@@ -242,11 +182,11 @@ def handle_comment_event(
     route = _route_issue_comment_trust(
         bot,
         comment_request,
-        _resolve_trust_context(bot, trust_context),
+        _resolve_pr_admission_for_request(bot, comment_request, pr_admission),
     )
-    if route == "safe_noop":
+    if route == PrCommentRouterOutcome.SAFE_NOOP:
         return False
-    if route == "issue_direct":
+    if route == comment_routing_policy.ProcessingTarget.ISSUE_DIRECT:
         if comment_request.issue_state == "closed":
             removed = state.get("active_reviews", {}).pop(str(issue_number), None)
             _log(
@@ -258,7 +198,9 @@ def handle_comment_event(
             )
             return removed is not None
         return _process_comment_event(bot, state, comment_request)
-    if route == "pr_trusted_direct":
+    if route == PrCommentRouterOutcome.TRUSTED_DIRECT:
+        if comment_request.issue_state != "open":
+            return False
         if not _require_v18_for_pr(bot, state, comment_request, "pr_trusted_direct_comment"):
             return False
         return _process_comment_event(bot, state, comment_request)

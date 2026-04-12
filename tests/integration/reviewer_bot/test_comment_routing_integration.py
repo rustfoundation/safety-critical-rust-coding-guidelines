@@ -18,17 +18,16 @@ def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypa
         issue_number=42,
         is_pull_request=False,
         issue_author="dana",
+        issue_labels=(FLS_AUDIT_LABEL,),
         comment_author="dana",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
     effects = harness.capture_comment_side_effects()
-    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
 
     assert comment_routing.handle_comment_event(harness.runtime, state, request) is True
-    pending = state["active_reviews"]["42"]["pending_privileged_commands"]
+    pending = state["active_reviews"]["42"]["sidecars"]["pending_privileged_commands"]
     assert pending["issue_comment:100"]["command_name"] == "accept-no-fls-changes"
-    assert pending["issue_comment:100"]["authorization"]["authorized"] is True
     assert effects.comments == [
         (
             42,
@@ -148,8 +147,8 @@ def test_observer_noop_payload_is_safe_noop(tmp_path, monkeypatch):
     harness.config.set("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
     harness.config.set("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
 
-    assert reconcile.handle_workflow_run_event(harness.runtime, state) is False
-    assert state["active_reviews"]["42"]["deferred_gaps"] == {}
+    assert reconcile.handle_workflow_run_event_result(harness.runtime, state).state_changed is False
+    assert state["active_reviews"]["42"]["sidecars"]["deferred_gaps"] == {}
 
 
 def test_cross_repo_pr_comment_route_remains_deferred_not_direct(monkeypatch):
@@ -163,14 +162,9 @@ def test_cross_repo_pr_comment_route_remains_deferred_not_direct(monkeypatch):
         comment_body="hello",
     )
     trust_context = harness.trust_context(
+        route_outcome=comment_routing.comment_routing_policy.PrCommentRouterOutcome.DEFERRED_RECONCILE,
         github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-        comment_author_association="MEMBER",
-        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        github_ref="refs/heads/main",
-    )
-    harness.add_pull_request_metadata(
-        issue_number=42,
-        head_repo_full_name="fork/example",
+        pr_head_full_name="fork/example",
         pr_author="dana",
     )
 

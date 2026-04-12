@@ -17,6 +17,14 @@ from tests.fixtures.reviewer_bot import (
 pytestmark = pytest.mark.integration
 
 
+def _deferred_gaps(review: dict) -> dict:
+    return review["sidecars"]["deferred_gaps"]
+
+
+def _reconciled_source_events(review: dict) -> dict:
+    return review["sidecars"]["reconciled_source_events"]
+
+
 C4C_DELETION_MANIFEST = [
     "inline comment classification drift decision text in reconcile.py",
     "inline non-command text drift decision text in reconcile.py",
@@ -29,7 +37,7 @@ def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping
 ):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="bob")
-    review["deferred_gaps"]["pull_request_review:11"] = {"reason": "artifact_missing"}
+    _deferred_gaps(review)["pull_request_review:11"] = {"reason": "artifact_missing"}
     harness = ReconcileHarness(
         monkeypatch,
         review_submitted_payload(
@@ -57,8 +65,8 @@ def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping
     )
 
     assert harness.run(state) is True
-    assert "pull_request_review:11" in review["reconciled_source_events"]
-    assert "pull_request_review:11" not in review["deferred_gaps"]
+    assert "pull_request_review:11" in _reconciled_source_events(review)
+    assert "pull_request_review:11" not in _deferred_gaps(review)
 
 
 def test_handle_workflow_run_event_persists_fail_closed_diagnostic_without_raising(monkeypatch):
@@ -87,7 +95,7 @@ def test_handle_workflow_run_event_persists_fail_closed_diagnostic_without_raisi
     )
 
     assert harness.run(state) is True
-    gap = review["deferred_gaps"]["pull_request_review:12"]
+    gap = _deferred_gaps(review)["pull_request_review:12"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["failure_kind"] == "server_error"
 
@@ -115,15 +123,14 @@ def test_handle_workflow_run_event_treats_observer_noop_payload_as_no_mutation(m
 
     assert result.state_changed is False
     assert result.touched_items == [42]
-    assert result.projection_followup_needed is True
     assert harness.runtime.drain_touched_items() == []
-    assert state["active_reviews"]["42"]["reconciled_source_events"] == []
+    assert state["active_reviews"]["42"]["sidecars"]["reconciled_source_events"] == {}
 
 
 def test_deferred_comment_reconcile_returns_true_for_bookkeeping_only_mutations(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="alice")
-    review["deferred_gaps"]["issue_comment:210"] = {"reason": "artifact_missing"}
+    _deferred_gaps(review)["issue_comment:210"] = {"reason": "artifact_missing"}
     live_body = "@guidelines-bot /queue"
     harness = ReconcileHarness(
         monkeypatch,
@@ -151,8 +158,8 @@ def test_deferred_comment_reconcile_returns_true_for_bookkeeping_only_mutations(
     harness.stub_apply_comment_command(False)
 
     assert harness.run(state) is True
-    assert "issue_comment:210" in review["reconciled_source_events"]
-    assert "issue_comment:210" not in review["deferred_gaps"]
+    assert "issue_comment:210" in _reconciled_source_events(review)
+    assert "issue_comment:210" not in _deferred_gaps(review)
 
 
 def test_deferred_comment_missing_live_object_preserves_source_time_freshness(monkeypatch):
@@ -183,7 +190,7 @@ def test_deferred_comment_missing_live_object_preserves_source_time_freshness(mo
 
     assert harness.run(state) is True
     assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"]["semantic_key"] == "issue_comment:99"
-    assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:99"]["reason"] == "reconcile_failed_closed"
+    assert state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]["issue_comment:99"]["reason"] == "reconcile_failed_closed"
 
 
 def test_handle_workflow_run_event_rebuilds_completion_from_live_review_commit_id(monkeypatch):
@@ -412,7 +419,7 @@ def test_deferred_review_comment_missing_live_object_preserves_source_time_fresh
 
     assert harness.run(state) is True
     assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:303"
-    assert review["deferred_gaps"]["pull_request_review_comment:303"]["reason"] == "reconcile_failed_closed"
+    assert _deferred_gaps(review)["pull_request_review_comment:303"]["reason"] == "reconcile_failed_closed"
 
 
 def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguous(monkeypatch):
@@ -462,8 +469,8 @@ def test_deferred_comment_reconcile_fails_closed_when_command_replay_is_ambiguou
 
     assert harness.run(state) is True
     assert command_calls == []
-    assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
-    assert "issue_comment:201" not in state["active_reviews"]["42"]["reconciled_source_events"]
+    assert state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
+    assert "issue_comment:201" not in state["active_reviews"]["42"]["sidecars"]["reconciled_source_events"]
 
 
 def test_deferred_comment_reconcile_hydrates_pr_author_context_for_contributor_freshness(monkeypatch):
@@ -591,7 +598,7 @@ def test_deferred_comment_reconcile_records_failure_kind_when_live_comment_unava
     )
 
     assert harness.run(state) is True
-    gap = state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:205"]
+    gap = state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]["issue_comment:205"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["failure_kind"] == "server_error"
 
@@ -633,11 +640,13 @@ def test_deferred_comment_reconcile_fails_closed_when_comment_classification_dri
             "normalized_body": live_body,
         }
     )
+    harness.runtime.add_reaction = lambda *args, **kwargs: True
+    harness.runtime.post_comment = lambda *args, **kwargs: True
 
     assert harness.run(state) is True
     assert state["active_reviews"]["42"]["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:202"
-    assert state["active_reviews"]["42"]["deferred_gaps"]["issue_comment:202"]["reason"] == "reconcile_failed_closed"
-    assert "issue_comment:202" not in state["active_reviews"]["42"]["reconciled_source_events"]
+    assert state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]["issue_comment:202"]["reason"] == "reconcile_failed_closed"
+    assert state["active_reviews"]["42"]["sidecars"]["reconciled_source_events"] == {}
 
 
 def test_c4c_reconcile_deletion_manifest_and_adapter_cleanup_are_explicit():

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.reviewer_bot_core import privileged_command_policy
 from scripts.reviewer_bot_lib import (
     automation,
     commands,
@@ -204,12 +205,10 @@ def test_handle_accept_no_fls_changes_command_fails_closed_when_permission_unava
 def test_i1_comment_application_consumes_typed_ordinary_command_result(monkeypatch):
     module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
 
-    assert "decision.kind == \"handler_call\"" in module_text
-    assert "decision.handler_name" in module_text
-    assert "decision.handler_args" in module_text
+    assert "ORDINARY_COMMAND_HANDLERS" in module_text
+    assert "decision.command_id" in module_text
     assert "decision.needs_assignment_request" in module_text
-    assert "decision.result_shape" in module_text
-    assert "decision.react" in module_text
+    assert "CommandExecutionResult" in module_text
 
 
 def test_k2_comment_application_entrypoints_use_narrow_comment_runtime_protocol():
@@ -326,17 +325,21 @@ def test_validate_accept_no_fls_changes_handoff_distinguishes_permission_unavail
     request = harness.request(
         issue_number=42,
         is_pull_request=False,
+        issue_labels=(FLS_AUDIT_LABEL,),
         comment_author="alice",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
 
-    ok, metadata = comment_application.validate_accept_no_fls_changes_handoff(
-        harness.runtime,
+    decision = privileged_command_policy.validate_accept_no_fls_changes_handoff(
         request,
+        "unavailable",
+        source_event_key="issue_comment:100",
     )
 
-    assert ok is False
-    assert metadata["reason"] == "authorization_unavailable"
+    assert decision == privileged_command_policy.BlockedPrivilegedHandoff(
+        reason="authorization_unavailable",
+        response="❌ Unable to verify triage permissions right now; refusing to run this command.",
+    )
 
 
 @pytest.mark.parametrize(
@@ -360,14 +363,18 @@ def test_validate_accept_no_fls_changes_handoff_freezes_fail_closed_reason_matri
     request = harness.request(
         issue_number=42,
         is_pull_request=is_pull_request,
+        issue_labels=labels,
         comment_author="alice",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
 
-    ok, metadata = comment_application.validate_accept_no_fls_changes_handoff(harness.runtime, request)
+    decision = privileged_command_policy.validate_accept_no_fls_changes_handoff(
+        request,
+        permission,
+        source_event_key="issue_comment:100",
+    )
 
-    assert ok is False
-    assert metadata == {"reason": expected_reason}
+    assert decision.reason == expected_reason
 
 
 def test_validate_accept_no_fls_changes_handoff_freezes_success_metadata_shape(monkeypatch):
@@ -377,20 +384,28 @@ def test_validate_accept_no_fls_changes_handoff_freezes_success_metadata_shape(m
     request = harness.request(
         issue_number=42,
         is_pull_request=False,
+        issue_labels=(FLS_AUDIT_LABEL,),
         comment_author="alice",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
 
-    ok, metadata = comment_application.validate_accept_no_fls_changes_handoff(harness.runtime, request)
+    decision = privileged_command_policy.validate_accept_no_fls_changes_handoff(
+        request,
+        "granted",
+        source_event_key="issue_comment:100",
+    )
 
-    assert ok is True
-    assert metadata == {
-        "command_name": "accept-no-fls-changes",
-        "issue_number": 42,
-        "actor": "alice",
-        "authorization": {"required_permission": "triage", "authorized": True},
-        "target": {"kind": "issue", "number": 42, "labels": [FLS_AUDIT_LABEL]},
-    }
+    assert decision == privileged_command_policy.AllowedPrivilegedHandoff(
+        source_event_key="issue_comment:100",
+        command_name=privileged_command_policy.PrivilegedCommandId.ACCEPT_NO_FLS_CHANGES.value,
+        issue_number=42,
+        actor="alice",
+        authorization_required_permission="triage",
+        authorization_authorized=True,
+        target_kind="issue",
+        target_number=42,
+        target_labels_snapshot=(FLS_AUDIT_LABEL,),
+    )
 
 
 def test_apply_comment_command_records_privileged_handoff_side_effects(monkeypatch):
@@ -403,8 +418,8 @@ def test_apply_comment_command_records_privileged_handoff_side_effects(monkeypat
         body="@guidelines-bot /accept-no-fls-changes",
         issue_author="dana",
         is_pull_request=False,
+        issue_labels=(FLS_AUDIT_LABEL,),
     )
-    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
     harness.stub_permission("granted")
 
     changed = comment_application.apply_comment_command(
@@ -415,11 +430,11 @@ def test_apply_comment_command_records_privileged_handoff_side_effects(monkeypat
         classify_issue_comment_actor=lambda current_request: "repo_user_principal",
     )
 
-    pending = state["active_reviews"]["42"]["pending_privileged_commands"]["issue_comment:100"]
+    pending = state["active_reviews"]["42"]["sidecars"]["pending_privileged_commands"]["issue_comment:100"]
     assert changed is True
     assert pending["command_name"] == "accept-no-fls-changes"
     assert pending["status"] == "pending"
-    assert pending["authorization"]["authorized"] is True
+    assert pending["authorization_authorized"] is True
     assert side_effects.comments == [
         (
             42,
@@ -455,18 +470,24 @@ def test_apply_comment_command_adds_reactions_and_posts_normalized_queue_respons
     assert side_effects.reactions == [(100, "eyes"), (100, "+1")]
 
 
-def test_manual_dispatch_marks_live_permission_unavailable_for_pending_privileged_command(monkeypatch):
+def test_manual_dispatch_marks_authorization_unavailable_for_pending_privileged_command(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
-    review["pending_privileged_commands"] = {
+    review["sidecars"]["pending_privileged_commands"] = {
         "issue_comment:100": {
             "source_event_key": "issue_comment:100",
             "command_name": "accept-no-fls-changes",
             "issue_number": 42,
             "actor": "alice",
+            "authorization_required_permission": "triage",
+            "authorization_authorized": True,
+            "target_kind": "issue",
+            "target_number": 42,
+            "target_labels_snapshot": [FLS_AUDIT_LABEL],
             "status": "pending",
+            "created_at": "2026-03-17T10:00:00Z",
         }
     }
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
@@ -474,9 +495,9 @@ def test_manual_dispatch_marks_live_permission_unavailable_for_pending_privilege
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     assert harness.handle_manual_dispatch(state) is True
-    pending = review["pending_privileged_commands"]["issue_comment:100"]
+    pending = review["sidecars"]["pending_privileged_commands"]["issue_comment:100"]
     assert pending["status"] == "failed_closed"
-    assert pending["result"] == "live_permission_unavailable"
+    assert pending["result_code"] == "authorization_unavailable"
 
 
 @pytest.mark.parametrize(
@@ -542,7 +563,7 @@ def test_comment_application_delegates_ordinary_command_decision_to_core_policy(
 
 
 def test_commands_module_exposes_rectify_handler_for_decision_adapter_surface():
-    assert hasattr(commands, "handle_rectify_command")
+    assert hasattr(commands, "handle_rectify_command") is False
 
 
 def test_comment_application_and_automation_delegate_privileged_planning_to_core_policy():

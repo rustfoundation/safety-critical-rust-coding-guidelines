@@ -27,7 +27,8 @@ jobs:
           python - <<'PY'
           import json, os
           payload = {
-              'schema_version': 2,
+              'payload_kind': 'deferred_review_submitted',
+              'schema_version': 3,
               'source_workflow_name': 'Reviewer Bot PR Review Submitted Observer',
               'source_workflow_file': '.github/workflows/reviewer-bot-pr-review-submitted-observer.yml',
               'source_run_id': int(os.environ['GITHUB_RUN_ID']),

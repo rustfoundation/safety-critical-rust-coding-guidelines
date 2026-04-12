@@ -3,17 +3,14 @@
 import sys
 
 from . import maintenance, reconcile
-from .context import (
-    AppEventContextRuntime,
-    AppExecutionRuntime,
-    EventContext,
-    ExecutionResult,
-)
+from .context import EventContext, ExecutionResult
 from .event_inputs import build_event_context as decode_event_context
 from .maintenance import (
     collect_status_projection_repair_items,
     status_projection_repair_needed,
 )
+from .repair_records import projection_repair_marker, store_repair_marker
+from .runtime_protocols import AppEventContextRuntime, AppExecutionRuntime
 
 
 def _log(bot: AppExecutionRuntime, level: str, message: str, **fields) -> None:
@@ -40,20 +37,8 @@ def _mark_projection_repair_needed(bot: AppExecutionRuntime, state: dict, issue_
         review_data = active_reviews.get(str(issue_number))
         if not isinstance(review_data, dict):
             continue
-        marker = {
-            "kind": "projection_failure",
-            "reason": reason,
-            "recorded_at": bot.datetime.now(bot.timezone.utc).isoformat(),
-        }
-        existing = review_data.get("repair_needed")
-        if isinstance(existing, dict) and {
-            key: value for key, value in existing.items() if key != "recorded_at"
-        } == {
-            key: value for key, value in marker.items() if key != "recorded_at"
-        }:
-            continue
-        review_data["repair_needed"] = marker
-        changed = True
+        marker = projection_repair_marker(reason, bot.datetime.now(bot.timezone.utc).isoformat())
+        changed = store_repair_marker(review_data, "status_label_projection", marker) or changed
     return changed
 
 
@@ -79,11 +64,6 @@ def _classify_event_intent_from_context(bot: AppEventContextRuntime, context: Ev
             return bot.EVENT_INTENT_MUTATING
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
-    if event_name == "pull_request_review":
-        if event_action in {"submitted", "dismissed"}:
-            return bot.EVENT_INTENT_NON_MUTATING_DEFER
-        return bot.EVENT_INTENT_NON_MUTATING_READONLY
-
     if event_name == "pull_request_review_comment":
         if event_action == "created":
             return bot.EVENT_INTENT_NON_MUTATING_DEFER
@@ -92,10 +72,7 @@ def _classify_event_intent_from_context(bot: AppEventContextRuntime, context: Ev
     if event_name == "workflow_run":
         if event_action != "completed":
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
-        if reconcile.supports_mutating_workflow_run_source_action(
-            context.workflow_run_event,
-            context.workflow_run_event_action,
-        ):
+        if context.workflow_kind == "reconcile" and context.workflow_run_triggering_conclusion == "success":
             return bot.EVENT_INTENT_MUTATING
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
@@ -128,14 +105,9 @@ def classify_event_intent(bot: AppEventContextRuntime, event_name: str, event_ac
         pr_is_cross_repository=context.pr_is_cross_repository,
         review_author=context.review_author,
         review_state=context.review_state,
-        workflow_run_event=context.workflow_run_event,
-        workflow_run_event_action=context.workflow_run_event_action,
-        workflow_run_head_sha=context.workflow_run_head_sha,
-        workflow_run_reconcile_pr_number=context.workflow_run_reconcile_pr_number,
-        workflow_run_reconcile_head_sha=context.workflow_run_reconcile_head_sha,
-        workflow_run_id=context.workflow_run_id,
-        workflow_name=context.workflow_name,
-        workflow_job_name=context.workflow_job_name,
+        workflow_kind=context.workflow_kind,
+        workflow_run_triggering_conclusion=context.workflow_run_triggering_conclusion,
+        workflow_artifact_contract=context.workflow_artifact_contract,
         manual_action=context.manual_action,
     )
     return _classify_event_intent_from_context(bot, context)
@@ -219,10 +191,6 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             elif event_action == "synchronize":
                 state_changed = bot.handlers.handle_pull_request_target_synchronize(state)
 
-        elif event_name == "pull_request_review":
-            if event_action in {"submitted", "dismissed"}:
-                state_changed = bot.handlers.handle_pull_request_review_event(state)
-
         elif event_name == "issue_comment":
             if event_action == "created":
                 state_changed = bot.handlers.handle_comment_event(state)
@@ -231,26 +199,21 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             state_changed = bot.handlers.handle_manual_dispatch(state)
 
         elif event_name == "schedule":
-            schedule_result = maintenance.handle_scheduled_check_result(bot, state)
+            schedule_result = bot.handlers.handle_scheduled_check_result(state)
             state_changed = schedule_result.state_changed
 
         elif event_name == "workflow_run":
             if event_action == "completed":
-                if reconcile.supports_mutating_workflow_run_source_action(
-                    context.workflow_run_event,
-                    context.workflow_run_event_action,
-                ):
+                if context.workflow_kind == "reconcile" and context.workflow_run_triggering_conclusion == "success":
                     workflow_run_result = reconcile.handle_workflow_run_event_result(bot, state)
                     state_changed = workflow_run_result.state_changed
                 else:
                     _log(
                         bot,
                         "info",
-                        "Ignoring workflow_run event with unsupported source-action pair: "
-                        f"{context.workflow_run_event or '<missing>'}/"
-                        f"{context.workflow_run_event_action or '<missing>'}",
-                        workflow_run_event=context.workflow_run_event or "<missing>",
-                        workflow_run_event_action=context.workflow_run_event_action or "<missing>",
+                        "Ignoring workflow_run event outside retained reconcile envelope.",
+                        workflow_kind=context.workflow_kind or "<missing>",
+                        workflow_conclusion=context.workflow_run_triggering_conclusion or "<missing>",
                     )
 
         if workflow_run_result is not None:

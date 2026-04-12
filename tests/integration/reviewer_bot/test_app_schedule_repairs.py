@@ -111,7 +111,7 @@ def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tm
     result = harness.run_execute()
 
     assert result.exit_code == 0
-    assert state["active_reviews"]["42"]["repair_needed"]["kind"] == "projection_failure"
+    assert state["active_reviews"]["42"]["sidecars"]["repair_markers"]["status_label_projection"]["kind"] == "projection_failure"
     assert len(saved_states) >= 2
 
 def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repair(monkeypatch):

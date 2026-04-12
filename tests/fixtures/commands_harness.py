@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 
+from scripts.reviewer_bot_core.comment_routing_policy import PrCommentRouterOutcome
 from scripts.reviewer_bot_lib import automation as automation_module
 from scripts.reviewer_bot_lib import commands as commands_module
 from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
@@ -9,13 +10,16 @@ from scripts.reviewer_bot_lib import event_inputs
 from scripts.reviewer_bot_lib import maintenance as maintenance_module
 from scripts.reviewer_bot_lib import reconcile as reconcile_module
 from scripts.reviewer_bot_lib.config import AssignmentAttempt
-from scripts.reviewer_bot_lib.context import CommentEventRequest, PrCommentTrustContext
+from scripts.reviewer_bot_lib.context import (
+    CommentEventRequest,
+    PrCommentAdmission,
+)
 
 from .fake_runtime import FakeReviewerBotRuntime
 from .reviewer_bot_builders import (
     build_assignment_request,
     build_comment_event_request,
-    build_pr_comment_trust_context,
+    build_pr_comment_admission,
     build_privileged_command_request,
 )
 from .reviewer_bot_env import set_env_values
@@ -43,6 +47,7 @@ class CommandHarness:
     def __init__(self, monkeypatch):
         self._monkeypatch = monkeypatch
         self.runtime = FakeReviewerBotRuntime(monkeypatch)
+        self.runtime.ACTIVE_LEASE_CONTEXT = object()
         self.config = self.runtime.config
         self.github = self.runtime.github
         self.handlers = self.runtime.handlers
@@ -116,9 +121,11 @@ class CommandHarness:
         self.runtime.get_issue_assignees = lambda issue_number: assignees
 
     def stub_assignment(self, *, success: bool = True, status_code: int = 201):
-        self.runtime.request_reviewer_assignment = lambda issue_number, username: AssignmentAttempt(
-            success=success, status_code=status_code
-        )
+        def attempt(issue_number, username):
+            return AssignmentAttempt(success=success, status_code=status_code)
+
+        self.runtime.request_pr_reviewer_assignment = attempt
+        self.runtime.assign_issue_assignee = attempt
 
     def stub_permission(self, status: str) -> None:
         self.runtime.get_user_permission_status = lambda username, required_permission="triage": status
@@ -170,10 +177,6 @@ class CommandHarness:
         command_name: str = "",
         is_pull_request: bool = False,
         issue_labels: tuple[str, ...] = (),
-        target_repo_root: str = "",
-        workflow_run_reconcile_pr_number: int | None = None,
-        workflow_run_reconcile_head_sha: str = "",
-        workflow_run_head_sha: str = "",
     ):
         return build_privileged_command_request(
             issue_number=issue_number,
@@ -181,10 +184,6 @@ class CommandHarness:
             command_name=command_name,
             is_pull_request=is_pull_request,
             issue_labels=issue_labels,
-            target_repo_root=target_repo_root,
-            workflow_run_reconcile_pr_number=workflow_run_reconcile_pr_number,
-            workflow_run_reconcile_head_sha=workflow_run_reconcile_head_sha,
-            workflow_run_head_sha=workflow_run_head_sha,
         )
 
     def typed_comment_request(
@@ -195,13 +194,17 @@ class CommandHarness:
         body: str,
         issue_author: str,
         is_pull_request: bool = False,
+        issue_state: str = "open",
+        issue_labels: tuple[str, ...] = (),
         comment_id: int = 100,
         created_at: str = "2026-03-17T10:00:00Z",
     ) -> CommentEventRequest:
         return build_comment_event_request(
             issue_number=issue_number,
             is_pull_request=is_pull_request,
+            issue_state=issue_state,
             issue_author=issue_author,
+            issue_labels=issue_labels,
             comment_id=comment_id,
             comment_author=actor,
             comment_body=body,
@@ -209,24 +212,41 @@ class CommandHarness:
             comment_user_type="User",
         )
 
-    def typed_trust_context(
+    def typed_pr_admission(
         self,
         *,
-        author_association: str = "",
-        workflow_file: str = "",
         repository: str = "",
-        ref: str = "",
+        pr_head_full_name: str = "",
+        pr_author: str = "",
+        issue_state: str = "open",
+        issue_labels: tuple[str, ...] = (),
+        comment_author_id: int = 200,
         run_id: int = 0,
         run_attempt: int = 0,
-    ) -> PrCommentTrustContext:
-        return build_pr_comment_trust_context(
+        author_association: str = "",
+        workflow_file: str = "",
+        ref: str = "",
+    ) -> PrCommentAdmission:
+        del author_association, workflow_file, ref
+        if repository and not pr_head_full_name:
+            pr_head_full_name = repository
+        if repository and not pr_author:
+            pr_author = "trusted-author"
+        return build_pr_comment_admission(
+            route_outcome=PrCommentRouterOutcome.TRUSTED_DIRECT,
+            declared_trust_class="pr_trusted_direct",
             github_repository=repository,
-            comment_author_association=author_association,
-            current_workflow_file=workflow_file,
-            github_ref=ref,
+            pr_head_full_name=pr_head_full_name,
+            pr_author=pr_author,
+            issue_state=issue_state,
+            issue_labels=issue_labels,
+            comment_author_id=comment_author_id,
             github_run_id=run_id,
             github_run_attempt=run_attempt,
         )
+
+    def typed_trust_context(self, **kwargs):
+        return self.typed_pr_admission(**kwargs)
 
     def handle_assign(self, state: dict, issue_number: int, username: str, *, request=None):
         return commands_module.handle_assign_command(
@@ -294,19 +314,27 @@ class CommandHarness:
         )
 
     def handle_accept_no_fls_changes(self, issue_number: int, comment_author: str, *, request=None):
-        return automation_module.handle_accept_no_fls_changes_command(
+        result = automation_module.handle_accept_no_fls_changes_command(
             self.runtime,
             issue_number,
             comment_author,
             request=request or self.privileged_request(issue_number=issue_number, actor=comment_author, command_name="accept-no-fls-changes"),
         )
+        return result.result_message or "", result.status == "executed"
 
-    def handle_comment_event(self, state: dict, *, request: CommentEventRequest | None = None, trust_context: PrCommentTrustContext | None = None):
+    def handle_comment_event(
+        self,
+        state: dict,
+        *,
+        request: CommentEventRequest | None = None,
+        pr_admission: PrCommentAdmission | None = None,
+        trust_context: PrCommentAdmission | None = None,
+    ):
         return comment_routing_module.handle_comment_event(
             self.runtime,
             state,
             request or event_inputs.build_comment_event_request(self.runtime),
-            trust_context or event_inputs.build_pr_comment_trust_context(self.runtime),
+            pr_admission or trust_context or event_inputs.build_pr_comment_admission(self.runtime),
         )
 
     def handle_manual_dispatch(self, state: dict):

@@ -3,24 +3,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
+
+
+class DeferredPayloadKind(StrEnum):
+    DEFERRED_COMMENT = "deferred_comment"
+    DEFERRED_REVIEW_COMMENT = "deferred_review_comment"
+    DEFERRED_REVIEW_SUBMITTED = "deferred_review_submitted"
+    DEFERRED_REVIEW_DISMISSED = "deferred_review_dismissed"
 
 
 @dataclass(frozen=True)
 class DeferredArtifactIdentity:
+    payload_kind: DeferredPayloadKind
     schema_version: int
-    source_workflow_name: str
-    source_workflow_file: str
     source_run_id: int
     source_run_attempt: int
     source_event_name: str
     source_event_action: str
     source_event_key: str
+    pr_number: int
 
 
 @dataclass(frozen=True)
 class DeferredReviewPayload:
     identity: DeferredArtifactIdentity
-    pr_number: int
     review_id: int
     source_submitted_at: str | None
     source_review_state: str | None
@@ -28,11 +35,36 @@ class DeferredReviewPayload:
     actor_login: str | None
     raw_payload: dict
 
+    @property
+    def pr_number(self) -> int:
+        return self.identity.pr_number
+
 
 @dataclass(frozen=True)
 class DeferredCommentPayload:
     identity: DeferredArtifactIdentity
-    pr_number: int
+    comment_id: int
+    comment_body: str
+    comment_created_at: str
+    comment_author: str
+    comment_author_id: int
+    comment_user_type: str
+    comment_sender_type: str
+    comment_installation_id: str | None
+    comment_performed_via_github_app: bool
+    issue_author: str
+    issue_state: str
+    issue_labels: tuple[str, ...]
+    raw_payload: dict
+
+    @property
+    def pr_number(self) -> int:
+        return self.identity.pr_number
+
+
+@dataclass(frozen=True)
+class _LegacyDeferredIssueCommentPayloadV2:
+    identity: DeferredArtifactIdentity
     comment_id: int
     comment_class: str
     has_non_command_text: bool
@@ -41,18 +73,41 @@ class DeferredCommentPayload:
     actor_login: str | None
     raw_payload: dict
 
+    @property
+    def pr_number(self) -> int:
+        return self.identity.pr_number
+
+
+@dataclass(frozen=True)
+class _LegacyDeferredReviewCommentPayloadV2:
+    identity: DeferredArtifactIdentity
+    comment_id: int
+    comment_class: str
+    has_non_command_text: bool
+    source_body_digest: str
+    source_created_at: str
+    actor_login: str | None
+    raw_payload: dict
+
+    @property
+    def pr_number(self) -> int:
+        return self.identity.pr_number
+
 
 @dataclass(frozen=True)
 class ObserverNoopPayload:
     identity: DeferredArtifactIdentity
-    pr_number: int
     reason: str
     raw_payload: dict
+
+    @property
+    def pr_number(self) -> int:
+        return self.identity.pr_number
 
 
 @dataclass(frozen=True)
 class DeferredCommentReplayContext:
-    payload: DeferredCommentPayload
+    payload: DeferredCommentPayload | _LegacyDeferredIssueCommentPayloadV2 | _LegacyDeferredReviewCommentPayloadV2
     expected_event_name: str
     live_comment_endpoint: str
 
@@ -66,18 +121,24 @@ class DeferredCommentReplayContext:
 
     @property
     def pr_number(self) -> int:
-        return self.payload.pr_number
+        return self.payload.identity.pr_number
 
     @property
     def actor_login(self) -> str:
+        if hasattr(self.payload, "comment_author"):
+            return self.payload.comment_author
         return self.payload.actor_login or ""
 
     @property
     def source_created_at(self) -> str:
+        if hasattr(self.payload, "comment_created_at"):
+            return self.payload.comment_created_at
         return self.payload.source_created_at
 
     @property
     def source_freshness_eligible(self) -> bool:
+        if hasattr(self.payload, "comment_body"):
+            return True
         return self.payload.comment_class in {"plain_text", "command_plus_text"} and self.payload.has_non_command_text
 
 
@@ -95,7 +156,7 @@ class DeferredReviewReplayContext:
 
     @property
     def pr_number(self) -> int:
-        return self.payload.pr_number
+        return self.payload.identity.pr_number
 
     @property
     def actor_login(self) -> str:
@@ -103,20 +164,36 @@ class DeferredReviewReplayContext:
 
 
 def _build_deferred_identity(payload: dict) -> DeferredArtifactIdentity:
+    payload_kind = payload.get("payload_kind")
+    if payload_kind is None:
+        event_name = payload.get("source_event_name")
+        event_action = payload.get("source_event_action")
+        if event_name == "issue_comment" and event_action == "created":
+            payload_kind = DeferredPayloadKind.DEFERRED_COMMENT.value
+        elif event_name == "pull_request_review_comment" and event_action == "created":
+            payload_kind = DeferredPayloadKind.DEFERRED_REVIEW_COMMENT.value
+        elif event_name == "pull_request_review" and event_action == "submitted":
+            payload_kind = DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED.value
+        elif event_name == "pull_request_review" and event_action == "dismissed":
+            payload_kind = DeferredPayloadKind.DEFERRED_REVIEW_DISMISSED.value
+    try:
+        resolved_payload_kind = DeferredPayloadKind(str(payload_kind))
+    except ValueError as exc:
+        raise RuntimeError("Unsupported deferred workflow_run payload") from exc
     return DeferredArtifactIdentity(
+        payload_kind=resolved_payload_kind,
         schema_version=int(payload["schema_version"]),
-        source_workflow_name=str(payload["source_workflow_name"]),
-        source_workflow_file=str(payload["source_workflow_file"]),
         source_run_id=int(payload["source_run_id"]),
         source_run_attempt=int(payload["source_run_attempt"]),
         source_event_name=str(payload["source_event_name"]),
         source_event_action=str(payload["source_event_action"]),
         source_event_key=str(payload["source_event_key"]),
+        pr_number=int(payload["pr_number"]),
     )
 
 
 def build_deferred_comment_replay_context(
-    payload: DeferredCommentPayload,
+    payload: DeferredCommentPayload | _LegacyDeferredIssueCommentPayloadV2 | _LegacyDeferredReviewCommentPayloadV2,
     *,
     expected_event_name: str,
     live_comment_endpoint: str,
@@ -144,10 +221,36 @@ def build_deferred_review_replay_context(
 
 
 def _validate_deferred_comment_artifact(payload: dict) -> None:
+    if payload.get("schema_version") == 3:
+        required = {
+            "payload_kind",
+            "schema_version",
+            "source_run_id",
+            "source_run_attempt",
+            "source_event_name",
+            "source_event_action",
+            "source_event_key",
+            "pr_number",
+            "comment_id",
+            "comment_body",
+            "comment_created_at",
+            "comment_author",
+            "comment_author_id",
+            "comment_user_type",
+            "comment_sender_type",
+            "comment_performed_via_github_app",
+            "issue_author",
+            "issue_state",
+            "issue_labels",
+        }
+        missing = sorted(required - set(payload))
+        if missing:
+            raise RuntimeError("Deferred comment artifact missing required fields: " + ", ".join(missing))
+        return
+    if payload.get("schema_version") != 2:
+        raise RuntimeError("Deferred comment artifact schema_version is not accepted by V18 reconcile")
     required = {
         "schema_version",
-        "source_workflow_name",
-        "source_workflow_file",
         "source_run_id",
         "source_run_attempt",
         "source_event_name",
@@ -163,8 +266,6 @@ def _validate_deferred_comment_artifact(payload: dict) -> None:
     missing = sorted(required - set(payload))
     if missing:
         raise RuntimeError("Deferred comment artifact missing required fields: " + ", ".join(missing))
-    if payload.get("schema_version") != 2:
-        raise RuntimeError("Deferred comment artifact schema_version is not accepted by V18 reconcile")
     if not isinstance(payload.get("comment_id"), int) or not isinstance(payload.get("pr_number"), int):
         raise RuntimeError("Deferred comment artifact comment_id and pr_number must be integers")
     if not isinstance(payload.get("comment_class"), str) or not isinstance(payload.get("has_non_command_text"), bool):
@@ -174,10 +275,24 @@ def _validate_deferred_comment_artifact(payload: dict) -> None:
 
 
 def _validate_deferred_review_artifact(payload: dict) -> None:
+    if payload.get("schema_version") == 3:
+        required = {
+            "payload_kind",
+            "schema_version",
+            "source_run_id",
+            "source_run_attempt",
+            "source_event_name",
+            "source_event_action",
+            "source_event_key",
+            "pr_number",
+            "review_id",
+        }
+        missing = sorted(required - set(payload))
+        if missing:
+            raise RuntimeError("Deferred review artifact missing required fields: " + ", ".join(missing))
+        return
     required = {
         "schema_version",
-        "source_workflow_name",
-        "source_workflow_file",
         "source_run_id",
         "source_run_attempt",
         "source_event_name",
@@ -196,10 +311,11 @@ def _validate_deferred_review_artifact(payload: dict) -> None:
 
 
 def _validate_deferred_review_comment_artifact(payload: dict) -> None:
+    if payload.get("schema_version") == 3:
+        _validate_deferred_comment_artifact(payload)
+        return
     required = {
         "schema_version",
-        "source_workflow_name",
-        "source_workflow_file",
         "source_run_id",
         "source_run_attempt",
         "source_event_name",
@@ -230,8 +346,6 @@ def _validate_observer_noop_payload(payload: dict) -> None:
         "schema_version",
         "kind",
         "reason",
-        "source_workflow_name",
-        "source_workflow_file",
         "source_run_id",
         "source_run_attempt",
         "source_event_name",
@@ -252,7 +366,7 @@ def _validate_observer_noop_payload(payload: dict) -> None:
         raise RuntimeError("Observer no-op payload pr_number must be an integer")
 
 
-def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | DeferredCommentPayload | ObserverNoopPayload:
+def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | DeferredCommentPayload | ObserverNoopPayload | _LegacyDeferredIssueCommentPayloadV2 | _LegacyDeferredReviewCommentPayloadV2:
     if not isinstance(payload, dict):
         raise RuntimeError("Deferred context payload must be a JSON object")
 
@@ -260,31 +374,44 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
         _validate_observer_noop_payload(payload)
         return ObserverNoopPayload(
             identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
             reason=str(payload["reason"]),
             raw_payload=payload,
         )
-
-    event_name = payload.get("source_event_name")
-    event_action = payload.get("source_event_action")
-    if event_name == "issue_comment" and event_action == "created":
-        _validate_deferred_comment_artifact(payload)
-        return DeferredCommentPayload(
-            identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
-            comment_id=int(payload["comment_id"]),
-            comment_class=str(payload["comment_class"]),
-            has_non_command_text=bool(payload["has_non_command_text"]),
-            source_body_digest=str(payload["source_body_digest"]),
-            source_created_at=str(payload["source_created_at"]),
-            actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
-            raw_payload=payload,
-        )
-    if event_name == "pull_request_review_comment" and event_action == "created":
+    identity = _build_deferred_identity(payload)
+    if identity.payload_kind == DeferredPayloadKind.DEFERRED_COMMENT or identity.payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_COMMENT:
+        if identity.schema_version == 3:
+            _validate_deferred_comment_artifact(payload)
+            return DeferredCommentPayload(
+                identity=identity,
+                comment_id=int(payload["comment_id"]),
+                comment_body=str(payload["comment_body"]),
+                comment_created_at=str(payload["comment_created_at"]),
+                comment_author=str(payload["comment_author"]),
+                comment_author_id=int(payload["comment_author_id"]),
+                comment_user_type=str(payload["comment_user_type"]),
+                comment_sender_type=str(payload["comment_sender_type"]),
+                comment_installation_id=(str(payload["comment_installation_id"]) if payload.get("comment_installation_id") else None),
+                comment_performed_via_github_app=bool(payload["comment_performed_via_github_app"]),
+                issue_author=str(payload["issue_author"]),
+                issue_state=str(payload["issue_state"]),
+                issue_labels=tuple(str(label) for label in payload["issue_labels"]),
+                raw_payload=payload,
+            )
+        if identity.payload_kind is DeferredPayloadKind.DEFERRED_COMMENT:
+            _validate_deferred_comment_artifact(payload)
+            return _LegacyDeferredIssueCommentPayloadV2(
+                identity=identity,
+                comment_id=int(payload["comment_id"]),
+                comment_class=str(payload["comment_class"]),
+                has_non_command_text=bool(payload["has_non_command_text"]),
+                source_body_digest=str(payload["source_body_digest"]),
+                source_created_at=str(payload["source_created_at"]),
+                actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
+                raw_payload=payload,
+            )
         _validate_deferred_review_comment_artifact(payload)
-        return DeferredCommentPayload(
-            identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
+        return _LegacyDeferredReviewCommentPayloadV2(
+            identity=identity,
             comment_id=int(payload["comment_id"]),
             comment_class=str(payload["comment_class"]),
             has_non_command_text=bool(payload["has_non_command_text"]),
@@ -293,11 +420,12 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
             actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
             raw_payload=payload,
         )
-    if event_name == "pull_request_review" and event_action in {"submitted", "dismissed"}:
+    if identity.payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED or identity.payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_DISMISSED:
         _validate_deferred_review_artifact(payload)
+        if identity.schema_version != 3:
+            raise RuntimeError("Deferred review artifact schema_version is not accepted by V18 reconcile")
         return DeferredReviewPayload(
-            identity=_build_deferred_identity(payload),
-            pr_number=int(payload["pr_number"]),
+            identity=identity,
             review_id=int(payload["review_id"]),
             source_submitted_at=(str(payload["source_submitted_at"]) if payload.get("source_submitted_at") is not None else None),
             source_review_state=(str(payload["source_review_state"]) if payload.get("source_review_state") is not None else None),
@@ -308,7 +436,25 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
     raise RuntimeError("Unsupported deferred workflow_run payload")
 
 
-def expected_observer_identity(payload: dict) -> tuple[str, str]:
+def expected_observer_identity(payload: dict) -> tuple[str, str] | None:
+    if payload.get("schema_version") == 3:
+        if payload.get("payload_kind") == DeferredPayloadKind.DEFERRED_COMMENT.value:
+            return ("Reviewer Bot PR Comment Router", ".github/workflows/reviewer-bot-pr-comment-router.yml")
+        if payload.get("payload_kind") == DeferredPayloadKind.DEFERRED_REVIEW_COMMENT.value:
+            return (
+                "Reviewer Bot PR Review Comment Observer",
+                ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
+            )
+        if payload.get("payload_kind") == DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED.value:
+            return (
+                "Reviewer Bot PR Review Submitted Observer",
+                ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+            )
+        if payload.get("payload_kind") == DeferredPayloadKind.DEFERRED_REVIEW_DISMISSED.value:
+            return (
+                "Reviewer Bot PR Review Dismissed Observer",
+                ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
+            )
     event_name = payload.get("source_event_name")
     event_action = payload.get("source_event_action")
     if event_name == "issue_comment" and event_action == "created":
@@ -334,15 +480,7 @@ def expected_observer_identity(payload: dict) -> tuple[str, str]:
     raise RuntimeError("Unsupported deferred workflow identity")
 
 
-def validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
-    expected_name, expected_file = expected_observer_identity(payload)
-    if payload.get("source_workflow_name") != expected_name:
-        raise RuntimeError("Deferred artifact workflow name mismatch")
-    if payload.get("source_workflow_file") != expected_file:
-        raise RuntimeError("Deferred artifact workflow file mismatch")
-    triggering_name = bot.get_config_value("WORKFLOW_RUN_TRIGGERING_NAME").strip()
-    if triggering_name and triggering_name != expected_name:
-        raise RuntimeError("Triggering workflow name mismatch")
+def validate_triggering_run_identity(bot, payload: dict) -> None:
     triggering_id = bot.get_config_value("WORKFLOW_RUN_TRIGGERING_ID").strip()
     if triggering_id and str(payload.get("source_run_id")) != triggering_id:
         raise RuntimeError("Deferred artifact run_id mismatch")
@@ -353,31 +491,45 @@ def validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
         raise RuntimeError("Triggering observer workflow did not conclude successfully")
 
 
+def validate_workflow_run_artifact_identity(bot, payload: dict) -> None:
+    validate_triggering_run_identity(bot, payload)
+
+
 def artifact_expected_name(payload: dict) -> str:
-    event_name = payload.get("source_event_name")
-    event_action = payload.get("source_event_action")
+    payload_kind = payload.get("payload_kind")
     run_id = payload.get("source_run_id")
     run_attempt = payload.get("source_run_attempt")
+    if payload_kind == DeferredPayloadKind.DEFERRED_COMMENT.value:
+        return f"reviewer-bot-comment-context-{run_id}-attempt-{run_attempt}"
+    if payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED.value:
+        return f"reviewer-bot-review-submitted-context-{run_id}-attempt-{run_attempt}"
+    if payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_DISMISSED.value:
+        return f"reviewer-bot-review-dismissed-context-{run_id}-attempt-{run_attempt}"
+    if payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_COMMENT.value:
+        return f"reviewer-bot-review-comment-context-{run_id}-attempt-{run_attempt}"
+    event_name = payload.get("source_event_name")
+    event_action = payload.get("source_event_action")
     if event_name == "issue_comment" and event_action == "created":
         return f"reviewer-bot-comment-context-{run_id}-attempt-{run_attempt}"
-    if event_name == "pull_request_review" and event_action == "submitted":
-        return f"reviewer-bot-review-submitted-context-{run_id}-attempt-{run_attempt}"
-    if event_name == "pull_request_review" and event_action == "dismissed":
-        return f"reviewer-bot-review-dismissed-context-{run_id}-attempt-{run_attempt}"
     if event_name == "pull_request_review_comment" and event_action == "created":
         return f"reviewer-bot-review-comment-context-{run_id}-attempt-{run_attempt}"
     raise RuntimeError("Unsupported deferred artifact naming")
 
 
 def artifact_expected_payload_name(payload: dict) -> str:
+    payload_kind = payload.get("payload_kind")
+    if payload_kind == DeferredPayloadKind.DEFERRED_COMMENT.value:
+        return "deferred-comment.json"
+    if payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED.value:
+        return "deferred-review-submitted.json"
+    if payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_DISMISSED.value:
+        return "deferred-review-dismissed.json"
+    if payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_COMMENT.value:
+        return "deferred-review-comment.json"
     event_name = payload.get("source_event_name")
     event_action = payload.get("source_event_action")
     if event_name == "issue_comment" and event_action == "created":
         return "deferred-comment.json"
-    if event_name == "pull_request_review" and event_action == "submitted":
-        return "deferred-review-submitted.json"
-    if event_name == "pull_request_review" and event_action == "dismissed":
-        return "deferred-review-dismissed.json"
     if event_name == "pull_request_review_comment" and event_action == "created":
         return "deferred-review-comment.json"
     raise RuntimeError("Unsupported deferred payload path")

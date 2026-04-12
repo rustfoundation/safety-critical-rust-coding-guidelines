@@ -4,9 +4,22 @@ from datetime import datetime, timezone
 from .config import MAX_RECENT_ASSIGNMENTS
 
 
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
+
 def sync_members_with_queue(bot, state: dict) -> tuple[dict, list[str]]:
     """Sync the queue with the current members list."""
-    producers = bot.adapters.automation.fetch_members()
+    fetch_result = bot.adapters.workflow.fetch_members()
+    if not fetch_result.ok:
+        _log(
+            bot,
+            "warning",
+            "Failed to refresh members; keeping existing queue membership unchanged.",
+            failure_kind=fetch_result.failure_kind,
+        )
+        return state, []
+    producers = fetch_result.producers
     current_queue = {member["github"]: member for member in state["queue"]}
     pass_until_users = {member["github"] for member in state.get("pass_until", [])}
 
@@ -84,9 +97,13 @@ def process_pass_until_expirations(state: dict) -> tuple[dict, list[str]]:
                 try:
                     return_date = datetime.strptime(return_date, "%Y-%m-%d").date()
                 except ValueError:
-                    return_date = datetime.fromisoformat(return_date).date()
+                    still_away.append(entry)
+                    continue
             elif isinstance(return_date, datetime):
                 return_date = return_date.date()
+            else:
+                still_away.append(entry)
+                continue
 
             if return_date <= now:
                 restored_member = {

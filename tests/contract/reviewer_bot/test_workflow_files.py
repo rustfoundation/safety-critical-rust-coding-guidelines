@@ -27,35 +27,26 @@ def test_issue_comment_direct_workflow_exports_issue_state():
     )
     assert "ISSUE_STATE: ${{ github.event.issue.state }}" in workflow_text
 
-def test_pr_comment_observer_workflow_builds_payload_inline_without_bot_src_root():
-    workflow = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
-    assert "BOT_SRC_ROOT" not in workflow
+def test_pr_comment_router_workflow_builds_payload_inline_without_bot_src_root():
+    workflow = Path(".github/workflows/reviewer-bot-pr-comment-router.yml").read_text(encoding="utf-8")
     assert "build_pr_comment_observer_payload" not in workflow
-    assert "Fetch trusted bot source tarball" not in workflow
+    assert "Fetch trusted bot source tarball" in workflow
 
-def test_trusted_pr_comment_workflow_preflights_same_repo_before_mutation():
-    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-trusted.yml").read_text(encoding="utf-8"))
-    job = data["jobs"]["reviewer-bot-pr-comment-trusted"]
-    steps = job["steps"]
-    assert steps[0]["name"] == "Decide whether same-repo trusted path applies"
-    assert steps[1]["if"] == "env.RUN_TRUSTED_PR_COMMENT == 'true'"
-    assert steps[2]["if"] == "env.RUN_TRUSTED_PR_COMMENT == 'true'"
-    assert steps[3]["if"] == "env.RUN_TRUSTED_PR_COMMENT == 'true'"
-    assert steps[4]["name"] == "Trusted path skipped"
-    assert steps[4]["if"] == "env.RUN_TRUSTED_PR_COMMENT != 'true'"
-    workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-trusted.yml").read_text(encoding="utf-8")
-    assert "https://api.github.com/repos/{repo}/pulls/{pr_number}" in workflow_text
-    assert "RUN_TRUSTED_PR_COMMENT" in workflow_text
+def test_pr_comment_router_workflow_contains_route_and_trusted_jobs_in_order():
+    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-router.yml").read_text(encoding="utf-8"))
+    assert set(data["jobs"]) == {"route-pr-comment", "trusted-direct"}
+    route_steps = data["jobs"]["route-pr-comment"]["steps"]
+    trusted_steps = data["jobs"]["trusted-direct"]["steps"]
+    assert route_steps[0]["name"] == "Route PR comment"
+    assert route_steps[1]["name"] == "Upload deferred comment artifact"
+    assert trusted_steps[0]["name"] == "Install uv"
+    assert trusted_steps[1]["name"] == "Fetch trusted bot source tarball"
+    assert trusted_steps[2]["name"] == "Run reviewer bot"
 
-def test_pr_comment_observer_workflow_uses_inline_payload_builder():
-    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8"))
-    job = data["jobs"]["observer"]
-    steps = job["steps"]
-    assert steps[0]["name"] == "Build deferred comment artifact"
-    assert steps[1]["name"] == "Upload deferred comment artifact"
-    workflow_text = Path(".github/workflows/reviewer-bot-pr-comment-observer.yml").read_text(encoding="utf-8")
-    assert "build_pr_comment_observer_payload" not in workflow_text
-    assert 'uv run --project "$BOT_SRC_ROOT"' not in workflow_text
+def test_pr_comment_router_upload_is_emitted_only_for_deferred_reconcile():
+    data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-router.yml").read_text(encoding="utf-8"))
+    upload_step = data["jobs"]["route-pr-comment"]["steps"][1]
+    assert upload_step["if"] == "${{ steps.route.outputs.route_outcome == 'deferred_reconcile' }}"
 
 def test_review_comment_observer_workflow_exists_and_is_read_only():
     data = yaml.safe_load(
@@ -80,7 +71,7 @@ def test_mutating_reviewer_bot_workflows_do_not_share_global_github_concurrency(
         ".github/workflows/reviewer-bot-issue-comment-direct.yml",
         ".github/workflows/reviewer-bot-sweeper-repair.yml",
         ".github/workflows/reviewer-bot-pr-metadata.yml",
-        ".github/workflows/reviewer-bot-pr-comment-trusted.yml",
+        ".github/workflows/reviewer-bot-pr-comment-router.yml",
         ".github/workflows/reviewer-bot-reconcile.yml",
         ".github/workflows/reviewer-bot-privileged-commands.yml",
     ]
@@ -96,8 +87,7 @@ def test_workflow_policy_split_and_lock_only_boundaries():
         "reviewer-bot-issue-comment-direct.yml",
         "reviewer-bot-sweeper-repair.yml",
         "reviewer-bot-pr-metadata.yml",
-        "reviewer-bot-pr-comment-trusted.yml",
-        "reviewer-bot-pr-comment-observer.yml",
+        "reviewer-bot-pr-comment-router.yml",
         "reviewer-bot-pr-review-submitted-observer.yml",
         "reviewer-bot-pr-review-dismissed-observer.yml",
         "reviewer-bot-pr-review-comment-observer.yml",
@@ -116,7 +106,10 @@ def test_workflow_policy_split_and_lock_only_boundaries():
             if "observer" in path:
                 assert permissions.get("contents") == "read"
                 assert all("checkout" not in value for value in uses_values)
-            if permissions.get("contents") == "write" and path != "reviewer-bot-privileged-commands.yml":
+            if permissions.get("contents") == "write" and path not in {
+                "reviewer-bot-privileged-commands.yml",
+                "reviewer-bot-pr-comment-router.yml",
+            }:
                 assert all("checkout" not in value for value in uses_values)
                 assert "Temporary lock debt" in text
             for value in uses_values:
@@ -131,81 +124,52 @@ def test_workflow_summaries_and_runbook_references_exist():
 
 
 @pytest.mark.parametrize(
-    ("fixture_id", "workflow_name", "workflow_file", "artifact_name_shape"),
+    ("fixture_path", "workflow_file", "payload_kind", "expected_event_name", "expected_event_action"),
     [
         (
-            "workflow_pr_comment_deferred",
-            "Reviewer Bot PR Comment Observer",
-            ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-            "reviewer-bot-comment-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+            "tests/fixtures/observer_payloads/workflow_pr_comment_deferred.json",
+            ".github/workflows/reviewer-bot-pr-comment-router.yml",
+            "deferred_comment",
+            "issue_comment",
+            "created",
         ),
         (
-            "workflow_pr_review_submitted_deferred",
-            "Reviewer Bot PR Review Submitted Observer",
+            "tests/fixtures/observer_payloads/workflow_pr_review_submitted_deferred.json",
             ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
-            "reviewer-bot-review-submitted-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+            "deferred_review_submitted",
+            "pull_request_review",
+            "submitted",
         ),
         (
-            "workflow_pr_review_dismissed_deferred",
-            "Reviewer Bot PR Review Dismissed Observer",
+            "tests/fixtures/observer_payloads/workflow_pr_review_dismissed_deferred.json",
             ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
-            "reviewer-bot-review-dismissed-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+            "deferred_review_dismissed",
+            "pull_request_review",
+            "dismissed",
         ),
         (
-            "workflow_pr_review_comment_deferred",
-            "Reviewer Bot PR Review Comment Observer",
+            "tests/fixtures/observer_payloads/workflow_pr_review_comment_deferred.json",
             ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
-            "reviewer-bot-review-comment-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+            "deferred_review_comment",
+            "pull_request_review_comment",
+            "created",
         ),
     ],
 )
-def test_observer_workflow_fixture_identities_match_exact_workflow_contract_strings(
-    fixture_id, workflow_name, workflow_file, artifact_name_shape
+def test_observer_workflow_fixtures_match_trigger_event_shape(
+    fixture_path, workflow_file, payload_kind, expected_event_name, expected_event_action
 ):
     matrix = _load_observer_contract_matrix()
     fixture_entry = next(
-        item for item in matrix["workflow_emitted_payloads"] if item["fixture_id"] == fixture_id
+        item for item in matrix["payload_contracts"] if item["payload_kind"] == payload_kind
     )
-    payload = _load_fixture_payload(fixture_entry["fixture_path"])
+    payload = _load_fixture_payload(fixture_path)
     workflow_text = Path(workflow_file).read_text(encoding="utf-8")
     workflow_data = yaml.safe_load(workflow_text)
+    on_block = workflow_data.get("on", workflow_data.get(True))
 
-    assert fixture_entry["contract_source"] == "workflow YAML"
-    assert fixture_entry["source_workflow_file"] == workflow_file
-    assert payload["source_workflow_name"] == workflow_name
-    assert payload["source_workflow_file"] == workflow_file
-    assert workflow_data["name"] == workflow_name
-    assert artifact_name_shape in workflow_text
-
-def test_build_pr_comment_observer_payload_marks_trusted_direct_same_repo_as_observer_noop(monkeypatch):
-    from scripts.reviewer_bot_lib import comment_routing
-    from tests.fixtures.comment_routing_harness import CommentRoutingHarness
-
-    harness = CommentRoutingHarness(monkeypatch)
-    harness.config.set("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
-    harness.config.set("COMMENT_USER_TYPE", "User")
-    harness.config.set("COMMENT_AUTHOR", "PLeVasseur")
-    harness.config.set("COMMENT_AUTHOR_ASSOCIATION", "COLLABORATOR")
-    harness.config.set("COMMENT_SENDER_TYPE", "User")
-    harness.config.set("COMMENT_INSTALLATION_ID", "")
-    harness.config.set("COMMENT_PERFORMED_VIA_GITHUB_APP", "false")
-    harness.config.set("COMMENT_BODY", "@guidelines-bot /r? @felix91gr")
-    harness.config.set("COMMENT_ID", "100")
-    harness.config.set("COMMENT_AUTHOR_ID", "123")
-    harness.config.set("COMMENT_CREATED_AT", "2026-03-20T20:48:25Z")
-    harness.config.set("GITHUB_RUN_ID", "999")
-    harness.config.set("GITHUB_RUN_ATTEMPT", "1")
-    harness.github.add_api(
-        "GET",
-        "pulls/42",
-        {
-            "head": {"repo": {"full_name": "rustfoundation/safety-critical-rust-coding-guidelines"}},
-            "user": {"login": "PLeVasseur"},
-        },
-    )
-
-    payload = comment_routing.build_pr_comment_observer_payload(harness.runtime, 42)
-
-    assert payload["kind"] == "observer_noop"
-    assert payload["reason"] == "trusted_direct_same_repo_human_comment"
-    assert payload["source_event_key"] == "issue_comment:100"
+    assert fixture_entry["owner"] == workflow_file
+    assert fixture_entry["payload_kind"] == payload_kind
+    assert payload["source_event_name"] == expected_event_name
+    assert payload["source_event_action"] == expected_event_action
+    assert expected_event_name in on_block

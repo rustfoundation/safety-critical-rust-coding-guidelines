@@ -224,21 +224,27 @@ class GitHubStub:
 
         return github_api_module.get_issue_assignees(self._runtime_required(), issue_number)
 
-    def request_reviewer_assignment(self, issue_number: int, username: str):
-        override = self._instance_override("request_reviewer_assignment")
+    def request_pr_reviewer_assignment(self, issue_number: int, username: str):
+        override = self._instance_override("request_pr_reviewer_assignment")
         if override is not None:
             return override(issue_number, username)
         from scripts.reviewer_bot_lib import github_api as github_api_module
 
-        return github_api_module.request_reviewer_assignment(self._runtime_required(), issue_number, username)
+        return github_api_module.request_pr_reviewer_assignment(self._runtime_required(), issue_number, username)
+
+    def assign_issue_assignee(self, issue_number: int, username: str):
+        override = self._instance_override("assign_issue_assignee")
+        if override is not None:
+            return override(issue_number, username)
+        from scripts.reviewer_bot_lib import github_api as github_api_module
+
+        return github_api_module.assign_issue_assignee(self._runtime_required(), issue_number, username)
 
     def get_assignment_failure_comment(self, reviewer: str, attempt):
         override = self._instance_override("get_assignment_failure_comment")
         if override is not None:
             return override(reviewer, attempt)
-        from scripts.reviewer_bot_lib import github_api as github_api_module
-
-        return github_api_module.get_assignment_failure_comment(self._runtime_required(), reviewer, attempt)
+        return None
 
     def add_reaction(self, comment_id: int, reaction: str):
         override = self._instance_override("add_reaction")
@@ -248,29 +254,25 @@ class GitHubStub:
 
         return github_api_module.add_reaction(self._runtime_required(), comment_id, reaction)
 
-    def remove_assignee(self, issue_number: int, username: str):
-        override = self._instance_override("remove_assignee")
+    def remove_issue_assignee(self, issue_number: int, username: str):
+        override = self._instance_override("remove_issue_assignee")
+        if override is None:
+            override = self._instance_override("unassign_reviewer")
         if override is not None:
             return override(issue_number, username)
         from scripts.reviewer_bot_lib import github_api as github_api_module
 
-        return github_api_module.remove_assignee(self._runtime_required(), issue_number, username)
+        return github_api_module.remove_issue_assignee(self._runtime_required(), issue_number, username)
 
     def remove_pr_reviewer(self, issue_number: int, username: str):
         override = self._instance_override("remove_pr_reviewer")
+        if override is None:
+            override = self._instance_override("unassign_reviewer")
         if override is not None:
             return override(issue_number, username)
         from scripts.reviewer_bot_lib import github_api as github_api_module
 
         return github_api_module.remove_pr_reviewer(self._runtime_required(), issue_number, username)
-
-    def unassign_reviewer(self, issue_number: int, username: str):
-        override = self._instance_override("unassign_reviewer")
-        if override is not None:
-            return override(issue_number, username)
-        from scripts.reviewer_bot_lib import github_api as github_api_module
-
-        return github_api_module.unassign_reviewer(self._runtime_required(), issue_number, username)
 
     def get_user_permission_status(self, username: str, required_permission="triage"):
         override = self._instance_override("get_user_permission_status")
@@ -432,10 +434,9 @@ class HandlerStub:
         "handle_issue_edited_event",
         "handle_closed_event",
         "handle_pull_request_target_synchronize",
-        "handle_pull_request_review_event",
         "handle_comment_event",
         "handle_manual_dispatch",
-        "handle_scheduled_check",
+        "handle_scheduled_check_result",
     }
 
     def __init__(self, defaults: dict[str, Callable[[dict], bool]]):
@@ -471,10 +472,14 @@ class TouchTrackerStub:
 
 class WorkflowBehaviorStub:
     def __init__(self):
+        self._runtime = None
         self._process_pass_until: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_members: Callable[[dict], tuple[dict, list[str]]] = lambda state: (state, [])
         self._sync_status_labels: Callable[[dict, Any], bool] = lambda state, issue_numbers: False
         self.calls: list[dict[str, Any]] = []
+
+    def bind_runtime(self, runtime) -> None:
+        self._runtime = runtime
 
     def process_pass_until_expirations(self, state: dict):
         self.calls.append({"name": "process_pass_until_expirations", "state": deepcopy(state)})
@@ -488,6 +493,11 @@ class WorkflowBehaviorStub:
         self.calls.append({"name": "sync_status_labels_for_items", "state": deepcopy(state), "issue_numbers": list(issue_numbers)})
         return self._sync_status_labels(state, issue_numbers)
 
+    def fetch_members(self):
+        if self._runtime is None:
+            raise AssertionError("WorkflowBehaviorStub runtime not bound")
+        return self._runtime.compat.automation.fetch_members()
+
     def stub_pass_until(self, func: Callable[[dict], tuple[dict, list[str]]]) -> None:
         self._process_pass_until = func
 
@@ -500,7 +510,6 @@ class WorkflowBehaviorStub:
 
 def build_default_handler_map(runtime) -> dict[str, Callable[[dict], bool]]:
     from scripts.reviewer_bot_lib import comment_routing as comment_routing_module
-    from scripts.reviewer_bot_lib import events as events_module
     from scripts.reviewer_bot_lib import lifecycle as lifecycle_module
     from scripts.reviewer_bot_lib import maintenance as maintenance_module
 
@@ -510,8 +519,7 @@ def build_default_handler_map(runtime) -> dict[str, Callable[[dict], bool]]:
         "handle_issue_edited_event": lambda state: lifecycle_module.handle_issue_edited_event(runtime, state),
         "handle_closed_event": lambda state: lifecycle_module.handle_closed_event(runtime, state),
         "handle_pull_request_target_synchronize": lambda state: lifecycle_module.handle_pull_request_target_synchronize(runtime, state),
-        "handle_pull_request_review_event": lambda state: events_module.handle_pull_request_review_event(runtime, state),
         "handle_comment_event": lambda state: comment_routing_module.handle_comment_event(runtime, state),
         "handle_manual_dispatch": lambda state: maintenance_module.handle_manual_dispatch(runtime, state),
-        "handle_scheduled_check": lambda state: maintenance_module.handle_scheduled_check(runtime, state),
+        "handle_scheduled_check_result": lambda state: maintenance_module.handle_scheduled_check_result(runtime, state),
     }

@@ -20,6 +20,7 @@ STATE_BLOCK_START_MARKER = "<!-- REVIEWER_BOT_STATE_START -->"
 STATE_BLOCK_END_MARKER = "<!-- REVIEWER_BOT_STATE_END -->"
 LOCK_BLOCK_START_MARKER = "<!-- REVIEWER_BOT_LOCK_START -->"
 LOCK_BLOCK_END_MARKER = "<!-- REVIEWER_BOT_LOCK_END -->"
+TRANSITION_NOTICE_MARKER_PREFIX = "reviewer-bot:transition-notice:v1"
 
 LOCK_SCHEMA_VERSION = 1
 LOCK_LEASE_TTL_SECONDS_ENV = "REVIEWER_BOT_LOCK_TTL_SECONDS"
@@ -46,7 +47,7 @@ EVENT_INTENT_MUTATING = "mutating"
 EVENT_INTENT_NON_MUTATING_DEFER = "non_mutating_defer"
 EVENT_INTENT_NON_MUTATING_READONLY = "non_mutating_readonly"
 
-STATE_SCHEMA_VERSION = 18
+STATE_SCHEMA_VERSION = 19
 FRESHNESS_RUNTIME_EPOCH_LEGACY = "legacy_v14"
 FRESHNESS_RUNTIME_EPOCH_V18 = "freshness_v15"
 STATUS_PROJECTION_EPOCH = "status_projection_v2"
@@ -217,6 +218,13 @@ class AssignmentAttempt:
     success: bool
     status_code: int | None
     exhausted_retryable_failure: bool = False
+
+
+@dataclass(frozen=True)
+class MemberFetchResult:
+    ok: bool
+    producers: list[dict[str, str]]
+    failure_kind: str | None = None
 
 
 @dataclass

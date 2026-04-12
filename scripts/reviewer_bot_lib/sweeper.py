@@ -2,24 +2,18 @@
 
 from __future__ import annotations
 
-import io
 import json
-import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
 from scripts.reviewer_bot_core import deferred_gap_diagnosis
 
 from . import deferred_gap_bookkeeping as gap_bookkeeping
 from . import retrying
+from . import sweeper_observer_correlation as observer_correlation
 from .config import REVIEW_FRESHNESS_RUNBOOK_PATH
-from .context import SweeperContext
 from .reconcile_payloads import artifact_expected_name as _artifact_expected_name
-from .reconcile_payloads import (
-    artifact_expected_payload_name as _artifact_expected_payload_name,
-)
 from .review_state import (
     accept_reviewer_review_from_live_review,
     get_current_cycle_boundary,
@@ -28,6 +22,7 @@ from .review_state import (
     semantic_key_seen,
 )
 from .reviews import rebuild_pr_approval_state
+from .runtime_protocols import SweeperContext
 
 
 def _now() -> datetime:
@@ -96,177 +91,22 @@ def _sleep(bot: SweeperContext, seconds: float) -> None:
     bot.sleeper.sleep(seconds)
 
 
-def _fetch_workflow_runs_for_file(bot: SweeperContext, workflow_file: str, event_name: str) -> list[dict] | None:
-    runs: list[dict] = []
-    page = 1
-    encoded_workflow = quote(workflow_file, safe="")
-    while True:
-        response, _ = _read_api_payload(
-            bot,
-            f"actions/workflows/{encoded_workflow}/runs?event={quote(event_name, safe='')}&per_page=100&page={page}",
-        )
-        if response is None:
-            return None
-        workflow_runs = response.get("workflow_runs") if isinstance(response, dict) else None
-        if not isinstance(workflow_runs, list):
-            return None
-        runs.extend([run for run in workflow_runs if isinstance(run, dict)])
-        if len(workflow_runs) < 100:
-            return runs
-        page += 1
-
-
-def _fetch_run_detail(bot: SweeperContext, run_id: int) -> dict | None:
-    response, _ = _read_api_payload(bot, f"actions/runs/{run_id}")
-    if isinstance(response, dict):
-        return response
-    return None
-
-
-def _list_run_artifacts(bot: SweeperContext, run_id: int) -> list[dict] | None:
-    artifacts: list[dict] = []
-    page = 1
-    while True:
-        response, _ = _read_api_payload(bot, f"actions/runs/{run_id}/artifacts?per_page=100&page={page}")
-        if response is None:
-            return None
-        page_artifacts = response.get("artifacts") if isinstance(response, dict) else None
-        if not isinstance(page_artifacts, list):
-            return None
-        artifacts.extend([artifact for artifact in page_artifacts if isinstance(artifact, dict)])
-        if len(page_artifacts) < 100:
-            return artifacts
-        page += 1
-
-
-def _download_artifact_payload(bot: SweeperContext, artifact: dict, expected_payload_name: str) -> tuple[str, dict | None]:
-    if artifact.get("expired") is True:
-        return "expired", None
-    download_url = artifact.get("archive_download_url")
-    if not isinstance(download_url, str) or not download_url:
-        return "missing_download_url", None
-    max_attempts = int(bot.lock_api_retry_limit()) + 1
-    response = None
-    for attempt in range(1, max_attempts + 1):
-        try:
-            response = bot.artifact_download_transport.download(
-                download_url,
-                headers={
-                    "Authorization": f"Bearer {bot.get_github_token()}",
-                    "Accept": "application/vnd.github+json",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-            )
-        except Exception:
-            if attempt < max_attempts:
-                _sleep(bot, _download_retry_delay(bot, attempt))
-                continue
-            return "download_unavailable", None
-        if retrying.is_retryable_status(response.status_code):
-            if attempt < max_attempts:
-                _sleep(bot, _download_retry_delay(bot, attempt))
-                continue
-            return "download_unavailable", None
-        break
-    if response is None:
-        return "download_unavailable", None
-    if response.status_code >= 400:
-        return "download_failed", None
-    try:
-        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-            payload_files = [name for name in archive.namelist() if not name.endswith("/")]
-            if payload_files != [expected_payload_name]:
-                return "invalid_payload_layout", None
-            with archive.open(expected_payload_name) as handle:
-                payload = json.loads(handle.read().decode("utf-8"))
-    except (zipfile.BadZipFile, json.JSONDecodeError, OSError, UnicodeDecodeError):
-        return "invalid_payload_format", None
-    if not isinstance(payload, dict):
-        return "invalid_payload_format", None
-    return "ok", payload
-
-
-def inspect_run_artifact_payloads(bot: SweeperContext, workflow_runs: list[dict], source_event_key: str, *, pr_number: int, source_event_kind: str) -> dict:
-    payloads_by_run: dict[int, list[dict]] = {}
-    prior_visibility: dict[int, dict[str, str]] = {}
-    artifact_scan_outcomes: dict[int, str] = {}
-    event_name, event_action = source_event_kind.split(":", 1)
-    expected_payload_name = _artifact_expected_payload_name(
-        {
-            "source_event_name": event_name,
-            "source_event_action": event_action,
-        }
-    )
-    for run in workflow_runs:
-        run_id = run.get("id")
-        if not isinstance(run_id, int):
-            continue
-        run_attempt = run.get("run_attempt")
-        if not isinstance(run_attempt, int):
-            continue
-        expected_name = _artifact_expected_name(
-            {
-                "source_event_name": event_name,
-                "source_event_action": event_action,
-                "source_run_id": run_id,
-                "source_run_attempt": run_attempt,
-            }
-        )
-        artifacts = _list_run_artifacts(bot, run_id)
-        if artifacts is None:
-            return {"status": "observer_state_unknown", "reason": "artifact_listing_unavailable", "payloads_by_run": None}
-        filtered = []
-        for artifact in artifacts:
-            name = artifact.get("name")
-            if not isinstance(name, str) or name != expected_name:
-                continue
-            filtered.append(artifact)
-            prior_visibility[run_id] = {"artifact_seen_at": _now_iso()}
-            status, payload = _download_artifact_payload(bot, artifact, expected_payload_name)
-            if status == "ok" and isinstance(payload, dict):
-                payloads_by_run.setdefault(run_id, []).append(payload)
-                artifact_scan_outcomes[run_id] = "ok"
-            elif status == "expired":
-                prior_visibility[run_id]["artifact_last_downloadable_at"] = prior_visibility[run_id]["artifact_seen_at"]
-                artifact_scan_outcomes[run_id] = "expired"
-            else:
-                artifact_scan_outcomes[run_id] = status
-        if run_id not in payloads_by_run and filtered:
-            payloads_by_run.setdefault(run_id, [])
-    result = deferred_gap_diagnosis.correlate_run_artifacts_exact(
-        payloads_by_run,
-        source_event_key,
-        pr_number=pr_number,
-    )
-    result["payloads_by_run"] = payloads_by_run
-    result["prior_visibility"] = prior_visibility
-    result["artifact_scan_outcomes"] = artifact_scan_outcomes
-    return result
-
-
-def _update_observer_watermark(bot, review_data: dict, surface: str, event_time: str, event_id: str) -> None:
-    watermarks = review_data.setdefault("observer_discovery_watermarks", {})
-    current = watermarks.get(surface) if isinstance(watermarks.get(surface), dict) else {}
-    watermarks[surface] = {
-        "last_scan_started_at": current.get("last_scan_started_at") or _now_iso(),
-        "last_scan_completed_at": _now_iso(),
-        "last_safe_event_time": event_time,
-        "last_safe_event_id": event_id,
-        "lookback_seconds": bot.DEFERRED_DISCOVERY_OVERLAP_SECONDS if hasattr(bot, "DEFERRED_DISCOVERY_OVERLAP_SECONDS") else 3600,
-        "bootstrap_window_seconds": bot.DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS if hasattr(bot, "DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS") else 604800,
-        "bootstrap_completed_at": current.get("bootstrap_completed_at") or _now_iso(),
-    }
+_fetch_workflow_runs_for_file = observer_correlation.fetch_workflow_runs_for_file
+_fetch_run_detail = observer_correlation.fetch_run_detail
+inspect_run_artifact_payloads = observer_correlation.inspect_run_artifact_payloads
+_update_observer_watermark = observer_correlation.update_observer_watermark
 
 
 def _complete_surface_scan(bot, review_data: dict, surface: str, discovered: list[dict]) -> None:
-    if discovered:
-        last_seen = discovered[-1]
-        _update_observer_watermark(bot, review_data, surface, last_seen["source_created_at"], last_seen["object_id"])
-        return
-    watermark = _load_surface_watermark(review_data, surface)
-    watermark["last_scan_started_at"] = watermark.get("last_scan_started_at") or _now_iso()
-    watermark["last_scan_completed_at"] = _now_iso()
-    watermark["bootstrap_completed_at"] = watermark.get("bootstrap_completed_at") or _now_iso()
+    observer_correlation.complete_surface_scan(
+        bot,
+        review_data,
+        surface,
+        discovered,
+        _load_surface_watermark,
+    )
+
+
 
 
 def _diagnose_deferred_event(
@@ -336,7 +176,7 @@ def _diagnose_deferred_event(
 
 
 def _load_surface_watermark(review_data: dict, surface: str) -> dict:
-    watermarks = review_data.setdefault("observer_discovery_watermarks", {})
+    watermarks = gap_bookkeeping._observer_discovery_watermarks(review_data)
     current = watermarks.get(surface)
     if isinstance(current, dict):
         return current
@@ -421,8 +261,8 @@ def _purge_bot_authored_comment_gap(bot, review_data: dict, source_event_key: st
     live_comment = _fetch_live_issue_comment(bot, comment_id)
     if not isinstance(live_comment, dict) or not _is_automation_comment(live_comment):
         return False
-    deferred_gaps = review_data.get("deferred_gaps")
-    if not isinstance(deferred_gaps, dict) or source_event_key not in deferred_gaps:
+    deferred_gaps = gap_bookkeeping._deferred_gaps(review_data)
+    if source_event_key not in deferred_gaps:
         return False
     deferred_gaps.pop(source_event_key, None)
     return True
@@ -620,6 +460,15 @@ def _record_gap_diagnostics(
     reason: str,
     diagnostic_reason: str,
 ) -> None:
+    payload_kind = None
+    if source_event_name == "pull_request_review" and source_event_action == "submitted":
+        payload_kind = "deferred_review_submitted"
+    elif source_event_name == "pull_request_review" and source_event_action == "dismissed":
+        payload_kind = "deferred_review_dismissed"
+    elif source_event_name == "pull_request_review_comment" and source_event_action == "created":
+        payload_kind = "deferred_review_comment"
+    elif source_event_name == "issue_comment" and source_event_action == "created":
+        payload_kind = "deferred_comment"
     gap_bookkeeping._update_deferred_gap(
         bot,
         review_data,
@@ -634,6 +483,7 @@ def _record_gap_diagnostics(
             "source_run_attempt": run_detail.get("run_attempt") if isinstance(run_detail, dict) else None,
             "source_artifact_name": _artifact_expected_name(
                 {
+                    "payload_kind": payload_kind,
                     "source_event_name": source_event_name,
                     "source_event_action": source_event_action,
                     "source_run_id": run_correlation.get("correlated_run") or 0,
@@ -644,7 +494,7 @@ def _record_gap_diagnostics(
         reason,
         f"Trusted sweeper diagnostics for {source_event_key}: {diagnostic_reason}. See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}.",
     )
-    gap = review_data["deferred_gaps"][source_event_key]
+    gap = gap_bookkeeping._deferred_gaps(review_data)[source_event_key]
     gap["full_scan_complete"] = bool(run_correlation.get("full_scan_complete"))
     gap["later_recheck_complete"] = bool(run_correlation.get("later_recheck_complete"))
     gap["correlated_run_found"] = bool(run_correlation.get("correlated_run"))
@@ -662,8 +512,9 @@ def _record_gap_diagnostics(
 def _should_skip_discovered_key(bot, review_data: dict, source_event_key: str, channels: tuple[str, ...]) -> bool:
     if gap_bookkeeping._was_reconciled_source_event(review_data, source_event_key):
         return True
-    if source_event_key in review_data.get("deferred_gaps", {}):
-        existing_gap = review_data["deferred_gaps"].get(source_event_key)
+    deferred_gaps = gap_bookkeeping._deferred_gaps(review_data)
+    if source_event_key in deferred_gaps:
+        existing_gap = deferred_gaps.get(source_event_key)
         if isinstance(existing_gap, dict) and existing_gap.get("reason") in {
             "awaiting_observer_run",
             "awaiting_observer_approval",
@@ -693,11 +544,10 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
         pull_request, _ = _read_api_payload(bot, f"pulls/{issue_number}")
         if not isinstance(pull_request, dict) or str(pull_request.get("state", "")).lower() != "open":
             continue
-        deferred_gaps = review_data.get("deferred_gaps")
-        if isinstance(deferred_gaps, dict):
-            for source_event_key in list(deferred_gaps):
-                if _purge_bot_authored_comment_gap(bot, review_data, source_event_key):
-                    changed = True
+        deferred_gaps = gap_bookkeeping._deferred_gaps(review_data)
+        for source_event_key in list(deferred_gaps):
+            if _purge_bot_authored_comment_gap(bot, review_data, source_event_key):
+                changed = True
         discovered_comments, comments_complete = _discover_visible_comment_events(bot, issue_number, review_data)
         if comments_complete and isinstance(discovered_comments, list):
             for discovered in discovered_comments:
@@ -728,7 +578,7 @@ def sweep_deferred_gaps(bot, state: dict) -> bool:
                 submitted_at = discovered["source_created_at"]
                 if _should_skip_discovered_key(bot, review_data, source_event_key, ("reviewer_review",)):
                     continue
-                existing_gap = review_data.get("deferred_gaps", {}).get(source_event_key, {})
+                existing_gap = gap_bookkeeping._deferred_gaps(review_data).get(source_event_key, {})
                 workflow_file = ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml"
                 workflow_runs = _fetch_workflow_runs_for_file(bot, workflow_file, "pull_request_review")
                 run_correlation = deferred_gap_diagnosis.correlate_candidate_observer_runs(

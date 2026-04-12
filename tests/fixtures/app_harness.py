@@ -7,7 +7,7 @@ from scripts.reviewer_bot_lib import app
 from scripts.reviewer_bot_lib.context import EventContext, ExecutionResult
 
 from .fake_runtime import FakeReviewerBotRuntime
-from .reviewer_bot_env import set_env_values
+from .reviewer_bot_env import set_env_values, set_workflow_run_event_payload
 
 
 @dataclass
@@ -29,6 +29,9 @@ class AppHarness:
 
     def set_event(self, **values) -> None:
         set_env_values(self.config, **values)
+
+    def set_workflow_run_name(self, workflow_name: str) -> None:
+        set_workflow_run_event_payload(self.config, workflow_name)
 
     def set_state_sequence(self, *states: dict) -> None:
         self.runtime.stub_state_sequence(*states)

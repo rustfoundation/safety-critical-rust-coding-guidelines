@@ -53,6 +53,7 @@ jobs:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_UPDATED_AT: ${{ github.event.issue.updated_at }}
+          EVENT_CREATED_AT: ${{ github.event.issue.updated_at }}
           ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
           ISSUE_HTML_URL: ${{ github.event.issue.html_url }}
           ISSUE_LABELS: ${{ toJson(github.event.issue.labels.*.name) }}
@@ -67,5 +68,4 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
-          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-issues.yml
         run: uv run --project "$BOT_SRC_ROOT" reviewer-bot

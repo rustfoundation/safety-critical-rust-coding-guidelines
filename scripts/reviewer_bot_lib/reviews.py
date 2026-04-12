@@ -6,7 +6,9 @@ from datetime import datetime, timezone
 from typing import Iterable
 from urllib.parse import quote
 
-from . import review_read_support, review_state
+from scripts.reviewer_bot_core import live_review_support
+
+from . import review_state
 from .config import (
     MANDATORY_TRIAGE_APPROVER_LABEL,
     MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
@@ -26,11 +28,7 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-_projection_failure = review_read_support._projection_failure
-_pull_request_read_result = review_read_support._pull_request_read_result
-get_pull_request_reviews_result = review_read_support.get_pull_request_reviews_result
-_permission_status = review_read_support._permission_status
-parse_github_timestamp = review_read_support.parse_github_timestamp
+parse_github_timestamp = live_review_support.parse_github_timestamp
 
 
 def get_latest_review_by_reviewer(bot, reviews: list[dict], reviewer: str) -> dict | None:
@@ -40,7 +38,7 @@ def get_latest_review_by_reviewer(bot, reviews: list[dict], reviewer: str) -> di
         author = review.get("user", {}).get("login")
         if not isinstance(author, str) or author.lower() != reviewer.lower():
             continue
-        submitted_at = bot.parse_github_timestamp(review.get("submitted_at"))
+        submitted_at = parse_github_timestamp(review.get("submitted_at"))
         if submitted_at is None:
             continue
         review_id = str(review.get("id", ""))
@@ -93,34 +91,6 @@ def get_latest_valid_current_reviewer_review_for_cycle(
     return latest_review
 
 
-def get_preferred_current_reviewer_review_for_cycle(
-    bot,
-    issue_number: int,
-    review_data: dict,
-    *,
-    pull_request: dict | None = None,
-    reviews: list[dict] | None = None,
-) -> dict | None:
-    from scripts.reviewer_bot_core import reviewer_review_helpers
-
-    return reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
-        bot,
-        issue_number,
-        review_data,
-        pull_request=pull_request,
-        reviews=reviews,
-    )
-
-
-def build_reviewer_review_record_from_live_review(review: dict, *, actor: str | None = None) -> dict | None:
-    from scripts.reviewer_bot_core import reviewer_review_helpers
-
-    return reviewer_review_helpers.build_reviewer_review_record_from_live_review(
-        review,
-        actor=actor,
-    )
-
-
 def resolve_pr_approval_state(
     bot,
     issue_number: int,
@@ -160,18 +130,8 @@ def apply_pr_approval_state(
         review_data["review_completion_source"] = None
 
 
-def _compare_records(left: dict | None, right: dict | None) -> int:
-    from scripts.reviewer_bot_core import reviewer_review_helpers
-
-    return reviewer_review_helpers.compare_records(
-        left,
-        right,
-        parse_timestamp=parse_github_timestamp,
-    )
-
-
 def is_triage_or_higher(bot, username: str) -> bool:
-    status = _permission_status(bot, username, "triage")
+    status = live_review_support.permission_status(bot, username, "triage")
     if status == "unavailable":
         raise RuntimeError(f"Unable to determine triage permission for @{username}")
     return status == "granted"
@@ -234,7 +194,7 @@ def satisfy_mandatory_approver_requirement(bot, state: dict, issue_number: int, 
 
 
 def get_pull_request_reviews(bot, issue_number: int) -> list[dict] | None:
-    result = get_pull_request_reviews_result(bot, issue_number)
+    result = live_review_support.read_pull_request_reviews_result(bot, issue_number)
     if not result.get("ok"):
         return None
     reviews = result.get("reviews")
@@ -257,26 +217,6 @@ def collapse_latest_reviews_by_login(reviews: list[dict]) -> dict[str, dict]:
         if current is None or review_key >= (current[0], current[1]):
             latest_by_login[key] = (submitted_at, review_id, review)
     return {login: item[2] for login, item in latest_by_login.items()}
-def rebuild_pr_approval_state(
-    bot,
-    issue_number: int,
-    review_data: dict,
-    *,
-    pull_request: dict | None = None,
-    reviews: list[dict] | None = None,
-) -> tuple[dict | None, dict | None]:
-    result = rebuild_pr_approval_state_result(
-        bot,
-        issue_number,
-        review_data,
-        pull_request=pull_request,
-        reviews=reviews,
-    )
-    if not result.get("ok"):
-        return None, None
-    return result.get("completion"), result.get("write_approval")
-
-
 def rebuild_pr_approval_state_result(
     bot,
     issue_number: int,
@@ -307,6 +247,26 @@ def rebuild_pr_approval_state_result(
         "completion": result["completion"],
         "write_approval": result["write_approval"],
     }
+
+
+def rebuild_pr_approval_state(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> tuple[dict | None, dict | None]:
+    result = rebuild_pr_approval_state_result(
+        bot,
+        issue_number,
+        review_data,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    if not result.get("ok"):
+        return None, None
+    return result.get("completion"), result.get("write_approval")
 
 
 def pr_has_current_write_approval(

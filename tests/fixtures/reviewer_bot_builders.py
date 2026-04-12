@@ -1,8 +1,9 @@
-from scripts.reviewer_bot_lib import review_state
+from scripts.reviewer_bot_core.comment_routing_policy import PrCommentRouterOutcome
+from scripts.reviewer_bot_lib import repair_records, review_state
 from scripts.reviewer_bot_lib.context import (
     AssignmentRequest,
     CommentEventRequest,
-    PrCommentTrustContext,
+    PrCommentAdmission,
     PrivilegedCommandRequest,
 )
 
@@ -33,10 +34,6 @@ def build_privileged_command_request(
     command_name: str = "",
     is_pull_request: bool = False,
     issue_labels: tuple[str, ...] = (),
-    target_repo_root: str = "",
-    workflow_run_reconcile_pr_number: int | None = None,
-    workflow_run_reconcile_head_sha: str = "",
-    workflow_run_head_sha: str = "",
 ) -> PrivilegedCommandRequest:
     return PrivilegedCommandRequest(
         issue_number=issue_number,
@@ -44,10 +41,6 @@ def build_privileged_command_request(
         command_name=command_name,
         is_pull_request=is_pull_request,
         issue_labels=issue_labels,
-        target_repo_root=target_repo_root,
-        workflow_run_reconcile_pr_number=workflow_run_reconcile_pr_number,
-        workflow_run_reconcile_head_sha=workflow_run_reconcile_head_sha,
-        workflow_run_head_sha=workflow_run_head_sha,
     )
 
 
@@ -57,6 +50,7 @@ def build_comment_event_request(
     is_pull_request: bool,
     issue_state: str = "",
     issue_author: str = "",
+    issue_labels: tuple[str, ...] = (),
     comment_id: int = 0,
     comment_author: str = "",
     comment_author_id: int = 0,
@@ -73,6 +67,7 @@ def build_comment_event_request(
         is_pull_request=is_pull_request,
         issue_state=issue_state,
         issue_author=issue_author,
+        issue_labels=issue_labels,
         comment_id=comment_id,
         comment_author=comment_author,
         comment_author_id=comment_author_id,
@@ -86,20 +81,28 @@ def build_comment_event_request(
     )
 
 
-def build_pr_comment_trust_context(
+def build_pr_comment_admission(
     *,
+    route_outcome: PrCommentRouterOutcome = PrCommentRouterOutcome.TRUSTED_DIRECT,
+    declared_trust_class: str = "pr_trusted_direct",
     github_repository: str = "",
-    comment_author_association: str = "",
-    current_workflow_file: str = "",
-    github_ref: str = "",
+    pr_head_full_name: str = "",
+    pr_author: str = "",
+    issue_state: str = "open",
+    issue_labels: tuple[str, ...] = (),
+    comment_author_id: int = 200,
     github_run_id: int = 0,
     github_run_attempt: int = 0,
-) -> PrCommentTrustContext:
-    return PrCommentTrustContext(
+) -> PrCommentAdmission:
+    return PrCommentAdmission(
+        route_outcome=route_outcome,
+        declared_trust_class=declared_trust_class,
         github_repository=github_repository,
-        comment_author_association=comment_author_association,
-        current_workflow_file=current_workflow_file,
-        github_ref=github_ref,
+        pr_head_full_name=pr_head_full_name,
+        pr_author=pr_author,
+        issue_state=issue_state,
+        issue_labels=issue_labels,
+        comment_author_id=comment_author_id,
         github_run_id=github_run_id,
         github_run_attempt=github_run_attempt,
     )
@@ -124,7 +127,7 @@ def make_tracked_review_state(
     if active_cycle_started_at is not None:
         review["active_cycle_started_at"] = active_cycle_started_at
     if repair_needed is not None:
-        review["repair_needed"] = repair_needed
+        repair_records.store_repair_marker(review, "status_label_projection", repair_needed)
     return review
 
 

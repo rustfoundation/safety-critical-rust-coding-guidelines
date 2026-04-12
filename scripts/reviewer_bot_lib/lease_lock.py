@@ -8,7 +8,7 @@ from .config import (
     LOCK_REF_NAME,
     LeaseContext,
 )
-from .context import LeaseLockContext, LeaseLockRuntimeContext
+from .runtime_protocols import LeaseLockContext, LeaseLockRuntimeContext
 
 
 def _log(bot: LeaseLockRuntimeContext, level: str, message: str, **fields: Any) -> None:

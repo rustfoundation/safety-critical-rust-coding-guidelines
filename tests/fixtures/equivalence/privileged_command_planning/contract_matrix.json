@@ -19,12 +19,12 @@
     "authorization_unavailable",
     "authorization_failed",
     "working_tree_not_clean",
-    "audit_reports_guideline_impact",
-    "audit_command_failed",
-    "spec_lock_update_failed",
-    "unexpected_tracked_changes",
+    "audit_reported_guideline_impact",
+    "audit_failed",
+    "update_failed",
+    "unexpected_changed_files",
     "branch_or_push_failed",
-    "pull_request_create_failed"
+    "pull_request_creation_failed"
   ],
   "commit_message": "chore: update spec.lock; no affected guidelines",
   "pull_request_title": "chore: update spec.lock (no guideline impact)",
@@ -47,16 +47,69 @@
     "authorization_unavailable",
     "authorization_failed"
   ],
+  "revalidation_fail_closed_reasons": [
+    "unsupported_command",
+    "pull_request_target_not_allowed",
+    "missing_fls_audit_label",
+    "authorization_unavailable",
+    "authorization_failed"
+  ],
+  "execution_result_codes": [
+    "working_tree_not_clean",
+    "audit_reported_guideline_impact",
+    "audit_failed",
+    "update_failed",
+    "already_up_to_date",
+    "unexpected_changed_files",
+    "branch_or_push_failed",
+    "pull_request_creation_failed",
+    "opened_pull_request"
+  ],
   "pending_command_metadata_keys": [
     "source_event_key",
     "command_name",
     "issue_number",
     "actor",
-    "args",
+    "authorization_required_permission",
+    "authorization_authorized",
+    "target_kind",
+    "target_number",
+    "target_labels_snapshot",
     "status",
     "created_at",
-    "authorization",
-    "target"
+    "completed_at",
+    "result_code",
+    "result_message",
+    "opened_pr_url"
+  ],
+  "execute_plan_keys": [
+    "record",
+    "execution_context"
+  ],
+  "execute_plan_record_keys": [
+    "source_event_key",
+    "command_name",
+    "issue_number",
+    "actor",
+    "authorization_required_permission",
+    "authorization_authorized",
+    "target_kind",
+    "target_number",
+    "target_labels_snapshot",
+    "status",
+    "created_at",
+    "completed_at",
+    "result_code",
+    "result_message",
+    "opened_pr_url"
+  ],
+  "execute_plan_execution_context_keys": [
+    "target_repo_root",
+    "base_branch",
+    "branch_probe_name",
+    "branch_name",
+    "expected_changed_files",
+    "existing_open_pr_url"
   ],
   "trusted_acknowledgment_comment": "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `#314` state."
 }

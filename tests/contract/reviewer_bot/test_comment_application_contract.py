@@ -43,10 +43,10 @@ def test_comment_application_stores_pending_privileged_command_from_typed_reques
         issue_number=42,
         is_pull_request=False,
         issue_author="dana",
+        issue_labels=(FLS_AUDIT_LABEL,),
         comment_author="dana",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
-    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
     harness.runtime.post_comment = lambda issue_number, body: True
 
@@ -59,7 +59,7 @@ def test_comment_application_stores_pending_privileged_command_from_typed_reques
     )
 
     assert changed is True
-    assert review["pending_privileged_commands"]["issue_comment:100"]["command_name"] == "accept-no-fls-changes"
+    assert review["sidecars"]["pending_privileged_commands"]["issue_comment:100"]["command_name"] == "accept-no-fls-changes"
 
 
 def test_comment_application_freezes_pending_privileged_command_metadata_shape_and_ack_message(monkeypatch):
@@ -72,10 +72,11 @@ def test_comment_application_freezes_pending_privileged_command_metadata_shape_a
         issue_number=42,
         is_pull_request=False,
         issue_author="dana",
+        issue_labels=(FLS_AUDIT_LABEL,),
         comment_author="alice",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
-    harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
+    harness.runtime.set_config_value("STATE_ISSUE_NUMBER", "314")
     harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
     harness.runtime.post_comment = lambda issue_number, body: posted.append((issue_number, body)) or True
 
@@ -88,17 +89,23 @@ def test_comment_application_freezes_pending_privileged_command_metadata_shape_a
     )
 
     assert changed is True
-    pending = review["pending_privileged_commands"]["issue_comment:100"]
+    pending = review["sidecars"]["pending_privileged_commands"]["issue_comment:100"]
     assert list(pending) == [
         "source_event_key",
         "command_name",
         "issue_number",
         "actor",
-        "args",
+        "authorization_required_permission",
+        "authorization_authorized",
+        "target_kind",
+        "target_number",
+        "target_labels_snapshot",
         "status",
         "created_at",
-        "authorization",
-        "target",
+        "completed_at",
+        "result_code",
+        "result_message",
+        "opened_pr_url",
     ]
     assert posted == [
         (
@@ -111,7 +118,9 @@ def test_comment_application_freezes_pending_privileged_command_metadata_shape_a
 def test_c3b2_comment_application_deletion_manifest_leaves_only_privileged_branching():
     module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
 
-    assert 'if isinstance(decision, dict) and decision["kind"] == "deferred_privileged_handoff":' in module_text
+    assert "DeferPrivilegedHandoffDecision" in module_text
+    assert "ORDINARY_COMMAND_HANDLERS" in module_text
+    assert "decision.command_id" in module_text
     for command_name in [
         '"pass"',
         '"away"',
@@ -148,16 +157,12 @@ def test_n1_comment_application_obeys_policy_selected_handler_without_inline_com
     monkeypatch.setattr(
         comment_command_policy,
         "decide_comment_command",
-        lambda *args, **kwargs: comment_command_policy.OrdinaryCommentUseCaseResult(
-            kind="handler_call",
-            handler_name="handle_queue_command",
-            handler_args=[],
+        lambda *args, **kwargs: comment_command_policy.ExecuteOrdinaryCommandDecision(
+            command_id=comment_command_policy.OrdinaryCommandId.QUEUE,
+            issue_number=42,
+            actor="alice",
+            raw_args=(),
             needs_assignment_request=False,
-            result_shape="pair",
-            state_changed_from="never",
-            response=None,
-            success=None,
-            react=False,
         ),
     )
     monkeypatch.setattr(
@@ -165,6 +170,7 @@ def test_n1_comment_application_obeys_policy_selected_handler_without_inline_com
         "handle_queue_command",
         lambda bot, current_state: calls.append((bot, current_state)) or ("", True),
     )
+    harness.runtime.add_reaction = lambda *args, **kwargs: True
 
     changed = comment_application.process_comment_event(
         harness.runtime,
@@ -183,7 +189,7 @@ def test_comment_application_no_longer_owns_privileged_handoff_validation_or_met
 
     assert "privileged_command_policy.validate_accept_no_fls_changes_handoff(" in module_text
     assert "privileged_command_policy.build_pending_privileged_command(" in module_text
-    assert 'return decision.kind == "handoff_allowed", dict(decision.metadata or {})' in module_text
+    assert "put_pending_accept_no_fls_changes" in module_text
 
 
 def test_comment_application_no_longer_owns_direct_comment_freshness_decision_branching():
@@ -211,7 +217,7 @@ def test_n1_comment_application_obeys_routing_result_without_text_shape_contract
     monkeypatch.setattr(
         comment_application,
         "_route_comment_application",
-        lambda classified, *, comment_id: comment_application.CommentApplicationRoutingResult("freshness_only"),
+        lambda classified, *, comment_id: "freshness_only",
     )
     monkeypatch.setattr(
         comment_application,

@@ -1,5 +1,5 @@
 
-from scripts.reviewer_bot_lib import review_read_support
+from scripts.reviewer_bot_core import live_review_support
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
@@ -9,7 +9,7 @@ def test_pull_request_read_result_uses_fallback_payload_after_system_exit(monkey
     routes = RouteGitHubApi().raise_system_exit_on_request().add_api("GET", "pulls/42", {"head": {"sha": "head-1"}})
     runtime.github.stub(routes)
 
-    result = review_read_support._pull_request_read_result(runtime, 42)
+    result = live_review_support.read_pull_request_result(runtime, 42)
 
     assert result == {"ok": True, "pull_request": {"head": {"sha": "head-1"}}}
 
@@ -23,7 +23,7 @@ def test_pull_request_read_result_reports_not_found(monkeypatch):
     )
     runtime.github.stub(routes)
 
-    result = review_read_support._pull_request_read_result(runtime, 42)
+    result = live_review_support.read_pull_request_result(runtime, 42)
 
     assert result == {"ok": False, "reason": "pull_request_not_found", "failure_kind": "not_found"}
 
@@ -38,7 +38,7 @@ def test_pull_request_read_result_reports_invalid_payload(monkeypatch):
     )
     runtime.github.stub(routes)
 
-    result = review_read_support._pull_request_read_result(runtime, 42)
+    result = live_review_support.read_pull_request_result(runtime, 42)
 
     assert result == {"ok": False, "reason": "pull_request_unavailable", "failure_kind": "invalid_payload"}
 
@@ -62,7 +62,7 @@ def test_get_pull_request_reviews_result_paginates(monkeypatch):
     )
     runtime.github.stub(routes)
 
-    result = review_read_support.get_pull_request_reviews_result(runtime, 42)
+    result = live_review_support.read_pull_request_reviews_result(runtime, 42)
 
     assert result["ok"] is True
     assert len(result["reviews"]) == 101
@@ -78,7 +78,7 @@ def test_get_pull_request_reviews_result_uses_fallback_loader_after_system_exit(
     runtime.github.stub(routes)
     runtime.get_pull_request_reviews = lambda issue_number: [{"id": 10}]
 
-    result = review_read_support.get_pull_request_reviews_result(runtime, 42)
+    result = live_review_support.read_pull_request_reviews_result(runtime, 42)
 
     assert result == {"ok": True, "reviews": [{"id": 10}]}
 
@@ -92,7 +92,7 @@ def test_get_pull_request_reviews_result_reports_unavailable(monkeypatch):
     )
     runtime.github.stub(routes)
 
-    result = review_read_support.get_pull_request_reviews_result(runtime, 42)
+    result = live_review_support.read_pull_request_reviews_result(runtime, 42)
 
     assert result == {"ok": False, "reason": "reviews_unavailable", "failure_kind": "server_error"}
 
@@ -107,7 +107,7 @@ def test_get_pull_request_reviews_result_reports_invalid_payload(monkeypatch):
     )
     runtime.github.stub(routes)
 
-    result = review_read_support.get_pull_request_reviews_result(runtime, 42)
+    result = live_review_support.read_pull_request_reviews_result(runtime, 42)
 
     assert result == {"ok": False, "reason": "reviews_unavailable", "failure_kind": "invalid_payload"}
 
@@ -116,10 +116,10 @@ def test_permission_status_fails_closed_for_unknown_values(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.github.get_user_permission_status = lambda username, required_permission="push": "mystery"
 
-    assert review_read_support._permission_status(runtime, "alice", "push") == "unavailable"
+    assert live_review_support.permission_status(runtime, "alice", "push") == "unavailable"
 
 
 def test_parse_github_timestamp_rejects_invalid_values():
-    assert review_read_support.parse_github_timestamp(None) is None
-    assert review_read_support.parse_github_timestamp("") is None
-    assert review_read_support.parse_github_timestamp("not-a-timestamp") is None
+    assert live_review_support.parse_github_timestamp(None) is None
+    assert live_review_support.parse_github_timestamp("") is None
+    assert live_review_support.parse_github_timestamp("not-a-timestamp") is None

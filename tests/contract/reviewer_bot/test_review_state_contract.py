@@ -51,8 +51,15 @@ def test_ensure_review_entry_initializes_tracked_review_shape():
     assert review is not None
     assert review["current_reviewer"] is None
     assert review["reviewer_comment"]["accepted"] is None
-    assert review["pending_privileged_commands"] == {}
-    assert review["observer_discovery_watermarks"] == {}
+    assert review["sidecars"]["repair_markers"] == {
+        "review_repair": None,
+        "head_observation_repair": None,
+        "status_label_projection": None,
+    }
+    assert review["sidecars"]["pending_privileged_commands"] == {}
+    assert review["sidecars"]["deferred_gaps"] == {}
+    assert review["sidecars"]["observer_discovery_watermarks"] == {}
+    assert review["sidecars"]["reconciled_source_events"] == {}
     assert review["current_cycle_write_approval"] == {}
 
 
@@ -70,10 +77,13 @@ def test_state_contract_table_fixture_lists_frozen_sections_and_field_classifica
     for line in [
         "- active_reviews: required",
         "- status_projection_epoch: lazily materialized",
-        "- pending_privileged_commands: lazily materialized",
+        "- sidecars: lazily materialized",
+        "- repair_markers: nested under sidecars with fixed owner keys",
+        "- pending_privileged_commands: nested under sidecars",
+        "- deferred_gaps: nested under sidecars",
         "- current_cycle_write_approval: lazily materialized",
-        "- observer_discovery_watermarks: lazily materialized",
-        "- reconciled_source_events: tolerated legacy shape",
+        "- observer_discovery_watermarks: nested under sidecars",
+        "- reconciled_source_events: nested under sidecars as a map; tolerated legacy list shape",
         "- accepted: lazily materialized",
         "- seen_keys: tolerated legacy shape",
         "- non-list skipped: tolerated legacy shape",
@@ -90,8 +100,13 @@ def test_ensure_review_entry_lazily_upgrades_sparse_legacy_review_entries():
     assert review is state["active_reviews"]["42"]
     assert review["skipped"] == ["alice", "bob"]
     assert review["reviewer_comment"] == {"accepted": None, "seen_keys": []}
-    assert review["pending_privileged_commands"] == {}
-    assert review["reconciled_source_events"] == []
+    assert review["sidecars"]["repair_markers"] == {
+        "review_repair": None,
+        "head_observation_repair": None,
+        "status_label_projection": None,
+    }
+    assert review["sidecars"]["pending_privileged_commands"] == {}
+    assert review["sidecars"]["reconciled_source_events"] == {}
 
 
 def test_ensure_review_entry_repairs_missing_nested_maps_and_legacy_list_fields():
@@ -108,12 +123,17 @@ def test_ensure_review_entry_repairs_missing_nested_maps_and_legacy_list_fields(
     assert review["skipped"] == []
     assert review["reviewer_comment"] == {"accepted": None, "seen_keys": []}
     assert review["contributor_revision"] == {"accepted": None, "seen_keys": []}
-    assert review["deferred_gaps"] == {}
-    assert review["observer_discovery_watermarks"] == {}
-    assert review["pending_privileged_commands"] == {}
+    assert review["sidecars"]["deferred_gaps"] == {}
+    assert review["sidecars"]["observer_discovery_watermarks"] == {}
+    assert review["sidecars"]["pending_privileged_commands"] == {}
+    assert review["sidecars"]["repair_markers"] == {
+        "review_repair": None,
+        "head_observation_repair": None,
+        "status_label_projection": None,
+    }
     assert review["current_cycle_completion"] == {}
     assert review["current_cycle_write_approval"] == {}
-    assert review["reconciled_source_events"] == []
+    assert review["sidecars"]["reconciled_source_events"] == {}
 
 
 def test_core_state_adapter_matches_current_sparse_review_entry_upgrade_contract():
@@ -222,10 +242,13 @@ def test_review_state_module_exposes_named_mutation_surface():
 def test_review_state_local_mutation_surface_delegates_to_core_owner():
     review_state_text = _read("scripts/reviewer_bot_lib/review_state.py")
 
-    assert "from scripts.reviewer_bot_core import review_state_live_repair, review_state_machine" in review_state_text
+    assert "from scripts.reviewer_bot_core import (" in review_state_text
+    assert "live_review_support," in review_state_text
+    assert "review_state_live_repair," in review_state_text
+    assert "review_state_machine," in review_state_text
     assert "return review_state_machine.ensure_review_entry(state, issue_number, create=create)" in review_state_text
     assert "return review_state_machine.accept_channel_event(" in review_state_text
-    assert "return review_state_machine.mark_review_complete(state, issue_number, reviewer, source)" in review_state_text
+    assert "return review_state_machine.mark_review_complete(state, issue_number, reviewer, source, completed_at=_now_iso())" in review_state_text
 
 
 def test_production_modules_do_not_import_mutable_review_state_api_from_reviews_module():
@@ -270,7 +293,7 @@ def test_production_modules_use_review_state_as_live_repair_bridge_home():
         assert f"def {name}(" in review_state_text
         assert f"def {name}(" not in reviews_text
 
-    assert "repair_missing_reviewer_review_state," in maintenance_text
+    assert "repair_missing_reviewer_review_state = maintenance_schedule.repair_missing_reviewer_review_state" in maintenance_text
     assert "refresh_reviewer_review_from_live_preferred_review," in reconcile_text
     assert "accept_reviewer_review_from_live_review," in sweeper_text
     assert "refresh_reviewer_review_from_live_preferred_review," in sweeper_text

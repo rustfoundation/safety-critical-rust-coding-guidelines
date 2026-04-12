@@ -1,24 +1,24 @@
 """Reviewer queue membership helpers."""
 
-from .config import MEMBERS_URL
+from .config import MEMBERS_URL, MemberFetchResult
 
 
-def _log(bot, level: str, message: str, **fields) -> None:
-    bot.logger.event(level, message, **fields)
-
-
-def fetch_members(bot) -> list[dict]:
+def fetch_members(bot) -> MemberFetchResult:
     """Fetch and parse members.md from the consortium repo to extract Producers."""
     try:
         response = bot.rest_transport.request("GET", MEMBERS_URL, timeout_seconds=10)
-        if getattr(response, "status_code", 0) >= 400:
-            raise RuntimeError(f"status {response.status_code}")
-        content = response.text
-    except Exception as exc:
-        _log(bot, "warning", f"Failed to fetch members file from {MEMBERS_URL}: {exc}", url=MEMBERS_URL, error=str(exc))
-        return []
+    except Exception:
+        return MemberFetchResult(ok=False, producers=[], failure_kind="transport_error")
 
-    producers = []
+    status_code = getattr(response, "status_code", 0)
+    if status_code >= 400:
+        return MemberFetchResult(ok=False, producers=[], failure_kind="http_error")
+
+    content = getattr(response, "text", None)
+    if not isinstance(content, str):
+        return MemberFetchResult(ok=False, producers=[], failure_kind="invalid_payload")
+
+    producers: list[dict[str, str]] = []
     lines = content.split("\n")
     in_table = False
     headers = []
@@ -55,4 +55,4 @@ def fetch_members(bot) -> list[dict]:
                             }
                         )
 
-    return producers
+    return MemberFetchResult(ok=True, producers=producers)

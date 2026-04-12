@@ -143,7 +143,7 @@ def test_execute_run_persists_projection_repair_marker_after_projection_failure(
     assert result.exit_code == 0
     assert result.state_changed is True
     assert len(saved_states) == 2
-    assert saved_states[-1]["active_reviews"]["42"]["repair_needed"]["kind"] == "projection_failure"
+    assert saved_states[-1]["active_reviews"]["42"]["sidecars"]["repair_markers"]["status_label_projection"]["kind"] == "projection_failure"
 
 
 def test_execute_run_returns_failure_when_lock_release_fails(monkeypatch):
@@ -165,8 +165,8 @@ def test_execute_run_returns_failure_for_invalid_workflow_run_context(monkeypatc
     harness.set_event(
         EVENT_NAME="workflow_run",
         EVENT_ACTION="completed",
-        WORKFLOW_RUN_EVENT="pull_request_review",
-        WORKFLOW_RUN_EVENT_ACTION="submitted",
+        REVIEWER_BOT_WORKFLOW_KIND="reconcile",
+        WORKFLOW_RUN_TRIGGERING_CONCLUSION="success",
     )
     harness.stub_lock(acquire=lambda: None, release=lambda: True)
     harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())

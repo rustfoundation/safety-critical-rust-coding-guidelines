@@ -16,9 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from scripts.reviewer_bot_lib import review_read_support
-
-from . import reviewer_review_helpers
+from . import live_review_support, reviewer_review_helpers
 
 _UNSET = object()
 
@@ -109,7 +107,7 @@ def derive_reviewer_response_state(
         if reviewer_review_helpers.compare_records(
             reviewer_review,
             latest_reviewer_response,
-            parse_timestamp=review_read_support.parse_github_timestamp,
+            parse_timestamp=live_review_support.parse_github_timestamp,
         ) > 0:
             latest_reviewer_response = reviewer_review
         completion = review_data.get("current_cycle_completion")
@@ -142,7 +140,7 @@ def derive_reviewer_response_state(
     if reviewer_review_helpers.compare_records(
         reviewer_review,
         latest_reviewer_response,
-        parse_timestamp=review_read_support.parse_github_timestamp,
+        parse_timestamp=live_review_support.parse_github_timestamp,
     ) > 0:
         latest_reviewer_response = reviewer_review
 
@@ -155,14 +153,14 @@ def derive_reviewer_response_state(
     if reviewer_review_helpers.compare_records(
         contributor_revision,
         contributor_handoff,
-        parse_timestamp=review_read_support.parse_github_timestamp,
+        parse_timestamp=live_review_support.parse_github_timestamp,
     ) > 0:
         contributor_handoff = contributor_revision
 
     if _compare_cross_channel_conversation(
         contributor_handoff,
         latest_reviewer_response,
-        parse_timestamp=review_read_support.parse_github_timestamp,
+        parse_timestamp=live_review_support.parse_github_timestamp,
     ) > 0:
         reason = "contributor_comment_newer"
         if isinstance(contributor_handoff, dict) and str(contributor_handoff.get("semantic_key", "")).startswith(
@@ -262,7 +260,7 @@ def compute_reviewer_response_state(
             had_reviewer_review=had_reviewer_review,
         )
 
-    pull_request_result = review_read_support._pull_request_read_result(bot, issue_number, pull_request)
+    pull_request_result = live_review_support.read_pull_request_result(bot, issue_number, pull_request)
     if not pull_request_result.get("ok"):
         return {"state": "projection_failed", "reason": str(pull_request_result.get("reason"))}
     pull_request = pull_request_result["pull_request"]
@@ -272,7 +270,7 @@ def compute_reviewer_response_state(
         return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
 
     if not reviewer_comment and not reviewer_review:
-        reviews_result = review_read_support.get_pull_request_reviews_result(bot, issue_number, reviews)
+        reviews_result = live_review_support.read_pull_request_reviews_result(bot, issue_number, reviews)
         if not reviews_result.get("ok"):
             return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
         reviews = reviews_result["reviews"]
@@ -296,7 +294,7 @@ def compute_reviewer_response_state(
 
     preferred_live_review = None
     if refresh_live_review:
-        reviews_result = review_read_support.get_pull_request_reviews_result(bot, issue_number, reviews)
+        reviews_result = live_review_support.read_pull_request_reviews_result(bot, issue_number, reviews)
         if not reviews_result.get("ok"):
             return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
         reviews = reviews_result["reviews"]

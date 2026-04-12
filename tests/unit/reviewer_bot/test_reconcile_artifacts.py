@@ -61,7 +61,9 @@ def test_review_comment_artifact_identity_validation(monkeypatch):
     )
     runtime.github.stub(routes)
 
-    assert reconcile.handle_workflow_run_event(runtime, state) is True
+    runtime.ACTIVE_LEASE_CONTEXT = object()
+
+    assert reconcile.handle_workflow_run_event_result(runtime, state).state_changed is True
 
 
 def test_validate_workflow_run_artifact_identity_accepts_matching_contract():
@@ -147,7 +149,6 @@ def test_read_live_comment_replay_context_normalizes_comment_metadata():
     assert context == reconcile_reads.LiveCommentReplayContext(
         comment_author="alice",
         comment_user_type="User",
-        comment_author_association="MEMBER",
         comment_sender_type="User",
         comment_installation_id="",
         comment_performed_via_github_app=False,

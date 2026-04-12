@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 from scripts.reviewer_bot_core import (
     comment_command_policy,
@@ -14,41 +13,32 @@ from scripts.reviewer_bot_core import (
 
 from . import commands as commands_module
 from . import config as config_module
-from .context import (
-    AssignmentRequest,
-    CommentApplicationRuntimeContext,
-    CommentEventRequest,
-)
+from .context import AssignmentRequest, CommentEventRequest
 from .review_state import (
     accept_channel_event,
     ensure_review_entry,
     record_reviewer_activity,
 )
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _now_iso() -> str:
-    return _now().isoformat()
+from .runtime_protocols import CommentApplicationRuntimeContext
 
 
 @dataclass(frozen=True)
-class CommentApplicationRoutingResult:
-    kind: str
+class CommandExecutionResult:
+    response: str
+    success: bool
+    state_changed: bool
 
 
-def _route_comment_application(classified: dict, *, comment_id: int) -> CommentApplicationRoutingResult:
+def _route_comment_application(classified: dict, *, comment_id: int) -> str:
     comment_class = str(classified.get("comment_class", ""))
     command_count = int(classified.get("command_count", 0))
     if comment_class in {"plain_text", "command_plus_text"} and comment_id > 0:
         if comment_class in {"command_only", "command_plus_text"} and command_count == 1:
-            return CommentApplicationRoutingResult(kind="both")
-        return CommentApplicationRoutingResult(kind="freshness_only")
+            return "both"
+        return "freshness_only"
     if comment_class in {"command_only", "command_plus_text"} and command_count == 1:
-        return CommentApplicationRoutingResult(kind="command_only")
-    return CommentApplicationRoutingResult(kind="noop")
+        return "command_only"
+    return "noop"
 
 
 def normalize_comment_body(body: str) -> str:
@@ -92,22 +82,150 @@ def record_conversation_freshness(
     return changed
 
 
-def build_assignment_request_from_comment(request: CommentEventRequest) -> AssignmentRequest:
+def _build_assignment_request_from_comment_request(request: CommentEventRequest) -> AssignmentRequest:
     return AssignmentRequest(
         issue_number=request.issue_number,
         issue_author=request.issue_author,
         is_pull_request=request.is_pull_request,
+        issue_labels=request.issue_labels,
     )
 
 
-def validate_accept_no_fls_changes_handoff(
-    bot: CommentApplicationRuntimeContext,
-    request: CommentEventRequest,
-) -> tuple[bool, dict]:
-    labels = commands_module.parse_issue_labels(bot)
-    permission_status = bot.github.get_user_permission_status(request.comment_author, "triage")
-    decision = privileged_command_policy.validate_accept_no_fls_changes_handoff(request, labels, permission_status)
-    return decision.kind == "handoff_allowed", dict(decision.metadata or {})
+def _build_execution_result(command_id: comment_command_policy.OrdinaryCommandId, result) -> CommandExecutionResult:
+    if command_id in {
+        comment_command_policy.OrdinaryCommandId.PASS,
+        comment_command_policy.OrdinaryCommandId.AWAY,
+        comment_command_policy.OrdinaryCommandId.SYNC_MEMBERS,
+        comment_command_policy.OrdinaryCommandId.CLAIM,
+        comment_command_policy.OrdinaryCommandId.RELEASE,
+        comment_command_policy.OrdinaryCommandId.ASSIGN_SPECIFIC,
+        comment_command_policy.OrdinaryCommandId.ASSIGN_FROM_QUEUE,
+    }:
+        response, success = result
+        return CommandExecutionResult(response=response, success=success, state_changed=success)
+    if command_id in {
+        comment_command_policy.OrdinaryCommandId.QUEUE,
+        comment_command_policy.OrdinaryCommandId.COMMANDS,
+    }:
+        response, success = result
+        return CommandExecutionResult(response=response, success=success, state_changed=False)
+    response, success, state_changed = result
+    return CommandExecutionResult(response=response, success=success, state_changed=state_changed)
+
+
+def _execute_pass(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    return _build_execution_result(
+        decision.command_id,
+        commands_module.handle_pass_command(
+            bot,
+            state,
+            decision.issue_number,
+            decision.actor,
+            " ".join(decision.raw_args) if decision.raw_args else None,
+            request=assignment_request,
+        ),
+    )
+
+
+def _execute_away(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    return _build_execution_result(
+        decision.command_id,
+        commands_module.handle_pass_until_command(
+            bot,
+            state,
+            decision.issue_number,
+            decision.actor,
+            decision.raw_args[0],
+            " ".join(decision.raw_args[1:]) if len(decision.raw_args) > 1 else None,
+            request=assignment_request,
+        ),
+    )
+
+
+def _execute_label(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    return _build_execution_result(
+        decision.command_id,
+        commands_module.handle_label_command(
+            bot,
+            state,
+            decision.issue_number,
+            " ".join(decision.raw_args),
+            request=assignment_request,
+        ),
+    )
+
+
+def _execute_sync_members(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    del decision, assignment_request
+    return _build_execution_result(comment_command_policy.OrdinaryCommandId.SYNC_MEMBERS, commands_module.handle_sync_members_command(bot, state))
+
+
+def _execute_queue(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    del decision
+    if assignment_request is None:
+        result = commands_module.handle_queue_command(bot, state)
+    else:
+        result = commands_module.handle_queue_command(bot, state, request=assignment_request)
+    return _build_execution_result(comment_command_policy.OrdinaryCommandId.QUEUE, result)
+
+
+def _execute_commands(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    del state, decision, assignment_request
+    return _build_execution_result(comment_command_policy.OrdinaryCommandId.COMMANDS, commands_module.handle_commands_command(bot))
+
+
+def _execute_claim(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    return _build_execution_result(
+        decision.command_id,
+        commands_module.handle_claim_command(bot, state, decision.issue_number, decision.actor, request=assignment_request),
+    )
+
+
+def _execute_release(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    return _build_execution_result(
+        decision.command_id,
+        commands_module.handle_release_command(bot, state, decision.issue_number, decision.actor, list(decision.raw_args), request=assignment_request),
+    )
+
+
+def _execute_rectify(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    del assignment_request
+    from . import reconcile as reconcile_module
+
+    return _build_execution_result(
+        decision.command_id,
+        reconcile_module.handle_rectify_command(bot, state, decision.issue_number, decision.actor),
+    )
+
+
+def _execute_assign_specific(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    username = decision.raw_args[0] if decision.raw_args else ""
+    return _build_execution_result(
+        decision.command_id,
+        commands_module.handle_assign_command(bot, state, decision.issue_number, username, request=assignment_request),
+    )
+
+
+def _execute_assign_from_queue(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
+    return _build_execution_result(
+        decision.command_id,
+        commands_module.handle_assign_from_queue_command(bot, state, decision.issue_number, request=assignment_request),
+    )
+
+
+ORDINARY_COMMAND_HANDLERS = {
+    comment_command_policy.OrdinaryCommandId.PASS: _execute_pass,
+    comment_command_policy.OrdinaryCommandId.AWAY: _execute_away,
+    comment_command_policy.OrdinaryCommandId.LABEL: _execute_label,
+    comment_command_policy.OrdinaryCommandId.SYNC_MEMBERS: _execute_sync_members,
+    comment_command_policy.OrdinaryCommandId.QUEUE: _execute_queue,
+    comment_command_policy.OrdinaryCommandId.COMMANDS: _execute_commands,
+    comment_command_policy.OrdinaryCommandId.CLAIM: _execute_claim,
+    comment_command_policy.OrdinaryCommandId.RELEASE: _execute_release,
+    comment_command_policy.OrdinaryCommandId.RECTIFY: _execute_rectify,
+    comment_command_policy.OrdinaryCommandId.ASSIGN_SPECIFIC: _execute_assign_specific,
+    comment_command_policy.OrdinaryCommandId.ASSIGN_FROM_QUEUE: _execute_assign_from_queue,
+}
 
 
 def apply_comment_command(
@@ -126,72 +244,59 @@ def apply_comment_command(
         actor_class=actor_class,
         commands_help=config_module.get_commands_help(),
     )
-    if isinstance(decision, dict) and decision["kind"] == "ignore":
+    if isinstance(decision, comment_command_policy.IgnoreDecision):
         return False
 
     issue_number = request.issue_number
-    comment_author = request.comment_author
-    command = classified.get("command")
-    args = classified.get("args") or []
     review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
     source_event_key = request.comment_source_event_key or f"issue_comment:{request.comment_id}"
-    if isinstance(decision, dict) and decision["kind"] == "deferred_privileged_handoff":
-        is_valid, metadata = validate_accept_no_fls_changes_handoff(bot, request)
-        if not is_valid:
-            bot.github.post_comment(
-                issue_number,
-                "❌ This command is not eligible for privileged handoff from the current trusted live state.",
-            )
-            return False
-        pending = privileged_command_policy.build_pending_privileged_command(
+    if isinstance(decision, comment_command_policy.DeferPrivilegedHandoffDecision):
+        permission_status = bot.github.get_user_permission_status(request.comment_author, "triage")
+        handoff = privileged_command_policy.validate_accept_no_fls_changes_handoff(
+            request,
+            permission_status,
             source_event_key=source_event_key,
-            command_name=str(command),
-            issue_number=issue_number,
-            actor=comment_author,
-            args=list(args),
-            created_at=_now_iso(),
-            metadata=metadata,
         )
-        review_data.setdefault("pending_privileged_commands", {})[source_event_key] = pending.data
+        if isinstance(handoff, privileged_command_policy.BlockedPrivilegedHandoff):
+            bot.github.post_comment(issue_number, handoff.response)
+            return False
+        pending = privileged_command_policy.build_pending_privileged_command(created_at=request.comment_created_at, handoff=handoff)
+        privileged_command_policy.put_pending_accept_no_fls_changes(review_data, pending)
         stored = True
         if stored:
+            state_issue_number = bot.state_issue_number()
+            if state_issue_number <= 0:
+                state_issue_number = int(getattr(bot, "STATE_ISSUE_NUMBER", 0) or 0)
+            issue_reference = f"#{state_issue_number}" if state_issue_number > 0 else "the configured state issue"
             bot.github.post_comment(
                 issue_number,
-                "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `#314` state.",
+                "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. "
+                f"Use the isolated privileged workflow to execute it from issue `{issue_reference}` state.",
             )
         return stored
 
-    response = ""
-    success = False
-    state_changed = False
-    assignment_request = build_assignment_request_from_comment(request)
-    if decision.kind == "handler_call":
-        handler = getattr(commands_module, str(decision.handler_name))
-        handler_args = [bot, state, *(decision.handler_args or [])]
-        handler_kwargs = {}
-        if decision.needs_assignment_request:
-            handler_kwargs["request"] = assignment_request
-        result = handler(*handler_args, **handler_kwargs)
-        if decision.result_shape == "pair":
-            response, success = result
-            state_changed = success if decision.state_changed_from == "success" else False
-        else:
-            response, success, state_changed = result
+    if isinstance(decision, comment_command_policy.InlineResponseDecision):
+        execution = CommandExecutionResult(response=decision.response, success=decision.success, state_changed=False)
+        react = decision.react
     else:
-        response = str(decision.response or "")
-        success = bool(decision.success)
-        state_changed = False
+        assignment_request = (
+            _build_assignment_request_from_comment_request(request)
+            if decision.needs_assignment_request
+            else None
+        )
+        execution = ORDINARY_COMMAND_HANDLERS[decision.command_id](bot, state, decision, assignment_request)
+        react = True
 
     comment_id = request.comment_id
-    if comment_id > 0 and decision.react:
+    if comment_id > 0 and react:
         bot.github.add_reaction(comment_id, "eyes")
-        if success:
+        if execution.success:
             bot.github.add_reaction(comment_id, "+1")
-    if response:
-        bot.github.post_comment(issue_number, response)
-    return state_changed
+    if execution.response:
+        bot.github.post_comment(issue_number, execution.response)
+    return execution.state_changed
 
 
 def process_comment_event(
@@ -203,18 +308,16 @@ def process_comment_event(
     classify_issue_comment_actor,
 ) -> bool:
     comment_id = request.comment_id
-    comment_created_at = request.comment_created_at or _now_iso()
-    comment_request = CommentEventRequest(**{**request.__dict__, "comment_created_at": comment_created_at})
-    classified = classify_comment_payload(bot, comment_request.comment_body)
+    classified = classify_comment_payload(bot, request.comment_body)
     routing = _route_comment_application(classified, comment_id=comment_id)
     state_changed = False
-    if routing.kind in {"freshness_only", "both"}:
-        state_changed = record_conversation_freshness(bot, state, comment_request) or state_changed
-    if routing.kind in {"command_only", "both"}:
+    if routing in {"freshness_only", "both"}:
+        state_changed = record_conversation_freshness(bot, state, request) or state_changed
+    if routing in {"command_only", "both"}:
         state_changed = apply_comment_command(
             bot,
             state,
-            comment_request,
+            request,
             classified,
             classify_issue_comment_actor=classify_issue_comment_actor,
         ) or state_changed

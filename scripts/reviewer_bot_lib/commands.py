@@ -1,20 +1,17 @@
 """Reviewer-bot command parsing and handlers."""
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 
 from . import review_state
-from .automation import bot_parse_issue_labels
-from .automation import (
-    find_open_pr_for_branch_status as automation_find_open_pr_for_branch_status,
-)
 from .config import AssignmentAttempt
-from .context import AssignmentRequest, PrivilegedCommandRequest
+from .context import AssignmentRequest
 from .event_inputs import build_assignment_request as decode_assignment_request
-from .event_inputs import (
-    build_privileged_command_request as decode_privileged_command_request,
+from .guidance import (
+    get_assignment_failure_comment,
+    get_issue_guidance,
+    get_pr_guidance,
 )
-from .guidance import get_issue_guidance, get_pr_guidance
 
 
 def _log(bot, level: str, message: str, **fields) -> None:
@@ -44,15 +41,6 @@ _CONVERSATIONAL_WORDS = {
 
 def build_assignment_request(bot, *, issue_number: int) -> AssignmentRequest:
     return decode_assignment_request(bot, issue_number=issue_number)
-
-
-def build_privileged_command_request(bot, *, issue_number: int, actor: str = "", command_name: str = "") -> PrivilegedCommandRequest:
-    return decode_privileged_command_request(
-        bot,
-        issue_number=issue_number,
-        actor=actor,
-        command_name=command_name,
-    )
 
 
 def strip_code_blocks(comment_body: str) -> str:
@@ -132,10 +120,17 @@ def _apply_assignment_side_effects(
     assignment_method: str,
 ) -> tuple[AssignmentAttempt, str | None]:
     issue_number = request.issue_number
-    assignment_attempt = bot.github.request_reviewer_assignment(issue_number, reviewer)
+    if request.is_pull_request:
+        assignment_attempt = bot.github.request_pr_reviewer_assignment(issue_number, reviewer)
+    else:
+        assignment_attempt = bot.github.assign_issue_assignee(issue_number, reviewer)
     review_state.set_current_reviewer(state, issue_number, reviewer, assignment_method=assignment_method)
     bot.adapters.queue.record_assignment(state, reviewer, issue_number, "pr" if request.is_pull_request else "issue")
-    failure_comment = bot.github.get_assignment_failure_comment(reviewer, assignment_attempt)
+    failure_comment = get_assignment_failure_comment(
+        reviewer,
+        assignment_attempt,
+        is_pull_request=request.is_pull_request,
+    )
     if failure_comment:
         bot.github.post_comment(issue_number, failure_comment)
     if assignment_attempt.success:
@@ -191,7 +186,10 @@ def handle_pass_command(
     if not next_reviewer:
         return ("❌ No other reviewers available. Everyone in the queue has either passed on this issue or is the author."), False
     bot.adapters.queue.reposition_member_as_next(state, passed_reviewer)
-    bot.github.unassign_reviewer(issue_number, passed_reviewer)
+    if assignment_request.is_pull_request:
+        bot.github.remove_pr_reviewer(issue_number, passed_reviewer)
+    else:
+        bot.github.remove_issue_assignee(issue_number, passed_reviewer)
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
@@ -227,7 +225,8 @@ def handle_pass_until_command(
         parsed_date = datetime.strptime(return_date, "%Y-%m-%d").date()
     except ValueError:
         return (f"❌ Invalid date format: `{return_date}`. Please use YYYY-MM-DD format (e.g., 2025-02-01)."), False
-    if parsed_date <= datetime.now(timezone.utc).date():
+    normalized_return_date = parsed_date.isoformat()
+    if parsed_date <= bot.clock.now().date():
         return "❌ Return date must be in the future.", False
     user_in_queue = None
     user_index = None
@@ -239,13 +238,13 @@ def handle_pass_until_command(
     if not user_in_queue:
         for entry in state.get("pass_until", []):
             if entry["github"].lower() == comment_author.lower():
-                entry["return_date"] = return_date
+                entry["return_date"] = normalized_return_date
                 if reason:
                     entry["reason"] = reason
-                return (f"✅ Updated your return date to {return_date}.\n\nYou're already marked as away."), True
+                return (f"✅ Updated your return date to {normalized_return_date}.\n\nYou're already marked as away."), True
         return (f"❌ @{comment_author} is not in the reviewer queue. Only Producers can use this command."), False
     state["queue"].remove(user_in_queue)
-    pass_entry = {"github": user_in_queue["github"], "name": user_in_queue.get("name", user_in_queue["github"]), "return_date": return_date, "original_queue_position": user_index}
+    pass_entry = {"github": user_in_queue["github"], "name": user_in_queue.get("name", user_in_queue["github"]), "return_date": normalized_return_date, "original_queue_position": user_index}
     if reason:
         pass_entry["reason"] = reason
     state["pass_until"].append(pass_entry)
@@ -267,7 +266,10 @@ def handle_pass_until_command(
     is_current_reviewer = ((tracked_reviewer and tracked_reviewer.lower() == comment_author.lower()) or comment_author.lower() in [a.lower() for a in current_assignees])
     reassigned_msg = ""
     if is_current_reviewer:
-        bot.github.unassign_reviewer(issue_number, comment_author)
+        if assignment_request.is_pull_request:
+            bot.github.remove_pr_reviewer(issue_number, comment_author)
+        else:
+            bot.github.remove_issue_assignee(issue_number, comment_author)
         skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
         next_reviewer = bot.adapters.queue.get_next_reviewer(state, skip_usernames=skip_set)
         if next_reviewer:
@@ -291,7 +293,7 @@ def handle_pass_until_command(
                 state["active_reviews"][issue_key]["current_reviewer"] = None
             reassigned_msg = "\n\n⚠️ No other reviewers available to assign."
     reason_text = f" ({reason})" if reason else ""
-    return (f"✅ @{comment_author} is now away until {return_date}{reason_text}.\n\nYou'll be automatically added back to the queue on that date.{reassigned_msg}"), True
+    return (f"✅ @{comment_author} is now away until {normalized_return_date}{reason_text}.\n\nYou'll be automatically added back to the queue on that date.{reassigned_msg}"), True
 
 
 def handle_label_command(
@@ -341,60 +343,6 @@ def handle_label_command(
     return "\n".join(results), all_success, state_changed
 
 
-def parse_issue_labels(bot) -> list[str]:
-    return bot_parse_issue_labels(bot)
-
-
-def get_default_branch(bot) -> str:
-    repo_info = bot.github_api("GET", "")
-    if isinstance(repo_info, dict):
-        return repo_info.get("default_branch", "main")
-    return "main"
-
-
-def find_open_pr_for_branch(bot, branch: str) -> dict | None:
-    status, pr = automation_find_open_pr_for_branch_status(bot, branch)
-    if status != "found":
-        return None
-    return pr
-
-
-def resolve_workflow_run_pr_number(
-    bot,
-    request: PrivilegedCommandRequest | None = None,
-) -> int:
-    privileged_request = request or build_privileged_command_request(bot, issue_number=0)
-    if privileged_request.workflow_run_reconcile_pr_number is None:
-        raise RuntimeError("Missing WORKFLOW_RUN_RECONCILE_PR_NUMBER in workflow_run reconcile context")
-    pr_number = privileged_request.workflow_run_reconcile_pr_number
-    if pr_number <= 0:
-        raise RuntimeError("WORKFLOW_RUN_RECONCILE_PR_NUMBER must be a positive integer")
-    reconcile_head_sha = privileged_request.workflow_run_reconcile_head_sha
-    if not reconcile_head_sha:
-        raise RuntimeError("Missing WORKFLOW_RUN_RECONCILE_HEAD_SHA in workflow_run reconcile context")
-    workflow_run_head_sha = privileged_request.workflow_run_head_sha
-    if not workflow_run_head_sha:
-        raise RuntimeError("Missing WORKFLOW_RUN_HEAD_SHA for workflow_run reconcile")
-    if reconcile_head_sha != workflow_run_head_sha:
-        raise RuntimeError("Workflow_run reconcile context SHA mismatch between artifact and workflow payload")
-    response = bot.github_api_request("GET", f"pulls/{pr_number}", retry_policy="idempotent_read")
-    if not response.ok or not isinstance(response.payload, dict):
-        raise RuntimeError(f"Failed to fetch pull request #{pr_number} during workflow_run reconcile")
-    pull_request = response.payload
-    head = pull_request.get("head")
-    pull_request_head_sha = ""
-    if isinstance(head, dict):
-        head_sha = head.get("sha")
-        if isinstance(head_sha, str):
-            pull_request_head_sha = head_sha.strip()
-    if not pull_request_head_sha:
-        raise RuntimeError(f"Pull request #{pr_number} is missing a valid head SHA")
-    if pull_request_head_sha != reconcile_head_sha:
-        raise RuntimeError(f"Pull request #{pr_number} head SHA does not match workflow_run reconcile context")
-    _log(bot, "info", f"Resolved workflow_run PR from reconcile context: #{pr_number}", pr_number=pr_number)
-    return pr_number
-
-
 def handle_sync_members_command(bot, state: dict) -> tuple[str, bool]:
     state, changes = bot.adapters.workflow.sync_members_with_queue(state)
     if changes:
@@ -408,13 +356,13 @@ def handle_queue_command(
     state: dict,
     request: AssignmentRequest | None = None,
 ) -> tuple[str, bool]:
-    assignment_request = request or build_assignment_request(bot, issue_number=0)
+    del request
     queue_size = len(state["queue"])
-    repo_owner = assignment_request.repo_owner
-    repo_name = assignment_request.repo_name
+    github_repository = bot.get_config_value("GITHUB_REPOSITORY").strip()
+    state_issue_number = bot.state_issue_number()
     state_issue_link = ""
-    if repo_owner and repo_name and bot.STATE_ISSUE_NUMBER:
-        state_issue_link = f"\n\n[View full state details](https://github.com/{repo_owner}/{repo_name}/issues/{bot.STATE_ISSUE_NUMBER})"
+    if github_repository and state_issue_number:
+        state_issue_link = f"\n\n[View full state details](https://github.com/{github_repository}/issues/{state_issue_number})"
     if queue_size == 0:
         return f"📊 **Queue Status**: No reviewers in queue.{state_issue_link}", True
     current_index = state["current_index"]
@@ -438,12 +386,6 @@ def handle_commands_command(bot) -> tuple[str, bool]:
     return (f"ℹ️ **Available Commands**\n\n**Pass or step away:**\n- `{bot.BOT_MENTION} /pass [reason]` - Pass this review to next in queue (current reviewer only)\n- `{bot.BOT_MENTION} /away YYYY-MM-DD [reason]` - Step away from queue until a date\n- `{bot.BOT_MENTION} /release [@username] [reason]` - Release assignment (yours or someone else's with triage+ permission)\n\n**Assign reviewers:**\n- `{bot.BOT_MENTION} /r? @username` - Assign a specific reviewer\n- `{bot.BOT_MENTION} /r? producers` - Request the next reviewer from the queue\n- `{bot.BOT_MENTION} /claim` - Claim this review for yourself\n\n**Other:**\n- `{bot.BOT_MENTION} /label +label-name` - Add a label\n- `{bot.BOT_MENTION} /label -label-name` - Remove a label\n- `{bot.BOT_MENTION} /rectify` - Reconcile this issue/PR review state from GitHub\n- `{bot.BOT_MENTION} /accept-no-fls-changes` - Update spec.lock and open a PR when no guidelines are impacted\n- `{bot.BOT_MENTION} /queue` - Show current queue status\n- `{bot.BOT_MENTION} /sync-members` - Sync queue with members.md"), True
 
 
-def handle_rectify_command(bot, state: dict, issue_number: int, comment_author: str):
-    from . import reconcile as reconcile_module
-
-    return reconcile_module.handle_rectify_command(bot, state, issue_number, comment_author)
-
-
 def handle_claim_command(
     bot,
     state: dict,
@@ -462,7 +404,10 @@ def handle_claim_command(
     if assignee_error:
         return assignee_error, False
     for assignee in current_assignees:
-        bot.github.unassign_reviewer(issue_number, assignee)
+        if assignment_request.is_pull_request:
+            bot.github.remove_pr_reviewer(issue_number, assignee)
+        else:
+            bot.github.remove_issue_assignee(issue_number, assignee)
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
@@ -528,7 +473,10 @@ def handle_release_command(
         if current_assignees:
             return (f"❌ @{comment_author} is not assigned to this issue/PR. Current assignee(s): @{', @'.join(current_assignees)}"), False
         return "❌ No reviewer is currently assigned to release.", False
-    bot.github.unassign_reviewer(issue_number, target_username)
+    if request.is_pull_request:
+        bot.github.remove_pr_reviewer(issue_number, target_username)
+    else:
+        bot.github.remove_issue_assignee(issue_number, target_username)
     if "active_reviews" in state and issue_key in state["active_reviews"] and isinstance(state["active_reviews"][issue_key], dict):
         state["active_reviews"][issue_key]["current_reviewer"] = None
     if assignment_method == "round-robin":
@@ -563,7 +511,10 @@ def handle_assign_command(
     if assignee_error:
         return assignee_error, False
     for assignee in current_assignees:
-        bot.github.unassign_reviewer(issue_number, assignee)
+        if assignment_request.is_pull_request:
+            bot.github.remove_pr_reviewer(issue_number, assignee)
+        else:
+            bot.github.remove_issue_assignee(issue_number, assignee)
     assignment_attempt, failure_comment = _apply_assignment_side_effects(
         bot,
         state,
@@ -591,7 +542,10 @@ def handle_assign_from_queue_command(
     if assignee_error:
         return assignee_error, False
     for assignee in current_assignees:
-        bot.github.unassign_reviewer(issue_number, assignee)
+        if assignment_request.is_pull_request:
+            bot.github.remove_pr_reviewer(issue_number, assignee)
+        else:
+            bot.github.remove_issue_assignee(issue_number, assignee)
     skip_set = {assignment_request.issue_author} if assignment_request.issue_author else set()
     next_reviewer = bot.adapters.queue.get_next_reviewer(state, skip_usernames=skip_set)
     if not next_reviewer:

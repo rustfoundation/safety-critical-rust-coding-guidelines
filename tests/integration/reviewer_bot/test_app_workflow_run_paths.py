@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from scripts.reviewer_bot_lib import reconcile
-from scripts.reviewer_bot_lib.context import LeaseContext
+from scripts.reviewer_bot_lib.config import LeaseContext
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state
 
@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integration
 D4C_DELETION_MANIFEST = []
 
 
-def test_execute_run_cross_repo_review_does_not_acquire_lock(monkeypatch):
+def test_execute_run_cross_repo_review_stays_read_only(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="pull_request_review", EVENT_ACTION="submitted", PR_IS_CROSS_REPOSITORY="true")
 
@@ -25,13 +25,12 @@ def test_execute_run_cross_repo_review_does_not_acquire_lock(monkeypatch):
 
     harness.stub_lock(acquire=fail_if_called)
     harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
-    harness.stub_handler("handle_pull_request_review_event", lambda state: False)
 
     harness.run_execute()
 
     assert acquire_called["value"] is False
 
-def test_execute_run_same_repo_review_does_not_acquire_lock(monkeypatch):
+def test_execute_run_same_repo_review_stays_read_only(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="pull_request_review", EVENT_ACTION="submitted")
 
@@ -45,7 +44,6 @@ def test_execute_run_same_repo_review_does_not_acquire_lock(monkeypatch):
     harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
     harness.stub_pass_until(lambda state: (state, []))
     harness.stub_sync_members(lambda state: (state, []))
-    harness.stub_handler("handle_pull_request_review_event", lambda state: False)
 
     harness.run_execute()
 
@@ -64,11 +62,12 @@ def test_execute_run_supported_workflow_run_source_action_pairs_acquire_lock(
     monkeypatch, workflow_run_event, workflow_run_event_action
 ):
     harness = AppHarness(monkeypatch)
+    harness.set_workflow_run_name("Reviewer Bot PR Review Submitted Observer")
     harness.set_event(
         EVENT_NAME="workflow_run",
         EVENT_ACTION="completed",
-        WORKFLOW_RUN_EVENT=workflow_run_event,
-        WORKFLOW_RUN_EVENT_ACTION=workflow_run_event_action,
+        REVIEWER_BOT_WORKFLOW_KIND="reconcile",
+        WORKFLOW_RUN_TRIGGERING_CONCLUSION="success",
     )
 
     acquire_called = {"value": False}
@@ -92,7 +91,7 @@ def test_execute_run_supported_workflow_run_source_action_pairs_acquire_lock(
     monkeypatch.setattr(
         reconcile,
         "handle_workflow_run_event_result",
-        lambda bot, state: reconcile.WorkflowRunHandlerResult(False, [], False, None, False, False),
+        lambda bot, state: reconcile.WorkflowRunHandlerResult(False, []),
     )
 
     result = harness.run_execute()
@@ -106,8 +105,8 @@ def test_execute_run_unsupported_workflow_run_source_action_pair_stays_read_only
     harness.set_event(
         EVENT_NAME="workflow_run",
         EVENT_ACTION="completed",
-        WORKFLOW_RUN_EVENT="pull_request_review",
-        WORKFLOW_RUN_EVENT_ACTION="edited",
+        REVIEWER_BOT_WORKFLOW_KIND="pull_request_review",
+        WORKFLOW_RUN_TRIGGERING_CONCLUSION="edited",
     )
 
     acquire_called = {"value": False}
@@ -151,9 +150,9 @@ def test_d4c_deletion_manifest_is_explicit_and_remaining_app_branches_stay_trans
     assert 'if projection_failure is not None:' in app_text
 
 
-def test_m1_typed_workflow_run_result_keeps_public_bool_entrypoint_present():
+def test_m1_typed_workflow_run_result_is_the_only_retained_entrypoint():
     reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
 
     assert "def handle_workflow_run_event_result(" in reconcile_text
-    assert "def handle_workflow_run_event(bot: ReconcileWorkflowRuntimeContext, state: dict) -> bool:" in reconcile_text
-    assert "return handle_workflow_run_event_result(bot, state).state_changed" in reconcile_text
+    assert "def handle_workflow_run_event(bot: ReconcileWorkflowRuntimeContext, state: dict) -> bool:" not in reconcile_text
+    assert "return handle_workflow_run_event_result(bot, state).state_changed" not in reconcile_text

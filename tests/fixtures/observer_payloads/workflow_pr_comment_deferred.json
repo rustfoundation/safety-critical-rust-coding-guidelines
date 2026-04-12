@@ -3,12 +3,13 @@
     "fixture_id": "workflow_pr_comment_deferred",
     "contract_class": "workflow_emitted_payload",
     "contract_source": "workflow YAML",
-    "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml"
+    "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-router.yml"
   },
   "payload": {
-    "schema_version": 2,
-    "source_workflow_name": "Reviewer Bot PR Comment Observer",
-    "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+    "payload_kind": "deferred_comment",
+    "schema_version": 3,
+    "source_workflow_name": "Reviewer Bot PR Comment Router",
+    "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-router.yml",
     "source_run_id": 401,
     "source_run_attempt": 3,
     "source_event_name": "issue_comment",
@@ -16,13 +17,16 @@
     "source_event_key": "issue_comment:501",
     "pr_number": 42,
     "comment_id": 501,
-    "comment_class": "command_plus_text",
-    "has_non_command_text": true,
-    "source_body_digest": "0077f0d5470f756bc8005e538a4bf62506c3d65f66ba46234a8c3b5e6ab4d082",
-    "source_created_at": "2026-03-20T20:48:25Z",
-    "actor_login": "contributor",
-    "actor_id": 7001,
-    "actor_class": "repo_user_principal",
-    "source_artifact_name": "reviewer-bot-comment-context-401-attempt-3"
+    "comment_body": "hello\n@guidelines-bot /queue",
+    "comment_created_at": "2026-03-20T20:48:25Z",
+    "comment_author": "contributor",
+    "comment_author_id": 7001,
+    "comment_user_type": "User",
+    "comment_sender_type": "User",
+    "comment_installation_id": null,
+    "comment_performed_via_github_app": false,
+    "issue_author": "dana",
+    "issue_state": "open",
+    "issue_labels": ["triage"]
   }
 }

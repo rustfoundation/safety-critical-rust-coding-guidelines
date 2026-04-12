@@ -28,14 +28,32 @@ from scripts.reviewer_bot_lib.config import (
     EVENT_INTENT_NON_MUTATING_DEFER,
     EVENT_INTENT_NON_MUTATING_READONLY,
     FLS_AUDIT_LABEL,
+    LOCK_API_RETRY_LIMIT,
+    LOCK_API_RETRY_LIMIT_ENV,
+    LOCK_LEASE_TTL_SECONDS,
+    LOCK_LEASE_TTL_SECONDS_ENV,
+    LOCK_MAX_WAIT_SECONDS,
+    LOCK_MAX_WAIT_SECONDS_ENV,
+    LOCK_REF_BOOTSTRAP_BRANCH,
+    LOCK_REF_BOOTSTRAP_BRANCH_ENV,
+    LOCK_REF_NAME,
+    LOCK_REF_NAME_ENV,
+    LOCK_RENEWAL_WINDOW_SECONDS,
+    LOCK_RENEWAL_WINDOW_SECONDS_ENV,
+    LOCK_RETRY_BASE_SECONDS,
+    LOCK_RETRY_BASE_SECONDS_ENV,
     REVIEW_FRESHNESS_RUNBOOK_PATH,
     REVIEWER_REQUEST_422_TEMPLATE,
+    STATE_READ_RETRY_BASE_SECONDS,
+    STATE_READ_RETRY_BASE_SECONDS_ENV,
+    STATE_READ_RETRY_LIMIT,
+    STATE_READ_RETRY_LIMIT_ENV,
     STATUS_PROJECTION_EPOCH,
     TRANSITION_PERIOD_DAYS,
     AssignmentAttempt,
     GitHubApiResult,
+    MemberFetchResult,
 )
-from scripts.reviewer_bot_lib.context import LeaseContext
 from tests.fixtures.fake_clock import FakeClock
 from tests.fixtures.fake_jitter import DeterministicJitter
 from tests.fixtures.fake_sleeper import RecordingSleeper
@@ -117,11 +135,11 @@ class FakeRuntimeGitHubCompatibility:
     def get_issue_assignees(self, issue_number: int):
         return github_api_module.get_issue_assignees(self._runtime, issue_number)
 
-    def request_reviewer_assignment(self, issue_number: int, username: str):
-        return github_api_module.request_reviewer_assignment(self._runtime, issue_number, username)
+    def request_pr_reviewer_assignment(self, issue_number: int, username: str):
+        return github_api_module.request_pr_reviewer_assignment(self._runtime, issue_number, username)
 
-    def get_assignment_failure_comment(self, reviewer: str, attempt):
-        return github_api_module.get_assignment_failure_comment(self._runtime, reviewer, attempt)
+    def assign_issue_assignee(self, issue_number: int, username: str):
+        return github_api_module.assign_issue_assignee(self._runtime, issue_number, username)
 
     def post_comment(self, issue_number: int, body: str) -> bool:
         return github_api_module.post_comment(self._runtime, issue_number, body)
@@ -144,14 +162,11 @@ class FakeRuntimeGitHubCompatibility:
     def remove_label(self, issue_number: int, label: str) -> bool:
         return github_api_module.remove_label(self._runtime, issue_number, label)
 
-    def remove_assignee(self, issue_number: int, username: str) -> bool:
-        return github_api_module.remove_assignee(self._runtime, issue_number, username)
+    def remove_issue_assignee(self, issue_number: int, username: str) -> bool:
+        return github_api_module.remove_issue_assignee(self._runtime, issue_number, username)
 
     def remove_pr_reviewer(self, issue_number: int, username: str) -> bool:
         return github_api_module.remove_pr_reviewer(self._runtime, issue_number, username)
-
-    def unassign_reviewer(self, issue_number: int, username: str) -> bool:
-        return github_api_module.unassign_reviewer(self._runtime, issue_number, username)
 
     def get_issue_or_pr_snapshot(self, issue_number: int) -> dict | None:
         payload = self._runtime.github_api("GET", f"issues/{issue_number}")
@@ -282,11 +297,8 @@ class FakeRuntimeStateLockCompatibility:
     def conditional_patch_state_issue(self, body: str, etag: str | None = None):
         return state_store_module.conditional_patch_state_issue(self._runtime, body, etag)
 
-    def parse_lock_metadata_from_issue_body(self, body: str):
-        return state_store_module.parse_lock_metadata_from_issue_body(body)
-
-    def render_state_issue_body(self, state: dict, lock_meta: dict, base_body: str | None = None, *, preserve_state_block: bool = False):
-        return state_store_module.render_state_issue_body(state, lock_meta, base_body, preserve_state_block=preserve_state_block)
+    def render_state_issue_body(self, state: dict, base_body: str | None = None, *, preserve_state_block: bool = False):
+        return state_store_module.render_state_issue_body(state, base_body, preserve_state_block=preserve_state_block)
 
     def get_state_issue_html_url(self):
         return lease_lock_module.get_state_issue_html_url(self._runtime)
@@ -362,17 +374,15 @@ class FakeRuntimeAutomationCompatibility:
             return override(branch, base, issue_number)
         return automation_module.create_pull_request(self._runtime, branch, base, issue_number)
 
-    def parse_issue_labels(self) -> list[str]:
-        override = runtime_instance_override(self._runtime, "parse_issue_labels")
-        if override is not None:
-            return override()
-        return automation_module.bot_parse_issue_labels(self._runtime)
-
     def fetch_members(self):
         override = runtime_instance_override(self._runtime, "fetch_members")
         if override is not None:
-            return override()
-        return self._runtime._fetch_members()
+            result = override()
+        else:
+            result = self._runtime._fetch_members()
+        if isinstance(result, list):
+            return MemberFetchResult(ok=True, producers=result)
+        return result
 
     def handle_accept_no_fls_changes_command(self, issue_number: int, comment_author: str, request=None):
         return automation_module.handle_accept_no_fls_changes_command(self._runtime, issue_number, comment_author, request=request)
@@ -407,14 +417,9 @@ class FakeReviewerBotRuntime:
         self.jitter = DeterministicJitter(0.0)
         self.uuid_source = FixedUuidSource("fake-runtime-uuid")
         self.logger = RecordingLogger()
-        self.ACTIVE_LEASE_CONTEXT = LeaseContext(
-            lock_token="test-lock-token",
-            lock_owner_run_id="test-run",
-            lock_owner_workflow="test-workflow",
-            lock_owner_job="test-job",
-            state_issue_url="https://example.com/state",
-        )
+        self.ACTIVE_LEASE_CONTEXT = object()
         self.config = ConfigBag(monkeypatch)
+        self.config.set("STATE_ISSUE_NUMBER", "314")
         self.outputs = OutputCapture()
         self.deferred_payloads = DeferredPayloadStore()
         self.github = GitHubStub(github)
@@ -426,7 +431,8 @@ class FakeReviewerBotRuntime:
         self.state_store = StateStoreStub()
         self.locks = LockStub()
         self.workflow = WorkflowBehaviorStub()
-        self._fetch_members = lambda: []
+        self.workflow.bind_runtime(self)
+        self._fetch_members = lambda: MemberFetchResult(ok=True, producers=[])
         self.compat = SimpleNamespace(
             github=FakeRuntimeGitHubCompatibility(self),
             review=FakeRuntimeReviewCompatibility(self),
@@ -475,49 +481,44 @@ class FakeReviewerBotRuntime:
         return int(self.get_config_value("STATE_ISSUE_NUMBER", "0") or 0)
 
     def state_read_retry_limit(self) -> int:
-        return int(self.get_config_value("REVIEWER_BOT_STATE_READ_RETRY_LIMIT", "4") or 0)
+        return int(self.get_config_value(STATE_READ_RETRY_LIMIT_ENV, str(STATE_READ_RETRY_LIMIT)) or 0)
 
     def state_read_retry_base_seconds(self) -> float:
-        return float(self.get_config_value("REVIEWER_BOT_STATE_READ_RETRY_SECONDS", "1.0") or 0.0)
+        return float(self.get_config_value(STATE_READ_RETRY_BASE_SECONDS_ENV, str(STATE_READ_RETRY_BASE_SECONDS)) or 0.0)
 
     def lock_api_retry_limit(self) -> int:
-        return int(self.get_config_value("REVIEWER_BOT_LOCK_API_RETRY_LIMIT", "5") or 0)
+        return int(self.get_config_value(LOCK_API_RETRY_LIMIT_ENV, str(LOCK_API_RETRY_LIMIT)) or 0)
 
     def lock_retry_base_seconds(self) -> float:
-        return float(self.get_config_value("REVIEWER_BOT_LOCK_RETRY_SECONDS", "2.0") or 0.0)
+        return float(self.get_config_value(LOCK_RETRY_BASE_SECONDS_ENV, str(LOCK_RETRY_BASE_SECONDS)) or 0.0)
 
     def lock_lease_ttl_seconds(self) -> int:
-        return int(self.get_config_value("REVIEWER_BOT_LOCK_TTL_SECONDS", "300") or 0)
+        return int(self.get_config_value(LOCK_LEASE_TTL_SECONDS_ENV, str(LOCK_LEASE_TTL_SECONDS)) or 0)
 
     def lock_max_wait_seconds(self) -> int:
-        return int(self.get_config_value("REVIEWER_BOT_LOCK_MAX_WAIT_SECONDS", "120") or 0)
+        return int(self.get_config_value(LOCK_MAX_WAIT_SECONDS_ENV, str(LOCK_MAX_WAIT_SECONDS)) or 0)
 
     def lock_renewal_window_seconds(self) -> int:
-        return int(self.get_config_value("REVIEWER_BOT_LOCK_RENEWAL_WINDOW_SECONDS", "60") or 0)
+        return int(self.get_config_value(LOCK_RENEWAL_WINDOW_SECONDS_ENV, str(LOCK_RENEWAL_WINDOW_SECONDS)) or 0)
 
     def lock_ref_name(self) -> str:
-        return self.get_config_value("REVIEWER_BOT_LOCK_REF_NAME", "refs/heads/reviewer-bot-lock")
+        return self.get_config_value(LOCK_REF_NAME_ENV, f"refs/{LOCK_REF_NAME}")
 
     def lock_ref_bootstrap_branch(self) -> str:
-        return self.get_config_value("REVIEWER_BOT_LOCK_BOOTSTRAP_BRANCH", "main")
+        return self.get_config_value(LOCK_REF_BOOTSTRAP_BRANCH_ENV, LOCK_REF_BOOTSTRAP_BRANCH)
 
     def write_output(self, name: str, value: str) -> None:
         self.outputs.write(name, value)
 
-    def assert_lock_held(self, _context: str) -> None:
-        return None
+    def assert_lock_held(self, context: str) -> None:
+        if self.ACTIVE_LEASE_CONTEXT is None:
+            raise RuntimeError(f"Mutating path reached without lease lock: {context}")
 
     def load_deferred_payload(self) -> dict:
         return self.deferred_payloads.load()
 
     def parse_iso8601_timestamp(self, value: Any):
         return self.compat.state_lock.parse_iso8601_timestamp(value)
-
-    def parse_github_timestamp(self, value: Any):
-        return reviews_module.parse_github_timestamp(value)
-
-    def is_triage_or_higher(self, username: str) -> bool:
-        return reviews_module.is_triage_or_higher(self, username)
 
     def satisfy_mandatory_approver_requirement(self, state: dict, issue_number: int, approver: str) -> bool:
         return reviews_module.satisfy_mandatory_approver_requirement(self, state, issue_number, approver)
@@ -532,10 +533,16 @@ class FakeReviewerBotRuntime:
         return self.compat.state_lock.ensure_state_issue_lease_lock_fresh()
 
     def acquire_state_issue_lease_lock(self):
-        return self.compat.state_lock.acquire_state_issue_lease_lock()
+        context = self.compat.state_lock.acquire_state_issue_lease_lock()
+        if context is not None:
+            self.ACTIVE_LEASE_CONTEXT = context
+        return context
 
     def release_state_issue_lease_lock(self) -> bool:
-        return self.compat.state_lock.release_state_issue_lease_lock()
+        released = self.compat.state_lock.release_state_issue_lease_lock()
+        if released:
+            self.ACTIVE_LEASE_CONTEXT = None
+        return released
 
     def process_pass_until_expirations(self, state: dict):
         return self.workflow.process_pass_until_expirations(state)
@@ -552,11 +559,11 @@ class FakeReviewerBotRuntime:
     def get_issue_assignees(self, issue_number: int):
         return self.compat.github.get_issue_assignees(issue_number)
 
-    def request_reviewer_assignment(self, issue_number: int, username: str):
-        return self.compat.github.request_reviewer_assignment(issue_number, username)
+    def request_pr_reviewer_assignment(self, issue_number: int, username: str):
+        return self.compat.github.request_pr_reviewer_assignment(issue_number, username)
 
-    def get_assignment_failure_comment(self, reviewer: str, attempt):
-        return self.compat.github.get_assignment_failure_comment(reviewer, attempt)
+    def assign_issue_assignee(self, issue_number: int, username: str):
+        return self.compat.github.assign_issue_assignee(issue_number, username)
 
     def post_comment(self, issue_number: int, body: str) -> bool:
         return self.compat.github.post_comment(issue_number, body)
@@ -579,14 +586,11 @@ class FakeReviewerBotRuntime:
     def remove_label(self, issue_number: int, label: str) -> bool:
         return self.compat.github.remove_label(issue_number, label)
 
-    def remove_assignee(self, issue_number: int, username: str) -> bool:
-        return self.compat.github.remove_assignee(issue_number, username)
+    def remove_issue_assignee(self, issue_number: int, username: str) -> bool:
+        return self.compat.github.remove_issue_assignee(issue_number, username)
 
     def remove_pr_reviewer(self, issue_number: int, username: str) -> bool:
         return self.compat.github.remove_pr_reviewer(issue_number, username)
-
-    def unassign_reviewer(self, issue_number: int, username: str) -> bool:
-        return self.compat.github.unassign_reviewer(issue_number, username)
 
     def get_issue_or_pr_snapshot(self, issue_number: int) -> dict | None:
         return self.compat.github.get_issue_or_pr_snapshot(issue_number)
@@ -712,9 +716,6 @@ class FakeReviewerBotRuntime:
     def get_commands_help(self) -> str:
         return self.compat.review.get_commands_help()
 
-    def parse_issue_labels(self) -> list[str]:
-        return self.compat.automation.parse_issue_labels()
-
     def fetch_members(self):
         return self.compat.automation.fetch_members()
 
@@ -751,17 +752,14 @@ class FakeReviewerBotRuntime:
     def handle_pull_request_target_synchronize(self, state: dict) -> bool:
         return self.handlers.call("handle_pull_request_target_synchronize", state)
 
-    def handle_pull_request_review_event(self, state: dict) -> bool:
-        return self.handlers.call("handle_pull_request_review_event", state)
-
     def handle_comment_event(self, state: dict) -> bool:
         return self.handlers.call("handle_comment_event", state)
 
     def handle_manual_dispatch(self, state: dict) -> bool:
         return self.handlers.call("handle_manual_dispatch", state)
 
-    def handle_scheduled_check(self, state: dict) -> bool:
-        return self.handlers.call("handle_scheduled_check", state)
+    def handle_scheduled_check_result(self, state: dict):
+        return self.handlers.call("handle_scheduled_check_result", state)
 
     def github_api(self, method: str, endpoint: str, data=None):
         override = runtime_instance_override(self, "github_api")
@@ -811,5 +809,5 @@ class FakeReviewerBotRuntime:
     def stub_sync_status_labels(self, func: Callable[[dict, Any], bool]) -> None:
         self.workflow.stub_sync_status_labels(func)
 
-    def stub_fetch_members(self, func: Callable[[], list[dict]]) -> None:
+    def stub_fetch_members(self, func: Callable[[], MemberFetchResult | list[dict]]) -> None:
         self._fetch_members = func

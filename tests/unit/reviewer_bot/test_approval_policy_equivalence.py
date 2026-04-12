@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from scripts.reviewer_bot_core import approval_policy
+from scripts.reviewer_bot_core import approval_policy, live_review_support
 from scripts.reviewer_bot_lib import review_state, reviews
 from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.reviewer_bot import (
@@ -43,7 +43,7 @@ def test_approval_policy_classification_table_freezes_exact_categories_and_scope
     for heading in [
         "Stays in `reviews.py`",
         "Moves to `approval_policy.py`",
-        "Remains in `reviews_projection.py`",
+        "Moves to `live_review_support.py`",
         "Out of scope",
     ]:
         assert heading in table
@@ -88,32 +88,34 @@ def _legacy_compute_pr_approval_state_result(
     pull_request: dict | None = None,
     reviews_data: list[dict] | None = None,
 ) -> dict[str, object]:
-    from scripts.reviewer_bot_lib.reviews_projection import (
-        collect_permission_statuses,
+    from scripts.reviewer_bot_core.approval_policy import (
         compute_pr_approval_state_from_reviews,
+    )
+    from scripts.reviewer_bot_core.live_review_support import (
+        collect_permission_statuses,
         filter_current_head_reviews_for_cycle,
         normalize_reviews_with_parsed_timestamps,
     )
 
     boundary = review_state.get_current_cycle_boundary(bot, review_data)
     if boundary is None:
-        return reviews._projection_failure("pull_request_unavailable")
-    pull_request_result = reviews._pull_request_read_result(bot, issue_number, pull_request)
+        return live_review_support.projection_failure_result("pull_request_unavailable")
+    pull_request_result = live_review_support.read_pull_request_result(bot, issue_number, pull_request)
     if not pull_request_result.get("ok"):
         return pull_request_result
     pull_request = pull_request_result["pull_request"]
     head = pull_request.get("head")
     current_head = head.get("sha") if isinstance(head, dict) else None
     if not isinstance(current_head, str) or not current_head.strip():
-        return reviews._projection_failure("pull_request_head_unavailable", "invalid_payload")
-    reviews_result = reviews.get_pull_request_reviews_result(bot, issue_number, reviews_data)
+        return live_review_support.projection_failure_result("pull_request_head_unavailable", "invalid_payload")
+    reviews_result = live_review_support.read_pull_request_reviews_result(bot, issue_number, reviews_data)
     if not reviews_result.get("ok"):
         return reviews_result
     reviews_data = reviews_result["reviews"]
 
     normalized_reviews = normalize_reviews_with_parsed_timestamps(
         reviews_data,
-        parse_timestamp=reviews.parse_github_timestamp,
+        parse_timestamp=live_review_support.parse_github_timestamp,
     )
     survivors = filter_current_head_reviews_for_cycle(
         normalized_reviews,
@@ -122,7 +124,7 @@ def _legacy_compute_pr_approval_state_result(
     )
     permission_cache = collect_permission_statuses(
         survivors,
-        permission_status=lambda author: reviews._permission_status(bot, author, "push"),
+        permission_status=lambda author: live_review_support.permission_status(bot, author, "push"),
     )
     result = compute_pr_approval_state_from_reviews(
         survivors,
@@ -130,7 +132,7 @@ def _legacy_compute_pr_approval_state_result(
         permission_statuses=permission_cache,
     )
     if not result.get("ok"):
-        return reviews._projection_failure(str(result.get("reason")))
+        return live_review_support.projection_failure_result(str(result.get("reason")))
     return result
 
 
@@ -291,4 +293,4 @@ def test_g1_approval_policy_owns_cycle_boundary_without_review_state_wrapper_dep
 
     assert "from scripts.reviewer_bot_lib import review_state" not in approval_policy_text
     assert "review_state.get_current_cycle_boundary" not in approval_policy_text
-    assert "review_state_machine.get_current_cycle_boundary" in approval_policy_text
+    assert "live_review_support.get_current_cycle_boundary" in approval_policy_text

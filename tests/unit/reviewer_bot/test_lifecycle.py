@@ -7,6 +7,7 @@ from scripts.reviewer_bot_lib import (
     comment_routing,
     lifecycle,
     maintenance,
+    maintenance_schedule,
     review_state,
     reviews,
 )
@@ -155,11 +156,11 @@ def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypat
     review["assigned_at"] = "2026-03-01T00:00:00Z"
     review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
     review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
-    monkeypatch.setattr(maintenance, "sweep_deferred_gaps", lambda bot, state: False)
+    monkeypatch.setattr(maintenance_schedule, "sweep_deferred_gaps", lambda bot, state: False)
     monkeypatch.setattr(review_state, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data, *, reviews=None: False)
-    monkeypatch.setattr(maintenance, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(changed=False, outcome="unchanged"))
+    monkeypatch.setattr(maintenance_schedule, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(changed=False, outcome="unchanged"))
     monkeypatch.setattr(
-        maintenance,
+        maintenance_schedule,
         "check_overdue_reviews",
         lambda bot, state: [
             {
@@ -185,7 +186,7 @@ def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypat
         }
     ]
 
-    assert maintenance.handle_scheduled_check(runtime, state) is True
+    assert maintenance.handle_scheduled_check_result(runtime, state).state_changed is True
     assert review["transition_notice_sent_at"] == "2026-03-25T15:22:42Z"
     assert posted == []
 

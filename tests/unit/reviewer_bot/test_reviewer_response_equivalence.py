@@ -2,7 +2,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scripts.reviewer_bot_core import reviewer_response_policy
+from scripts.reviewer_bot_core import (
+    live_review_support,
+    reviewer_response_policy,
+    reviewer_review_helpers,
+)
 from scripts.reviewer_bot_lib import reviews
 from tests.fixtures.reviewer_bot import (
     accept_contributor_revision,
@@ -132,7 +136,11 @@ def _legacy_compute_reviewer_response_state(
                 "contributor_handoff": None,
             }
         latest_reviewer_response = reviewer_comment
-        if reviews._compare_records(reviewer_review, latest_reviewer_response) > 0:
+        if reviewer_review_helpers.compare_records(
+            reviewer_review,
+            latest_reviewer_response,
+            parse_timestamp=live_review_support.parse_github_timestamp,
+        ) > 0:
             latest_reviewer_response = reviewer_review
         completion = review_data.get("current_cycle_completion")
         if not isinstance(completion, dict) or not completion.get("completed"):
@@ -145,7 +153,7 @@ def _legacy_compute_reviewer_response_state(
             }
         return {"state": "done", "reason": None}
 
-    pull_request_result = reviews._pull_request_read_result(bot, issue_number, pull_request)
+    pull_request_result = live_review_support.read_pull_request_result(bot, issue_number, pull_request)
     if not pull_request_result.get("ok"):
         return {"state": "projection_failed", "reason": str(pull_request_result.get("reason"))}
     pull_request = pull_request_result["pull_request"]
@@ -155,11 +163,11 @@ def _legacy_compute_reviewer_response_state(
         return {"state": "projection_failed", "reason": "pull_request_head_unavailable"}
 
     if not reviewer_comment and not reviewer_review:
-        reviews_result = reviews.get_pull_request_reviews_result(bot, issue_number, reviews_data)
+        reviews_result = live_review_support.read_pull_request_reviews_result(bot, issue_number, reviews_data)
         if not reviews_result.get("ok"):
             return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
         reviews_data = reviews_result["reviews"]
-        preferred_live_review = reviews.get_preferred_current_reviewer_review_for_cycle(
+        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
             bot,
             issue_number,
             review_data,
@@ -167,7 +175,10 @@ def _legacy_compute_reviewer_response_state(
             reviews=reviews_data,
         )
         if preferred_live_review is not None:
-            reviewer_review = reviews.build_reviewer_review_record_from_live_review(preferred_live_review, actor=current_reviewer)
+            reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
+                preferred_live_review,
+                actor=current_reviewer,
+            )
         else:
             return {
                 "state": "awaiting_reviewer_response",
@@ -186,11 +197,11 @@ def _legacy_compute_reviewer_response_state(
 
     preferred_live_review = None
     if refresh_live_review:
-        reviews_result = reviews.get_pull_request_reviews_result(bot, issue_number, reviews_data)
+        reviews_result = live_review_support.read_pull_request_reviews_result(bot, issue_number, reviews_data)
         if not reviews_result.get("ok"):
             return {"state": "projection_failed", "reason": str(reviews_result.get("reason"))}
         reviews_data = reviews_result["reviews"]
-        preferred_live_review = reviews.get_preferred_current_reviewer_review_for_cycle(
+        preferred_live_review = reviewer_review_helpers.get_preferred_current_reviewer_review_for_cycle(
             bot,
             issue_number,
             review_data,
@@ -198,12 +209,19 @@ def _legacy_compute_reviewer_response_state(
             reviews=reviews_data,
         )
     if preferred_live_review is not None:
-        reviewer_review = reviews.build_reviewer_review_record_from_live_review(preferred_live_review, actor=current_reviewer)
+        reviewer_review = reviewer_review_helpers.build_reviewer_review_record_from_live_review(
+            preferred_live_review,
+            actor=current_reviewer,
+        )
     elif refresh_live_review:
         reviewer_review = None
 
     latest_reviewer_response = reviewer_comment
-    if reviews._compare_records(reviewer_review, latest_reviewer_response) > 0:
+    if reviewer_review_helpers.compare_records(
+        reviewer_review,
+        latest_reviewer_response,
+        parse_timestamp=live_review_support.parse_github_timestamp,
+    ) > 0:
         latest_reviewer_response = reviewer_review
 
     contributor_handoff = contributor_comment
@@ -212,7 +230,11 @@ def _legacy_compute_reviewer_response_state(
         current_head,
         reviewer_review if isinstance(reviewer_review, dict) else None,
     )
-    if reviews._compare_records(contributor_revision, contributor_handoff) > 0:
+    if reviewer_review_helpers.compare_records(
+        contributor_revision,
+        contributor_handoff,
+        parse_timestamp=live_review_support.parse_github_timestamp,
+    ) > 0:
         contributor_handoff = contributor_revision
 
     if _legacy_compare_cross_channel_conversation(contributor_handoff, latest_reviewer_response) > 0:

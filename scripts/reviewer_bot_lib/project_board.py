@@ -27,7 +27,11 @@ from .config import (
     REVIEWER_BOARD_PROJECT_MANIFEST,
     REVIEWER_BOARD_PROJECT_NUMBER,
 )
-from .context import ProjectBoardMetadataContext, ProjectBoardProjectionContext
+from .repair_records import load_repair_marker
+from .runtime_protocols import (
+    ProjectBoardMetadataContext,
+    ProjectBoardProjectionContext,
+)
 
 PROJECT_BOARD_METADATA_QUERY = """
 query ReviewerBoardProjectMetadata($organization: String!, $projectNumber: Int!) {
@@ -350,7 +354,7 @@ def derive_board_projection(input: BoardProjectionInput) -> BoardProjectionValue
         raise RuntimeError(f"Unsupported board review state for #{input.issue_number}: {derivation.state}")
 
     needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_NO
-    repair_needed = review_data.get("repair_needed")
+    repair_needed = load_repair_marker(review_data, "status_label_projection")
     if isinstance(repair_needed, dict) and repair_needed.get("kind") == "projection_failure":
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED
     elif review_data.get("mandatory_approver_required"):

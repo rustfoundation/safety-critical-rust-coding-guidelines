@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from scripts.reviewer_bot_core import approval_policy
-from scripts.reviewer_bot_lib import reviews, reviews_projection
+from scripts.reviewer_bot_core import approval_policy, live_review_support
+from scripts.reviewer_bot_lib import reviews
 from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.reviewer_bot import (
     make_state,
@@ -174,7 +174,7 @@ def test_compute_pr_approval_state_from_reviews_is_pure():
     }
     before = json.loads(json.dumps({"survivors": {"alice": {"id": 10, "state": "APPROVED", "commit_id": "head-1", "user": {"login": "alice"}}}}))
 
-    result = reviews_projection.compute_pr_approval_state_from_reviews(
+    result = approval_policy.compute_pr_approval_state_from_reviews(
         survivors,
         current_head="head-1",
         permission_statuses={"alice": "granted"},
@@ -197,7 +197,7 @@ def test_normalize_reviews_with_parsed_timestamps_is_pure():
     ]
     before = json.loads(json.dumps(review_items))
 
-    normalized = reviews_projection.normalize_reviews_with_parsed_timestamps(
+    normalized = live_review_support.normalize_reviews_with_parsed_timestamps(
         review_items,
         parse_timestamp=reviews.parse_github_timestamp,
     )
@@ -214,7 +214,7 @@ def test_collect_permission_statuses_deduplicates_authors():
     }
     observed = []
 
-    statuses = reviews_projection.collect_permission_statuses(
+    statuses = live_review_support.collect_permission_statuses(
         survivors,
         permission_status=lambda author: observed.append(author) or "granted",
     )
@@ -223,15 +223,17 @@ def test_collect_permission_statuses_deduplicates_authors():
     assert observed == ["alice", "bob"]
 
 
-def test_approval_policy_classification_table_marks_projection_helpers_as_remaining_in_projection_module():
+def test_approval_policy_classification_table_marks_support_helpers_as_moved_out_of_projection_module():
     table = Path("tests/fixtures/equivalence/approval_policy/function_classification_table.md").read_text(
         encoding="utf-8"
     )
 
     for line in [
+        "Moves to `live_review_support.py`",
         "- `filter_current_head_reviews_for_cycle`",
         "- `normalize_reviews_with_parsed_timestamps`",
         "- `collect_permission_statuses`",
+        "Moves to `approval_policy.py`",
         "- `compute_pr_approval_state_from_reviews`",
         "- `desired_labels_from_response_state`",
     ]:

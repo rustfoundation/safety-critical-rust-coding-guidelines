@@ -17,6 +17,130 @@ from .review_state_types import (
     ReviewEntryState,
 )
 
+_CANONICAL_REPAIR_MARKERS = (
+    "review_repair",
+    "head_observation_repair",
+    "status_label_projection",
+)
+
+_DEFERRED_GAP_MIGRATION_DROP_KEYS = {
+    "source_run_id",
+    "source_run_attempt",
+    "source_workflow_file",
+    "source_artifact_name",
+}
+
+
+def _migrate_repair_marker(marker: Any) -> dict[str, Any] | None:
+    if not isinstance(marker, dict):
+        return None
+    return {
+        "kind": marker.get("kind"),
+        "reason": marker.get("reason"),
+        "failure_kind": marker.get("failure_kind"),
+        "recorded_at": marker.get("recorded_at"),
+    }
+
+
+def _migrate_deferred_gaps(legacy: Any) -> dict[str, Any]:
+    if not isinstance(legacy, dict):
+        return {}
+    migrated: dict[str, Any] = {}
+    for source_event_key, payload in legacy.items():
+        if not isinstance(source_event_key, str) or not isinstance(payload, dict):
+            continue
+        migrated[source_event_key] = {
+            key: deepcopy(value)
+            for key, value in payload.items()
+            if key not in _DEFERRED_GAP_MIGRATION_DROP_KEYS
+        }
+    return migrated
+
+
+def _migrate_reconciled_source_events(legacy: Any) -> dict[str, Any]:
+    if isinstance(legacy, dict):
+        migrated: dict[str, Any] = {}
+        for source_event_key, record in legacy.items():
+            if not isinstance(source_event_key, str):
+                continue
+            if isinstance(record, dict):
+                migrated[source_event_key] = {
+                    "source_event_key": str(record.get("source_event_key") or source_event_key),
+                    "reconciled_at": record.get("reconciled_at"),
+                }
+            else:
+                migrated[source_event_key] = {
+                    "source_event_key": source_event_key,
+                    "reconciled_at": None,
+                }
+        return migrated
+    if isinstance(legacy, list):
+        return {
+            source_event_key: {"source_event_key": source_event_key, "reconciled_at": None}
+            for source_event_key in legacy
+            if isinstance(source_event_key, str)
+        }
+    return {}
+
+
+def ensure_sidecar_subtree(review_entry: dict[str, Any], *, state_last_updated: str | None = None) -> None:
+    del state_last_updated
+    sidecars = review_entry.get("sidecars")
+    if not isinstance(sidecars, dict):
+        sidecars = {}
+        review_entry["sidecars"] = sidecars
+
+    sidecars["pending_privileged_commands"] = (
+        deepcopy(sidecars.get("pending_privileged_commands"))
+        if isinstance(sidecars.get("pending_privileged_commands"), dict)
+        else deepcopy(review_entry.get("pending_privileged_commands"))
+        if isinstance(review_entry.get("pending_privileged_commands"), dict)
+        else {}
+    )
+    sidecars["deferred_gaps"] = (
+        deepcopy(sidecars.get("deferred_gaps"))
+        if isinstance(sidecars.get("deferred_gaps"), dict)
+        else _migrate_deferred_gaps(review_entry.get("deferred_gaps"))
+    )
+    sidecars["observer_discovery_watermarks"] = (
+        deepcopy(sidecars.get("observer_discovery_watermarks"))
+        if isinstance(sidecars.get("observer_discovery_watermarks"), dict)
+        else deepcopy(review_entry.get("observer_discovery_watermarks"))
+        if isinstance(review_entry.get("observer_discovery_watermarks"), dict)
+        else {}
+    )
+    sidecars["reconciled_source_events"] = _migrate_reconciled_source_events(
+        sidecars.get("reconciled_source_events")
+        if sidecars.get("reconciled_source_events") is not None
+        else review_entry.get("reconciled_source_events")
+    )
+
+    repair_markers = sidecars.get("repair_markers") if isinstance(sidecars.get("repair_markers"), dict) else {}
+    canonical_repair_markers = dict.fromkeys(_CANONICAL_REPAIR_MARKERS)
+    for key in _CANONICAL_REPAIR_MARKERS:
+        if isinstance(repair_markers.get(key), dict):
+            canonical_repair_markers[key] = _migrate_repair_marker(repair_markers[key])
+
+    legacy_marker = review_entry.get("repair_needed")
+    if isinstance(legacy_marker, dict):
+        migrated = _migrate_repair_marker(legacy_marker)
+        if legacy_marker.get("kind") == "projection_failure":
+            canonical_repair_markers["status_label_projection"] = migrated
+        elif legacy_marker.get("phase") == "review_repair":
+            canonical_repair_markers["review_repair"] = migrated
+        elif legacy_marker.get("phase") == "head_observation_repair":
+            canonical_repair_markers["head_observation_repair"] = migrated
+    sidecars["repair_markers"] = canonical_repair_markers
+
+    for legacy_key in (
+        "repair_needed",
+        "pending_privileged_commands",
+        "deferred_gaps",
+        "observer_discovery_watermarks",
+        "reconciled_source_events",
+    ):
+        review_entry.pop(legacy_key, None)
+
 
 def _channel_from_persisted(review_entry: dict[str, Any], name: str) -> ReviewChannelState:
     raw_channel = review_entry.get(name)

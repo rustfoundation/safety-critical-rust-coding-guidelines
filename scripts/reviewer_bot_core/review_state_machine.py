@@ -18,25 +18,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from scripts.reviewer_bot_lib.review_read_support import parse_github_timestamp
-
 from . import state_adapters
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _ensure_extra_persisted_fields(review_entry: dict[str, Any]) -> None:
-    if "repair_needed" not in review_entry:
-        review_entry["repair_needed"] = None
-    for mapping in ("deferred_gaps", "observer_discovery_watermarks", "pending_privileged_commands"):
-        current = review_entry.get(mapping)
-        if not isinstance(current, dict):
-            review_entry[mapping] = {}
-    reconciled_source_events = review_entry.get("reconciled_source_events")
-    if not isinstance(reconciled_source_events, list):
-        review_entry["reconciled_source_events"] = []
+from .live_review_support import parse_github_timestamp
 
 
 def _ensure_channel_map(review_entry: dict[str, Any], name: str) -> dict[str, Any]:
@@ -69,7 +52,7 @@ def ensure_review_entry(state: dict, issue_number: int, create: bool = False) ->
     if core_entry is None:
         return None
     state_adapters.apply_local_state_core_to_persisted(review_entry, core_entry)
-    _ensure_extra_persisted_fields(review_entry)
+    state_adapters.ensure_sidecar_subtree(review_entry, state_last_updated=state.get("last_updated"))
     return review_entry
 
 
@@ -155,6 +138,18 @@ def accept_channel_event(
     return True
 
 
+def upsert_channel_accepted_record(review_data: dict, channel_name: str, record: dict) -> bool:
+    channel = _ensure_channel_map(review_data, channel_name)
+    changed = False
+    if record["semantic_key"] not in channel["seen_keys"]:
+        channel["seen_keys"].append(record["semantic_key"])
+        changed = True
+    if channel.get("accepted") != record:
+        channel["accepted"] = record
+        changed = True
+    return changed
+
+
 def _reset_cycle_state(review_data: dict) -> None:
     for channel in (
         "reviewer_comment",
@@ -167,17 +162,16 @@ def _reset_cycle_state(review_data: dict) -> None:
     review_data["current_cycle_completion"] = {}
     review_data["current_cycle_write_approval"] = {}
     review_data["overdue_anchor"] = None
-    if isinstance(review_data.get("pending_privileged_commands"), dict):
-        review_data["pending_privileged_commands"] = {}
 
 
 def set_current_reviewer(
     state: dict,
     issue_number: int,
     reviewer: str,
+    *,
+    now: str,
     assignment_method: str = "round-robin",
 ) -> None:
-    now = _now_iso()
     review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return
@@ -199,80 +193,29 @@ def set_current_reviewer(
     _reset_cycle_state(review_data)
 
 
-def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
+def update_reviewer_activity(state: dict, issue_number: int, reviewer: str, *, now: str) -> bool:
     review_data = ensure_review_entry(state, issue_number)
     if review_data is None:
         return False
     current_reviewer = review_data.get("current_reviewer")
     if not isinstance(current_reviewer, str) or current_reviewer.lower() != reviewer.lower():
         return False
-    record_reviewer_activity(review_data, _now_iso())
+    record_reviewer_activity(review_data, now)
     return True
 
 
-def mark_review_complete(state: dict, issue_number: int, reviewer: str | None, source: str) -> bool:
+def mark_review_complete(state: dict, issue_number: int, reviewer: str | None, source: str, *, completed_at: str) -> bool:
     review_data = ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
-    now = _now_iso()
-    review_data["review_completed_at"] = now
+    review_data["review_completed_at"] = completed_at
     review_data["review_completed_by"] = reviewer or None
     review_data["review_completion_source"] = source
-    record_reviewer_activity(review_data, now)
+    record_reviewer_activity(review_data, completed_at)
     review_data["current_cycle_completion"] = {
         "completed": True,
-        "completed_at": now,
+        "completed_at": completed_at,
         "source": source,
         "reviewer": reviewer,
     }
     return True
-
-
-def get_current_cycle_boundary(bot, review_data: dict):
-    for field in ("active_cycle_started_at", "cycle_started_at", "assigned_at"):
-        boundary = bot.parse_iso8601_timestamp(review_data.get(field))
-        if boundary is not None:
-            return boundary
-    return None
-
-
-def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:
-    from . import review_state_live_repair
-
-    return review_state_live_repair.accept_reviewer_review_from_live_review(
-        review_data,
-        review,
-        actor=actor,
-    )
-
-
-def refresh_reviewer_review_from_live_preferred_review(
-    bot,
-    issue_number: int,
-    review_data: dict,
-    *,
-    pull_request: dict | None = None,
-    reviews: list[dict] | None = None,
-    actor: str | None = None,
-) -> tuple[bool, dict | None]:
-    from . import review_state_live_repair
-
-    return review_state_live_repair.refresh_reviewer_review_from_live_preferred_review(
-        bot,
-        issue_number,
-        review_data,
-        pull_request=pull_request,
-        reviews=reviews,
-        actor=actor,
-    )
-
-
-def repair_missing_reviewer_review_state(bot, issue_number: int, review_data: dict, *, reviews: list[dict] | None = None) -> bool:
-    from . import review_state_live_repair
-
-    return review_state_live_repair.repair_missing_reviewer_review_state(
-        bot,
-        issue_number,
-        review_data,
-        reviews=reviews,
-    )

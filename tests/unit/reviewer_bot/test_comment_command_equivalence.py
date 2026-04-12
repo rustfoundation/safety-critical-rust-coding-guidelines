@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from scripts.reviewer_bot_core import comment_command_policy
+from scripts.reviewer_bot_core import comment_command_policy, privileged_command_policy
 from scripts.reviewer_bot_lib import commands, comment_application
 from scripts.reviewer_bot_lib import config as config_module
 from tests.fixtures.commands_harness import CommandHarness
@@ -44,19 +44,7 @@ def _legacy_decide_comment_command(bot, request, classified, *, actor_class: str
         actor_class=actor_class,
         commands_help=commands_help,
     )
-    if isinstance(decision, dict):
-        return decision
-    return {
-        "kind": decision.kind,
-        "handler": decision.handler_name,
-        "handler_args": decision.handler_args,
-        "needs_assignment_request": decision.needs_assignment_request,
-        "result_shape": decision.result_shape,
-        "state_changed_from": decision.state_changed_from,
-        "response": decision.response,
-        "success": decision.success,
-        "react": decision.react,
-    }
+    return _normalize_decision(decision)
 
 
 def _legacy_apply_ordinary_decision(bot, state: dict, request, decision: dict) -> bool:
@@ -64,19 +52,19 @@ def _legacy_apply_ordinary_decision(bot, state: dict, request, decision: dict) -
     review_data = comment_application.ensure_review_entry(state, issue_number, create=True)
     if review_data is None:
         return False
-    assignment_request = comment_application.build_assignment_request_from_comment(request)
-    if decision["kind"] == "handler_call":
-        handler = getattr(commands, decision["handler"])
-        handler_args = [bot, state, *decision["handler_args"]]
-        handler_kwargs = {}
-        if decision["needs_assignment_request"]:
-            handler_kwargs["request"] = assignment_request
-        result = handler(*handler_args, **handler_kwargs)
-        if decision["result_shape"] == "pair":
-            response, success = result
-            state_changed = success if decision.get("state_changed_from") == "success" else False
-        else:
-            response, success, state_changed = result
+    assignment_request = comment_application._build_assignment_request_from_comment_request(request)
+    if decision["kind"] == "execute_ordinary_command":
+        typed_decision = comment_command_policy.ExecuteOrdinaryCommandDecision(
+            command_id=decision["command_id"],
+            issue_number=decision["issue_number"],
+            actor=decision["actor"],
+            raw_args=tuple(decision["raw_args"]),
+            needs_assignment_request=decision["needs_assignment_request"],
+        )
+        execution = comment_application.ORDINARY_COMMAND_HANDLERS[decision["command_id"]](bot, state, typed_decision, assignment_request if decision["needs_assignment_request"] else None)
+        response = execution.response
+        success = execution.success
+        state_changed = execution.state_changed
     else:
         response = decision["response"]
         success = decision["success"]
@@ -93,17 +81,20 @@ def _legacy_apply_ordinary_decision(bot, state: dict, request, decision: dict) -
 
 def _normalize_decision(decision):
     if isinstance(decision, dict):
-        return decision
+        return {key: value for key, value in decision.items() if key != "raw_decision"}
+    if isinstance(decision, comment_command_policy.IgnoreDecision):
+        return {"kind": "ignore"}
+    if isinstance(decision, comment_command_policy.InlineResponseDecision):
+        return {"kind": "inline_response", "response": decision.response, "success": decision.success, "react": decision.react}
+    if isinstance(decision, comment_command_policy.DeferPrivilegedHandoffDecision):
+        return {"kind": "deferred_privileged_handoff", "command_id": decision.command_id, "raw_decision": decision}
     return {
-        "kind": decision.kind,
-        "handler": decision.handler_name,
-        "handler_args": decision.handler_args,
+        "kind": "execute_ordinary_command",
+        "command_id": decision.command_id,
+        "issue_number": decision.issue_number,
+        "actor": decision.actor,
+        "raw_args": decision.raw_args,
         "needs_assignment_request": decision.needs_assignment_request,
-        "result_shape": decision.result_shape,
-        "state_changed_from": decision.state_changed_from,
-        "response": decision.response,
-        "success": decision.success,
-        "react": decision.react,
     }
 
 
@@ -144,7 +135,9 @@ def test_command_policy_explicitly_defers_privileged_handoff_path(monkeypatch):
         commands_help="help text",
     )
 
-    assert decision == {"kind": "deferred_privileged_handoff"}
+    assert decision == comment_command_policy.DeferPrivilegedHandoffDecision(
+        privileged_command_policy.PrivilegedCommandId.ACCEPT_NO_FLS_CHANGES
+    )
 
 
 def test_i1_comment_policy_types_ordinary_command_output_shape(monkeypatch):
@@ -165,25 +158,21 @@ def test_i1_comment_policy_types_ordinary_command_output_shape(monkeypatch):
         commands_help="help text",
     )
 
-    assert isinstance(decision, comment_command_policy.OrdinaryCommentUseCaseResult)
+    assert isinstance(decision, comment_command_policy.ExecuteOrdinaryCommandDecision)
     assert list(decision.__dataclass_fields__) == [
-        "kind",
-        "handler_name",
-        "handler_args",
+        "command_id",
+        "issue_number",
+        "actor",
+        "raw_args",
         "needs_assignment_request",
-        "result_shape",
-        "state_changed_from",
-        "response",
-        "success",
-        "react",
     ]
 
 
 def test_i2_comment_application_routing_does_not_reopen_command_semantics_in_adapter():
     module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
 
-    assert 'if routing.kind in {"freshness_only", "both"}:' in module_text
-    assert 'if routing.kind in {"command_only", "both"}:' in module_text
+    assert 'if routing in {"freshness_only", "both"}:' in module_text
+    assert 'if routing in {"command_only", "both"}:' in module_text
     assert "if command == " not in module_text
 
 

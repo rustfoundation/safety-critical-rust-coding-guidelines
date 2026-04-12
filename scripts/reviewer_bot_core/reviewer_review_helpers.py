@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from . import live_review_support
+
 
 def compare_records(
     left: dict | None,
@@ -30,7 +32,7 @@ def compare_records(
 
 def _review_sort_key(bot, review: dict) -> tuple[datetime, str]:
     return (
-        bot.parse_github_timestamp(review.get("submitted_at")) or datetime.min.replace(tzinfo=timezone.utc),
+        live_review_support.parse_github_timestamp(review.get("submitted_at")) or datetime.min.replace(tzinfo=timezone.utc),
         str(review.get("id", "")),
     )
 
@@ -45,15 +47,13 @@ def get_valid_current_reviewer_reviews_for_cycle(
     issue_number: int,
     review_data: dict,
     *,
+    current_cycle_boundary,
     reviews: list[dict] | None = None,
 ) -> list[dict]:
-    from scripts.reviewer_bot_lib import review_state
-
     current_reviewer = review_data.get("current_reviewer")
     if not isinstance(current_reviewer, str) or not current_reviewer.strip():
         return []
-    boundary = review_state.get_current_cycle_boundary(bot, review_data)
-    if boundary is None:
+    if current_cycle_boundary is None:
         return []
     if reviews is None:
         reviews = bot.github.get_pull_request_reviews(issue_number)
@@ -69,8 +69,8 @@ def get_valid_current_reviewer_reviews_for_cycle(
         state = str(review.get("state", "")).upper()
         if state not in {"APPROVED", "COMMENTED", "CHANGES_REQUESTED"}:
             continue
-        submitted_at = bot.parse_github_timestamp(review.get("submitted_at"))
-        if submitted_at is None or submitted_at < boundary:
+        submitted_at = live_review_support.parse_github_timestamp(review.get("submitted_at"))
+        if submitted_at is None or submitted_at < current_cycle_boundary:
             continue
         commit_id = review.get("commit_id")
         if not isinstance(commit_id, str) or not commit_id.strip():
@@ -87,7 +87,18 @@ def get_preferred_current_reviewer_review_for_cycle(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> dict | None:
-    valid_reviews = get_valid_current_reviewer_reviews_for_cycle(bot, issue_number, review_data, reviews=reviews)
+    from . import live_review_support
+
+    valid_reviews = get_valid_current_reviewer_reviews_for_cycle(
+        bot,
+        issue_number,
+        review_data,
+        current_cycle_boundary=live_review_support.get_current_cycle_boundary(
+            review_data,
+            parse_timestamp=bot.parse_iso8601_timestamp,
+        ),
+        reviews=reviews,
+    )
     if not valid_reviews:
         return None
     if len(valid_reviews) == 1:

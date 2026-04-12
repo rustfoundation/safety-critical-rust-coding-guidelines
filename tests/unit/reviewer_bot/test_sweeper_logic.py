@@ -73,11 +73,11 @@ def test_sweeper_creates_keyed_deferred_gaps_for_visible_comments_reviews_and_di
     ]
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is True
-    gaps = state["active_reviews"]["42"]["deferred_gaps"]
+    gaps = state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]
     assert "issue_comment:101" in gaps
     assert "pull_request_review:202" in gaps
     assert "pull_request_review_dismissed:303" in gaps
-    assert gaps["pull_request_review_dismissed:303"]["source_workflow_file"] == ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml"
+    assert gaps["pull_request_review_dismissed:303"]["source_event_kind"] == "pull_request_review:dismissed"
 
 
 def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypatch, freeze_sweeper_now):
@@ -115,9 +115,9 @@ def test_sweeper_creates_keyed_deferred_gap_for_visible_review_comments(monkeypa
     runtime.get_pull_request_reviews = lambda issue_number: []
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is True
-    gaps = state["active_reviews"]["42"]["deferred_gaps"]
+    gaps = state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]
     assert "pull_request_review_comment:404" in gaps
-    assert gaps["pull_request_review_comment:404"]["source_workflow_file"] == ".github/workflows/reviewer-bot-pr-review-comment-observer.yml"
+    assert gaps["pull_request_review_comment:404"]["source_event_kind"] == "pull_request_review_comment:created"
 
 
 def test_discover_visible_review_comment_events_paginates_past_page_one(monkeypatch, freeze_sweeper_now):
@@ -175,7 +175,7 @@ def test_review_comment_surface_marks_complete_only_after_full_pagination_succee
 
     assert discovered is None
     assert complete is False
-    watermark = review["observer_discovery_watermarks"]["review_comments"]
+    watermark = review["sidecars"]["observer_discovery_watermarks"]["review_comments"]
     assert watermark["last_scan_started_at"] is not None
     assert watermark["last_scan_completed_at"] is None
 
@@ -187,7 +187,12 @@ def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    review["reconciled_source_events"] = ["pull_request_review_dismissed:303"]
+    review["sidecars"]["reconciled_source_events"] = {
+        "pull_request_review_dismissed:303": {
+            "source_event_key": "pull_request_review_dismissed:303",
+            "reconciled_at": None,
+        }
+    }
     routes = (
         RouteGitHubApi()
         .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
@@ -200,7 +205,7 @@ def test_sweeper_skips_dismissed_reviews_already_reconciled_by_source_event_key(
     runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(303, submitted_at="2026-03-17T09:00:00Z", updated_at="2026-03-17T12:00:00Z", state="DISMISSED")]
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is False
-    assert state["active_reviews"]["42"]["deferred_gaps"] == {}
+    assert state["active_reviews"]["42"]["sidecars"]["deferred_gaps"] == {}
 
 
 def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch, freeze_sweeper_now):
@@ -210,7 +215,10 @@ def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    review["reconciled_source_events"] = ["issue_comment:101", "pull_request_review:202"]
+    review["sidecars"]["reconciled_source_events"] = {
+        "issue_comment:101": {"source_event_key": "issue_comment:101", "reconciled_at": None},
+        "pull_request_review:202": {"source_event_key": "pull_request_review:202", "reconciled_at": None},
+    }
     routes = (
         RouteGitHubApi()
         .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
@@ -234,7 +242,7 @@ def test_sweeper_skips_events_already_reconciled_by_source_event_key(monkeypatch
     runtime.get_pull_request_reviews = lambda issue_number: [pull_request_review_event(202, submitted_at="2026-03-17T11:00:00Z", state="APPROVED")]
 
     assert sweeper.sweep_deferred_gaps(runtime, state) is False
-    assert state["active_reviews"]["42"]["deferred_gaps"] == {}
+    assert state["active_reviews"]["42"]["sidecars"]["deferred_gaps"] == {}
 
 
 def test_discover_visible_comment_events_skips_github_actions_and_bot_comments(monkeypatch, freeze_sweeper_now):
@@ -271,7 +279,7 @@ def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_witho
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
     review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
     review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
-    review["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
+    review["sidecars"]["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
     routes = (
         RouteGitHubApi()
         .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
@@ -293,8 +301,8 @@ def test_sweeper_visible_review_repair_refreshes_current_reviewer_activity_witho
     assert review["last_reviewer_activity"] == "2026-03-25T11:00:00Z"
     assert review["transition_warning_sent"] is None
     assert review["transition_notice_sent_at"] is None
-    assert "pull_request_review:202" not in review["deferred_gaps"]
-    assert "pull_request_review:202" in review["reconciled_source_events"]
+    assert "pull_request_review:202" not in review["sidecars"]["deferred_gaps"]
+    assert "pull_request_review:202" in review["sidecars"]["reconciled_source_events"]
 
 
 def test_visible_review_repair_does_not_clear_transition_warning_for_stale_replayed_review(monkeypatch, freeze_sweeper_now):
@@ -308,7 +316,7 @@ def test_visible_review_repair_does_not_clear_transition_warning_for_stale_repla
     review["last_reviewer_activity"] = "2026-03-25T11:00:00Z"
     review["transition_warning_sent"] = "2026-04-01T12:12:04Z"
     review["transition_notice_sent_at"] = "2026-04-15T12:12:04Z"
-    review["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
+    review["sidecars"]["deferred_gaps"]["pull_request_review:202"] = {"reason": "artifact_missing"}
     routes = (
         RouteGitHubApi()
         .add_api("GET", "pulls/42", {"state": "open", "head": {"sha": "head-1"}})
@@ -338,7 +346,7 @@ def test_repair_visible_review_gap_returns_true_for_bookkeeping_only_mutations(m
     assert review is not None
     review["current_reviewer"] = "alice"
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
-    review["deferred_gaps"]["pull_request_review:303"] = {"reason": "artifact_missing"}
+    review["sidecars"]["deferred_gaps"]["pull_request_review:303"] = {"reason": "artifact_missing"}
     monkeypatch.setattr(sweeper, "accept_reviewer_review_from_live_review", lambda review_data, live_review, actor=None: False)
     monkeypatch.setattr(sweeper, "refresh_reviewer_review_from_live_preferred_review", lambda bot, issue_number, review_data, actor=None: (False, None))
     monkeypatch.setattr(sweeper, "rebuild_pr_approval_state", lambda bot, issue_number, review_data: (None, None))
@@ -352,8 +360,8 @@ def test_repair_visible_review_gap_returns_true_for_bookkeeping_only_mutations(m
     )
 
     assert changed is True
-    assert "pull_request_review:303" in review["reconciled_source_events"]
-    assert "pull_request_review:303" not in review["deferred_gaps"]
+    assert "pull_request_review:303" in review["sidecars"]["reconciled_source_events"]
+    assert "pull_request_review:303" not in review["sidecars"]["deferred_gaps"]
 
 
 def test_load_surface_watermark_lazily_materializes_missing_surface_state(monkeypatch):
@@ -371,7 +379,7 @@ def test_load_surface_watermark_lazily_materializes_missing_surface_state(monkey
         "bootstrap_window_seconds": None,
         "bootstrap_completed_at": None,
     }
-    assert review["observer_discovery_watermarks"]["reviewer_comment"] == watermark
+    assert review["sidecars"]["observer_discovery_watermarks"]["reviewer_comment"] == watermark
 
 
 def test_observer_run_reason_mapping_and_near_miss_signature():

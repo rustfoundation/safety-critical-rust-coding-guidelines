@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
-from scripts.reviewer_bot_core import review_state_live_repair, review_state_machine
+from scripts.reviewer_bot_core import (
+    live_review_support,
+    review_state_live_repair,
+    review_state_machine,
+)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def ensure_review_entry(state: dict, issue_number: int, create: bool = False) -> dict | None:
@@ -33,6 +41,7 @@ def set_current_reviewer(
         state,
         issue_number,
         reviewer,
+        now=_now_iso(),
         assignment_method=assignment_method,
     )
 
@@ -67,15 +76,15 @@ def accept_channel_event(
 
 
 def update_reviewer_activity(state: dict, issue_number: int, reviewer: str) -> bool:
-    return review_state_machine.update_reviewer_activity(state, issue_number, reviewer)
+    return review_state_machine.update_reviewer_activity(state, issue_number, reviewer, now=_now_iso())
 
 
 def mark_review_complete(state: dict, issue_number: int, reviewer: str | None, source: str) -> bool:
-    return review_state_machine.mark_review_complete(state, issue_number, reviewer, source)
+    return review_state_machine.mark_review_complete(state, issue_number, reviewer, source, completed_at=_now_iso())
 
 
 def get_current_cycle_boundary(bot, review_data: dict) -> datetime | None:
-    return review_state_machine.get_current_cycle_boundary(bot, review_data)
+    return live_review_support.get_current_cycle_boundary(review_data, parse_timestamp=bot.parse_iso8601_timestamp)
 
 
 def accept_reviewer_review_from_live_review(review_data: dict, review: dict, *, actor: str | None = None) -> bool:

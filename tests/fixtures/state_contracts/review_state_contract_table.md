@@ -29,14 +29,15 @@ Per-Review-Entry Keys
 - mandatory_approver_pinged_at: lazily materialized
 - mandatory_approver_satisfied_by: lazily materialized
 - mandatory_approver_satisfied_at: lazily materialized
-- repair_needed: lazily materialized
+- sidecars: lazily materialized
+- repair_markers: nested under sidecars with fixed owner keys
 - overdue_anchor: lazily materialized
-- deferred_gaps: lazily materialized
-- observer_discovery_watermarks: lazily materialized
-- pending_privileged_commands: lazily materialized
+- deferred_gaps: nested under sidecars
+- observer_discovery_watermarks: nested under sidecars
+- pending_privileged_commands: nested under sidecars
 - current_cycle_completion: lazily materialized
 - current_cycle_write_approval: lazily materialized
-- reconciled_source_events: tolerated legacy shape
+- reconciled_source_events: nested under sidecars as a map; tolerated legacy list shape
 
 Per-Channel Keys
 - accepted: lazily materialized
@@ -46,6 +47,6 @@ Lazy-Upgrade Cases
 - missing active_reviews: tolerated legacy shape
 - list-form review entry converted to {"skipped": ...}: tolerated legacy shape
 - missing channel maps: lazily materialized
-- missing per-review-entry dict fields: lazily materialized
+- missing sidecar-backed fields: lazily materialized
 - non-list reconciled_source_events: tolerated legacy shape
 - non-list skipped: tolerated legacy shape

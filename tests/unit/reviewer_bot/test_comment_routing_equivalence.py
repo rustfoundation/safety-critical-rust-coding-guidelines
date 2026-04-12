@@ -67,97 +67,6 @@ def _legacy_classify_issue_comment_actor(request) -> str:
     return "unknown_actor"
 
 
-def _legacy_classify_pr_comment_processing_target(
-    request,
-    trust_context,
-    *,
-    actor_class: str,
-    is_self_comment: bool,
-    pr_head_full_name: str | None,
-    pr_author: str | None,
-    author_association_trust_allowlist,
-) -> str:
-    if actor_class in {"bot_account", "github_app_or_other_automation"} or is_self_comment:
-        return "safe_noop"
-    if not isinstance(pr_head_full_name, str) or not pr_head_full_name:
-        raise RuntimeError("Missing PR head repository metadata for trust routing")
-    is_cross_repo = pr_head_full_name != trust_context.github_repository
-    is_dependabot_restricted = pr_author == "dependabot[bot]"
-    author_association = trust_context.comment_author_association
-    trusted_principal = actor_class == "repo_user_principal" and author_association in author_association_trust_allowlist
-    if is_cross_repo or is_dependabot_restricted:
-        return "pr_deferred_reconcile"
-    if trusted_principal:
-        return "pr_trusted_direct"
-    raise RuntimeError("Ambiguous same-repo PR comment trust posture; failing closed")
-
-
-def _legacy_route_issue_comment_trust(request, trust_context, *, processing_target: str | None = None) -> str:
-    if not request.is_pull_request:
-        return "issue_direct"
-    target = processing_target
-    if target != "pr_trusted_direct":
-        return target or "safe_noop"
-    if (
-        trust_context.current_workflow_file == ".github/workflows/reviewer-bot-pr-comment-trusted.yml"
-        and trust_context.github_ref == "refs/heads/main"
-    ):
-        return "pr_trusted_direct"
-    raise RuntimeError("Ambiguous same-repo PR comment trust posture; failing closed")
-
-
-def _legacy_build_pr_comment_observer_payload(
-    request,
-    trust_context,
-    *,
-    actor_class: str,
-    processing_target: str,
-    payload_classification: dict,
-    body_digest: str,
-) -> dict:
-    comment_id = request.comment_id
-    base_payload = {
-        "source_workflow_name": "Reviewer Bot PR Comment Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        "source_run_id": trust_context.github_run_id,
-        "source_run_attempt": trust_context.github_run_attempt,
-        "source_event_name": "issue_comment",
-        "source_event_action": "created",
-        "source_event_key": f"issue_comment:{comment_id}",
-        "pr_number": request.issue_number,
-    }
-    if actor_class in {"bot_account", "github_app_or_other_automation"}:
-        return {
-            "schema_version": 1,
-            "kind": "observer_noop",
-            "reason": "ignored_non_human_automation",
-            **base_payload,
-        }
-    if processing_target == "pr_trusted_direct":
-        return {
-            "schema_version": 1,
-            "kind": "observer_noop",
-            "reason": "trusted_direct_same_repo_human_comment",
-            **base_payload,
-        }
-    return {
-        "schema_version": 2,
-        **base_payload,
-        "comment_id": comment_id,
-        "comment_class": payload_classification["comment_class"],
-        "has_non_command_text": payload_classification["has_non_command_text"],
-        "source_body_digest": body_digest,
-        "source_created_at": request.comment_created_at,
-        "actor_login": request.comment_author,
-        "actor_id": request.comment_author_id,
-        "actor_class": "repo_user_principal" if actor_class == "repo_user_principal" else "unknown_actor",
-        "source_artifact_name": (
-            f"reviewer-bot-comment-context-{trust_context.github_run_id}-attempt-"
-            f"{trust_context.github_run_attempt}"
-        ),
-    }
-
-
 def test_comment_routing_equivalence_fixture_exists():
     fixture = _load_fixture()
 
@@ -213,13 +122,11 @@ def test_route_outcome_equivalence_covers_trusted_deferred_noop_and_issue_direct
                 comment_user_type="User",
             ),
             "trust_context": harness.trust_context(
+                route_outcome=comment_routing_policy.PrCommentRouterOutcome.TRUSTED_DIRECT,
                 github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-                comment_author_association="MEMBER",
-                current_workflow_file=".github/workflows/reviewer-bot-pr-comment-trusted.yml",
-                github_ref="refs/heads/main",
+                pr_head_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+                pr_author="carol",
             ),
-            "head_repo_full_name": "rustfoundation/safety-critical-rust-coding-guidelines",
-            "pr_author": "carol",
         },
         {
             "name": "cross_repo_deferred_pr_comment",
@@ -232,13 +139,11 @@ def test_route_outcome_equivalence_covers_trusted_deferred_noop_and_issue_direct
                 comment_user_type="User",
             ),
             "trust_context": harness.trust_context(
+                route_outcome=comment_routing_policy.PrCommentRouterOutcome.DEFERRED_RECONCILE,
                 github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-                comment_author_association="MEMBER",
-                current_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
-                github_ref="refs/heads/main",
+                pr_head_full_name="fork/example",
+                pr_author="carol",
             ),
-            "head_repo_full_name": "fork/example",
-            "pr_author": "carol",
         },
         {
             "name": "automation_or_self_noop_pr_comment",
@@ -251,13 +156,11 @@ def test_route_outcome_equivalence_covers_trusted_deferred_noop_and_issue_direct
                 comment_user_type="Bot",
             ),
             "trust_context": harness.trust_context(
+                route_outcome=comment_routing_policy.PrCommentRouterOutcome.SAFE_NOOP,
                 github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-                comment_author_association="NONE",
-                current_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
-                github_ref="refs/heads/main",
+                pr_head_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+                pr_author="carol",
             ),
-            "head_repo_full_name": "rustfoundation/safety-critical-rust-coding-guidelines",
-            "pr_author": "carol",
         },
         {
             "name": "issue_comment_direct",
@@ -271,12 +174,7 @@ def test_route_outcome_equivalence_covers_trusted_deferred_noop_and_issue_direct
             ),
             "trust_context": harness.trust_context(
                 github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-                comment_author_association="MEMBER",
-                current_workflow_file=".github/workflows/reviewer-bot-issue-comment-direct.yml",
-                github_ref="refs/heads/main",
             ),
-            "head_repo_full_name": None,
-            "pr_author": None,
         },
     ]
 
@@ -284,86 +182,39 @@ def test_route_outcome_equivalence_covers_trusted_deferred_noop_and_issue_direct
 
     for scenario in scenarios:
         actor_class = comment_routing_policy.classify_issue_comment_actor(scenario["request"])
-        legacy_target = None
-        new_target = None
         if scenario["request"].is_pull_request:
-            legacy_target = _legacy_classify_pr_comment_processing_target(
-                scenario["request"],
-                scenario["trust_context"],
-                actor_class=actor_class,
-                is_self_comment=False,
-                pr_head_full_name=scenario["head_repo_full_name"],
-                pr_author=scenario["pr_author"],
-                author_association_trust_allowlist=harness.runtime.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
-            )
             new_target = comment_routing_policy.classify_pr_comment_processing_target(
                 scenario["request"],
                 scenario["trust_context"],
                 actor_class=actor_class,
                 is_self_comment=False,
-                pr_head_full_name=scenario["head_repo_full_name"],
-                pr_author=scenario["pr_author"],
-                author_association_trust_allowlist=harness.runtime.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
             )
-            assert new_target == legacy_target
+            if scenario["name"] == "same_repo_trusted_pr_comment":
+                assert new_target == comment_routing_policy.ProcessingTarget.PR_TRUSTED_DIRECT
+            if scenario["name"] == "cross_repo_deferred_pr_comment":
+                assert new_target == comment_routing_policy.PrCommentRouterOutcome.DEFERRED_RECONCILE
+            if scenario["name"] == "automation_or_self_noop_pr_comment":
+                assert new_target == comment_routing_policy.PrCommentRouterOutcome.SAFE_NOOP
+            assert comment_routing_policy.route_issue_comment_trust(
+                scenario["request"],
+                scenario["trust_context"],
+                processing_target=new_target,
+            ) == (
+                comment_routing_policy.PrCommentRouterOutcome.TRUSTED_DIRECT
+                if new_target == comment_routing_policy.ProcessingTarget.PR_TRUSTED_DIRECT
+                else new_target
+            )
+        else:
+            assert comment_routing_policy.route_issue_comment_trust(
+                scenario["request"],
+                scenario["trust_context"],
+                processing_target=None,
+            ) == comment_routing_policy.ProcessingTarget.ISSUE_DIRECT
 
-        assert comment_routing_policy.route_issue_comment_trust(
-            scenario["request"],
-            scenario["trust_context"],
-            processing_target=new_target,
-        ) == _legacy_route_issue_comment_trust(
-            scenario["request"],
-            scenario["trust_context"],
-            processing_target=legacy_target,
-        )
 
-
-def test_observer_payload_equivalence_matches_legacy_helper_outcomes(monkeypatch):
+def test_pr_comment_observer_helper_is_removed_after_router_cutover(monkeypatch):
     fixture = _load_fixture()
-    harness = CommentRoutingHarness(monkeypatch)
-    request = harness.request(
-        issue_number=42,
-        is_pull_request=True,
-        issue_author="dana",
-        comment_author="alice",
-        comment_body="hello\n@guidelines-bot /queue",
-        comment_user_type="User",
-    )
-    trust_context = harness.trust_context(
-        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
-        comment_author_association="MEMBER",
-        current_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
-        github_ref="refs/heads/main",
-        github_run_id=777,
-        github_run_attempt=2,
-    )
-    normalized = "hello\n@guidelines-bot /queue"
-    parsed = ("queue", [])
-    payload_classification = _legacy_classify_comment_payload(harness.runtime.BOT_MENTION, normalized, parsed)
-    actor_class = _legacy_classify_issue_comment_actor(request)
-    processing_target = _legacy_classify_pr_comment_processing_target(
-        request,
-        trust_context,
-        actor_class=actor_class,
-        is_self_comment=False,
-        pr_head_full_name="fork/example",
-        pr_author="dana",
-        author_association_trust_allowlist=harness.runtime.AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
-    )
+    module_text = Path("scripts/reviewer_bot_lib/comment_routing.py").read_text(encoding="utf-8")
 
     assert "deferred_observer_payload" in fixture["payload_scenarios"]
-    assert comment_routing_policy.build_pr_comment_observer_payload(
-        request,
-        trust_context,
-        actor_class=actor_class,
-        processing_target=processing_target,
-        payload_classification=payload_classification,
-        body_digest=comment_routing.digest_comment_body(request.comment_body),
-    ) == _legacy_build_pr_comment_observer_payload(
-        request,
-        trust_context,
-        actor_class=actor_class,
-        processing_target=processing_target,
-        payload_classification=payload_classification,
-        body_digest=comment_routing.digest_comment_body(request.comment_body),
-    )
+    assert "build_pr_comment_observer_payload" not in module_text

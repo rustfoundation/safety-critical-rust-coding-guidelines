@@ -1,224 +1,29 @@
-"""Maintenance and operator-dispatch handlers for reviewer-bot."""
+"""Manual maintenance and operator-dispatch handlers for reviewer-bot."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import yaml
 
-from . import automation, reviews
-from .context import PrivilegedCommandRequest
+from . import maintenance_privileged, maintenance_schedule, reviews
 from .event_inputs import build_manual_dispatch_request
-from .lifecycle import handle_transition_notice, maybe_record_head_observation_repair
-from .overdue import (
-    backfill_transition_notice_if_present,
-    check_overdue_reviews,
-    handle_overdue_review_warning,
-)
 from .project_board import (
     format_preview_for_output,
     preview_board_projection_for_item,
     reviewer_board_preflight,
 )
-from .review_state import (
-    list_open_tracked_review_items,
-    repair_missing_reviewer_review_state,
-)
-from .sweeper import sweep_deferred_gaps
 
-
-def _log(bot, level: str, message: str, **fields) -> None:
-    bot.logger.event(level, message, **fields)
-
-
-def _now_iso(bot) -> str:
-    return bot.datetime.now(bot.timezone.utc).isoformat()
-
-
-@dataclass(frozen=True)
-class ScheduleHandlerResult:
-    state_changed: bool
-    touched_items: list[int]
-    projection_followup_needed: bool
-    projection_failure_message: str | None
-
-
-def build_revalidated_privileged_command_request(
-    bot,
-    *,
-    issue_number: int,
-    actor: str,
-    command_name: str,
-    labels: set[str],
-) -> PrivilegedCommandRequest:
-    workflow_run_reconcile_pr_number = bot.get_config_value("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "").strip()
-    return PrivilegedCommandRequest(
-        issue_number=issue_number,
-        actor=actor,
-        command_name=command_name,
-        is_pull_request=False,
-        issue_labels=tuple(sorted(labels)),
-        target_repo_root=bot.get_config_value("REVIEWER_BOT_TARGET_REPO_ROOT", "").strip(),
-        workflow_run_reconcile_pr_number=int(workflow_run_reconcile_pr_number) if workflow_run_reconcile_pr_number else None,
-        workflow_run_reconcile_head_sha=bot.get_config_value("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "").strip(),
-        workflow_run_head_sha=bot.get_config_value("WORKFLOW_RUN_HEAD_SHA", "").strip(),
-    )
-
-
-def _clear_maintenance_repair_marker(review_data: dict, phase: str) -> bool:
-    marker = review_data.get("repair_needed")
-    if not isinstance(marker, dict):
-        return False
-    if marker.get("kind") != "live_read_failure":
-        return False
-    if marker.get("phase") != phase:
-        return False
-    review_data["repair_needed"] = None
-    return True
-
-
-def _repair_marker_matches(existing: dict | None, candidate: dict) -> bool:
-    if not isinstance(existing, dict):
-        return False
-    return {
-        key: value for key, value in existing.items() if key != "recorded_at"
-    } == {
-        key: value for key, value in candidate.items() if key != "recorded_at"
-    }
-
-
-def _record_maintenance_repair_marker(
-    bot,
-    review_data: dict,
-    *,
-    phase: str,
-    reason: str,
-    failure_kind: str | None,
-) -> bool:
-    marker = {
-        "kind": "live_read_failure",
-        "phase": phase,
-        "reason": reason,
-        "failure_kind": failure_kind,
-        "recorded_at": _now_iso(bot),
-    }
-    existing_marker = review_data.get("repair_needed")
-    if _repair_marker_matches(existing_marker, marker):
-        return False
-    review_data["repair_needed"] = marker
-    return True
-
-
-def _run_deferred_gap_sweep(bot, state: dict) -> bool:
-    return sweep_deferred_gaps(bot, state)
-
-
-def _run_tracked_pr_repair(bot, issue_number: int, review_data: dict) -> bool:
-    changed = False
-    try:
-        if repair_missing_reviewer_review_state(bot, issue_number, review_data):
-            changed = True
-            bot.collect_touched_item(issue_number)
-        if _clear_maintenance_repair_marker(review_data, "review_repair"):
-            changed = True
-    except Exception as exc:
-        _log(
-            bot,
-            "warning",
-            f"Scheduled repair failed for #{issue_number} during review_repair: {exc}",
-            issue_number=issue_number,
-            phase="review_repair",
-            error=str(exc),
-        )
-        if _record_maintenance_repair_marker(
-            bot,
-            review_data,
-            phase="review_repair",
-            reason=str(exc),
-            failure_kind=None,
-        ):
-            changed = True
-        return changed
-
-    try:
-        repair_result = maybe_record_head_observation_repair(bot, issue_number, review_data)
-    except Exception as exc:
-        _log(
-            bot,
-            "warning",
-            f"Scheduled repair failed for #{issue_number} during head_observation_repair: {exc}",
-            issue_number=issue_number,
-            phase="head_observation_repair",
-            error=str(exc),
-        )
-        if _record_maintenance_repair_marker(
-            bot,
-            review_data,
-            phase="head_observation_repair",
-            reason=str(exc),
-            failure_kind=None,
-        ):
-            changed = True
-        return changed
-
-    if repair_result.changed:
-        changed = True
-        bot.collect_touched_item(issue_number)
-    if repair_result.outcome in {"skipped_unavailable", "skipped_not_found", "invalid_live_payload"}:
-        if _record_maintenance_repair_marker(
-            bot,
-            review_data,
-            phase="head_observation_repair",
-            reason=repair_result.reason or repair_result.outcome,
-            failure_kind=repair_result.failure_kind,
-        ):
-            changed = True
-    elif _clear_maintenance_repair_marker(review_data, "head_observation_repair"):
-        changed = True
-    return changed
-
-
-def _run_tracked_pr_repairs(bot, state: dict) -> bool:
-    changed = False
-    active_reviews = state.get("active_reviews")
-    if not isinstance(active_reviews, dict):
-        return False
-    for issue_key, review_data in active_reviews.items():
-        if not isinstance(review_data, dict) or not review_data.get("current_reviewer"):
-            continue
-        issue_number = int(issue_key)
-        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
-        if not isinstance(issue_snapshot, dict) or not isinstance(issue_snapshot.get("pull_request"), dict):
-            continue
-        changed = _run_tracked_pr_repair(bot, issue_number, review_data) or changed
-    return changed
-
-
-def _run_overdue_pass(bot, state: dict) -> bool:
-    changed = False
-    overdue_reviews = check_overdue_reviews(bot, state)
-    for review in overdue_reviews:
-        issue_number = review["issue_number"]
-        reviewer = review["reviewer"]
-        if review["needs_warning"]:
-            if handle_overdue_review_warning(bot, state, issue_number, reviewer):
-                changed = True
-        elif review["needs_transition"]:
-            if backfill_transition_notice_if_present(bot, state, issue_number):
-                changed = True
-            elif handle_transition_notice(bot, state, issue_number, reviewer):
-                changed = True
-    return changed
-
-
-def _finalize_schedule_result(bot, state_changed: bool) -> ScheduleHandlerResult:
-    touched_items = bot.drain_touched_items()
-    return ScheduleHandlerResult(
-        state_changed=state_changed,
-        touched_items=touched_items,
-        projection_followup_needed=bool(touched_items),
-        projection_failure_message=None,
-    )
+ScheduleHandlerResult = maintenance_schedule.ScheduleHandlerResult
+_now_iso = maintenance_privileged._now_iso
+_finalize_schedule_result = maintenance_schedule._finalize_schedule_result
+_record_maintenance_repair_marker = maintenance_schedule._record_maintenance_repair_marker
+_run_tracked_pr_repairs = maintenance_schedule._run_tracked_pr_repairs
+repair_missing_reviewer_review_state = maintenance_schedule.repair_missing_reviewer_review_state
+maybe_record_head_observation_repair = maintenance_schedule.maybe_record_head_observation_repair
+check_overdue_reviews = maintenance_schedule.check_overdue_reviews
+handle_overdue_review_warning = maintenance_schedule.handle_overdue_review_warning
+backfill_transition_notice_if_present = maintenance_schedule.backfill_transition_notice_if_present
+handle_transition_notice = maintenance_schedule.handle_transition_notice
+sweep_deferred_gaps = maintenance_schedule.sweep_deferred_gaps
 
 
 def status_projection_repair_needed(bot, state: dict) -> bool:
@@ -227,9 +32,7 @@ def status_projection_repair_needed(bot, state: dict) -> bool:
 
 
 def collect_status_projection_repair_items(bot, state: dict) -> list[int]:
-    numbers = set(reviews.list_open_items_with_status_labels(bot))
-    numbers.update(list_open_tracked_review_items(state))
-    return sorted(number for number in numbers if isinstance(number, int) and number > 0)
+    return maintenance_schedule.collect_status_projection_repair_items(bot, state)
 
 
 def handle_manual_dispatch(bot, state: dict) -> bool:
@@ -284,82 +87,14 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
             bot.collect_touched_item(issue_number)
         return False
     if action == "check-overdue":
-        return bot.handlers.handle_scheduled_check(state)
+        return maintenance_schedule.handle_scheduled_check_result(bot, state).state_changed
     if action == "execute-pending-privileged-command":
         source_event_key = request.privileged_source_event_key
         if not source_event_key:
             raise RuntimeError("Missing PRIVILEGED_SOURCE_EVENT_KEY for privileged command execution")
-        for issue_key, review_data in (state.get("active_reviews") or {}).items():
-            if not isinstance(review_data, dict):
-                continue
-            pending = review_data.get("pending_privileged_commands")
-            if not isinstance(pending, dict) or source_event_key not in pending:
-                continue
-            record = pending[source_event_key]
-            if not isinstance(record, dict):
-                raise RuntimeError("Pending privileged command record is malformed")
-            if record.get("status") != "pending":
-                return False
-            issue_number = int(record.get("issue_number") or int(issue_key))
-            actor = str(record.get("actor", "")).strip()
-            command_name = record.get("command_name")
-            if command_name != "accept-no-fls-changes":
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "unsupported_command"
-                return True
-            issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
-            if not isinstance(issue_snapshot, dict) or isinstance(issue_snapshot.get("pull_request"), dict):
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "live_target_invalid"
-                return True
-            labels: set[str] = set()
-            for label in issue_snapshot.get("labels", []):
-                if not isinstance(label, dict):
-                    continue
-                name = label.get("name")
-                if isinstance(name, str):
-                    labels.add(name)
-            permission_status = bot.github.get_user_permission_status(actor, "triage")
-            if bot.FLS_AUDIT_LABEL not in labels:
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "live_revalidation_failed"
-                return True
-            if permission_status == "unavailable":
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "live_permission_unavailable"
-                return True
-            if permission_status != "granted":
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "live_revalidation_failed"
-                return True
-            request = build_revalidated_privileged_command_request(
-                bot,
-                issue_number=issue_number,
-                actor=actor,
-                command_name=str(command_name),
-                labels=labels,
-            )
-            message, success = automation.handle_accept_no_fls_changes_command(bot, issue_number, actor, request=request)
-            record["completed_at"] = _now_iso(bot)
-            record["result_message"] = message
-            record["status"] = "executed" if success else "failed_closed"
-            return True
-        raise RuntimeError(f"Pending privileged command not found for {source_event_key}")
+        return maintenance_privileged.execute_pending_privileged_command(bot, state, source_event_key)
     return False
 
 
 def handle_scheduled_check_result(bot, state: dict) -> ScheduleHandlerResult:
-    bot.assert_lock_held("handle_scheduled_check")
-    changed = _run_deferred_gap_sweep(bot, state)
-    changed = _run_tracked_pr_repairs(bot, state) or changed
-    changed = _run_overdue_pass(bot, state) or changed
-    return _finalize_schedule_result(bot, changed)
-
-
-def handle_scheduled_check(bot, state: dict) -> bool:
-    return handle_scheduled_check_result(bot, state).state_changed
+    return maintenance_schedule.handle_scheduled_check_result(bot, state)

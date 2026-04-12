@@ -21,7 +21,6 @@ class LivePrReplayContext:
 class LiveCommentReplayContext:
     comment_author: str
     comment_user_type: str
-    comment_author_association: str
     comment_sender_type: str
     comment_installation_id: str
     comment_performed_via_github_app: bool
@@ -97,13 +96,9 @@ def read_live_comment_replay_context(live_comment: dict, payload: dict) -> LiveC
     comment_user_type = user.get("type")
     if not isinstance(comment_user_type, str) or not comment_user_type.strip():
         raise RuntimeError("Live deferred comment user type is unavailable")
-    author_association = live_comment.get("author_association")
-    if not isinstance(author_association, str) or not author_association.strip():
-        raise RuntimeError("Live deferred comment author association is unavailable")
     return LiveCommentReplayContext(
         comment_author=comment_author,
         comment_user_type=comment_user_type,
-        comment_author_association=author_association,
         comment_sender_type=comment_user_type,
         comment_installation_id="",
         comment_performed_via_github_app=bool(live_comment.get("performed_via_github_app")),

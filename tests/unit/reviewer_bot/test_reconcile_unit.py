@@ -4,15 +4,21 @@ from typing import get_type_hints
 
 import pytest
 
-from scripts.reviewer_bot_lib import commands, lifecycle, reconcile, review_state
+from scripts.reviewer_bot_lib import (
+    lifecycle,
+    reconcile,
+    reconcile_payloads,
+    review_state,
+)
 from scripts.reviewer_bot_lib.config import GitHubApiResult
-from scripts.reviewer_bot_lib.context import (
+from scripts.reviewer_bot_lib.runtime_protocols import (
     ReconcileRectifyRuntimeContext,
     ReconcileWorkflowRuntimeContext,
 )
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reconcile_harness import ReconcileHarness, review_submitted_payload
 from tests.fixtures.reviewer_bot import make_state
+from tests.fixtures.reviewer_bot_env import set_workflow_run_event_payload
 
 
 def test_parse_deferred_context_payload_returns_typed_review_payload():
@@ -38,9 +44,10 @@ def test_parse_deferred_context_payload_returns_typed_review_payload():
 
 def test_parse_deferred_context_payload_returns_typed_comment_payload():
     payload = {
-        "schema_version": 2,
-        "source_workflow_name": "Reviewer Bot PR Comment Observer",
-        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
+        "payload_kind": "deferred_comment",
+        "schema_version": 3,
+        "source_workflow_name": "Reviewer Bot PR Comment Router",
+        "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-router.yml",
         "source_run_id": 610,
         "source_run_attempt": 1,
         "source_event_name": "issue_comment",
@@ -48,11 +55,17 @@ def test_parse_deferred_context_payload_returns_typed_comment_payload():
         "source_event_key": "issue_comment:210",
         "pr_number": 42,
         "comment_id": 210,
-        "comment_class": "command_only",
-        "has_non_command_text": False,
-        "source_body_digest": "abc123",
-        "source_created_at": "2026-03-17T10:00:00Z",
-        "actor_login": "bob",
+        "comment_body": "@guidelines-bot /queue",
+        "comment_created_at": "2026-03-17T10:00:00Z",
+        "comment_author": "bob",
+        "comment_author_id": 123,
+        "comment_user_type": "User",
+        "comment_sender_type": "User",
+        "comment_installation_id": None,
+        "comment_performed_via_github_app": False,
+        "issue_author": "dana",
+        "issue_state": "open",
+        "issue_labels": ["coding guideline"],
     }
 
     parsed = reconcile.parse_deferred_context_payload(payload)
@@ -65,22 +78,27 @@ def test_parse_deferred_context_payload_returns_typed_comment_payload():
 def test_build_deferred_comment_replay_context_returns_typed_context():
     payload = reconcile.DeferredCommentPayload(
         identity=reconcile.DeferredArtifactIdentity(
-            schema_version=2,
-            source_workflow_name="Reviewer Bot PR Comment Observer",
-            source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            payload_kind=reconcile_payloads.DeferredPayloadKind.DEFERRED_COMMENT,
+            schema_version=3,
             source_run_id=610,
             source_run_attempt=1,
             source_event_name="issue_comment",
             source_event_action="created",
             source_event_key="issue_comment:210",
+            pr_number=42,
         ),
-        pr_number=42,
         comment_id=210,
-        comment_class="command_plus_text",
-        has_non_command_text=True,
-        source_body_digest="abc123",
-        source_created_at="2026-03-17T10:00:00Z",
-        actor_login="bob",
+        comment_body="hello\n@guidelines-bot /queue",
+        comment_created_at="2026-03-17T10:00:00Z",
+        comment_author="bob",
+        comment_author_id=123,
+        comment_user_type="User",
+        comment_sender_type="User",
+        comment_installation_id=None,
+        comment_performed_via_github_app=False,
+        issue_author="dana",
+        issue_state="open",
+        issue_labels=("coding guideline",),
         raw_payload={"source_event_key": "issue_comment:210"},
     )
 
@@ -99,22 +117,27 @@ def test_build_deferred_comment_replay_context_returns_typed_context():
 def test_build_deferred_comment_replay_context_rejects_mismatched_source_event_key():
     payload = reconcile.DeferredCommentPayload(
         identity=reconcile.DeferredArtifactIdentity(
-            schema_version=2,
-            source_workflow_name="Reviewer Bot PR Comment Observer",
-            source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            payload_kind=reconcile_payloads.DeferredPayloadKind.DEFERRED_COMMENT,
+            schema_version=3,
             source_run_id=610,
             source_run_attempt=1,
             source_event_name="issue_comment",
             source_event_action="created",
             source_event_key="issue_comment:999",
+            pr_number=42,
         ),
-        pr_number=42,
         comment_id=210,
-        comment_class="command_only",
-        has_non_command_text=False,
-        source_body_digest="abc123",
-        source_created_at="2026-03-17T10:00:00Z",
-        actor_login="bob",
+        comment_body="@guidelines-bot /queue",
+        comment_created_at="2026-03-17T10:00:00Z",
+        comment_author="bob",
+        comment_author_id=123,
+        comment_user_type="User",
+        comment_sender_type="User",
+        comment_installation_id=None,
+        comment_performed_via_github_app=False,
+        issue_author="dana",
+        issue_state="open",
+        issue_labels=("coding guideline",),
         raw_payload={"source_event_key": "issue_comment:999"},
     )
 
@@ -129,16 +152,15 @@ def test_build_deferred_comment_replay_context_rejects_mismatched_source_event_k
 def test_build_deferred_review_replay_context_returns_typed_context():
     payload = reconcile.DeferredReviewPayload(
         identity=reconcile.DeferredArtifactIdentity(
-            schema_version=2,
-            source_workflow_name="Reviewer Bot PR Review Submitted Observer",
-            source_workflow_file=".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+            payload_kind=reconcile_payloads.DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED,
+            schema_version=3,
             source_run_id=500,
             source_run_attempt=2,
             source_event_name="pull_request_review",
             source_event_action="submitted",
             source_event_key="pull_request_review:11",
+            pr_number=42,
         ),
-        pr_number=42,
         review_id=11,
         source_submitted_at="2026-03-17T10:00:00Z",
         source_review_state="COMMENTED",
@@ -161,16 +183,15 @@ def test_build_deferred_review_replay_context_returns_typed_context():
 def test_build_deferred_review_replay_context_rejects_mismatched_source_event_key():
     payload = reconcile.DeferredReviewPayload(
         identity=reconcile.DeferredArtifactIdentity(
-            schema_version=2,
-            source_workflow_name="Reviewer Bot PR Review Submitted Observer",
-            source_workflow_file=".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+            payload_kind=reconcile_payloads.DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED,
+            schema_version=3,
             source_run_id=500,
             source_run_attempt=2,
             source_event_name="pull_request_review",
             source_event_action="submitted",
             source_event_key="pull_request_review:99",
+            pr_number=42,
         ),
-        pr_number=42,
         review_id=11,
         source_submitted_at="2026-03-17T10:00:00Z",
         source_review_state="COMMENTED",
@@ -208,27 +229,11 @@ def test_parse_deferred_context_payload_returns_typed_observer_noop_payload():
     assert parsed.pr_number == 42
 
 
-@pytest.mark.parametrize(
-    ("source_event_name", "source_event_action", "expected"),
-    [
-        ("issue_comment", "created", True),
-        ("pull_request_review", "submitted", True),
-        ("pull_request_review", "dismissed", True),
-        ("pull_request_review_comment", "created", True),
-        ("issue_comment", "deleted", False),
-        ("pull_request_review", "edited", False),
-        ("pull_request_review_comment", "edited", False),
-        ("workflow_dispatch", "completed", False),
-    ],
-)
-def test_mutating_workflow_run_source_action_matrix(source_event_name, source_event_action, expected):
-    assert reconcile.supports_mutating_workflow_run_source_action(source_event_name, source_event_action) is expected
-
-
-def test_handle_workflow_run_event_collects_touched_item_for_projection_followup(monkeypatch):
+def test_handle_workflow_run_event_result_collects_touched_item(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.ACTIVE_LEASE_CONTEXT = object()
-    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_NAME", "Reviewer Bot PR Comment Observer")
+    runtime.set_config_value("EVENT_NAME", "workflow_run")
+    set_workflow_run_event_payload(runtime.config, "Reviewer Bot PR Comment Observer")
     runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
     runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
     runtime.stub_deferred_payload(
@@ -252,7 +257,6 @@ def test_handle_workflow_run_event_collects_touched_item_for_projection_followup
 
     assert result.state_changed is False
     assert result.touched_items == [42]
-    assert result.projection_followup_needed is True
     assert runtime.drain_touched_items() == []
     assert "42" in state["active_reviews"]
 
@@ -289,37 +293,49 @@ def test_reconcile_deferred_comment_fail_closes_for_command_ambiguity(monkeypatc
     comment_body = "@guidelines-bot /claim"
     payload = reconcile.DeferredCommentPayload(
         identity=reconcile.DeferredArtifactIdentity(
-            schema_version=2,
-            source_workflow_name="Reviewer Bot PR Comment Observer",
-            source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            payload_kind=reconcile_payloads.DeferredPayloadKind.DEFERRED_COMMENT,
+            schema_version=3,
             source_run_id=603,
             source_run_attempt=1,
             source_event_name="issue_comment",
             source_event_action="created",
             source_event_key="issue_comment:201",
+            pr_number=42,
         ),
-        pr_number=42,
         comment_id=201,
-        comment_class="command_only",
-        has_non_command_text=False,
-        source_body_digest=reconcile.digest_comment_body(comment_body),
-        source_created_at="2026-03-17T10:00:00Z",
-        actor_login="alice",
+        comment_body=comment_body,
+        comment_created_at="2026-03-17T10:00:00Z",
+        comment_author="alice",
+        comment_author_id=5,
+        comment_user_type="User",
+        comment_sender_type="User",
+        comment_installation_id=None,
+        comment_performed_via_github_app=False,
+        issue_author="dana",
+        issue_state="open",
+        issue_labels=("coding guideline",),
         raw_payload={
+            "payload_kind": "deferred_comment",
             "comment_id": 201,
-            "comment_class": "command_only",
-            "has_non_command_text": False,
+            "comment_body": comment_body,
+            "comment_created_at": "2026-03-17T10:00:00Z",
+            "comment_author": "alice",
+            "comment_author_id": 5,
+            "comment_user_type": "User",
+            "comment_sender_type": "User",
+            "comment_installation_id": None,
+            "comment_performed_via_github_app": False,
+            "issue_author": "dana",
+            "issue_state": "open",
+            "issue_labels": ["coding guideline"],
             "source_event_key": "issue_comment:201",
             "source_event_name": "issue_comment",
             "source_event_action": "created",
-            "source_created_at": "2026-03-17T10:00:00Z",
             "pr_number": 42,
             "source_run_id": 603,
             "source_run_attempt": 1,
-            "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-observer.yml",
-            "source_artifact_name": "reviewer-bot-comment-context-603-attempt-1",
-            "source_body_digest": reconcile.digest_comment_body(comment_body),
-            "actor_login": "alice",
+            "source_workflow_name": "Reviewer Bot PR Comment Router",
+            "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-router.yml",
         },
     )
     context = reconcile.build_deferred_comment_replay_context(
@@ -363,28 +379,23 @@ def test_reconcile_deferred_comment_fail_closes_for_command_ambiguity(monkeypatc
     changed = reconcile._reconcile_deferred_comment(runtime, state, review, context)
 
     assert changed is True
-    assert review["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
-    assert "no longer resolves to exactly one command" in review["deferred_gaps"]["issue_comment:201"]["diagnostic_summary"]
+    assert review["sidecars"]["deferred_gaps"]["issue_comment:201"]["reason"] == "reconcile_failed_closed"
+    assert "no longer resolves to exactly one command" in review["sidecars"]["deferred_gaps"]["issue_comment:201"]["diagnostic_summary"]
 
 
-def test_resolve_workflow_run_pr_number_fails_closed_when_pr_unavailable(monkeypatch):
+def test_workflow_run_reconcile_uses_artifact_contract_for_router_no_artifact_success(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.set_config_value("WORKFLOW_RUN_RECONCILE_PR_NUMBER", "42")
-    runtime.set_config_value("WORKFLOW_RUN_RECONCILE_HEAD_SHA", "head-1")
-    runtime.set_config_value("WORKFLOW_RUN_HEAD_SHA", "head-1")
-    runtime.github_api_request = lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
-        status_code=502,
-        payload={"message": "bad gateway"},
-        headers={},
-        text="bad gateway",
-        ok=False,
-        failure_kind="server_error",
-        retry_attempts=1,
-        transport_error=None,
-    )
+    runtime.ACTIVE_LEASE_CONTEXT = object()
+    runtime.set_config_value("EVENT_NAME", "workflow_run")
+    runtime.set_config_value("REVIEWER_BOT_WORKFLOW_KIND", "reconcile")
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    set_workflow_run_event_payload(runtime.config, "Reviewer Bot PR Comment Router")
+    runtime.load_deferred_payload = lambda: (_ for _ in ()).throw(RuntimeError("missing artifact"))
+    state = make_state(epoch="freshness_v15")
 
-    with pytest.raises(RuntimeError, match="Failed to fetch pull request #42 during workflow_run reconcile"):
-        commands.resolve_workflow_run_pr_number(runtime)
+    result = reconcile.handle_workflow_run_event_result(runtime, state)
+
+    assert result == reconcile.WorkflowRunHandlerResult(False, [])
 
 
 def test_read_reconcile_reviews_rejects_non_list_payload(monkeypatch):
@@ -487,6 +498,7 @@ def test_reconcile_module_delegates_replay_decision_logic_to_core_policy():
                     source_run_id=501,
                     source_run_attempt=1,
                 ),
+                "payload_kind": "deferred_review_dismissed",
                 "source_workflow_name": "Reviewer Bot PR Review Dismissed Observer",
                 "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
                 "source_event_action": "dismissed",
@@ -540,22 +552,27 @@ def test_workflow_run_dispatch_matrix_routes_supported_payloads(payload, expecte
 def test_workflow_run_dispatch_matrix_rejects_unsupported_pairs():
     parsed_payload = reconcile.DeferredCommentPayload(
         identity=reconcile.DeferredArtifactIdentity(
-            schema_version=2,
-            source_workflow_name="Reviewer Bot PR Comment Observer",
-            source_workflow_file=".github/workflows/reviewer-bot-pr-comment-observer.yml",
+            payload_kind=reconcile_payloads.DeferredPayloadKind.DEFERRED_COMMENT,
+            schema_version=3,
             source_run_id=610,
             source_run_attempt=1,
             source_event_name="issue_comment",
             source_event_action="edited",
             source_event_key="issue_comment:210",
+            pr_number=42,
         ),
-        pr_number=42,
         comment_id=210,
-        comment_class="command_only",
-        has_non_command_text=False,
-        source_body_digest="abc123",
-        source_created_at="2026-03-17T10:00:00Z",
-        actor_login="bob",
+        comment_body="@guidelines-bot /queue",
+        comment_created_at="2026-03-17T10:00:00Z",
+        comment_author="bob",
+        comment_author_id=123,
+        comment_user_type="User",
+        comment_sender_type="User",
+        comment_installation_id=None,
+        comment_performed_via_github_app=False,
+        issue_author="dana",
+        issue_state="open",
+        issue_labels=("coding guideline",),
         raw_payload={"source_event_key": "issue_comment:210"},
     )
 
@@ -563,7 +580,7 @@ def test_workflow_run_dispatch_matrix_rejects_unsupported_pairs():
 
 
 def test_k1b_context_module_freezes_two_reconcile_runtime_subseams_not_one_mega_protocol():
-    context_text = Path("scripts/reviewer_bot_lib/context.py").read_text(encoding="utf-8")
+    context_text = Path("scripts/reviewer_bot_lib/runtime_protocols.py").read_text(encoding="utf-8")
 
     assert "class ReconcileWorkflowRuntimeContext(Protocol):" in context_text
     assert "class ReconcileRectifyRuntimeContext(Protocol):" in context_text
@@ -574,7 +591,7 @@ def test_k1b_context_module_freezes_two_reconcile_runtime_subseams_not_one_mega_
 
 
 def test_k1c_workflow_run_reconcile_entrypoint_uses_frozen_workflow_runtime_protocol():
-    hints = get_type_hints(reconcile.handle_workflow_run_event)
+    hints = get_type_hints(reconcile.handle_workflow_run_event_result)
 
     assert hints["bot"] is ReconcileWorkflowRuntimeContext
 
@@ -591,26 +608,26 @@ def test_k1g_rectify_reconcile_entrypoints_use_finalized_rectify_runtime_protoco
 
 def test_k1d_rectify_refresh_keeps_retained_owner_boundaries_explicit_in_reconcile_source():
     reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
-    context_text = Path("scripts/reviewer_bot_lib/context.py").read_text(encoding="utf-8")
+    context_text = Path("scripts/reviewer_bot_lib/runtime_protocols.py").read_text(encoding="utf-8")
 
     assert "refresh_reviewer_review_from_live_preferred_review(" in reconcile_text
     assert "rebuild_pr_approval_state_result(" in reconcile_text
     assert "approval_policy.find_triage_approval_after(" in reconcile_text
     assert "def github_api_request(self, *args, **kwargs) -> Any: ..." in context_text
     assert "def github_api(self, *args, **kwargs) -> Any | None: ..." in context_text
-    assert "def parse_github_timestamp(self, value: Any) -> datetime | None: ..." in context_text
-    assert "def is_triage_or_higher(self, username: str) -> bool: ..." in context_text
+    assert "def parse_iso8601_timestamp(self, value: Any) -> datetime | None: ..." in context_text
+    assert "def get_user_permission_status(self, username: str, required_permission: str = \"triage\") -> str: ..." in context_text
 
 
 def test_k1e_rectify_finalization_keeps_retained_approval_support_explicit_but_workflow_seam_unchanged():
     reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
-    context_text = Path("scripts/reviewer_bot_lib/context.py").read_text(encoding="utf-8")
+    context_text = Path("scripts/reviewer_bot_lib/runtime_protocols.py").read_text(encoding="utf-8")
 
     assert "approval_policy.find_triage_approval_after(" in reconcile_text
-    assert "bot.parse_github_timestamp(" in reconcile_text or "bot.parse_github_timestamp(" in Path("scripts/reviewer_bot_core/approval_policy.py").read_text(encoding="utf-8")
-    assert "bot.is_triage_or_higher(" in Path("scripts/reviewer_bot_core/approval_policy.py").read_text(encoding="utf-8")
-    assert "def parse_github_timestamp(self, value: Any) -> datetime | None: ..." in context_text
-    assert "def is_triage_or_higher(self, username: str) -> bool: ..." in context_text
+    assert "live_review_support.parse_github_timestamp(" in reconcile_text or "live_review_support.parse_github_timestamp(" in Path("scripts/reviewer_bot_core/approval_policy.py").read_text(encoding="utf-8")
+    assert "live_review_support.permission_status(bot, author, \"triage\")" in Path("scripts/reviewer_bot_core/approval_policy.py").read_text(encoding="utf-8")
+    assert "def parse_iso8601_timestamp(self, value: Any) -> datetime | None: ..." in context_text
+    assert "def get_user_permission_status(self, username: str, required_permission: str = \"triage\") -> str: ..." in context_text
     workflow_block = context_text.split("class ReconcileWorkflowRuntimeContext(Protocol):", 1)[1].split("class ReconcileRectifyGitHubContext(Protocol):", 1)[0]
     assert "parse_github_timestamp" not in workflow_block
-    assert "is_triage_or_higher" not in workflow_block
+    assert 'required_permission: str = "triage"' not in workflow_block

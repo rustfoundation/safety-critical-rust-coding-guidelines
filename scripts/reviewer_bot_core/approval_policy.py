@@ -16,7 +16,46 @@ Old module no longer preferred for these derivation changes:
 
 from __future__ import annotations
 
-from scripts.reviewer_bot_lib import review_read_support
+from . import live_review_support
+
+
+def compute_pr_approval_state_from_reviews(
+    survivors: dict[str, dict],
+    *,
+    current_head: str,
+    permission_statuses: dict[str, str],
+) -> dict[str, object]:
+    approvals = [review for review in survivors.values() if str(review.get("state", "")).upper() == "APPROVED"]
+    completion = {
+        "completed": bool(approvals),
+        "current_head_sha": current_head,
+        "qualifying_review_ids": [review.get("id") for review in approvals],
+    }
+
+    has_write_approval = False
+    write_approvers: list[str] = []
+    for review in approvals:
+        author = review.get("user", {}).get("login")
+        if not isinstance(author, str) or not author.strip():
+            continue
+        status = permission_statuses.get(author.lower(), "unavailable")
+        if status == "unavailable":
+            return {"ok": False, "reason": "permission_unavailable"}
+        if status == "granted":
+            has_write_approval = True
+            write_approvers.append(author)
+
+    write_approval = {
+        "has_write_approval": has_write_approval,
+        "write_approvers": write_approvers,
+        "current_head_sha": current_head,
+    }
+    return {
+        "ok": True,
+        "completion": completion,
+        "write_approval": write_approval,
+        "current_head_sha": current_head,
+    }
 
 
 def compute_pr_approval_state_result(
@@ -27,42 +66,37 @@ def compute_pr_approval_state_result(
     pull_request: dict | None = None,
     reviews: list[dict] | None = None,
 ) -> dict[str, object]:
-    from scripts.reviewer_bot_core import review_state_machine
-    from scripts.reviewer_bot_lib.reviews_projection import (
-        collect_permission_statuses,
-        compute_pr_approval_state_from_reviews,
-        filter_current_head_reviews_for_cycle,
-        normalize_reviews_with_parsed_timestamps,
+    boundary = live_review_support.get_current_cycle_boundary(
+        review_data,
+        parse_timestamp=bot.parse_iso8601_timestamp,
     )
-
-    boundary = review_state_machine.get_current_cycle_boundary(bot, review_data)
     if boundary is None:
-        return review_read_support._projection_failure("pull_request_unavailable")
-    pull_request_result = review_read_support._pull_request_read_result(bot, issue_number, pull_request)
+        return live_review_support.projection_failure_result("pull_request_unavailable")
+    pull_request_result = live_review_support.read_pull_request_result(bot, issue_number, pull_request)
     if not pull_request_result.get("ok"):
         return pull_request_result
     pull_request = pull_request_result["pull_request"]
     head = pull_request.get("head")
     current_head = head.get("sha") if isinstance(head, dict) else None
     if not isinstance(current_head, str) or not current_head.strip():
-        return review_read_support._projection_failure("pull_request_head_unavailable", "invalid_payload")
-    reviews_result = review_read_support.get_pull_request_reviews_result(bot, issue_number, reviews)
+        return live_review_support.projection_failure_result("pull_request_head_unavailable", "invalid_payload")
+    reviews_result = live_review_support.read_pull_request_reviews_result(bot, issue_number, reviews)
     if not reviews_result.get("ok"):
         return reviews_result
     reviews = reviews_result["reviews"]
 
-    normalized_reviews = normalize_reviews_with_parsed_timestamps(
+    normalized_reviews = live_review_support.normalize_reviews_with_parsed_timestamps(
         reviews,
-        parse_timestamp=review_read_support.parse_github_timestamp,
+        parse_timestamp=live_review_support.parse_github_timestamp,
     )
-    survivors = filter_current_head_reviews_for_cycle(
+    survivors = live_review_support.filter_current_head_reviews_for_cycle(
         normalized_reviews,
         boundary=boundary,
         current_head=current_head,
     )
-    permission_cache = collect_permission_statuses(
+    permission_cache = live_review_support.collect_permission_statuses(
         survivors,
-        permission_status=lambda author: review_read_support._permission_status(bot, author, "push"),
+        permission_status=lambda author: live_review_support.permission_status(bot, author, "push"),
     )
     result = compute_pr_approval_state_from_reviews(
         survivors,
@@ -70,7 +104,7 @@ def compute_pr_approval_state_result(
         permission_statuses=permission_cache,
     )
     if not result.get("ok"):
-        return review_read_support._projection_failure(str(result.get("reason")))
+        return live_review_support.projection_failure_result(str(result.get("reason")))
     return result
 
 
@@ -84,7 +118,7 @@ def find_triage_approval_after(bot, reviews: list[dict], since) -> tuple[str, ob
         author = review.get("user", {}).get("login")
         if not isinstance(author, str) or not author:
             continue
-        submitted_at = bot.parse_github_timestamp(review.get("submitted_at"))
+        submitted_at = live_review_support.parse_github_timestamp(review.get("submitted_at"))
         if submitted_at is None:
             continue
         if since is not None and submitted_at <= since:
@@ -94,7 +128,7 @@ def find_triage_approval_after(bot, reviews: list[dict], since) -> tuple[str, ob
     for submitted_at, _, author in approvals:
         cache_key = author.lower()
         if cache_key not in permission_cache:
-            permission_cache[cache_key] = bot.is_triage_or_higher(author)
+            permission_cache[cache_key] = live_review_support.permission_status(bot, author, "triage") == "granted"
         if permission_cache[cache_key]:
             return author, submitted_at
     return None

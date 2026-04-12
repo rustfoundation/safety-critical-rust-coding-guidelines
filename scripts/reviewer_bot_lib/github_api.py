@@ -11,9 +11,8 @@ from .config import (
     LOCK_API_RETRY_LIMIT,
     LOCK_RETRY_BASE_SECONDS,
     REVIEWER_BOARD_TOKEN_ENV,
-    STATUS_LABEL_CONFIG,
 )
-from .context import GitHubApiContext, GitHubTransportContext
+from .runtime_protocols import GitHubApiContext, GitHubTransportContext
 
 RETRY_POLICY_NONE = retrying.RETRY_POLICY_NONE
 RETRY_POLICY_IDEMPOTENT_READ = retrying.RETRY_POLICY_IDEMPOTENT_READ
@@ -439,14 +438,13 @@ def ensure_label_exists(
     color: str | None = None,
     description: str | None = None,
 ) -> bool:
-    label_config = STATUS_LABEL_CONFIG.get(label, {})
     response = bot.github_api_request(
         "POST",
         "labels",
         {
             "name": label,
-            "color": color or label_config.get("color", "d73a4a"),
-            "description": description or label_config.get("description", ""),
+            "color": color or "d73a4a",
+            "description": description or "",
         },
         suppress_error_log=True,
     )
@@ -464,17 +462,15 @@ def ensure_label_exists(
     return False
 
 
-def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, username: str):
-    is_pr = _is_pull_request(bot)
-    if is_pr:
-        endpoint = f"pulls/{issue_number}/requested_reviewers"
-        payload = {"reviewers": [username]}
-        assignment_target = "PR reviewer"
-    else:
-        endpoint = f"issues/{issue_number}/assignees"
-        payload = {"assignees": [username]}
-        assignment_target = "issue assignee"
-
+def _request_assignment(
+    bot: GitHubTransportContext,
+    endpoint: str,
+    payload: dict,
+    *,
+    assignment_target: str,
+    issue_number: int,
+    username: str,
+):
     lock_api_retry_limit = bot.lock_api_retry_limit()
     lock_retry_base_seconds = bot.lock_retry_base_seconds()
 
@@ -522,27 +518,26 @@ def request_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, 
     return bot.AssignmentAttempt(success=False, status_code=None, exhausted_retryable_failure=True)
 
 
-def assign_reviewer(bot: GitHubTransportContext, issue_number: int, username: str) -> bool:
-    return request_reviewer_assignment(bot, issue_number, username).success
+def request_pr_reviewer_assignment(bot: GitHubTransportContext, issue_number: int, username: str):
+    return _request_assignment(
+        bot,
+        f"pulls/{issue_number}/requested_reviewers",
+        {"reviewers": [username]},
+        assignment_target="PR reviewer",
+        issue_number=issue_number,
+        username=username,
+    )
 
 
-def get_assignment_failure_comment(bot: GitHubTransportContext, reviewer: str, attempt) -> str | None:
-    is_pr = _is_pull_request(bot)
-    if attempt.status_code == 422:
-        if is_pr:
-            return bot.REVIEWER_REQUEST_422_TEMPLATE.format(reviewer=reviewer)
-        return (
-            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not "
-            "add them as an assignee automatically (API 422)."
-        )
-
-    if attempt.exhausted_retryable_failure:
-        return (
-            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not "
-            f"add them to PR Reviewers automatically after retries (status {attempt.status_code}). "
-            "A triage+ approver may still be required before merge queue."
-        )
-    return None
+def assign_issue_assignee(bot: GitHubTransportContext, issue_number: int, username: str):
+    return _request_assignment(
+        bot,
+        f"issues/{issue_number}/assignees",
+        {"assignees": [username]},
+        assignment_target="issue assignee",
+        issue_number=issue_number,
+        username=username,
+    )
 
 
 def get_issue_assignees(bot: GitHubTransportContext, issue_number: int) -> list[str] | None:
@@ -577,7 +572,7 @@ def add_reaction(bot: GitHubTransportContext, comment_id: int, reaction: str) ->
     )
 
 
-def remove_assignee(bot: GitHubTransportContext, issue_number: int, username: str) -> bool:
+def remove_issue_assignee(bot: GitHubTransportContext, issue_number: int, username: str) -> bool:
     return (
         bot.github_api("DELETE", f"issues/{issue_number}/assignees", {"assignees": [username]})
         is not None
@@ -593,13 +588,6 @@ def remove_pr_reviewer(bot: GitHubTransportContext, issue_number: int, username:
         )
         is not None
     )
-
-
-def unassign_reviewer(bot: GitHubTransportContext, issue_number: int, username: str) -> bool:
-    is_pr = _is_pull_request(bot)
-    if is_pr:
-        remove_pr_reviewer(bot, issue_number, username)
-    return remove_assignee(bot, issue_number, username)
 
 
 def get_user_permission_status(
