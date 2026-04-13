@@ -1,0 +1,10 @@
+{
+  "harness_id": "D1a comment freshness equivalence",
+  "scenarios": [
+    "contributor_plain_text_freshness",
+    "reviewer_plain_text_freshness",
+    "reviewer_activity_only_when_semantic_key_exists",
+    "non_contributor_non_reviewer_noop",
+    "command_plus_text_freshness"
+  ]
+}

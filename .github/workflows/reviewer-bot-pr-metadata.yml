@@ -52,11 +52,11 @@ jobs:
           ISSUE_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
           IS_PULL_REQUEST: 'true'
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_CREATED_AT: ${{ github.event.pull_request.updated_at }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
-          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-pr-metadata.yml
         run: uv run --project "$BOT_SRC_ROOT" reviewer-bot

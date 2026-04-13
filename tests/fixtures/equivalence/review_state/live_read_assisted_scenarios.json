@@ -1,0 +1,5 @@
+{
+  "harness_id": "C1b/C1c mutable review-state mutation equivalence",
+  "scope": "live-read-assisted mutation",
+  "scenarios": []
+}

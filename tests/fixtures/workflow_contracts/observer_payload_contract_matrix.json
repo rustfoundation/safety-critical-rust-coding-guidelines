@@ -1,0 +1,144 @@
+{
+  "behavior_questions": [
+    {
+      "question_id": "pr_comment_route_outcome",
+      "owner": ".github/workflows/reviewer-bot-pr-comment-router.yml",
+      "source_event_name": "issue_comment",
+      "source_event_action": "created",
+      "payload_kind": "deferred_comment"
+    },
+    {
+      "question_id": "pr_review_submitted_replay",
+      "owner": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+      "source_event_name": "pull_request_review",
+      "source_event_action": "submitted",
+      "payload_kind": "deferred_review_submitted"
+    },
+    {
+      "question_id": "pr_review_dismissed_replay",
+      "owner": ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
+      "source_event_name": "pull_request_review",
+      "source_event_action": "dismissed",
+      "payload_kind": "deferred_review_dismissed"
+    },
+    {
+      "question_id": "pr_review_comment_replay",
+      "owner": ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
+      "source_event_name": "pull_request_review_comment",
+      "source_event_action": "created",
+      "payload_kind": "deferred_review_comment"
+    }
+  ],
+  "payload_contracts": [
+    {
+      "payload_kind": "deferred_comment",
+      "owner": ".github/workflows/reviewer-bot-pr-comment-router.yml",
+      "schema_version": 3,
+      "carried_edge_fields": [
+        "source_run_id",
+        "source_run_attempt",
+        "source_event_name",
+        "source_event_action",
+        "source_event_key",
+        "pr_number",
+        "comment_id",
+        "comment_body",
+        "comment_created_at",
+        "comment_author",
+        "comment_author_id",
+        "comment_user_type",
+        "comment_sender_type",
+        "comment_installation_id",
+        "comment_performed_via_github_app",
+        "issue_author",
+        "issue_state",
+        "issue_labels"
+      ],
+      "debug_only_fields": [
+        "source_workflow_name",
+        "source_workflow_file",
+        "source_artifact_name",
+        "payload_filename"
+      ]
+    },
+    {
+      "payload_kind": "deferred_review_submitted",
+      "owner": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+      "schema_version": 3,
+      "carried_edge_fields": [
+        "source_run_id",
+        "source_run_attempt",
+        "source_event_name",
+        "source_event_action",
+        "source_event_key",
+        "pr_number",
+        "review_id",
+        "source_submitted_at",
+        "source_review_state",
+        "source_commit_id",
+        "actor_login",
+        "actor_id"
+      ],
+      "debug_only_fields": [
+        "source_workflow_name",
+        "source_workflow_file",
+        "source_artifact_name",
+        "payload_filename"
+      ]
+    },
+    {
+      "payload_kind": "deferred_review_dismissed",
+      "owner": ".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
+      "schema_version": 3,
+      "carried_edge_fields": [
+        "source_run_id",
+        "source_run_attempt",
+        "source_event_name",
+        "source_event_action",
+        "source_event_key",
+        "pr_number",
+        "review_id",
+        "source_commit_id",
+        "actor_login",
+        "actor_id"
+      ],
+      "debug_only_fields": [
+        "source_workflow_name",
+        "source_workflow_file",
+        "source_artifact_name",
+        "payload_filename"
+      ]
+    },
+    {
+      "payload_kind": "deferred_review_comment",
+      "owner": ".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
+      "schema_version": 3,
+      "carried_edge_fields": [
+        "source_run_id",
+        "source_run_attempt",
+        "source_event_name",
+        "source_event_action",
+        "source_event_key",
+        "pr_number",
+        "comment_id",
+        "comment_body",
+        "comment_created_at",
+        "comment_author",
+        "comment_author_id",
+        "comment_user_type",
+        "comment_sender_type",
+        "comment_installation_id",
+        "comment_performed_via_github_app",
+        "issue_author",
+        "issue_state",
+        "issue_labels"
+      ],
+      "debug_only_fields": [
+        "source_workflow_name",
+        "source_workflow_file",
+        "source_artifact_name",
+        "payload_filename"
+      ]
+    }
+  ]
+}

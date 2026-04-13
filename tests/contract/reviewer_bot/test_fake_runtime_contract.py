@@ -1,0 +1,350 @@
+import json
+from pathlib import Path
+
+import pytest
+
+from scripts.reviewer_bot_lib.runtime_protocols import (
+    CommentApplicationRuntimeContext,
+    CommentRoutingRuntimeContext,
+    ReconcileRectifyRuntimeContext,
+    ReconcileWorkflowRuntimeContext,
+)
+from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+from tests.fixtures.focused_fake_services import (
+    ArtifactDownloadTransportStub,
+    ConfigBag,
+    DeferredPayloadStore,
+    GitHubStub,
+    GraphQLTransportStub,
+    HandlerStub,
+    LockStub,
+    OutputCapture,
+    RestTransportStub,
+    StateStoreStub,
+    TouchTrackerStub,
+    WorkflowBehaviorStub,
+    build_default_handler_map,
+)
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
+
+pytestmark = pytest.mark.contract
+
+
+def test_fake_runtime_config_writes_round_trip_locally(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    runtime.set_config_value("EVENT_NAME", "issue_comment")
+
+    assert runtime.get_config_value("EVENT_NAME") == "issue_comment"
+
+
+def test_fake_runtime_config_writes_do_not_leak_to_process_env(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    monkeypatch.delenv("EVENT_NAME", raising=False)
+
+    runtime.set_config_value("EVENT_NAME", "issue_comment")
+
+    import os
+
+    assert "EVENT_NAME" not in os.environ
+    assert hasattr(FakeReviewerBotRuntime, "__getattr__") is False
+    assert "_module" not in vars(runtime)
+
+
+def test_fake_runtime_exposes_explicit_service_fields_and_no_omnibus_service_container(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.config is not None
+    assert runtime.outputs is not None
+    assert runtime.deferred_payloads is not None
+    assert runtime.logger is not None
+    assert runtime.state_store is not None
+    assert runtime.github is not None
+    assert runtime.locks is not None
+    assert runtime.handlers is not None
+    assert runtime.touch_tracker is not None
+    assert runtime.infra is not None
+    assert runtime.domain is not None
+    assert runtime.compat is not None
+    assert hasattr(runtime, "services") is False
+    assert hasattr(runtime, "components") is False
+
+
+def test_fake_runtime_exposes_no_class_level_module_authority_hints(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    module_hints = sorted(name for name in vars(FakeReviewerBotRuntime) if name.endswith("_module"))
+
+    assert module_hints == []
+    assert hasattr(runtime, "review_state_module") is False
+    assert hasattr(runtime, "reviews_module") is False
+
+
+def test_fake_runtime_output_sink_records_writes(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    runtime.write_output("state_changed", "true")
+
+    assert runtime.outputs.writes == [("state_changed", "true")]
+
+
+def test_fake_runtime_recording_logger_captures_structured_events(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    runtime.logger.event("warning", "retrying", issue_number=42, retry_attempt=2)
+
+    assert runtime.logger.records == [
+        {
+            "level": "warning",
+            "message": "retrying",
+            "fields": {"issue_number": 42, "retry_attempt": 2},
+        }
+    ]
+
+
+def test_fake_runtime_touched_items_preserve_uniqueness_and_drain(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    runtime.collect_touched_item(42)
+    runtime.collect_touched_item(42)
+    runtime.collect_touched_item(99)
+
+    assert runtime.drain_touched_items() == [42, 99]
+    assert runtime.drain_touched_items() == []
+
+
+def test_fake_runtime_stub_state_sequence_replays_until_last_snapshot(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.stub_state_sequence({"active_reviews": {"42": {}}}, {"active_reviews": {}})
+
+    first = runtime.load_state()
+    second = runtime.load_state()
+    third = runtime.load_state()
+
+    assert first == {"active_reviews": {"42": {}}}
+    assert second == {"active_reviews": {}}
+    assert third == {"active_reviews": {}}
+
+
+def test_fake_runtime_stub_state_unavailable_requires_fail_closed_load(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.stub_state_unavailable("state unavailable")
+
+    with pytest.raises(RuntimeError, match="state unavailable"):
+        runtime.load_state(fail_on_unavailable=True)
+
+
+def test_fake_runtime_record_saves_captures_structured_snapshots(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    snapshots = []
+    runtime.record_saves(snapshots)
+
+    state = {"active_reviews": {"42": {"current_reviewer": "alice"}}}
+    assert runtime.save_state(state) is True
+    state["active_reviews"]["42"]["current_reviewer"] = "bob"
+
+    assert snapshots == [{"active_reviews": {"42": {"current_reviewer": "alice"}}}]
+
+
+def test_fake_runtime_optional_lock_hooks_are_replaceable(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    calls = []
+    runtime.stub_lock(acquire=lambda: calls.append("acquire") or None, release=lambda: calls.append("release") or True)
+
+    assert runtime.acquire_state_issue_lease_lock() is None
+    assert runtime.release_state_issue_lease_lock() is True
+    assert calls == ["acquire", "release"]
+
+
+def test_fake_runtime_uses_explicit_public_service_fields(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.config is not None
+    assert runtime.outputs is not None
+    assert runtime.deferred_payloads is not None
+    assert runtime.state_store is not None
+    assert runtime.github is not None
+    assert runtime.locks is not None
+    assert runtime.touch_tracker is not None
+
+
+def test_fake_runtime_review_state_compatibility_surface_is_limited(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    allowed = {"ensure_review_entry", "set_current_reviewer", "update_reviewer_activity", "mark_review_complete"}
+    removed = {"record_transition_notice_sent", "accept_channel_event", "record_reviewer_activity", "get_current_cycle_boundary"}
+
+    for name in allowed:
+        assert hasattr(runtime, name)
+    for name in removed:
+        assert hasattr(runtime, name) is False
+
+
+def test_fake_runtime_rejects_unknown_handler_names(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    with pytest.raises(AssertionError, match="Unsupported runtime handler override"):
+        runtime.handlers.stub("handle_everything", lambda state: False)
+
+
+def test_fake_runtime_github_transport_delegates_to_shared_route_fake(monkeypatch):
+    github = RouteGitHubApi().add_request("GET", "pulls/42", status_code=200, payload={"head": {"sha": "head-1"}})
+    runtime = FakeReviewerBotRuntime(monkeypatch, github=github)
+
+    result = runtime.github_api_request("GET", "pulls/42")
+
+    assert result.ok is True
+    assert result.payload == {"head": {"sha": "head-1"}}
+
+
+def test_fake_runtime_github_api_mode_delegates_to_shared_route_fake(monkeypatch):
+    github = RouteGitHubApi().add_api("GET", "pulls/42", {"head": {"sha": "head-1"}})
+    runtime = FakeReviewerBotRuntime(monkeypatch, github=github)
+
+    assert runtime.github_api("GET", "pulls/42") == {"head": {"sha": "head-1"}}
+
+
+def test_focused_fake_service_types_are_exposed_for_direct_fixture_composition(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime.config, ConfigBag)
+    assert isinstance(runtime.outputs, OutputCapture)
+    assert isinstance(runtime.deferred_payloads, DeferredPayloadStore)
+    assert isinstance(runtime.state_store, StateStoreStub)
+    assert isinstance(runtime.github, GitHubStub)
+    assert isinstance(runtime.locks, LockStub)
+    assert isinstance(runtime.rest_transport, RestTransportStub)
+    assert isinstance(runtime.graphql_transport, GraphQLTransportStub)
+    assert isinstance(runtime.artifact_download_transport, ArtifactDownloadTransportStub)
+    assert isinstance(runtime.handlers, HandlerStub)
+    assert isinstance(runtime.touch_tracker, TouchTrackerStub)
+    assert isinstance(runtime.workflow, WorkflowBehaviorStub)
+
+
+def test_fake_runtime_groups_focused_services_into_infra_and_domain_shells(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.infra.config is runtime.config
+    assert runtime.infra.outputs is runtime.outputs
+    assert runtime.infra.deferred_payloads is runtime.deferred_payloads
+    assert runtime.infra.logger is runtime.logger
+    assert runtime.infra.rest_transport is runtime.rest_transport
+    assert runtime.infra.graphql_transport is runtime.graphql_transport
+    assert runtime.infra.artifact_download_transport is runtime.artifact_download_transport
+    assert runtime.infra.touch_tracker is runtime.touch_tracker
+    assert runtime.domain.state_store is runtime.state_store
+    assert runtime.domain.github is runtime.github
+    assert runtime.domain.locks is runtime.locks
+    assert runtime.domain.handlers is runtime.handlers
+    assert runtime.domain.workflow is runtime.workflow
+
+
+def test_fake_runtime_exposes_compatibility_groups_for_thin_delegation(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime.compat, "github")
+    assert hasattr(runtime.compat, "review")
+    assert hasattr(runtime.compat, "state_lock")
+    assert hasattr(runtime.compat, "automation")
+
+
+def test_k1b_fake_runtime_contract_still_exposes_members_needed_by_frozen_reconcile_seams(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime, "assert_lock_held")
+    assert hasattr(runtime, "load_deferred_payload")
+    assert hasattr(runtime, "collect_touched_item")
+    assert hasattr(runtime, "drain_touched_items")
+    assert hasattr(runtime, "github_api_request")
+    assert hasattr(runtime, "github_api")
+    assert hasattr(runtime.adapters.review_state, "maybe_record_head_observation_repair")
+    assert hasattr(runtime.github, "get_pull_request_reviews")
+    assert hasattr(runtime.github, "get_user_permission_status")
+    assert hasattr(runtime, "parse_iso8601_timestamp")
+    assert hasattr(runtime, "satisfy_mandatory_approver_requirement")
+    assert hasattr(runtime, "reconcile_workflow_runtime") is False
+    assert hasattr(runtime, "reconcile_rectify_runtime") is False
+    assert isinstance(ReconcileWorkflowRuntimeContext, type)
+    assert isinstance(ReconcileRectifyRuntimeContext, type)
+
+
+def test_k1c_fake_runtime_satisfies_frozen_workflow_reconcile_protocol(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime, ReconcileWorkflowRuntimeContext)
+
+
+def test_k1d_fake_runtime_contract_keeps_rectify_read_helpers_explicit_without_new_mega_surface(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime, "github_api_request")
+    assert hasattr(runtime, "github_api")
+    assert hasattr(runtime, "parse_iso8601_timestamp")
+    assert hasattr(runtime.github, "get_pull_request_reviews")
+    assert hasattr(runtime.github, "get_user_permission_status")
+    assert hasattr(runtime.adapters.review_state, "maybe_record_head_observation_repair")
+    assert hasattr(runtime, "reconcile_rectify_runtime") is False
+
+
+def test_k1e_fake_runtime_contract_exposes_retained_approval_support_for_rectify_only(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert hasattr(runtime, "satisfy_mandatory_approver_requirement")
+    assert hasattr(runtime, "reconcile_workflow_runtime") is False
+    assert hasattr(runtime, "reconcile_rectify_runtime") is False
+
+
+def test_k1f_fake_runtime_satisfies_finalized_rectify_runtime_protocol(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime, ReconcileRectifyRuntimeContext)
+
+
+def test_k2_fake_runtime_satisfies_narrow_comment_runtime_protocols(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert isinstance(runtime, CommentApplicationRuntimeContext)
+    assert isinstance(runtime, CommentRoutingRuntimeContext)
+
+
+def _load_runtime_surface_inventory() -> dict:
+    return json.loads(
+        Path("tests/fixtures/equivalence/runtime_surface/triple_inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def test_f2a_runtime_surface_inventory_matches_fake_runtime_branch_examples():
+    inventory = _load_runtime_surface_inventory()
+    capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
+
+    assert capabilities["comment-event dispatch"]["fake_runtime_branch"].endswith("handle_comment_event")
+    assert capabilities["privileged accept-no-fls-changes execution"]["fake_runtime_branch"].endswith(
+        "handle_accept_no_fls_changes_command"
+    )
+    assert capabilities["mandatory approver satisfaction"]["fake_runtime_branch"].endswith(
+        "satisfy_mandatory_approver_requirement"
+    )
+    assert "refresh reviewer review from live preferred review" not in capabilities
+    assert "repair missing reviewer review state" not in capabilities
+
+
+def test_f2b_no_migration_required_runtime_surface_triples_are_recorded():
+    inventory = _load_runtime_surface_inventory()
+
+    migration_required = [
+        entry for entry in inventory["capability_triples"] if entry["classification"] == "migration-required compatibility"
+    ]
+
+    assert migration_required == []
+
+
+def test_fake_runtime_default_handlers_are_built_from_focused_fake_service_helper(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    expected = build_default_handler_map(runtime)
+
+    assert set(expected) == HandlerStub.ALLOWED
+    assert "handle_workflow_run_event" not in expected
+    assert "handle_pull_request_review_event" not in expected
+    assert hasattr(runtime, "handle_workflow_run_event") is False

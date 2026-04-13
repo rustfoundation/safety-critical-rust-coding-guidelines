@@ -1,0 +1,86 @@
+{
+  "harness_id": "C4a reconcile replay scenario matrix",
+  "scenarios": [
+    {
+      "scenario_id": "noop_artifact",
+      "fixture_kind": "observer_noop",
+      "expected_state_delta": "create_tracked_review_only",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "none",
+      "expected_reconciled_source_events_mutation": "none",
+      "expected_diagnostic_output": "none"
+    },
+    {
+      "scenario_id": "deferred_comment_replay_matching_live_comment",
+      "fixture_kind": "deferred_comment",
+      "expected_state_delta": "apply_comment_replay",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "clear_or_none",
+      "expected_reconciled_source_events_mutation": "append_source_event_key",
+      "expected_diagnostic_output": "none"
+    },
+    {
+      "scenario_id": "deferred_comment_replay_missing_live_comment",
+      "fixture_kind": "deferred_comment",
+      "expected_state_delta": "no_business_mutation",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "artifact_missing_or_not_found",
+      "expected_reconciled_source_events_mutation": "none",
+      "expected_diagnostic_output": "missing_live_comment"
+    },
+    {
+      "scenario_id": "deferred_comment_replay_digest_or_classification_drift",
+      "fixture_kind": "deferred_comment",
+      "expected_state_delta": "fail_closed_only",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "reconcile_failed_closed",
+      "expected_reconciled_source_events_mutation": "none",
+      "expected_diagnostic_output": "classification_or_digest_drift"
+    },
+    {
+      "scenario_id": "deferred_review_submitted_replay",
+      "fixture_kind": "deferred_review_submitted",
+      "expected_state_delta": "apply_review_replay",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "clear_or_none",
+      "expected_reconciled_source_events_mutation": "append_source_event_key",
+      "expected_diagnostic_output": "none"
+    },
+    {
+      "scenario_id": "deferred_review_dismissed_replay",
+      "fixture_kind": "deferred_review_dismissed",
+      "expected_state_delta": "apply_review_dismissal_replay",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "clear_or_none",
+      "expected_reconciled_source_events_mutation": "append_source_event_key",
+      "expected_diagnostic_output": "none"
+    },
+    {
+      "scenario_id": "deferred_review_comment_replay",
+      "fixture_kind": "deferred_review_comment",
+      "expected_state_delta": "apply_review_comment_replay",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "clear_or_none",
+      "expected_reconciled_source_events_mutation": "append_source_event_key",
+      "expected_diagnostic_output": "none"
+    },
+    {
+      "scenario_id": "freshness_only_update",
+      "fixture_kind": "deferred_comment",
+      "expected_state_delta": "freshness_only",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "none",
+      "expected_reconciled_source_events_mutation": "none",
+      "expected_diagnostic_output": "none"
+    },
+    {
+      "scenario_id": "fail_closed_gap_update",
+      "fixture_kind": "deferred_review_submitted",
+      "expected_state_delta": "fail_closed_only",
+      "expected_touched_items": [42],
+      "expected_deferred_gap_mutation": "reconcile_failed_closed",
+      "expected_reconciled_source_events_mutation": "none",
+      "expected_diagnostic_output": "fail_closed_gap_update"
+    }
+  ]
+}

@@ -1,28 +1,29 @@
-"""Maintenance and operator-dispatch handlers for reviewer-bot."""
+"""Manual maintenance and operator-dispatch handlers for reviewer-bot."""
 
 from __future__ import annotations
 
-import json
-import os
-
 import yaml
 
-from .lifecycle import maybe_record_head_observation_repair
-from .overdue import (
-    backfill_transition_notice_if_present,
-    check_overdue_reviews,
-    handle_overdue_review_warning,
-)
+from . import maintenance_privileged, maintenance_schedule, reviews
+from .event_inputs import build_manual_dispatch_request
 from .project_board import (
     format_preview_for_output,
     preview_board_projection_for_item,
     reviewer_board_preflight,
 )
-from .sweeper import sweep_deferred_gaps
 
-
-def _now_iso(bot) -> str:
-    return bot.datetime.now(bot.timezone.utc).isoformat()
+ScheduleHandlerResult = maintenance_schedule.ScheduleHandlerResult
+_now_iso = maintenance_privileged._now_iso
+_finalize_schedule_result = maintenance_schedule._finalize_schedule_result
+_record_maintenance_repair_marker = maintenance_schedule._record_maintenance_repair_marker
+_run_tracked_pr_repairs = maintenance_schedule._run_tracked_pr_repairs
+repair_missing_reviewer_review_state = maintenance_schedule.repair_missing_reviewer_review_state
+maybe_record_head_observation_repair = maintenance_schedule.maybe_record_head_observation_repair
+check_overdue_reviews = maintenance_schedule.check_overdue_reviews
+handle_overdue_review_warning = maintenance_schedule.handle_overdue_review_warning
+backfill_transition_notice_if_present = maintenance_schedule.backfill_transition_notice_if_present
+handle_transition_notice = maintenance_schedule.handle_transition_notice
+sweep_deferred_gaps = maintenance_schedule.sweep_deferred_gaps
 
 
 def status_projection_repair_needed(bot, state: dict) -> bool:
@@ -31,13 +32,12 @@ def status_projection_repair_needed(bot, state: dict) -> bool:
 
 
 def collect_status_projection_repair_items(bot, state: dict) -> list[int]:
-    numbers = set(bot.list_open_items_with_status_labels())
-    numbers.update(bot.reviews_module.list_open_tracked_review_items(state))
-    return sorted(number for number in numbers if isinstance(number, int) and number > 0)
+    return maintenance_schedule.collect_status_projection_repair_items(bot, state)
 
 
 def handle_manual_dispatch(bot, state: dict) -> bool:
-    action = os.environ.get("MANUAL_ACTION", "")
+    request = build_manual_dispatch_request(bot)
+    action = request.action
     if action == "show-state":
         print(f"Current state:\n{yaml.dump(state, default_flow_style=False)}")
         return False
@@ -51,10 +51,9 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
                 "Reviewer board preview preflight failed: " + "; ".join(preflight.errors)
             )
 
-        issue_number_raw = os.environ.get("ISSUE_NUMBER", "").strip()
         issue_numbers: list[int] = []
-        if issue_number_raw:
-            issue_numbers = [int(issue_number_raw)]
+        if request.issue_number:
+            issue_numbers = [request.issue_number]
         else:
             active_reviews = state.get("active_reviews")
             if isinstance(active_reviews, dict):
@@ -81,95 +80,21 @@ def handle_manual_dispatch(bot, state: dict) -> bool:
         return False
     bot.assert_lock_held("handle_manual_dispatch")
     if action == "sync-members":
-        _, changes = bot.sync_members_with_queue(state)
+        _, changes = bot.adapters.workflow.sync_members_with_queue(state)
         return bool(changes)
     if action == "repair-review-status-labels":
-        for issue_number in bot.list_open_items_with_status_labels():
+        for issue_number in reviews.list_open_items_with_status_labels(bot):
             bot.collect_touched_item(issue_number)
         return False
     if action == "check-overdue":
-        return bot.handle_scheduled_check(state)
+        return maintenance_schedule.handle_scheduled_check_result(bot, state).state_changed
     if action == "execute-pending-privileged-command":
-        source_event_key = os.environ.get("PRIVILEGED_SOURCE_EVENT_KEY", "").strip()
+        source_event_key = request.privileged_source_event_key
         if not source_event_key:
             raise RuntimeError("Missing PRIVILEGED_SOURCE_EVENT_KEY for privileged command execution")
-        for issue_key, review_data in (state.get("active_reviews") or {}).items():
-            if not isinstance(review_data, dict):
-                continue
-            pending = review_data.get("pending_privileged_commands")
-            if not isinstance(pending, dict) or source_event_key not in pending:
-                continue
-            record = pending[source_event_key]
-            if not isinstance(record, dict):
-                raise RuntimeError("Pending privileged command record is malformed")
-            if record.get("status") != "pending":
-                return False
-            issue_number = int(record.get("issue_number") or int(issue_key))
-            actor = str(record.get("actor", "")).strip()
-            command_name = record.get("command_name")
-            if command_name != "accept-no-fls-changes":
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "unsupported_command"
-                return True
-            issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
-            if not isinstance(issue_snapshot, dict) or isinstance(issue_snapshot.get("pull_request"), dict):
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "live_target_invalid"
-                return True
-            labels: set[str] = set()
-            for label in issue_snapshot.get("labels", []):
-                if not isinstance(label, dict):
-                    continue
-                name = label.get("name")
-                if isinstance(name, str):
-                    labels.add(name)
-            if bot.FLS_AUDIT_LABEL not in labels or not bot.check_user_permission(actor, "triage"):
-                record["status"] = "failed_closed"
-                record["completed_at"] = _now_iso(bot)
-                record["result"] = "live_revalidation_failed"
-                return True
-            os.environ["ISSUE_LABELS"] = json.dumps(sorted(labels))
-            message, success = bot.handle_accept_no_fls_changes_command(issue_number, actor)
-            record["completed_at"] = _now_iso(bot)
-            record["result_message"] = message
-            record["status"] = "executed" if success else "failed_closed"
-            return True
-        raise RuntimeError(f"Pending privileged command not found for {source_event_key}")
+        return maintenance_privileged.execute_pending_privileged_command(bot, state, source_event_key)
     return False
 
 
-def handle_scheduled_check(bot, state: dict) -> bool:
-    bot.assert_lock_held("handle_scheduled_check")
-    changed = sweep_deferred_gaps(bot, state)
-    active_reviews = state.get("active_reviews")
-    if isinstance(active_reviews, dict):
-        for issue_key, review_data in active_reviews.items():
-            if not isinstance(review_data, dict) or not review_data.get("current_reviewer"):
-                continue
-            issue_number = int(issue_key)
-            issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
-            if not isinstance(issue_snapshot, dict) or not isinstance(issue_snapshot.get("pull_request"), dict):
-                continue
-            if bot.reviews_module.repair_missing_reviewer_review_state(bot, issue_number, review_data):
-                changed = True
-                bot.collect_touched_item(issue_number)
-            if maybe_record_head_observation_repair(bot, issue_number, review_data):
-                changed = True
-                bot.collect_touched_item(issue_number)
-    overdue_reviews = check_overdue_reviews(bot, state)
-    if not overdue_reviews:
-        return changed
-    for review in overdue_reviews:
-        issue_number = review["issue_number"]
-        reviewer = review["reviewer"]
-        if review["needs_warning"]:
-            if handle_overdue_review_warning(bot, state, issue_number, reviewer):
-                changed = True
-        elif review["needs_transition"]:
-            if backfill_transition_notice_if_present(bot, state, issue_number):
-                changed = True
-            elif bot.handle_transition_notice(state, issue_number, reviewer):
-                changed = True
-    return changed
+def handle_scheduled_check_result(bot, state: dict) -> ScheduleHandlerResult:
+    return maintenance_schedule.handle_scheduled_check_result(bot, state)

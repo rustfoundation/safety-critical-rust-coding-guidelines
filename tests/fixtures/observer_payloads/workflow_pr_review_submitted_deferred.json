@@ -1,0 +1,27 @@
+{
+  "fixture_metadata": {
+    "fixture_id": "workflow_pr_review_submitted_deferred",
+    "contract_class": "workflow_emitted_payload",
+    "contract_source": "workflow YAML",
+    "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml"
+  },
+  "payload": {
+    "payload_kind": "deferred_review_submitted",
+    "schema_version": 3,
+    "source_workflow_name": "Reviewer Bot PR Review Submitted Observer",
+    "source_workflow_file": ".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+    "source_run_id": 402,
+    "source_run_attempt": 4,
+    "source_event_name": "pull_request_review",
+    "source_event_action": "submitted",
+    "source_event_key": "pull_request_review:601",
+    "pr_number": 42,
+    "review_id": 601,
+    "source_submitted_at": "2026-03-20T20:50:00Z",
+    "source_review_state": "approved",
+    "source_commit_id": "abc123def456",
+    "actor_login": "reviewer1",
+    "actor_id": 7002,
+    "source_artifact_name": "reviewer-bot-review-submitted-context-402-attempt-4"
+  }
+}

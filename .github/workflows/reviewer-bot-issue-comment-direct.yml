@@ -61,7 +61,6 @@ jobs:
           COMMENT_ID: ${{ github.event.comment.id }}
           COMMENT_CREATED_AT: ${{ github.event.comment.created_at }}
           COMMENT_USER_TYPE: ${{ github.event.comment.user.type }}
-          COMMENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
           COMMENT_SENDER_TYPE: ${{ github.event.sender.type }}
           COMMENT_INSTALLATION_ID: ${{ github.event.installation.id }}
           COMMENT_PERFORMED_VIA_GITHUB_APP: ${{ github.event.comment.performed_via_github_app != null }}
@@ -72,5 +71,4 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
-          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-issue-comment-direct.yml
         run: uv run --project "$BOT_SRC_ROOT" reviewer-bot

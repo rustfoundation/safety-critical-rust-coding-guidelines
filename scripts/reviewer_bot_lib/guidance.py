@@ -3,6 +3,27 @@
 from .config import BOT_MENTION
 
 
+def get_assignment_failure_comment(reviewer: str, attempt, *, is_pull_request: bool) -> str | None:
+    if attempt.status_code == 422:
+        if is_pull_request:
+            return (
+                "@{reviewer} is designated as reviewer by queue rotation, but GitHub could not add them to PR "
+                "Reviewers automatically (API 422). A triage+ approver may still be required before merge queue."
+            ).format(reviewer=reviewer)
+        return (
+            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not "
+            "add them as an assignee automatically (API 422)."
+        )
+    if attempt.exhausted_retryable_failure:
+        target = "PR Reviewers" if is_pull_request else "issue assignees"
+        suffix = " A triage+ approver may still be required before merge queue." if is_pull_request else ""
+        return (
+            f"@{reviewer} is designated as reviewer by queue rotation, but GitHub could not add them to "
+            f"{target} automatically after retries (status {attempt.status_code}).{suffix}"
+        )
+    return None
+
+
 def get_issue_guidance(reviewer: str, issue_author: str) -> str:
     """Generate guidance text for an issue reviewer."""
     return f"""👋 Hey @{reviewer}! You've been assigned to review this coding guideline issue.

@@ -18,49 +18,26 @@ jobs:
           PAYLOAD_PATH: ${{ runner.temp }}/deferred-review-comment.json
           COMMENT_BODY: ${{ github.event.comment.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_AUTHOR: ${{ github.event.pull_request.user.login }}
+          ISSUE_STATE: ${{ github.event.pull_request.state }}
+          ISSUE_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
           COMMENT_ID: ${{ github.event.comment.id }}
           COMMENT_CREATED_AT: ${{ github.event.comment.created_at }}
           COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
           COMMENT_AUTHOR_ID: ${{ github.event.comment.user.id }}
           COMMENT_USER_TYPE: ${{ github.event.comment.user.type }}
-          COMMENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
           COMMENT_SENDER_TYPE: ${{ github.event.sender.type }}
           COMMENT_INSTALLATION_ID: ${{ github.event.installation.id }}
           COMMENT_PERFORMED_VIA_GITHUB_APP: ${{ github.event.comment.performed_via_github_app != null }}
-          REVIEW_ID: ${{ github.event.comment.pull_request_review_id }}
-          IN_REPLY_TO_ID: ${{ github.event.comment.in_reply_to_id }}
         run: |
           python - <<'PY'
-          import hashlib
           import json
           import os
 
-          body = os.environ['COMMENT_BODY']
-          normalized = "\n".join(line.rstrip() for line in body.replace("\r\n", "\n").split("\n")).strip()
-          has_non_command_text = any(
-              line.strip() and not line.strip().startswith('@guidelines-bot /')
-              for line in normalized.split("\n")
-          )
-          command_lines = [line for line in normalized.split("\n") if line.strip().startswith('@guidelines-bot /')]
-          if len(command_lines) == 0:
-              comment_class = 'plain_text'
-          elif len(command_lines) == 1 and has_non_command_text:
-              comment_class = 'command_plus_text'
-          elif len(command_lines) == 1:
-              comment_class = 'command_only'
-          else:
-              comment_class = 'command_plus_text'
-          actor_class = 'repo_user_principal'
-          user_type = os.environ.get('COMMENT_USER_TYPE', '')
-          author = os.environ.get('COMMENT_AUTHOR', '')
-          if user_type == 'Bot' or author.endswith('[bot]'):
-              actor_class = 'bot_account'
-          elif os.environ.get('COMMENT_INSTALLATION_ID', '').strip():
-              actor_class = 'github_app_or_other_automation'
-          elif not user_type:
-              actor_class = 'unknown_actor'
+          issue_labels = json.loads(os.environ.get('ISSUE_LABELS', '[]') or '[]')
           payload = {
-              'schema_version': 2,
+              'payload_kind': 'deferred_review_comment',
+              'schema_version': 3,
               'source_workflow_name': 'Reviewer Bot PR Review Comment Observer',
               'source_workflow_file': '.github/workflows/reviewer-bot-pr-review-comment-observer.yml',
               'source_run_id': int(os.environ['GITHUB_RUN_ID']),
@@ -70,16 +47,17 @@ jobs:
               'source_event_key': f"pull_request_review_comment:{os.environ['COMMENT_ID']}",
               'pr_number': int(os.environ['PR_NUMBER']),
               'comment_id': int(os.environ['COMMENT_ID']),
-              'comment_class': comment_class,
-              'has_non_command_text': has_non_command_text,
-              'source_body_digest': hashlib.sha256(normalized.encode('utf-8')).hexdigest(),
-              'source_created_at': os.environ['COMMENT_CREATED_AT'],
-              'actor_login': author,
-              'actor_id': int(os.environ['COMMENT_AUTHOR_ID']),
-              'actor_class': actor_class,
-              'pull_request_review_id': int(os.environ['REVIEW_ID']) if os.environ.get('REVIEW_ID', '').strip() else None,
-              'in_reply_to_id': int(os.environ['IN_REPLY_TO_ID']) if os.environ.get('IN_REPLY_TO_ID', '').strip() else None,
-              'source_artifact_name': f"reviewer-bot-review-comment-context-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}",
+              'comment_body': os.environ['COMMENT_BODY'],
+              'comment_created_at': os.environ['COMMENT_CREATED_AT'],
+              'comment_author': os.environ['COMMENT_AUTHOR'],
+              'comment_author_id': int(os.environ['COMMENT_AUTHOR_ID']),
+              'comment_user_type': os.environ['COMMENT_USER_TYPE'],
+              'comment_sender_type': os.environ['COMMENT_SENDER_TYPE'],
+              'comment_installation_id': os.environ.get('COMMENT_INSTALLATION_ID', '').strip() or None,
+              'comment_performed_via_github_app': os.environ['COMMENT_PERFORMED_VIA_GITHUB_APP'] == 'true',
+              'issue_author': os.environ['ISSUE_AUTHOR'],
+              'issue_state': os.environ['ISSUE_STATE'],
+              'issue_labels': [str(label) for label in issue_labels if str(label)],
           }
           with open(os.environ['PAYLOAD_PATH'], 'w', encoding='utf-8') as handle:
               json.dump(payload, handle)

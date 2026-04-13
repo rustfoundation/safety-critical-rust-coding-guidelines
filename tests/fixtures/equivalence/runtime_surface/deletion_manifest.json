@@ -1,0 +1,59 @@
+{
+  "harness_id": "O3 runtime compatibility deletion manifest",
+  "artifact_classification": "active migration proof fixture",
+  "proof_artifacts": [
+    {
+      "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
+      "classification": "rewritten final proof"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_adapter_contract.py",
+      "classification": "rewritten final proof"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+      "classification": "rewritten final proof"
+    }
+  ],
+  "paths": [
+    {
+      "path": "scripts/reviewer_bot_lib/context.py",
+      "reason": "remove dead workflow-run handler compatibility surface"
+    },
+    {
+      "path": "scripts/reviewer_bot_lib/bootstrap_runtime.py",
+      "reason": "remove dead workflow-run handler bootstrap branch"
+    },
+    {
+      "path": "tests/fixtures/fake_runtime.py",
+      "reason": "remove dead workflow-run handler fake-runtime branch"
+    },
+    {
+      "path": "tests/fixtures/focused_fake_services.py",
+      "reason": "remove dead workflow-run handler stub allowance and default mapping"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_adapter_contract.py",
+      "reason": "forbid deleted bootstrap workflow-run handler surface"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_fake_runtime_contract.py",
+      "reason": "forbid deleted fake-runtime workflow-run handler surface"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_runtime_protocols.py",
+      "reason": "forbid deleted workflow-run handler protocol expectation"
+    },
+    {
+      "path": "tests/contract/reviewer_bot/test_review_state_contract.py",
+      "reason": "keep full contract suite aligned with retained split review-state owner surface"
+    }
+  ],
+  "deleted_paths": [
+    "scripts/reviewer_bot_lib/context.py:EventHandlerContext.handle_workflow_run_event",
+    "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapHandlerServices.handle_workflow_run_event",
+    "tests/fixtures/fake_runtime.py:FakeReviewerBotRuntime.handle_workflow_run_event",
+    "tests/fixtures/focused_fake_services.py:HandlerStub.ALLOWED[handle_workflow_run_event]",
+    "tests/fixtures/focused_fake_services.py:build_default_handler_map()[handle_workflow_run_event]"
+  ]
+}

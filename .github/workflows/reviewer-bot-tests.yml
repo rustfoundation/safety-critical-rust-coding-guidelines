@@ -4,21 +4,23 @@ on:
   push:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
+      - 'tests/**'
       - '.github/workflows/reviewer-bot-*.yml'
-      - '.github/reviewer-bot-tests/**'
       - 'pyproject.toml'
   pull_request:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
+      - 'tests/**'
       - '.github/workflows/reviewer-bot-*.yml'
-      - '.github/reviewer-bot-tests/**'
       - 'pyproject.toml'
   workflow_dispatch:
 
 jobs:
-  reviewer-bot-tests:
+  reviewer-bot-unit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,5 +32,82 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
-      - name: Run reviewer bot tests
-        run: uv run pytest .github/reviewer-bot-tests
+      - name: Run reviewer bot unit tests
+        run: uv run pytest tests/unit/reviewer_bot
+
+  reviewer-bot-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run reviewer bot integration tests
+        run: uv run pytest tests/integration/reviewer_bot -m integration
+
+  reviewer-bot-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run reviewer bot contract tests
+        run: uv run pytest tests/contract/reviewer_bot -m contract
+
+  reviewer-bot-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run reviewer bot coverage suite
+        run: >-
+          mkdir -p artifacts/coverage &&
+          COVERAGE_FILE=artifacts/coverage/.coverage
+          uv run pytest tests/unit/reviewer_bot tests/integration/reviewer_bot
+          --cov=scripts.reviewer_bot
+          --cov=scripts.reviewer_bot_lib
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=json:artifacts/coverage/reviewer-bot.json
+
+      - name: Enforce reviewer bot statement and branch floors
+        run: |
+          uv run python - <<'PY'
+          import json
+
+          with open("artifacts/coverage/reviewer-bot.json", encoding="utf-8") as handle:
+              totals = json.load(handle)["totals"]
+
+          statements = totals["percent_statements_covered"]
+          branches = totals["percent_branches_covered"]
+
+          print(f"reviewer-bot statements: {statements:.2f}%")
+          print(f"reviewer-bot branches: {branches:.2f}%")
+
+          if statements < 66:
+              raise SystemExit(
+                  f"reviewer-bot statement coverage below floor: {statements:.2f}% < 66%"
+              )
+          if branches < 48:
+              raise SystemExit(
+                  f"reviewer-bot branch coverage below floor: {branches:.2f}% < 48%"
+              )
+          PY

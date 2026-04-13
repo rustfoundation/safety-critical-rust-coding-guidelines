@@ -1,25 +1,70 @@
 """Reviewer-bot lease lock helpers."""
 
-import json
-import os
-import random
-import time
-import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from . import lock_codec, retrying
 from .config import (
-    LOCK_API_RETRY_LIMIT,
-    LOCK_COMMIT_MARKER,
-    LOCK_LEASE_TTL_SECONDS,
-    LOCK_MAX_WAIT_SECONDS,
-    LOCK_REF_BOOTSTRAP_BRANCH,
     LOCK_REF_NAME,
-    LOCK_RENEWAL_WINDOW_SECONDS,
-    LOCK_RETRY_BASE_SECONDS,
     LeaseContext,
 )
-from .context import LeaseLockContext
+from .runtime_protocols import LeaseLockContext, LeaseLockRuntimeContext
+
+
+def _log(bot: LeaseLockRuntimeContext, level: str, message: str, **fields: Any) -> None:
+    bot.logger.event(level, message, **fields)
+
+
+def _sleep(bot: LeaseLockRuntimeContext, seconds: float) -> None:
+    bot.sleeper.sleep(seconds)
+
+
+def _jitter(bot: LeaseLockRuntimeContext, lower: float, upper: float) -> float:
+    return bot.jitter.uniform(lower, upper)
+
+
+def _retry_delay(bot: LeaseLockRuntimeContext, base_seconds: float, retry_attempt: int) -> float:
+    class _BotJitter:
+        def uniform(self, lower: float, upper: float) -> float:
+            return _jitter(bot, lower, upper)
+
+    return retrying.bounded_exponential_delay(
+        base_seconds,
+        retry_attempt,
+        jitter=_BotJitter(),
+    )
+
+
+def _now(bot: LeaseLockRuntimeContext) -> datetime:
+    return bot.clock.now()
+
+
+def _monotonic(bot: LeaseLockRuntimeContext) -> float:
+    return bot.time.monotonic()
+
+
+def _uuid4_hex(bot: LeaseLockRuntimeContext) -> str:
+    return bot.uuid_source.uuid4_hex()
+
+
+def _lock_lease_ttl_seconds(bot: LeaseLockRuntimeContext) -> int:
+    return bot.lock_lease_ttl_seconds()
+
+
+def _lock_api_retry_limit(bot: LeaseLockRuntimeContext) -> int:
+    return bot.lock_api_retry_limit()
+
+
+def _lock_retry_base_seconds(bot: LeaseLockRuntimeContext) -> float:
+    return bot.lock_retry_base_seconds()
+
+
+def _lock_max_wait_seconds(bot: LeaseLockRuntimeContext) -> int:
+    return bot.lock_max_wait_seconds()
+
+
+def _lock_renewal_window_seconds(bot: LeaseLockRuntimeContext) -> int:
+    return bot.lock_renewal_window_seconds()
 
 
 def lock_is_currently_valid(bot: LeaseLockContext, lock_meta: dict, now: datetime | None = None) -> bool:
@@ -33,33 +78,33 @@ def lock_is_currently_valid(bot: LeaseLockContext, lock_meta: dict, now: datetim
     expires_at = bot.parse_iso8601_timestamp(lock_meta.get("lock_expires_at"))
     if expires_at is None:
         return False
-    now = now or datetime.now(timezone.utc)
+    now = now or _now(bot)
     return expires_at > now
 
 
-def get_lock_owner_context() -> tuple[str, str, str]:
+def get_lock_owner_context(bot: LeaseLockContext) -> tuple[str, str, str]:
     run_id = (
-        os.environ.get("WORKFLOW_RUN_ID", "").strip()
-        or os.environ.get("GITHUB_RUN_ID", "").strip()
+        bot.get_config_value("WORKFLOW_RUN_ID", "").strip()
+        or bot.get_config_value("GITHUB_RUN_ID", "").strip()
         or "local-run"
     )
     workflow = (
-        os.environ.get("WORKFLOW_NAME", "").strip()
-        or os.environ.get("GITHUB_WORKFLOW", "").strip()
+        bot.get_config_value("WORKFLOW_NAME", "").strip()
+        or bot.get_config_value("GITHUB_WORKFLOW", "").strip()
         or "reviewer-bot"
     )
     job = (
-        os.environ.get("WORKFLOW_JOB_NAME", "").strip()
-        or os.environ.get("GITHUB_JOB", "").strip()
+        bot.get_config_value("WORKFLOW_JOB_NAME", "").strip()
+        or bot.get_config_value("GITHUB_JOB", "").strip()
         or "reviewer-bot"
     )
     return run_id, workflow, job
 
 
 def build_lock_metadata(bot: LeaseLockContext, lock_token: str, lock_owner_run_id: str, lock_owner_workflow: str, lock_owner_job: str) -> dict:
-    acquired_at = datetime.now(timezone.utc)
-    expires_at = acquired_at.timestamp() + getattr(bot, "LOCK_LEASE_TTL_SECONDS", LOCK_LEASE_TTL_SECONDS)
-    return bot.normalize_lock_metadata(
+    acquired_at = _now(bot)
+    expires_at = acquired_at.timestamp() + _lock_lease_ttl_seconds(bot)
+    return lock_codec.normalize_lock_metadata(
         {
             "schema_version": 1,
             "lock_state": "locked",
@@ -74,7 +119,7 @@ def build_lock_metadata(bot: LeaseLockContext, lock_token: str, lock_owner_run_i
 
 
 def clear_lock_metadata(bot: LeaseLockContext) -> dict:
-    return bot.normalize_lock_metadata({"lock_state": "unlocked"})
+    return lock_codec.normalize_lock_metadata({"lock_state": "unlocked"})
 
 
 def normalize_lock_ref_name(ref_name: str) -> str:
@@ -87,7 +132,7 @@ def normalize_lock_ref_name(ref_name: str) -> str:
 
 
 def get_lock_ref_name(bot: LeaseLockContext) -> str:
-    return normalize_lock_ref_name(getattr(bot, "LOCK_REF_NAME", LOCK_REF_NAME))
+    return normalize_lock_ref_name(bot.lock_ref_name())
 
 
 def get_lock_ref_display(bot: LeaseLockContext) -> str:
@@ -163,9 +208,13 @@ def _activate_lease_context(
         lock_ref=bot.get_lock_ref_display(),
         lock_expires_at=lock_expires_at,
     )
-    print(
-        "Acquired reviewer-bot lease lock "
-        f"(run_id={lock_owner_run_id}, token_prefix={lock_token[:8]}, lock_ref={bot.get_lock_ref_display()})"
+    _log(
+        bot,
+        "info",
+        "Acquired reviewer-bot lease lock",
+        run_id=lock_owner_run_id,
+        token_prefix=lock_token[:8],
+        lock_ref=bot.get_lock_ref_display(),
     )
     return bot.ACTIVE_LEASE_CONTEXT
 
@@ -179,24 +228,23 @@ def _snapshot_is_stale_unlocked_predecessor(current_lock: dict) -> bool:
 
 
 def render_lock_commit_message(bot: LeaseLockContext, lock_meta: dict) -> str:
-    lock_json = json.dumps(bot.normalize_lock_metadata(lock_meta), sort_keys=False)
-    return f"{LOCK_COMMIT_MARKER}\n{lock_json}"
+    del bot
+    return lock_codec.render_lock_commit_message(lock_meta)
 
 
 def parse_lock_metadata_from_lock_commit_message(bot: LeaseLockContext, message: str) -> dict:
-    if not message.startswith(f"{LOCK_COMMIT_MARKER}\n"):
-        return bot.clear_lock_metadata()
-    lock_json = message.split("\n", 1)[1]
-    try:
-        parsed = json.loads(lock_json)
-    except json.JSONDecodeError:
-        return bot.clear_lock_metadata()
-    return bot.normalize_lock_metadata(parsed if isinstance(parsed, dict) else None)
+    del bot
+    return lock_codec.parse_lock_commit_message(message)
 
 
 def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
     lock_ref = get_lock_ref_name(bot)
-    response = bot.github_api_request("GET", f"git/ref/{lock_ref}", suppress_error_log=True)
+    response = bot.github_api_request(
+        "GET",
+        f"git/ref/{lock_ref}",
+        retry_policy="idempotent_read",
+        suppress_error_log=True,
+    )
     if response.status_code == 200:
         ref_sha = extract_ref_sha(response.payload)
         if not ref_sha:
@@ -208,10 +256,11 @@ def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
             f"{get_lock_ref_display(bot)} (status {response.status_code}): {response.text}"
         )
 
-    default_branch = getattr(bot, "LOCK_REF_BOOTSTRAP_BRANCH", LOCK_REF_BOOTSTRAP_BRANCH)
+    default_branch = bot.lock_ref_bootstrap_branch()
     branch_response = bot.github_api_request(
         "GET",
         f"git/ref/heads/{default_branch}",
+        retry_policy="idempotent_read",
         suppress_error_log=True,
     )
     if branch_response.status_code != 200:
@@ -236,7 +285,12 @@ def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
             f"{get_lock_ref_display(bot)} (status {create_response.status_code}): {create_response.text}"
         )
 
-    refresh_response = bot.github_api_request("GET", f"git/ref/{lock_ref}", suppress_error_log=True)
+    refresh_response = bot.github_api_request(
+        "GET",
+        f"git/ref/{lock_ref}",
+        retry_policy="idempotent_read",
+        suppress_error_log=True,
+    )
     if refresh_response.status_code != 200:
         raise RuntimeError(
             "Unable to read reviewer-bot lock ref after create "
@@ -251,7 +305,12 @@ def ensure_lock_ref_exists(bot: LeaseLockContext) -> str:
 
 def get_lock_ref_snapshot(bot: LeaseLockContext) -> tuple[str, str, dict]:
     ref_sha = ensure_lock_ref_exists(bot)
-    commit_response = bot.github_api_request("GET", f"git/commits/{ref_sha}", suppress_error_log=True)
+    commit_response = bot.github_api_request(
+        "GET",
+        f"git/commits/{ref_sha}",
+        retry_policy="idempotent_read",
+        suppress_error_log=True,
+    )
     if commit_response.status_code != 200:
         raise RuntimeError(
             f"Failed to read lock commit {ref_sha} (status {commit_response.status_code}): {commit_response.text}"
@@ -295,32 +354,37 @@ def ensure_state_issue_lease_lock_fresh(bot: LeaseLockContext) -> bool:
     expires_at = bot.parse_iso8601_timestamp(context.lock_expires_at)
     if expires_at is None:
         return bot.renew_state_issue_lease_lock(context)
-    remaining_seconds = (expires_at - datetime.now(timezone.utc)).total_seconds()
-    renewal_window = getattr(bot, "LOCK_RENEWAL_WINDOW_SECONDS", LOCK_RENEWAL_WINDOW_SECONDS)
+    remaining_seconds = (expires_at - _now(bot)).total_seconds()
+    renewal_window = _lock_renewal_window_seconds(bot)
     if remaining_seconds > renewal_window:
         return True
-    print(
-        "Reviewer-bot lease lock nearing expiry; attempting renewal "
-        f"(remaining={int(remaining_seconds)}s, token_prefix={context.lock_token[:8]})"
+    _log(
+        bot,
+        "info",
+        "Reviewer-bot lease lock nearing expiry; attempting renewal",
+        remaining_seconds=int(remaining_seconds),
+        token_prefix=context.lock_token[:8],
     )
     return bot.renew_state_issue_lease_lock(context)
 
 
 def renew_state_issue_lease_lock(bot: LeaseLockContext, context: LeaseContext) -> bool:
-    retry_limit = getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
-    retry_base = getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+    retry_limit = _lock_api_retry_limit(bot)
+    retry_base = _lock_retry_base_seconds(bot)
     for attempt in range(1, retry_limit + 1):
         try:
             ref_head_sha, tree_sha, current_lock = bot.get_lock_ref_snapshot()
         except RuntimeError as exc:
-            print(f"ERROR: Failed to read lock snapshot during renewal: {exc}", file=bot.sys.stderr)
+            _log(bot, "error", f"Failed to read lock snapshot during renewal: {exc}")
             return False
         current_token = current_lock.get("lock_token")
         if current_token != context.lock_token:
-            print(
-                "ERROR: Cannot renew reviewer-bot lock due to token mismatch "
-                f"(expected prefix={context.lock_token[:8]}, got prefix={str(current_token)[:8]})",
-                file=bot.sys.stderr,
+            _log(
+                bot,
+                "error",
+                "Cannot renew reviewer-bot lock due to token mismatch",
+                expected_prefix=context.lock_token[:8],
+                actual_prefix=str(current_token)[:8],
             )
             return False
         desired_lock = bot.build_lock_metadata(
@@ -331,62 +395,75 @@ def renew_state_issue_lease_lock(bot: LeaseLockContext, context: LeaseContext) -
         )
         create_response = bot.create_lock_commit(ref_head_sha, tree_sha, desired_lock)
         if create_response.status_code != 201:
-            if create_response.status_code == 429 or create_response.status_code >= 500:
-                delay = retry_base + random.uniform(0, retry_base)
-                print(
-                    "Retryable lease lock renewal commit failure "
-                    f"(status {create_response.status_code}); retrying ({attempt}/{retry_limit})",
-                    file=bot.sys.stderr,
+            if retrying.is_retryable_status(create_response.status_code):
+                delay = _retry_delay(bot, retry_base, attempt)
+                _log(
+                    bot,
+                    "warning",
+                    "Retryable lease lock renewal commit failure",
+                    status_code=create_response.status_code,
+                    retry_attempt=attempt,
+                    retry_limit=retry_limit,
                 )
-                time.sleep(delay)
+                _sleep(bot, delay)
                 continue
-            print(
-                f"ERROR: Failed to create lock renewal commit (status {create_response.status_code}): {create_response.text}",
-                file=bot.sys.stderr,
+            _log(
+                bot,
+                "error",
+                f"Failed to create lock renewal commit (status {create_response.status_code}): {create_response.text}",
+                status_code=create_response.status_code,
             )
             return False
         new_commit_sha = extract_commit_sha(create_response.payload)
         if not new_commit_sha:
-            print("ERROR: Lock renewal commit response missing SHA", file=bot.sys.stderr)
+            _log(bot, "error", "Lock renewal commit response missing SHA")
             return False
         update_response = bot.cas_update_lock_ref(new_commit_sha)
         if update_response.status_code == 200:
             context.lock_expires_at = desired_lock.get("lock_expires_at")
-            print(
-                "Renewed reviewer-bot lease lock "
-                f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]})"
+            _log(
+                bot,
+                "info",
+                "Renewed reviewer-bot lease lock",
+                run_id=context.lock_owner_run_id,
+                token_prefix=context.lock_token[:8],
             )
             return True
-        if update_response.status_code in {409, 422, 429} or update_response.status_code >= 500:
-            delay = retry_base + random.uniform(0, retry_base)
-            print(
-                "Retryable lease lock renewal ref update failure "
-                f"(status {update_response.status_code}); retrying ({attempt}/{retry_limit})",
-                file=bot.sys.stderr,
+        if update_response.status_code in {409, 422} or retrying.is_retryable_status(update_response.status_code):
+            delay = _retry_delay(bot, retry_base, attempt)
+            _log(
+                bot,
+                "warning",
+                "Retryable lease lock renewal ref update failure",
+                status_code=update_response.status_code,
+                retry_attempt=attempt,
+                retry_limit=retry_limit,
             )
-            time.sleep(delay)
+            _sleep(bot, delay)
             continue
-        print(
-            f"ERROR: Failed to update lock ref during renewal (status {update_response.status_code}): {update_response.text}",
-            file=bot.sys.stderr,
+        _log(
+            bot,
+            "error",
+            f"Failed to update lock ref during renewal (status {update_response.status_code}): {update_response.text}",
+            status_code=update_response.status_code,
         )
         return False
-    print("ERROR: Exhausted retries while renewing reviewer-bot lease lock", file=bot.sys.stderr)
+    _log(bot, "error", "Exhausted retries while renewing reviewer-bot lease lock")
     return False
 
 
 def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
     if bot.ACTIVE_LEASE_CONTEXT is not None:
         return bot.ACTIVE_LEASE_CONTEXT
-    lock_token = uuid.uuid4().hex
-    lock_owner_run_id, lock_owner_workflow, lock_owner_job = get_lock_owner_context()
-    wait_started_at = time.monotonic()
+    lock_token = _uuid4_hex(bot)
+    lock_owner_run_id, lock_owner_workflow, lock_owner_job = get_lock_owner_context(bot)
+    wait_started_at = _monotonic(bot)
     attempt = 0
-    max_wait = getattr(bot, "LOCK_MAX_WAIT_SECONDS", LOCK_MAX_WAIT_SECONDS)
-    retry_base = getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+    max_wait = _lock_max_wait_seconds(bot)
+    retry_base = _lock_retry_base_seconds(bot)
     while True:
         attempt += 1
-        elapsed = time.monotonic() - wait_started_at
+        elapsed = _monotonic(bot) - wait_started_at
         if elapsed > max_wait:
             raise RuntimeError(
                 "Timed out waiting for reviewer-bot lease lock "
@@ -394,7 +471,7 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                 f"lock_ref={bot.get_lock_ref_display()})"
             )
         ref_head_sha, tree_sha, current_lock = bot.get_lock_ref_snapshot()
-        now = datetime.now(timezone.utc)
+        now = _now(bot)
         lock_valid = bot.lock_is_currently_valid(current_lock, now)
         if lock_valid and _snapshot_matches_expected_lock(current_lock, lock_token):
             if not _snapshot_matches_expected_owner(
@@ -418,13 +495,16 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
             )
             create_response = bot.create_lock_commit(ref_head_sha, tree_sha, desired_lock)
             if create_response.status_code != 201:
-                if create_response.status_code == 429 or create_response.status_code >= 500:
-                    print(
-                        "Retryable lease lock acquire commit failure "
-                        f"(status {create_response.status_code}); retrying (attempt {attempt})"
+                if retrying.is_retryable_status(create_response.status_code):
+                    _log(
+                        bot,
+                        "warning",
+                        "Retryable lease lock acquire commit failure",
+                        status_code=create_response.status_code,
+                        retry_attempt=attempt,
                     )
-                    delay = retry_base + random.uniform(0, retry_base)
-                    time.sleep(delay)
+                    delay = _retry_delay(bot, retry_base, attempt)
+                    _sleep(bot, delay)
                     continue
                 if create_response.status_code in {401, 403}:
                     raise RuntimeError(
@@ -459,12 +539,15 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                         desired_lock.get("lock_expires_at"),
                     )
                 if _snapshot_is_stale_unlocked_predecessor(snapshot_lock):
-                    print(
-                        "Lease lock acquire visibility lag detected; retrying confirmation "
-                        f"(attempt {attempt}, token_prefix={lock_token[:8]})"
+                    _log(
+                        bot,
+                        "warning",
+                        "Lease lock acquire visibility lag detected; retrying confirmation",
+                        retry_attempt=attempt,
+                        token_prefix=lock_token[:8],
                     )
-                    delay = retry_base + random.uniform(0, retry_base)
-                    time.sleep(delay)
+                    delay = _retry_delay(bot, retry_base, attempt)
+                    _sleep(bot, delay)
                     continue
                 conflicting_token = snapshot_lock.get("lock_token") if isinstance(snapshot_lock, dict) else None
                 raise RuntimeError(
@@ -472,10 +555,7 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                     f"(expected prefix={lock_token[:8]}, got prefix={str(conflicting_token)[:8]})"
                 )
             if update_response.status_code in {409, 422}:
-                print(
-                    "Lease lock acquire conflict "
-                    f"(status {update_response.status_code}); retrying (attempt {attempt})"
-                )
+                _log(bot, "warning", "Lease lock acquire conflict", status_code=update_response.status_code, retry_attempt=attempt)
             elif update_response.status_code == 404:
                 raise RuntimeError(f"Lock ref {bot.get_lock_ref_display()} not found while acquiring lease lock")
             elif update_response.status_code in {401, 403}:
@@ -483,11 +563,8 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
                     "Insufficient permission to acquire reviewer-bot lease lock "
                     f"(status {update_response.status_code}): {update_response.text}"
                 )
-            elif update_response.status_code == 429 or update_response.status_code >= 500:
-                print(
-                    "Retryable lease lock acquire failure "
-                    f"(status {update_response.status_code}); retrying (attempt {attempt})"
-                )
+            elif retrying.is_retryable_status(update_response.status_code):
+                _log(bot, "warning", "Retryable lease lock acquire failure", status_code=update_response.status_code, retry_attempt=attempt)
             else:
                 raise RuntimeError(
                     "Unexpected status while acquiring reviewer-bot lease lock "
@@ -496,12 +573,16 @@ def acquire_state_issue_lease_lock(bot: LeaseLockContext) -> LeaseContext:
         else:
             lock_owner = current_lock.get("lock_owner_run_id") or "unknown"
             lock_expires_at = current_lock.get("lock_expires_at") or "unknown"
-            print(
-                "Reviewer-bot lease lock currently held by "
-                f"run_id={lock_owner} until {lock_expires_at}; waiting (lock_ref={bot.get_lock_ref_display()})"
+            _log(
+                bot,
+                "info",
+                "Reviewer-bot lease lock currently held; waiting",
+                lock_owner=lock_owner,
+                lock_expires_at=lock_expires_at,
+                lock_ref=bot.get_lock_ref_display(),
             )
-        delay = retry_base + random.uniform(0, retry_base)
-        time.sleep(delay)
+        delay = _retry_delay(bot, retry_base, attempt)
+        _sleep(bot, delay)
 
 
 def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
@@ -509,88 +590,109 @@ def release_state_issue_lease_lock(bot: LeaseLockContext) -> bool:
     if context is None:
         return True
     released = False
-    retry_limit = getattr(bot, "LOCK_API_RETRY_LIMIT", LOCK_API_RETRY_LIMIT)
-    retry_base = getattr(bot, "LOCK_RETRY_BASE_SECONDS", LOCK_RETRY_BASE_SECONDS)
+    retry_limit = _lock_api_retry_limit(bot)
+    retry_base = _lock_retry_base_seconds(bot)
     try:
         for attempt in range(1, retry_limit + 1):
             try:
                 ref_head_sha, tree_sha, current_lock = bot.get_lock_ref_snapshot()
             except RuntimeError as exc:
-                print(f"ERROR: Failed to read lock snapshot while releasing lock: {exc}", file=bot.sys.stderr)
+                _log(bot, "error", f"Failed to read lock snapshot while releasing lock: {exc}")
                 break
             current_token = current_lock.get("lock_token")
             if current_token != context.lock_token:
                 if _snapshot_is_stale_unlocked_predecessor(current_lock):
-                    print(
-                        "Lease lock release observed stale unlocked predecessor; retrying "
-                        f"(attempt {attempt}, token_prefix={context.lock_token[:8]})",
-                        file=bot.sys.stderr,
+                    _log(
+                        bot,
+                        "warning",
+                        "Lease lock release observed stale unlocked predecessor; retrying",
+                        retry_attempt=attempt,
+                        token_prefix=context.lock_token[:8],
                     )
-                    delay = retry_base + random.uniform(0, retry_base)
-                    time.sleep(delay)
+                    delay = _retry_delay(bot, retry_base, attempt)
+                    _sleep(bot, delay)
                     continue
-                print(
-                    "WARNING: Lease lock token mismatch during release; "
-                    f"expected prefix={context.lock_token[:8]}, got prefix={str(current_token)[:8]}",
-                    file=bot.sys.stderr,
+                _log(
+                    bot,
+                    "warning",
+                    "Lease lock token mismatch during release",
+                    expected_prefix=context.lock_token[:8],
+                    actual_prefix=str(current_token)[:8],
                 )
                 return False
             create_response = bot.create_lock_commit(ref_head_sha, tree_sha, bot.clear_lock_metadata())
             if create_response.status_code != 201:
-                if create_response.status_code in {429} or create_response.status_code >= 500:
-                    print(
-                        "Retryable lease lock release commit failure "
-                        f"(status {create_response.status_code}); retrying ({attempt}/{retry_limit})",
-                        file=bot.sys.stderr,
+                if retrying.is_retryable_status(create_response.status_code):
+                    _log(
+                        bot,
+                        "warning",
+                        "Retryable lease lock release commit failure",
+                        status_code=create_response.status_code,
+                        retry_attempt=attempt,
+                        retry_limit=retry_limit,
                     )
-                    delay = retry_base + random.uniform(0, retry_base)
-                    time.sleep(delay)
+                    delay = _retry_delay(bot, retry_base, attempt)
+                    _sleep(bot, delay)
                     continue
-                print(
-                    f"ERROR: Failed to create lock release commit (status {create_response.status_code}): {create_response.text}",
-                    file=bot.sys.stderr,
+                _log(
+                    bot,
+                    "error",
+                    f"Failed to create lock release commit (status {create_response.status_code}): {create_response.text}",
+                    status_code=create_response.status_code,
                 )
                 break
             new_commit_sha = extract_commit_sha(create_response.payload)
             if not new_commit_sha:
-                print("ERROR: Lock release commit response missing SHA", file=bot.sys.stderr)
+                _log(bot, "error", "Lock release commit response missing SHA")
                 break
             update_response = bot.cas_update_lock_ref(new_commit_sha)
             if update_response.status_code == 200:
                 released = True
-                print(
-                    "Released reviewer-bot lease lock "
-                    f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]}, lock_ref={bot.get_lock_ref_display()})"
+                _log(
+                    bot,
+                    "info",
+                    "Released reviewer-bot lease lock",
+                    run_id=context.lock_owner_run_id,
+                    token_prefix=context.lock_token[:8],
+                    lock_ref=bot.get_lock_ref_display(),
                 )
                 return True
-            if update_response.status_code in {409, 422, 429} or update_response.status_code >= 500:
-                print(
-                    "Retryable lease lock release failure "
-                    f"(status {update_response.status_code}); retrying ({attempt}/{retry_limit})",
-                    file=bot.sys.stderr,
+            if update_response.status_code in {409, 422} or retrying.is_retryable_status(update_response.status_code):
+                _log(
+                    bot,
+                    "warning",
+                    "Retryable lease lock release failure",
+                    status_code=update_response.status_code,
+                    retry_attempt=attempt,
+                    retry_limit=retry_limit,
                 )
-                delay = retry_base + random.uniform(0, retry_base)
-                time.sleep(delay)
+                delay = _retry_delay(bot, retry_base, attempt)
+                _sleep(bot, delay)
                 continue
             if update_response.status_code in {401, 403, 404}:
-                print(
-                    "ERROR: Hard failure releasing reviewer-bot lease lock "
-                    f"(status {update_response.status_code}): {update_response.text}",
-                    file=bot.sys.stderr,
+                _log(
+                    bot,
+                    "error",
+                    f"Hard failure releasing reviewer-bot lease lock (status {update_response.status_code}): {update_response.text}",
+                    status_code=update_response.status_code,
                 )
                 break
-            print(
-                "ERROR: Unexpected status while releasing reviewer-bot lease lock "
-                f"(status {update_response.status_code}): {update_response.text}",
-                file=bot.sys.stderr,
+            _log(
+                bot,
+                "error",
+                f"Unexpected status while releasing reviewer-bot lease lock (status {update_response.status_code}): {update_response.text}",
+                status_code=update_response.status_code,
             )
             break
         return False
     finally:
         if not released:
-            print(
-                "ERROR: Lease lock release failed "
-                f"(run_id={context.lock_owner_run_id}, token_prefix={context.lock_token[:8]}, state_issue_url={context.state_issue_url})",
-                file=bot.sys.stderr,
+            _log(
+                bot,
+                "error",
+                "Lease lock release failed",
+                run_id=context.lock_owner_run_id,
+                token_prefix=context.lock_token[:8],
+                state_issue_url=context.state_issue_url,
             )
         bot.ACTIVE_LEASE_CONTEXT = None

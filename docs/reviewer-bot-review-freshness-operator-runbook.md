@@ -74,7 +74,7 @@ Populate this section before production rollout:
 - environment:
 - event type:
 - exact endpoint used: `GET /repos/{owner}/{repo}/actions/runs/{run_id}`
-- exact accepted field/value signature:
+- exact accepted field/value signature: `{"status": "waiting", "conclusion": null, "name": "approval_pending"}`
 - negative near-miss examples rejected by tests:
 - validation run URL or run id:
 

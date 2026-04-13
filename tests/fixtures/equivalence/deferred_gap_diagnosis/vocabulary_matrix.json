@@ -1,0 +1,30 @@
+{
+  "harness_id": "C5a deferred gap diagnosis vocabulary matrix",
+  "reason_values": [
+    "artifact_missing",
+    "artifact_invalid",
+    "observer_state_unknown",
+    "reconcile_failed_closed"
+  ],
+  "diagnostic_reason_values": [
+    "invalid_source_event_created_at",
+    "workflow_run_scan_unavailable",
+    "unsupported_source_event_kind",
+    "artifact_scan_unavailable",
+    "no_exact_source_event_key_match",
+    "ambiguous_exact_artifact_matches",
+    "run_scan_unknown",
+    "exact_artifact_missing",
+    "artifact_ambiguity",
+    "artifact_invalid"
+  ],
+  "visible_review_repair_categories": [
+    "review_submission_repair",
+    "review_dismissal_repair",
+    "no_repair_recommended"
+  ],
+  "ownership_decision": {
+    "diagnosis": "recommends",
+    "sweeper": "mutates"
+  }
+}

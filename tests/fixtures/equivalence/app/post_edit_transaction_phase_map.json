@@ -1,0 +1,18 @@
+{
+  "harness_id": "D4b app post-edit transaction phase map",
+  "branch_to_phase": {
+    "lock_required acquire": "lock acquisition",
+    "state_store.load_state initial": "initial load",
+    "lock_required pass_until": "pass-until restoration",
+    "lock_required sync_members": "member sync",
+    "issues/pull_request_target/issue_comment/workflow_dispatch/schedule/workflow_run dispatch": "event handling",
+    "drain touched items": "touched-item drain",
+    "schedule empty active reviews guard": "schedule-only empty-active-reviews guard",
+    "_revalidate_epoch authoritative save": "authoritative-save epoch revalidation",
+    "state_store.save_state authoritative": "authoritative save",
+    "state_store.load_state reload before status labels": "reload before status sync",
+    "_revalidate_epoch status-label projection": "status-sync epoch revalidation",
+    "_mark_projection_repair_needed and save_state": "projection failure repair marker persistence",
+    "locks.release": "lock release"
+  }
+}

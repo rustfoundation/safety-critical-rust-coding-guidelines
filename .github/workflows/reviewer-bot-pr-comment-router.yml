@@ -1,0 +1,202 @@
+name: Reviewer Bot PR Comment Router
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+env:
+  STATE_ISSUE_NUMBER: '314'
+
+jobs:
+  route-pr-comment:
+    if: ${{ github.event.issue.pull_request != null }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      route_outcome: ${{ steps.route.outputs.route_outcome }}
+      pr_head_full_name: ${{ steps.route.outputs.pr_head_full_name }}
+      pr_author: ${{ steps.route.outputs.pr_author }}
+      issue_state: ${{ steps.route.outputs.issue_state }}
+      issue_labels: ${{ steps.route.outputs.issue_labels }}
+      comment_author_id: ${{ steps.route.outputs.comment_author_id }}
+      reviewer_bot_trust_class: ${{ steps.route.outputs.reviewer_bot_trust_class }}
+    steps:
+      - name: Route PR comment
+        id: route
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAYLOAD_PATH: ${{ runner.temp }}/deferred-comment.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          event_path = Path(os.environ['GITHUB_EVENT_PATH'])
+          event = json.loads(event_path.read_text(encoding='utf-8'))
+          repo = os.environ['GITHUB_REPOSITORY']
+          issue = event['issue']
+          comment = event['comment']
+          sender = event.get('sender') or {}
+          installation = event.get('installation') or {}
+          labels = [str(item.get('name') or '') for item in issue.get('labels') or []]
+          issue_labels_json = json.dumps([label for label in labels if label])
+          issue_state = str(issue.get('state') or '').strip()
+          comment_author = str((comment.get('user') or {}).get('login') or '').strip()
+          comment_user_type = str((comment.get('user') or {}).get('type') or '').strip()
+          comment_sender_type = str(sender.get('type') or '').strip()
+          comment_author_association = str(comment.get('author_association') or '').strip()
+          performed_via_github_app = bool(comment.get('performed_via_github_app'))
+          installation_id = installation.get('id')
+          route_outcome = 'trusted_direct'
+          pr_head_full_name = ''
+          pr_author = ''
+
+          if (
+              comment_user_type != 'User'
+              or comment_author.endswith('[bot]')
+              or performed_via_github_app
+              or str(installation_id or '').strip()
+              or not comment_author
+          ):
+              route_outcome = 'safe_noop'
+          else:
+              pr_number = issue['number']
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/pulls/{pr_number}",
+                  headers={
+                      'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+                      'Accept': 'application/vnd.github+json',
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req) as response:
+                      pull_request = json.load(response)
+              except urllib.error.URLError:
+                  route_outcome = 'deferred_reconcile'
+              else:
+                  head_repo = pull_request.get('head', {}).get('repo') or {}
+                  pr_head_full_name = str(head_repo.get('full_name') or '').strip()
+                  pr_author = str((pull_request.get('user') or {}).get('login') or '').strip()
+                  if (
+                      not pr_head_full_name
+                      or not pr_author
+                      or pr_head_full_name != repo
+                      or pr_author == 'dependabot[bot]'
+                      or comment_author_association not in {'OWNER', 'MEMBER', 'COLLABORATOR'}
+                  ):
+                      route_outcome = 'deferred_reconcile'
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as handle:
+              print(f'route_outcome={route_outcome}', file=handle)
+              print(f'pr_head_full_name={pr_head_full_name}', file=handle)
+              print(f'pr_author={pr_author}', file=handle)
+              print(f'issue_state={issue_state}', file=handle)
+              print(f'issue_labels={issue_labels_json}', file=handle)
+              print(f'comment_author_id={int((comment.get("user") or {}).get("id") or 0)}', file=handle)
+              print('reviewer_bot_trust_class=pr_trusted_direct', file=handle)
+
+          if route_outcome == 'deferred_reconcile':
+              payload = {
+                  'payload_kind': 'deferred_comment',
+                  'schema_version': 3,
+                  'source_workflow_name': 'Reviewer Bot PR Comment Router',
+                  'source_workflow_file': '.github/workflows/reviewer-bot-pr-comment-router.yml',
+                  'source_run_id': int(os.environ['GITHUB_RUN_ID']),
+                  'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+                  'source_event_name': 'issue_comment',
+                  'source_event_action': 'created',
+                  'source_event_key': f"issue_comment:{comment['id']}",
+                  'pr_number': int(issue['number']),
+                  'comment_id': int(comment['id']),
+                  'comment_body': str(comment.get('body') or ''),
+                  'comment_created_at': str(comment.get('created_at') or ''),
+                  'comment_author': comment_author,
+                  'comment_author_id': int((comment.get('user') or {}).get('id') or 0),
+                  'comment_user_type': comment_user_type,
+                  'comment_sender_type': comment_sender_type,
+                  'comment_installation_id': str(installation_id) if installation_id is not None else None,
+                  'comment_performed_via_github_app': performed_via_github_app,
+                  'issue_author': str((issue.get('user') or {}).get('login') or ''),
+                  'issue_state': issue_state,
+                  'issue_labels': [label for label in labels if label],
+              }
+              Path(os.environ['PAYLOAD_PATH']).write_text(json.dumps(payload), encoding='utf-8')
+          PY
+      - name: Upload deferred comment artifact
+        if: ${{ steps.route.outputs.route_outcome == 'deferred_reconcile' }}
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: reviewer-bot-comment-context-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deferred-comment.json
+          retention-days: 7
+          if-no-files-found: error
+
+  trusted-direct:
+    if: ${{ needs.route-pr-comment.outputs.route_outcome == 'trusted_direct' }}
+    needs: [route-pr-comment]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Install uv
+        run: python -m pip install uv
+      - name: Fetch trusted bot source tarball
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import io, os, tarfile, urllib.request
+          from pathlib import Path
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/tarball/{os.environ['GITHUB_SHA']}",
+              headers={'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}", 'Accept': 'application/vnd.github+json'},
+          )
+          target = Path(os.environ['RUNNER_TEMP']) / 'reviewer-bot-src'
+          target.mkdir(parents=True, exist_ok=True)
+          with urllib.request.urlopen(req) as response:
+              data = response.read()
+          with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as archive:
+              archive.extractall(target)
+          roots = list(target.iterdir())
+          print(f'BOT_SRC_ROOT={roots[0]}', file=open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8'))
+          PY
+      - name: Run reviewer bot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: issue_comment
+          EVENT_ACTION: created
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_STATE: ${{ needs.route-pr-comment.outputs.issue_state }}
+          ISSUE_LABELS: ${{ needs.route-pr-comment.outputs.issue_labels }}
+          IS_PULL_REQUEST: 'true'
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_AUTHOR_ID: ${{ needs.route-pr-comment.outputs.comment_author_id }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_CREATED_AT: ${{ github.event.comment.created_at }}
+          COMMENT_USER_TYPE: ${{ github.event.comment.user.type }}
+          COMMENT_SENDER_TYPE: ${{ github.event.sender.type }}
+          COMMENT_INSTALLATION_ID: ${{ github.event.installation.id }}
+          COMMENT_PERFORMED_VIA_GITHUB_APP: ${{ github.event.comment.performed_via_github_app != null }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_HEAD_FULL_NAME: ${{ needs.route-pr-comment.outputs.pr_head_full_name }}
+          PR_AUTHOR: ${{ needs.route-pr-comment.outputs.pr_author }}
+          REVIEWER_BOT_ROUTE_OUTCOME: ${{ needs.route-pr-comment.outputs.route_outcome }}
+          REVIEWER_BOT_TRUST_CLASS: ${{ needs.route-pr-comment.outputs.reviewer_bot_trust_class }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          WORKFLOW_JOB_NAME: ${{ github.job }}
+        run: uv run --project "$BOT_SRC_ROOT" reviewer-bot

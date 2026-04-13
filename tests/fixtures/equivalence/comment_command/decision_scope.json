@@ -1,0 +1,31 @@
+{
+  "harness_id": "C3b1 command decision equivalence",
+  "in_scope_command_set": [
+    "pass",
+    "away",
+    "label",
+    "sync-members",
+    "queue",
+    "commands",
+    "claim",
+    "release",
+    "rectify",
+    "r?-user",
+    "assign-from-queue",
+    "r?",
+    "_multiple_commands",
+    "_malformed_known",
+    "_malformed_unknown",
+    "unknown_command"
+  ],
+  "deferred_command_set": [
+    "accept-no-fls-changes"
+  ],
+  "equivalence_scenarios": [
+    "queue_success",
+    "label_triplet_handler",
+    "away_missing_date",
+    "multiple_commands_warning",
+    "unknown_command_error"
+  ]
+}

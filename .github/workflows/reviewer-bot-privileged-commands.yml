@@ -69,6 +69,5 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           WORKFLOW_NAME: ${{ github.workflow }}
           WORKFLOW_JOB_NAME: ${{ github.job }}
-          CURRENT_WORKFLOW_FILE: .github/workflows/reviewer-bot-privileged-commands.yml
           REVIEWER_BOT_TARGET_REPO_ROOT: ${{ github.workspace }}
         run: uv run --project "$BOT_SRC_ROOT" python "$BOT_SRC_ROOT/scripts/reviewer_bot.py"

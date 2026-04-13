@@ -1,0 +1,53 @@
+{
+  "harness_id": "H2a mandatory-approver decision equivalence",
+  "owner": [
+    "scripts.reviewer_bot_lib.reviews.trigger_mandatory_approver_escalation",
+    "scripts.reviewer_bot_lib.reviews.satisfy_mandatory_approver_requirement"
+  ],
+  "out_of_scope": [
+    "reviewer-response derivation",
+    "label writes outside mandatory approver decisions"
+  ],
+  "rows": [
+    {
+      "id": "escalation_required_label_apply_ping_required",
+      "decision_rows": [
+        "escalation-required decision",
+        "label-apply decision",
+        "ping-required decision"
+      ],
+      "result": true
+    },
+    {
+      "id": "escalation_already_required_label_and_ping_already_recorded",
+      "decision_rows": [
+        "escalation-required decision",
+        "label-apply decision",
+        "ping-required decision"
+      ],
+      "result": false
+    },
+    {
+      "id": "satisfaction_allowed_with_label_remove",
+      "decision_rows": [
+        "satisfaction-allowed decision",
+        "label-remove decision"
+      ],
+      "result": true
+    },
+    {
+      "id": "satisfaction_denied_when_not_required",
+      "decision_rows": [
+        "satisfaction-allowed decision"
+      ],
+      "result": false
+    },
+    {
+      "id": "satisfaction_denied_when_already_satisfied",
+      "decision_rows": [
+        "satisfaction-allowed decision"
+      ],
+      "result": false
+    }
+  ]
+}

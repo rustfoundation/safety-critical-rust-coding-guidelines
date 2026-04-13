@@ -1,0 +1,14 @@
+{
+  "harness_id": "C3a trust-routing and comment classification equivalence",
+  "route_scenarios": [
+    "same_repo_trusted_pr_comment",
+    "cross_repo_deferred_pr_comment",
+    "automation_or_self_noop_pr_comment",
+    "issue_comment_direct"
+  ],
+  "payload_scenarios": [
+    "command_plus_text",
+    "trusted_direct_observer_noop",
+    "deferred_observer_payload"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "harness_id": "C2b approval/completion derivation equivalence",
+  "in_scope_move_functions": [
+    "compute_pr_approval_state_result",
+    "find_triage_approval_after"
+  ],
+  "out_of_scope_functions": [
+    "compute_reviewer_response_state"
+  ]
+}

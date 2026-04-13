@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+from .config import TRANSITION_NOTICE_MARKER_PREFIX
+
+_TRANSITION_NOTICE_FALLBACK_FIRST_LINE = "🔔 **Transition Period Ended**"
+_TRANSITION_NOTICE_AUTHORS = {"github-actions[bot]", "guidelines-bot"}
+
+
+def _log(bot, level: str, message: str, **fields) -> None:
+    bot.logger.event(level, message, **fields)
+
 
 def check_overdue_reviews(bot, state: dict) -> list[dict]:
     """Check all active reviews for overdue ones."""
@@ -18,15 +27,20 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
         if review_data.get("review_completed_at"):
             continue
 
+        if review_data.get("transition_notice_sent_at"):
+            continue
+
         current_reviewer = review_data.get("current_reviewer")
         if not current_reviewer:
             continue
 
         issue_number = int(issue_key)
-        issue_snapshot = bot.get_issue_or_pr_snapshot(issue_number)
-        if isinstance(issue_snapshot, dict) and isinstance(issue_snapshot.get("pull_request"), dict):
-            response_state = bot.reviews_module.compute_reviewer_response_state(
-                bot,
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
+        if not isinstance(issue_snapshot, dict):
+            _log(bot, "warning", f"Skipping overdue evaluation for #{issue_number}; issue/PR snapshot unavailable", issue_number=issue_number)
+            continue
+        if isinstance(issue_snapshot.get("pull_request"), dict):
+            response_state = bot.adapters.review_state.compute_reviewer_response_state(
                 issue_number,
                 review_data,
                 issue_snapshot=issue_snapshot,
@@ -53,11 +67,6 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             continue
 
         transition_warning_sent = review_data.get("transition_warning_sent")
-        transition_notice_sent_at = review_data.get("transition_notice_sent_at")
-
-        if transition_notice_sent_at:
-            continue
-
         if transition_warning_sent:
             try:
                 warning_dt = bot.datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
@@ -91,39 +100,45 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
     return overdue
 
 
-def find_existing_transition_notice(bot, issue_number: int, transition_warning_sent: str | None) -> str | None:
+def find_existing_transition_notice(bot, issue_number: int, transition_warning_sent: str | None, reviewer: str | None = None) -> str | None:
     if not isinstance(transition_warning_sent, str) or not transition_warning_sent:
         return None
     try:
         warning_dt = bot.datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
         return None
-    response = bot.github_api("GET", f"issues/{issue_number}/comments?per_page=100")
-    if not isinstance(response, list):
-        return None
     first_match = None
-    for comment in response:
-        if not isinstance(comment, dict):
-            continue
-        user = comment.get("user")
-        login = user.get("login") if isinstance(user, dict) else None
-        created_at = comment.get("created_at")
-        body = comment.get("body")
-        if not isinstance(login, str) or not isinstance(created_at, str) or not isinstance(body, str):
-            continue
-        if login != "github-actions[bot]":
-            continue
-        first_line = body.splitlines()[0].strip() if body.splitlines() else ""
-        if first_line != "🔔 **Transition Period Ended**":
-            continue
-        try:
-            created_dt = bot.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
-            continue
-        if created_dt < warning_dt:
-            continue
-        if first_match is None or created_dt < first_match[0]:
-            first_match = (created_dt, created_at)
+    marker = f"<!-- {TRANSITION_NOTICE_MARKER_PREFIX} issue={issue_number} reviewer={reviewer or ''} -->"
+    page = 1
+    while True:
+        response = bot.github_api("GET", f"issues/{issue_number}/comments?per_page=100&page={page}")
+        if not isinstance(response, list):
+            return None
+        for comment in response:
+            if not isinstance(comment, dict):
+                continue
+            user = comment.get("user")
+            login = user.get("login") if isinstance(user, dict) else None
+            created_at = comment.get("created_at")
+            body = comment.get("body")
+            if not isinstance(login, str) or not isinstance(created_at, str) or not isinstance(body, str):
+                continue
+            if login not in _TRANSITION_NOTICE_AUTHORS:
+                continue
+            try:
+                created_dt = bot.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            except (ValueError, AttributeError):
+                continue
+            if created_dt < warning_dt:
+                continue
+            lines = body.splitlines()
+            first_line = lines[0].strip() if lines else ""
+            if first_line == marker or first_line == _TRANSITION_NOTICE_FALLBACK_FIRST_LINE:
+                if first_match is None or created_dt < first_match[0]:
+                    first_match = (created_dt, created_at)
+        if len(response) < 100:
+            break
+        page += 1
     return first_match[1] if first_match else None
 
 
@@ -137,7 +152,12 @@ def backfill_transition_notice_if_present(bot, state: dict, issue_number: int) -
         return False
     if review_data.get("transition_notice_sent_at"):
         return False
-    existing_notice = find_existing_transition_notice(bot, issue_number, review_data.get("transition_warning_sent"))
+    existing_notice = find_existing_transition_notice(
+        bot,
+        issue_number,
+        review_data.get("transition_warning_sent"),
+        review_data.get("current_reviewer"),
+    )
     if not existing_notice:
         return False
     review_data["transition_notice_sent_at"] = existing_notice
@@ -169,10 +189,11 @@ If no action is taken within {bot.TRANSITION_PERIOD_DAYS} days, you may be trans
 
 _Life happens! If you're dealing with something, just let us know._"""
 
-    bot.post_comment(issue_number, warning_message)
+    if not bot.github.post_comment(issue_number, warning_message):
+        return False
 
     now = bot.datetime.now(bot.timezone.utc).isoformat()
     review_data["transition_warning_sent"] = now
 
-    print(f"Posted overdue warning for #{issue_number} to @{reviewer}")
+    _log(bot, "info", f"Posted overdue warning for #{issue_number} to @{reviewer}", issue_number=issue_number, reviewer=reviewer)
     return True

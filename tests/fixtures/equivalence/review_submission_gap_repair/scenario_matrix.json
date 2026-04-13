@@ -1,0 +1,20 @@
+{
+  "harness_id": "H4a review-submitted gap repair flow equivalence",
+  "out_of_scope": [
+    "production cutover",
+    "other sweeper repair flows"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "submitted_review_visible_without_exact_artifact",
+      "expected_reason": null,
+      "expected_diagnostic_reason": null,
+      "expected_repair_category": "review_submission_repair",
+      "expected_recommendation_payload": {
+        "author": "alice",
+        "submitted_at": "2026-03-25T11:00:00Z",
+        "commit_id": "head-1"
+      }
+    }
+  ]
+}

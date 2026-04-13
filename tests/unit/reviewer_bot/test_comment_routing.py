@@ -1,0 +1,155 @@
+from types import SimpleNamespace
+
+import pytest
+
+from scripts.reviewer_bot_core.comment_routing_policy import PrCommentRouterOutcome
+from scripts.reviewer_bot_lib import comment_application, comment_routing, review_state
+from scripts.reviewer_bot_lib.context import CommentEventRequest
+from tests.fixtures.comment_routing_harness import CommentRoutingHarness
+from tests.fixtures.reviewer_bot import make_state
+
+
+def test_record_conversation_freshness_returns_true_when_only_reviewer_activity_changes(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    assert harness.handlers is harness.runtime.handlers
+    state = make_state()
+    review = review_state.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    review["last_reviewer_activity"] = "2026-03-17T09:00:00Z"
+    review["transition_warning_sent"] = "2026-03-18T00:00:00Z"
+    review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
+    review_state.accept_channel_event(
+        review,
+        "reviewer_comment",
+        semantic_key="issue_comment:100",
+        timestamp="2026-03-17T09:00:00Z",
+        actor="alice",
+    )
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        issue_author="dana",
+        comment_id=100,
+        comment_author="alice",
+        comment_body="hello",
+        comment_created_at="2026-03-17T10:00:00Z",
+        comment_source_event_key="issue_comment:100",
+    )
+
+    changed = comment_application.record_conversation_freshness(
+        harness.runtime,
+        state,
+        request,
+    )
+
+    assert changed is True
+    assert review["last_reviewer_activity"] == "2026-03-17T10:00:00Z"
+    assert review["transition_warning_sent"] is None
+    assert review["transition_notice_sent_at"] is None
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ({"COMMENT_USER_TYPE": "Bot", "COMMENT_AUTHOR": "reviewer-bot"}, "bot_account"),
+        ({"COMMENT_INSTALLATION_ID": "12345"}, "github_app_or_other_automation"),
+        ({"COMMENT_USER_TYPE": "User", "COMMENT_AUTHOR": "alice"}, "repo_user_principal"),
+        ({"COMMENT_AUTHOR": "mystery", "COMMENT_USER_TYPE": ""}, "unknown_actor"),
+    ],
+)
+def test_classify_issue_comment_actor(monkeypatch, env, expected):
+    harness = CommentRoutingHarness(monkeypatch)
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=False,
+        comment_author=env.get("COMMENT_AUTHOR", ""),
+        comment_body="hello",
+        comment_user_type=env.get("COMMENT_USER_TYPE", ""),
+    )
+    request = CommentEventRequest(
+        **{
+            **request.__dict__,
+            "comment_installation_id": env.get("COMMENT_INSTALLATION_ID", ""),
+        }
+    )
+    assert comment_routing.classify_issue_comment_actor(request) == expected
+
+
+def test_classify_comment_payload_distinguishes_command_plus_text():
+    payload = comment_routing.classify_comment_payload(
+        SimpleNamespace(
+            BOT_MENTION="@guidelines-bot",
+            adapters=SimpleNamespace(
+                commands=SimpleNamespace(
+                    strip_code_blocks=lambda body: body,
+                    parse_command=lambda body: ("queue", []),
+                )
+            ),
+        ),
+        "hello\n@guidelines-bot /queue",
+    )
+    assert payload["comment_class"] == "command_plus_text"
+    assert payload["has_non_command_text"] is True
+
+
+def test_route_issue_comment_trust_allows_only_same_repo_repo_user_principal(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=True,
+        issue_author="carol",
+        comment_author="alice",
+        comment_body="hello",
+    )
+    pr_admission = harness.pr_admission(
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_head_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_author="carol",
+    )
+    assert comment_routing.route_issue_comment_trust(harness.runtime, 42, request, pr_admission) == PrCommentRouterOutcome.TRUSTED_DIRECT
+
+
+def test_route_issue_comment_trust_fails_closed_for_ambiguous_same_repo(monkeypatch):
+    harness = CommentRoutingHarness(monkeypatch)
+    request = harness.request(
+        issue_number=42,
+        is_pull_request=True,
+        issue_author="carol",
+        comment_author="alice",
+        comment_body="hello",
+        comment_user_type="",
+    )
+    pr_admission = harness.pr_admission(
+        github_repository="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_head_full_name="rustfoundation/safety-critical-rust-coding-guidelines",
+        pr_author="carol",
+    )
+    with pytest.raises(RuntimeError, match="Ambiguous same-repo PR comment trust posture"):
+        comment_routing.route_issue_comment_trust(harness.runtime, 42, request, pr_admission)
+
+
+def test_comment_routing_module_delegates_routing_and_classification_to_core_policy():
+    with open("scripts/reviewer_bot_lib/comment_routing.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert "from scripts.reviewer_bot_core import comment_routing_policy" in module_text
+    assert "return comment_routing_policy.classify_issue_comment_actor(request)" in module_text
+    assert "return comment_routing_policy.classify_comment_payload(bot.BOT_MENTION, normalized, parsed)" in module_text
+    assert "return comment_routing_policy.route_issue_comment_trust(" in module_text
+
+
+def test_comment_application_delegates_freshness_decision_to_core_policy():
+    with open("scripts/reviewer_bot_lib/comment_application.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert "comment_freshness_policy" in module_text
+    assert "decision = comment_freshness_policy.decide_comment_freshness(review_data, request)" in module_text
+
+
+def test_k2_comment_routing_entrypoints_use_narrow_comment_runtime_protocol():
+    with open("scripts/reviewer_bot_lib/comment_routing.py", encoding="utf-8") as handle:
+        module_text = handle.read()
+
+    assert "CommentRoutingRuntimeContext" in module_text
+    assert "bot: CommentRoutingRuntimeContext" in module_text
