@@ -107,7 +107,7 @@ def test_execute_run_records_repair_needed_when_projection_fails(monkeypatch, tm
     harness.stub_save_state(fake_save_state)
     harness.stub_pass_until(lambda current_state: (current_state, []))
     harness.stub_sync_members(lambda current_state: (current_state, []))
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "labels": [], "pull_request": None}
+    harness.runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "labels": [], "pull_request": None}
     harness.stub_sync_status_labels(lambda current_state, issue_numbers: (_ for _ in ()).throw(RuntimeError("projection failed")))
     output_path = tmp_path / "github-output.txt"
     monkeypatch.setenv("GITHUB_OUTPUT", str(output_path))
@@ -153,7 +153,7 @@ def test_schedule_overdue_check_does_not_repeat_warning_after_stale_review_repai
         "handle_scheduled_check_result",
         lambda bot, current: maintenance.ScheduleHandlerResult(False, []),
     )
-    harness.runtime.post_comment = lambda issue_number, body: posted_comments.append((issue_number, body)) or True
+    harness.runtime.github.post_comment = lambda issue_number, body: posted_comments.append((issue_number, body)) or True
     harness.stub_save_state(
         lambda current: saved_warning_values.append(current["active_reviews"]["42"]["transition_warning_sent"]) or True
     )

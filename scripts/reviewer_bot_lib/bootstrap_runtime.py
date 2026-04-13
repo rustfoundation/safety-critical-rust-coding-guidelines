@@ -53,6 +53,9 @@ class _BootstrapGitHubServices:
     def github_api(self, *args, **kwargs):
         return github_api.github_api(self._runtime_getter(), *args, **kwargs)
 
+    def github_graphql_request(self, *args, **kwargs):
+        return github_api.github_graphql_request(self._runtime_getter(), *args, **kwargs)
+
     def get_github_token(self):
         return github_api.get_github_token(self._runtime_getter())
 

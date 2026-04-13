@@ -11,11 +11,11 @@ def test_reconcile_active_review_entry_uses_explicit_head_repair_changed_field(m
 
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("IS_PULL_REQUEST", "true")
-    runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(
+    runtime.adapters.review_state.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(
         changed=False,
         outcome="unchanged",
     )
-    runtime.get_pull_request_reviews = lambda issue_number: []
+    runtime.github.get_pull_request_reviews = lambda issue_number: []
     monkeypatch.setattr(reconcile, "refresh_reviewer_review_from_live_preferred_review", lambda bot, issue_number, review_data, **kwargs: (False, None))
     monkeypatch.setattr(reconcile, "_record_review_rebuild", lambda bot, state_obj, issue_number, review_data: False)
 

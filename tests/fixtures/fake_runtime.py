@@ -22,6 +22,7 @@ from scripts.reviewer_bot_lib.config import (
     AUTHOR_ASSOCIATION_TRUST_ALLOWLIST,
     BOT_MENTION,
     BOT_NAME,
+    COMMANDS,
     DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS,
     DEFERRED_DISCOVERY_OVERLAP_SECONDS,
     EVENT_INTENT_MUTATING,
@@ -42,8 +43,11 @@ from scripts.reviewer_bot_lib.config import (
     LOCK_RENEWAL_WINDOW_SECONDS_ENV,
     LOCK_RETRY_BASE_SECONDS,
     LOCK_RETRY_BASE_SECONDS_ENV,
+    REVIEW_DEADLINE_DAYS,
     REVIEW_FRESHNESS_RUNBOOK_PATH,
+    REVIEW_LABELS,
     REVIEWER_REQUEST_422_TEMPLATE,
+    STATE_ISSUE_NUMBER,
     STATE_READ_RETRY_BASE_SECONDS,
     STATE_READ_RETRY_BASE_SECONDS_ENV,
     STATE_READ_RETRY_LIMIT,
@@ -123,11 +127,6 @@ class FakeRuntimeAdapterServices:
         return self._runtime.workflow.sync_status_labels_for_items(state, issue_numbers)
 
 
-def runtime_instance_override(runtime: "FakeReviewerBotRuntime", name: str):
-    override = runtime.__dict__.get(name)
-    return override if callable(override) else None
-
-
 class FakeRuntimeGitHubCompatibility:
     def __init__(self, runtime: "FakeReviewerBotRuntime"):
         self._runtime = runtime
@@ -194,9 +193,6 @@ class FakeRuntimeReviewCompatibility:
         self._runtime = runtime
 
     def maybe_record_head_observation_repair(self, issue_number: int, review_data: dict):
-        override = runtime_instance_override(self._runtime, "maybe_record_head_observation_repair")
-        if override is not None:
-            return override(issue_number, review_data)
         return lifecycle_module.maybe_record_head_observation_repair(self._runtime, issue_number, review_data)
 
     def handle_transition_notice(self, state: dict, issue_number: int, reviewer: str) -> bool:
@@ -269,9 +265,6 @@ class FakeRuntimeReviewCompatibility:
         return queue_module.reposition_member_as_next(state, username)
 
     def compute_reviewer_response_state(self, issue_number: int, state: dict, *, issue_snapshot=None):
-        override = runtime_instance_override(self._runtime, "compute_reviewer_response_state")
-        if override is not None:
-            return override(issue_number, state, issue_snapshot=issue_snapshot)
         return reviews_module.compute_reviewer_response_state(self._runtime, issue_number, state, issue_snapshot=issue_snapshot)
 
 
@@ -339,47 +332,25 @@ class FakeRuntimeAutomationCompatibility:
         self._runtime = runtime
 
     def run_command(self, command, cwd, check=False):
-        override = runtime_instance_override(self._runtime, "run_command")
-        if override is not None:
-            return override(command, cwd, check=check)
         return automation_module.run_command(command, cwd=cwd, check=check)
 
     def summarize_output(self, result, limit: int = 20) -> str:
-        override = runtime_instance_override(self._runtime, "summarize_output")
-        if override is not None:
-            return override(result, limit)
         return automation_module.summarize_output(result, limit=limit)
 
     def list_changed_files(self, repo_root):
-        override = runtime_instance_override(self._runtime, "list_changed_files")
-        if override is not None:
-            return override(repo_root)
         return automation_module.list_changed_files(repo_root)
 
     def get_default_branch(self) -> str:
-        override = runtime_instance_override(self._runtime, "get_default_branch")
-        if override is not None:
-            return override()
         return automation_module.get_default_branch(self._runtime)
 
     def find_open_pr_for_branch_status(self, branch: str):
-        override = runtime_instance_override(self._runtime, "find_open_pr_for_branch_status")
-        if override is not None:
-            return override(branch)
         return automation_module.find_open_pr_for_branch_status(self._runtime, branch)
 
     def create_pull_request(self, branch: str, base: str, issue_number: int):
-        override = runtime_instance_override(self._runtime, "create_pull_request")
-        if override is not None:
-            return override(branch, base, issue_number)
         return automation_module.create_pull_request(self._runtime, branch, base, issue_number)
 
     def fetch_members(self):
-        override = runtime_instance_override(self._runtime, "fetch_members")
-        if override is not None:
-            result = override()
-        else:
-            result = self._runtime._fetch_members()
+        result = self._runtime._fetch_members()
         if isinstance(result, list):
             return MemberFetchResult(ok=True, producers=result)
         return result
@@ -391,11 +362,13 @@ class FakeRuntimeAutomationCompatibility:
 class FakeReviewerBotRuntime:
     BOT_NAME = BOT_NAME
     BOT_MENTION = BOT_MENTION
+    COMMANDS = COMMANDS
     FLS_AUDIT_LABEL = FLS_AUDIT_LABEL
     AUTHOR_ASSOCIATION_TRUST_ALLOWLIST = AUTHOR_ASSOCIATION_TRUST_ALLOWLIST
+    REVIEW_LABELS = REVIEW_LABELS
     REVIEWER_REQUEST_422_TEMPLATE = REVIEWER_REQUEST_422_TEMPLATE
     REVIEW_FRESHNESS_RUNBOOK_PATH = REVIEW_FRESHNESS_RUNBOOK_PATH
-    REVIEW_DEADLINE_DAYS = 14
+    REVIEW_DEADLINE_DAYS = REVIEW_DEADLINE_DAYS
     TRANSITION_PERIOD_DAYS = TRANSITION_PERIOD_DAYS
     DEFERRED_DISCOVERY_OVERLAP_SECONDS = DEFERRED_DISCOVERY_OVERLAP_SECONDS
     DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS = DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS
@@ -417,9 +390,9 @@ class FakeReviewerBotRuntime:
         self.jitter = DeterministicJitter(0.0)
         self.uuid_source = FixedUuidSource("fake-runtime-uuid")
         self.logger = RecordingLogger()
-        self.ACTIVE_LEASE_CONTEXT = object()
+        self.ACTIVE_LEASE_CONTEXT = None
         self.config = ConfigBag(monkeypatch)
-        self.config.set("STATE_ISSUE_NUMBER", "314")
+        self.config.set("STATE_ISSUE_NUMBER", str(STATE_ISSUE_NUMBER))
         self.outputs = OutputCapture()
         self.deferred_payloads = DeferredPayloadStore()
         self.github = GitHubStub(github)
@@ -502,7 +475,7 @@ class FakeReviewerBotRuntime:
         return int(self.get_config_value(LOCK_RENEWAL_WINDOW_SECONDS_ENV, str(LOCK_RENEWAL_WINDOW_SECONDS)) or 0)
 
     def lock_ref_name(self) -> str:
-        return self.get_config_value(LOCK_REF_NAME_ENV, f"refs/{LOCK_REF_NAME}")
+        return self.get_config_value(LOCK_REF_NAME_ENV, LOCK_REF_NAME)
 
     def lock_ref_bootstrap_branch(self) -> str:
         return self.get_config_value(LOCK_REF_BOOTSTRAP_BRANCH_ENV, LOCK_REF_BOOTSTRAP_BRANCH)
@@ -520,6 +493,49 @@ class FakeReviewerBotRuntime:
     def parse_iso8601_timestamp(self, value: Any):
         return self.compat.state_lock.parse_iso8601_timestamp(value)
 
+    def normalize_lock_metadata(self, lock_meta: dict | None):
+        return self.compat.state_lock.normalize_lock_metadata(lock_meta)
+
+    def get_state_issue(self):
+        return self.compat.state_lock.get_state_issue()
+
+    def clear_lock_metadata(self):
+        return self.compat.state_lock.clear_lock_metadata()
+
+    def get_state_issue_snapshot(self):
+        return self.compat.state_lock.get_state_issue_snapshot()
+
+    def conditional_patch_state_issue(self, body: str, etag: str | None = None):
+        return self.compat.state_lock.conditional_patch_state_issue(body, etag)
+
+    def render_state_issue_body(self, state: dict, base_body: str | None = None, *, preserve_state_block: bool = False):
+        return self.compat.state_lock.render_state_issue_body(
+            state,
+            base_body,
+            preserve_state_block=preserve_state_block,
+        )
+
+    def get_state_issue_html_url(self):
+        return self.compat.state_lock.get_state_issue_html_url()
+
+    def get_lock_ref_display(self):
+        return self.compat.state_lock.get_lock_ref_display()
+
+    def get_lock_ref_snapshot(self):
+        return self.compat.state_lock.get_lock_ref_snapshot()
+
+    def build_lock_metadata(self, *args, **kwargs):
+        return self.compat.state_lock.build_lock_metadata(*args, **kwargs)
+
+    def create_lock_commit(self, parent_sha, tree_sha, lock_meta):
+        return self.compat.state_lock.create_lock_commit(parent_sha, tree_sha, lock_meta)
+
+    def cas_update_lock_ref(self, new_sha):
+        return self.compat.state_lock.cas_update_lock_ref(new_sha)
+
+    def lock_is_currently_valid(self, lock_meta: dict, now=None):
+        return self.compat.state_lock.lock_is_currently_valid(lock_meta, now)
+
     def satisfy_mandatory_approver_requirement(self, state: dict, issue_number: int, approver: str) -> bool:
         return reviews_module.satisfy_mandatory_approver_requirement(self, state, issue_number, approver)
 
@@ -531,6 +547,9 @@ class FakeReviewerBotRuntime:
 
     def ensure_state_issue_lease_lock_fresh(self) -> bool:
         return self.compat.state_lock.ensure_state_issue_lease_lock_fresh()
+
+    def renew_state_issue_lease_lock(self, context):
+        return self.compat.state_lock.renew_state_issue_lease_lock(context)
 
     def acquire_state_issue_lease_lock(self):
         context = self.compat.state_lock.acquire_state_issue_lease_lock()
@@ -671,6 +690,26 @@ class FakeReviewerBotRuntime:
     def get_github_graphql_token(self, *, prefer_board_token: bool = False) -> str:
         return self.compat.github.get_github_graphql_token(prefer_board_token=prefer_board_token)
 
+    def github_graphql_request(
+        self,
+        query: str,
+        variables=None,
+        *,
+        token=None,
+        retry_policy: str = "none",
+        timeout_seconds: float | None = None,
+        suppress_error_log: bool = False,
+    ):
+        return github_api_module.github_graphql_request(
+            self,
+            query,
+            variables,
+            token=token,
+            retry_policy=retry_policy,
+            timeout_seconds=timeout_seconds,
+            suppress_error_log=suppress_error_log,
+        )
+
     def github_graphql(self, query: str, variables=None, *, token=None):
         return self.compat.github.github_graphql(query, variables, token=token)
 
@@ -762,15 +801,9 @@ class FakeReviewerBotRuntime:
         return self.handlers.call("handle_scheduled_check_result", state)
 
     def github_api(self, method: str, endpoint: str, data=None):
-        override = runtime_instance_override(self, "github_api")
-        if override is not None:
-            return override(method, endpoint, data=data)
         return self.github.github_api(method, endpoint, data=data)
 
     def github_api_request(self, method: str, endpoint: str, data=None, extra_headers=None, **kwargs):
-        override = runtime_instance_override(self, "github_api_request")
-        if override is not None:
-            return override(method, endpoint, data=data, extra_headers=extra_headers, **kwargs)
         return self.github.github_api_request(
             method,
             endpoint,

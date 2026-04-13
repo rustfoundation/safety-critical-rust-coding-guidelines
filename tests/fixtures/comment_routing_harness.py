@@ -22,6 +22,7 @@ class CommentRoutingHarness:
         self._monkeypatch = monkeypatch
         self.github = RouteGitHubApi()
         self.runtime = FakeReviewerBotRuntime(monkeypatch, github=self.github)
+        self.runtime.ACTIVE_LEASE_CONTEXT = object()
         self.config = self.runtime.config
         self.handlers = self.runtime.handlers
 

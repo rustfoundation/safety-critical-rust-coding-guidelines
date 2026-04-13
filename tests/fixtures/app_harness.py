@@ -43,7 +43,18 @@ class AppHarness:
         self.state_store.stub_save(func)
 
     def stub_lock(self, *, acquire=None, release=None, refresh=None) -> None:
-        self.locks.stub(acquire=acquire, release=release, refresh=refresh)
+        def wrapped_acquire():
+            context = acquire() if acquire is not None else object()
+            self.runtime.ACTIVE_LEASE_CONTEXT = context if context is not None else object()
+            return context
+
+        def wrapped_release():
+            result = release() if release is not None else True
+            if result:
+                self.runtime.ACTIVE_LEASE_CONTEXT = None
+            return result
+
+        self.locks.stub(acquire=wrapped_acquire, release=wrapped_release, refresh=refresh)
 
     def stub_handler(self, name: str, func) -> None:
         self.handlers.stub(name, func)

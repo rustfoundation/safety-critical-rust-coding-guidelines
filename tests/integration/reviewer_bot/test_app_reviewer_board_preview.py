@@ -118,7 +118,7 @@ def test_execute_run_preview_reviewer_board_is_read_only(monkeypatch, capsys):
     harness.stub_save_state(lambda current: (_ for _ in ()).throw(AssertionError("preview should not save state")))
     harness.stub_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")))
     monkeypatch.setattr(harness.runtime, "github_graphql", lambda query, variables=None, *, token=None: valid_reviewer_board_metadata())
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []}
+    harness.runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": None, "labels": []}
 
     result = harness.run_execute()
 

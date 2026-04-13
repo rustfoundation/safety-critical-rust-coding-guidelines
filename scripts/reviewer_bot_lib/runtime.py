@@ -46,6 +46,8 @@ from .config import (
     STATE_READ_RETRY_LIMIT_ENV,
     STATUS_PROJECTION_EPOCH,
     TRANSITION_PERIOD_DAYS,
+    AssignmentAttempt,
+    GitHubApiResult,
 )
 
 
@@ -230,7 +232,9 @@ class ReviewerBotRuntime:
     BOT_MENTION = BOT_MENTION
     COMMANDS = COMMANDS
     FLS_AUDIT_LABEL = FLS_AUDIT_LABEL
+    AssignmentAttempt = AssignmentAttempt
     AUTHOR_ASSOCIATION_TRUST_ALLOWLIST = AUTHOR_ASSOCIATION_TRUST_ALLOWLIST
+    GitHubApiResult = GitHubApiResult
     REVIEWER_REQUEST_422_TEMPLATE = REVIEWER_REQUEST_422_TEMPLATE
     REVIEW_FRESHNESS_RUNBOOK_PATH = REVIEW_FRESHNESS_RUNBOOK_PATH
     REVIEW_DEADLINE_DAYS = REVIEW_DEADLINE_DAYS
@@ -364,6 +368,9 @@ class ReviewerBotRuntime:
 
     def github_api(self, *args, **kwargs):
         return self.github.github_api(*args, **kwargs)
+
+    def github_graphql_request(self, *args, **kwargs):
+        return self.adapters.github.github_graphql_request(*args, **kwargs)
 
     def collect_touched_item(self, issue_number: int | None) -> None:
         self.touch_tracker.collect(issue_number)

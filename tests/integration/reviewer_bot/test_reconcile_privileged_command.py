@@ -29,8 +29,8 @@ def test_execute_pending_privileged_command_revalidates_live_state(monkeypatch):
         "created_at": "2026-03-17T10:00:00Z",
     }
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
     monkeypatch.setattr(
         automation,
         "handle_accept_no_fls_changes_command",
@@ -64,8 +64,8 @@ def test_execute_pending_privileged_command_passes_revalidated_typed_request(mon
     }
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
     monkeypatch.setenv("ISSUE_LABELS", '["stale-label"]')
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
 
     observed = {}
 
@@ -118,8 +118,8 @@ def test_execute_pending_privileged_command_does_not_leak_issue_labels_env(monke
     }
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
     monkeypatch.delenv("ISSUE_LABELS", raising=False)
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
     monkeypatch.setattr(
         automation,
         "handle_accept_no_fls_changes_command",
@@ -152,8 +152,8 @@ def test_execute_pending_privileged_command_fails_closed_without_live_fls_audit_
         "created_at": "2026-03-17T10:00:00Z",
     }
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": "status: awaiting reviewer response"}]}
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": "status: awaiting reviewer response"}]}
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
     called = {"handle": 0}
     monkeypatch.setattr(
         automation,

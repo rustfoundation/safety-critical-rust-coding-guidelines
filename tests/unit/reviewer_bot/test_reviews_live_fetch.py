@@ -24,8 +24,8 @@ from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
 def _runtime(monkeypatch, routes=None):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
-    runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
     if routes is not None:
         runtime.github.stub(routes)
     return runtime
@@ -235,7 +235,7 @@ def test_compute_reviewer_response_state_reports_awaiting_write_approval_after_c
         [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="bob")],
     )
     runtime = _runtime(monkeypatch, routes)
-    runtime.get_user_permission_status = lambda username, required_permission="triage": "denied"
+    runtime.github.get_user_permission_status = lambda username, required_permission="triage": "denied"
 
     response_state = reviews.compute_reviewer_response_state(runtime, 42, review)
 
@@ -270,7 +270,7 @@ def test_project_status_labels_emits_awaiting_write_approval_only_after_completi
         [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="bob")],
     )
     runtime = _runtime(monkeypatch, routes)
-    runtime.get_user_permission_status = lambda username, required_permission="triage": "denied"
+    runtime.github.get_user_permission_status = lambda username, required_permission="triage": "denied"
 
     desired_labels, metadata = reviews.project_status_labels_for_item(runtime, 42, state)
 
@@ -314,7 +314,7 @@ def test_compute_reviewer_response_state_reports_permission_unavailable(monkeypa
         [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="alice")],
     )
     runtime = _runtime(monkeypatch, routes)
-    runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
+    runtime.github.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     response_state = reviews.compute_reviewer_response_state(runtime, 42, review)
 

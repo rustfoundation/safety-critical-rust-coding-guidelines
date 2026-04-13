@@ -282,7 +282,7 @@ class ReconcileHarness:
         )
 
     def stub_head_repair(self, *, changed: bool = False, outcome: str = "unchanged") -> None:
-        self.runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(
+        self.runtime.adapters.review_state.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(
             changed=changed,
             outcome=outcome,
         )

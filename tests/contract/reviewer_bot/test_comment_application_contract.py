@@ -47,8 +47,8 @@ def test_comment_application_stores_pending_privileged_command_from_typed_reques
         comment_author="dana",
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
-    harness.runtime.post_comment = lambda issue_number, body: True
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.post_comment = lambda issue_number, body: True
 
     changed = comment_application.process_comment_event(
         harness.runtime,
@@ -77,8 +77,8 @@ def test_comment_application_freezes_pending_privileged_command_metadata_shape_a
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
     harness.runtime.set_config_value("STATE_ISSUE_NUMBER", "314")
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
-    harness.runtime.post_comment = lambda issue_number, body: posted.append((issue_number, body)) or True
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.post_comment = lambda issue_number, body: posted.append((issue_number, body)) or True
 
     changed = comment_application.process_comment_event(
         harness.runtime,
@@ -170,7 +170,7 @@ def test_n1_comment_application_obeys_policy_selected_handler_without_inline_com
         "handle_queue_command",
         lambda bot, current_state: calls.append((bot, current_state)) or ("", True),
     )
-    harness.runtime.add_reaction = lambda *args, **kwargs: True
+    harness.runtime.github.add_reaction = lambda *args, **kwargs: True
 
     changed = comment_application.process_comment_event(
         harness.runtime,

@@ -21,6 +21,11 @@ from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 
 def _assert_core_runtime_surface(runtime) -> None:
     assert hasattr(runtime, "get_config_value")
+    assert hasattr(runtime, "AssignmentAttempt")
+    assert hasattr(runtime, "GitHubApiResult")
+    assert hasattr(runtime, "COMMANDS")
+    assert hasattr(runtime, "REVIEW_LABELS")
+    assert hasattr(runtime, "github_graphql_request")
     assert hasattr(runtime, "infra")
     assert hasattr(runtime, "domain")
     assert runtime.infra.config is runtime.config
@@ -32,6 +37,12 @@ def _assert_core_runtime_surface(runtime) -> None:
     assert runtime.domain.github is runtime.github
     assert runtime.domain.locks is runtime.locks
     assert runtime.domain.handlers is runtime.handlers
+
+
+def test_fake_runtime_default_lock_state_matches_production_contract(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.ACTIVE_LEASE_CONTEXT is None
 
 
 def test_runtime_bot_returns_concrete_runtime_object():
