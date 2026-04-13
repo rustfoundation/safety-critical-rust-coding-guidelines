@@ -19,6 +19,7 @@ from tests.fixtures.reviewer_bot import make_state
 
 def test_handle_pull_request_target_synchronize_returns_true_for_head_only_mutation(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.ACTIVE_LEASE_CONTEXT = object()
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -72,7 +73,7 @@ def test_check_overdue_reviews_skips_transition_after_transition_notice_sent(mon
     review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
     review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
     review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
     runtime.get_pull_request_reviews = lambda issue_number: []
 
     assert maintenance.check_overdue_reviews(runtime, state) == []
@@ -85,7 +86,7 @@ def test_handle_transition_notice_records_transition_notice_sent_at_once(monkeyp
     assert review is not None
     review["current_reviewer"] = "alice"
     posted = []
-    runtime.post_comment = lambda issue_number, body: posted.append((issue_number, body)) or True
+    runtime.github.post_comment = lambda issue_number, body: posted.append((issue_number, body)) or True
 
     assert lifecycle.handle_transition_notice(runtime, state, 42, "alice") is True
     assert review["transition_notice_sent_at"] is not None
@@ -98,7 +99,7 @@ def test_handle_transition_notice_message_does_not_claim_reassignment(monkeypatc
     state = make_state()
     review_state.ensure_review_entry(state, 42, create=True)
     posted = []
-    runtime.post_comment = lambda issue_number, body: posted.append(body) or True
+    runtime.github.post_comment = lambda issue_number, body: posted.append(body) or True
 
     assert lifecycle.handle_transition_notice(runtime, state, 42, "alice") is True
     assert "reassigned to the next person in the queue" not in posted[0]
@@ -149,6 +150,7 @@ def test_reviewer_comment_clears_warning_and_transition_notice_markers(monkeypat
 
 def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.ACTIVE_LEASE_CONTEXT = object()
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -174,9 +176,9 @@ def test_scheduled_check_backfills_transition_notice_without_reposting(monkeypat
         ],
     )
     runtime.get_pull_request_reviews = lambda issue_number: []
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: {"pull_request": {}}
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"pull_request": {}}
     posted = []
-    runtime.post_comment = lambda issue_number, body: posted.append(body) or True
+    runtime.github.post_comment = lambda issue_number, body: posted.append(body) or True
     runtime.github_api = lambda method, endpoint, data=None: [
         {
             "id": 99,
@@ -313,10 +315,11 @@ def test_maybe_record_head_observation_repair_records_changed_head_once(monkeypa
 
 def test_handle_issue_or_pr_opened_fails_closed_when_assignees_unavailable(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.ACTIVE_LEASE_CONTEXT = object()
     state = make_state()
     runtime.set_config_value("ISSUE_NUMBER", "42")
     runtime.set_config_value("ISSUE_LABELS", json.dumps(["coding guideline"]))
-    runtime.get_issue_assignees = lambda issue_number: None
+    runtime.github.get_issue_assignees = lambda issue_number: None
 
     with pytest.raises(RuntimeError, match="Unable to determine assignees"):
         lifecycle.handle_issue_or_pr_opened(runtime, state)
@@ -324,6 +327,7 @@ def test_handle_issue_or_pr_opened_fails_closed_when_assignees_unavailable(monke
 
 def test_issue_edit_by_author_records_contributor_freshness(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.ACTIVE_LEASE_CONTEXT = object()
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None

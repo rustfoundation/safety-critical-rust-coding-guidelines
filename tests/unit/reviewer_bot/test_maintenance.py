@@ -18,7 +18,7 @@ def test_scheduled_check_repairs_missing_reviewer_review_state(monkeypatch):
     review["active_cycle_started_at"] = "2026-03-17T09:00:00Z"
     bot = FakeReviewerBotRuntime(monkeypatch)
     bot.ACTIVE_LEASE_CONTEXT = object()
-    bot.get_issue_or_pr_snapshot = lambda issue_number: {"pull_request": {}}
+    bot.github.get_issue_or_pr_snapshot = lambda issue_number: {"pull_request": {}}
     bot.github_api_request = lambda method, endpoint, data=None, extra_headers=None, **kwargs: GitHubApiResult(
             200,
             {"state": "open", "head": {"sha": "head-1"}}
@@ -62,7 +62,7 @@ def test_scheduled_check_records_live_read_failure_and_continues(monkeypatch):
     bot = FakeReviewerBotRuntime(monkeypatch)
     bot.ACTIVE_LEASE_CONTEXT = object()
     bot.collect_touched_item = lambda issue_number: None
-    bot.get_issue_or_pr_snapshot = lambda issue_number: {"pull_request": {}}
+    bot.github.get_issue_or_pr_snapshot = lambda issue_number: {"pull_request": {}}
     monkeypatch.setattr(maintenance_schedule, "sweep_deferred_gaps", lambda bot, state: False)
     monkeypatch.setattr(maintenance_schedule, "check_overdue_reviews", lambda bot, state: overdue_called.append(True) or [])
     monkeypatch.setattr(maintenance_schedule, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data: False)
@@ -128,7 +128,7 @@ def test_tracked_pr_repair_pass_collects_touched_items_and_clears_review_repair_
         "recorded_at": "2026-03-01T00:00:00Z",
     })
     bot = FakeReviewerBotRuntime(monkeypatch)
-    bot.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
+    bot.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
     monkeypatch.setattr(maintenance_schedule, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data: True)
     monkeypatch.setattr(
         maintenance_schedule,
@@ -169,7 +169,7 @@ def test_scheduled_check_clears_head_observation_repair_marker_after_success(mon
     })
     bot = FakeReviewerBotRuntime(monkeypatch)
     bot.ACTIVE_LEASE_CONTEXT = object()
-    bot.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
+    bot.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
     monkeypatch.setattr(maintenance_schedule, "sweep_deferred_gaps", lambda bot, state: False)
     monkeypatch.setattr(maintenance_schedule, "repair_missing_reviewer_review_state", lambda bot, issue_number, review_data: False)
     monkeypatch.setattr(maintenance_schedule, "maybe_record_head_observation_repair", lambda bot, issue_number, review_data: lifecycle.HeadObservationRepairResult(changed=False, outcome="unchanged"))

@@ -33,12 +33,12 @@ def test_label_signoff_create_pr_marks_issue_review_complete_without_inline_stat
         issue_author="dana",
         is_pull_request=False,
     )
-    harness.runtime.get_repo_labels = lambda: ["sign-off: create pr"]
-    harness.runtime.add_label = lambda issue_number, label: True
+    harness.runtime.github.get_repo_labels = lambda: ["sign-off: create pr"]
+    harness.runtime.github.add_label = lambda issue_number, label: True
     harness.runtime.sync_status_labels_for_items = lambda *args, **kwargs: pytest.fail(
         "status sync should run only from app orchestration after save"
     )
-    harness.runtime.add_reaction = lambda *args, **kwargs: True
+    harness.runtime.github.add_reaction = lambda *args, **kwargs: True
     posted = harness.capture_posted_comments()
 
     assert harness.handle_comment_event(state, request=request) is True
@@ -71,13 +71,13 @@ def test_label_signoff_create_pr_on_pr_does_not_mark_issue_complete(monkeypatch)
         "user": {"login": "dana"},
         "pull_request": {},
     }
-    harness.runtime.get_repo_labels = lambda: ["sign-off: create pr"]
-    harness.runtime.add_label = lambda issue_number, label: True
+    harness.runtime.github.get_repo_labels = lambda: ["sign-off: create pr"]
+    harness.runtime.github.add_label = lambda issue_number, label: True
     harness.runtime.sync_status_labels_for_items = lambda *args, **kwargs: pytest.fail(
         "status sync should not run for PR sign-off label command"
     )
-    harness.runtime.add_reaction = lambda *args, **kwargs: True
-    harness.runtime.post_comment = lambda *args, **kwargs: True
+    harness.runtime.github.add_reaction = lambda *args, **kwargs: True
+    harness.runtime.github.post_comment = lambda *args, **kwargs: True
 
     assert harness.handle_comment_event(state, request=request, trust_context=trust_context) is False
     assert review["review_completion_source"] is None
@@ -102,7 +102,7 @@ def test_assign_command_fails_closed_when_assignees_unavailable(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "felix91gr", "name": "Félix Fischer"}]
-    harness.runtime.get_issue_assignees = lambda issue_number: None
+    harness.runtime.github.get_issue_assignees = lambda issue_number: None
 
     response, success = harness.handle_assign(state, 42, "@felix91gr")
 
@@ -118,7 +118,7 @@ def test_assign_command_posts_pr_guidance_on_success(monkeypatch):
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
-    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
+    harness.runtime.github.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = harness.handle_assign(state, 42, "@felix91gr", request=request)
 
@@ -135,7 +135,7 @@ def test_claim_command_posts_pr_guidance_on_success(monkeypatch):
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
-    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
+    harness.runtime.github.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = harness.handle_claim(state, 42, "felix91gr", request=request)
 
@@ -157,9 +157,9 @@ def test_pass_command_posts_pr_guidance_for_new_reviewer(monkeypatch):
     request = harness.typed_assignment_request(issue_number=42, issue_author="PLeVasseur", is_pull_request=True)
     harness.stub_assignees(["alice"])
     harness.stub_assignment()
-    harness.runtime.unassign_reviewer = lambda issue_number, username: True
+    harness.runtime.github.remove_pr_reviewer = lambda issue_number, username: True
     posted = []
-    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
+    harness.runtime.github.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = harness.handle_pass(state, 42, "alice", None, request=request)
 
@@ -176,7 +176,7 @@ def test_assign_from_queue_posts_guidance_only_once(monkeypatch):
     harness.stub_assignees([])
     harness.stub_assignment()
     posted = []
-    harness.runtime.post_comment = lambda issue_number, body: posted.append(body) or True
+    harness.runtime.github.post_comment = lambda issue_number, body: posted.append(body) or True
 
     response, success = harness.handle_assign_from_queue(state, 42, request=request)
 
@@ -223,7 +223,7 @@ def test_pass_command_fails_closed_when_assignees_unavailable(monkeypatch):
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
-    harness.runtime.get_issue_assignees = lambda issue_number: None
+    harness.runtime.github.get_issue_assignees = lambda issue_number: None
 
     response, success = harness.handle_pass(state, 42, "alice", None)
 
@@ -238,7 +238,7 @@ def test_away_command_fails_closed_when_assignees_unavailable(monkeypatch):
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     review["current_reviewer"] = "alice"
-    harness.runtime.get_issue_assignees = lambda issue_number: None
+    harness.runtime.github.get_issue_assignees = lambda issue_number: None
 
     response, success = harness.handle_pass_until(state, 42, "alice", "2099-01-01", None)
 
@@ -250,7 +250,7 @@ def test_claim_command_fails_closed_when_assignees_unavailable(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "alice", "name": "Alice"}]
-    harness.runtime.get_issue_assignees = lambda issue_number: None
+    harness.runtime.github.get_issue_assignees = lambda issue_number: None
 
     response, success = harness.handle_claim(state, 42, "alice")
 
@@ -261,7 +261,7 @@ def test_claim_command_fails_closed_when_assignees_unavailable(monkeypatch):
 def test_release_command_fails_closed_when_permission_unavailable(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     response, success = harness.handle_release(state, 42, "alice", ["@bob"])
 
@@ -272,7 +272,7 @@ def test_release_command_fails_closed_when_permission_unavailable(monkeypatch):
 def test_release_command_fails_closed_when_assignees_unavailable(monkeypatch):
     harness = CommandHarness(monkeypatch)
     state = make_state()
-    harness.runtime.get_issue_assignees = lambda issue_number: None
+    harness.runtime.github.get_issue_assignees = lambda issue_number: None
 
     response, success = harness.handle_release(state, 42, "alice")
 
@@ -284,7 +284,7 @@ def test_assign_from_queue_command_fails_closed_when_assignees_unavailable(monke
     harness = CommandHarness(monkeypatch)
     state = make_state()
     state["queue"] = [{"github": "alice", "name": "Alice"}]
-    harness.runtime.get_issue_assignees = lambda issue_number: None
+    harness.runtime.github.get_issue_assignees = lambda issue_number: None
 
     response, success = harness.handle_assign_from_queue(state, 42)
 
@@ -296,7 +296,7 @@ def test_handle_rectify_command_reports_permission_unavailable(monkeypatch):
     state = make_state()
     harness = CommandHarness(monkeypatch)
     monkeypatch.setattr(reconcile, "ensure_review_entry", lambda current, issue_number, create=False: None)
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     message, success, changed = harness.handle_rectify(state, 42, "alice")
 
@@ -309,7 +309,7 @@ def test_handle_rectify_command_reports_permission_denied(monkeypatch):
     state = make_state()
     harness = CommandHarness(monkeypatch)
     monkeypatch.setattr(reconcile, "ensure_review_entry", lambda current, issue_number, create=False: None)
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "denied"
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "denied"
 
     message, success, changed = harness.handle_rectify(state, 42, "alice")
 
@@ -321,7 +321,7 @@ def test_handle_rectify_command_reports_permission_denied(monkeypatch):
 def test_validate_accept_no_fls_changes_handoff_distinguishes_permission_unavailable(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
     harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
     request = harness.request(
         issue_number=42,
         is_pull_request=False,
@@ -359,7 +359,7 @@ def test_validate_accept_no_fls_changes_handoff_freezes_fail_closed_reason_matri
 ):
     harness = CommentRoutingHarness(monkeypatch)
     harness.runtime.set_config_value("ISSUE_LABELS", str(list(labels)).replace("'", '"'))
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": permission
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": permission
     request = harness.request(
         issue_number=42,
         is_pull_request=is_pull_request,
@@ -380,7 +380,7 @@ def test_validate_accept_no_fls_changes_handoff_freezes_fail_closed_reason_matri
 def test_validate_accept_no_fls_changes_handoff_freezes_success_metadata_shape(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
     harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
     request = harness.request(
         issue_number=42,
         is_pull_request=False,
@@ -438,7 +438,7 @@ def test_apply_comment_command_records_privileged_handoff_side_effects(monkeypat
     assert side_effects.comments == [
         (
             42,
-            "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `#314` state.",
+            "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. Use the isolated privileged workflow to execute it from issue `the configured state issue` state.",
         )
     ]
     assert side_effects.reactions == []
@@ -491,8 +491,8 @@ def test_manual_dispatch_marks_authorization_unavailable_for_pending_privileged_
         }
     }
     harness.set_manual_dispatch(source_event_key="issue_comment:100")
-    harness.runtime.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
+    harness.runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "labels": [{"name": FLS_AUDIT_LABEL}]}
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
 
     assert harness.handle_manual_dispatch(state) is True
     pending = review["sidecars"]["pending_privileged_commands"]["issue_comment:100"]

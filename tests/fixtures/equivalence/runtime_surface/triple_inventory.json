@@ -85,6 +85,27 @@
       "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapCommandAdapterServices.handle_accept_no_fls_changes_command",
       "fake_runtime_branch": "tests/fixtures/fake_runtime.py:handle_accept_no_fls_changes_command",
       "classification": "retained final surface"
+    },
+    {
+      "capability": "typed REST request result",
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:GitHubApiResult",
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapGitHubServices.github_api_request",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:GitHubApiResult",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "typed assignment helper result",
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:AssignmentAttempt",
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapGitHubServices.request_pr_reviewer_assignment",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:AssignmentAttempt",
+      "classification": "retained final surface"
+    },
+    {
+      "capability": "reviewer-board GraphQL metadata read",
+      "runtime_forwarder": "scripts/reviewer_bot_lib/runtime.py:github_graphql_request",
+      "bootstrap_adapter": "scripts/reviewer_bot_lib/bootstrap_runtime.py:_BootstrapGitHubServices.github_graphql_request",
+      "fake_runtime_branch": "tests/fixtures/fake_runtime.py:github_graphql_request",
+      "classification": "retained final surface"
     }
   ]
 }

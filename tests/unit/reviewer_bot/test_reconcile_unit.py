@@ -268,8 +268,8 @@ def test_reconcile_active_review_entry_uses_explicit_head_repair_changed_field(m
     review["current_reviewer"] = "alice"
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.set_config_value("IS_PULL_REQUEST", "true")
-    runtime.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(changed=False, outcome="unchanged")
-    runtime.get_pull_request_reviews = lambda issue_number: []
+    runtime.adapters.review_state.maybe_record_head_observation_repair = lambda issue_number, review_data: lifecycle.HeadObservationRepairResult(changed=False, outcome="unchanged")
+    runtime.github.get_pull_request_reviews = lambda issue_number: []
     monkeypatch.setattr(reconcile, "refresh_reviewer_review_from_live_preferred_review", lambda bot, issue_number, review_data, **kwargs: (False, None))
     monkeypatch.setattr(reconcile, "_record_review_rebuild", lambda bot, state_obj, issue_number, review_data: False)
 
@@ -400,7 +400,7 @@ def test_workflow_run_reconcile_uses_artifact_contract_for_router_no_artifact_su
 
 def test_read_reconcile_reviews_rejects_non_list_payload(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.get_pull_request_reviews = lambda issue_number: {"unexpected": True}
+    runtime.github.get_pull_request_reviews = lambda issue_number: {"unexpected": True}
 
     with pytest.raises(reconcile.ReconcileReadError, match="payload invalid"):
         reconcile._read_reconcile_reviews(runtime, 42)

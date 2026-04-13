@@ -487,19 +487,14 @@ class CommentApplicationRuntimeContext(Protocol):
     BOT_MENTION: str
     github: CommentGitHubWriteContext
 
-    def get_config_value(self, name: str, default: str = "") -> str: ...
-
 
 @runtime_checkable
 class CommentRoutingRuntimeContext(Protocol):
     BOT_NAME: str
     BOT_MENTION: str
-    AUTHOR_ASSOCIATION_TRUST_ALLOWLIST: tuple[str, ...]
     logger: Logger
     adapters: CommentRoutingAdaptersContext
 
     def assert_lock_held(self, context: str) -> None: ...
 
     def collect_touched_item(self, issue_number: int | None) -> None: ...
-
-    def github_api(self, *args, **kwargs) -> Any | None: ...

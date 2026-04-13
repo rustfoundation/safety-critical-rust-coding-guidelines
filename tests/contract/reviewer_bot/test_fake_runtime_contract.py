@@ -155,6 +155,21 @@ def test_fake_runtime_optional_lock_hooks_are_replaceable(monkeypatch):
     assert calls == ["acquire", "release"]
 
 
+def test_fake_runtime_exposes_retained_runtime_labels_and_lock_helpers(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+
+    assert runtime.COMMANDS
+    assert runtime.REVIEW_LABELS
+    assert hasattr(runtime, "github_graphql_request")
+    assert hasattr(runtime, "normalize_lock_metadata")
+    assert hasattr(runtime, "get_state_issue")
+    assert hasattr(runtime, "get_state_issue_snapshot")
+    assert hasattr(runtime, "conditional_patch_state_issue")
+    assert hasattr(runtime, "render_state_issue_body")
+    assert hasattr(runtime, "get_lock_ref_snapshot")
+    assert hasattr(runtime, "renew_state_issue_lease_lock")
+
+
 def test_fake_runtime_uses_explicit_public_service_fields(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
 
@@ -321,6 +336,11 @@ def test_f2a_runtime_surface_inventory_matches_fake_runtime_branch_examples():
     assert capabilities["comment-event dispatch"]["fake_runtime_branch"].endswith("handle_comment_event")
     assert capabilities["privileged accept-no-fls-changes execution"]["fake_runtime_branch"].endswith(
         "handle_accept_no_fls_changes_command"
+    )
+    assert capabilities["typed REST request result"]["fake_runtime_branch"].endswith("GitHubApiResult")
+    assert capabilities["typed assignment helper result"]["fake_runtime_branch"].endswith("AssignmentAttempt")
+    assert capabilities["reviewer-board GraphQL metadata read"]["fake_runtime_branch"].endswith(
+        "github_graphql_request"
     )
     assert capabilities["mandatory approver satisfaction"]["fake_runtime_branch"].endswith(
         "satisfy_mandatory_approver_requirement"

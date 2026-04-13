@@ -19,8 +19,8 @@ from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 def _runtime(monkeypatch, routes=None):
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
-    runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
     if routes is not None:
         runtime.github.stub(routes)
     return runtime
@@ -52,7 +52,7 @@ def test_check_overdue_reviews_consumes_only_stable_reviewer_response_fields(mon
     anchor_timestamp = iso_z(now - timedelta(days=runtime.REVIEW_DEADLINE_DAYS + 1))
     state = make_state()
     make_tracked_review_state(state, 42, reviewer="alice", assigned_at=anchor_timestamp, active_cycle_started_at=anchor_timestamp)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
     runtime.adapters.review_state.compute_reviewer_response_state = lambda issue_number, review_data, **kwargs: {
         "state": "awaiting_reviewer_response",
         "anchor_timestamp": anchor_timestamp,
@@ -81,7 +81,7 @@ def test_check_overdue_reviews_skips_item_when_snapshot_unavailable(monkeypatch)
     review["assigned_at"] = "2026-03-01T00:00:00Z"
     review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: None
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: None
 
     assert maintenance.check_overdue_reviews(runtime, state) == []
 
@@ -91,7 +91,7 @@ def test_handle_overdue_review_warning_only_records_successful_comment(monkeypat
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
     runtime = FakeReviewerBotRuntime(monkeypatch)
-    runtime.post_comment = lambda issue_number, body: False
+    runtime.github.post_comment = lambda issue_number, body: False
 
     assert maintenance.handle_overdue_review_warning(runtime, state, 42, "alice") is False
     assert review["transition_warning_sent"] is None

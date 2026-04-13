@@ -118,17 +118,17 @@ class CommandHarness:
         return record_comment_side_effects(self.runtime)
 
     def stub_assignees(self, assignees):
-        self.runtime.get_issue_assignees = lambda issue_number: assignees
+        self.runtime.github.get_issue_assignees = lambda issue_number: assignees
 
     def stub_assignment(self, *, success: bool = True, status_code: int = 201):
         def attempt(issue_number, username):
             return AssignmentAttempt(success=success, status_code=status_code)
 
-        self.runtime.request_pr_reviewer_assignment = attempt
-        self.runtime.assign_issue_assignee = attempt
+        self.runtime.github.request_pr_reviewer_assignment = attempt
+        self.runtime.github.assign_issue_assignee = attempt
 
     def stub_permission(self, status: str) -> None:
-        self.runtime.get_user_permission_status = lambda username, required_permission="triage": status
+        self.runtime.github.get_user_permission_status = lambda username, required_permission="triage": status
 
     def stub_handler(self, name: str, func) -> None:
         self.handlers.stub(name, func)
@@ -136,7 +136,7 @@ class CommandHarness:
     def automation_runner(self) -> AutomationRunner:
         runner = AutomationRunner()
         self._monkeypatch.setattr(automation_module, "run_command", runner.run)
-        self.runtime.run_command = runner.run
+        self.runtime.adapters.automation.run_command = runner.run
         return runner
 
     def assignment_request(self, *, issue_number: int):

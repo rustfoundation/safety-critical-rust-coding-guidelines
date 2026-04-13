@@ -11,19 +11,22 @@ class CommentSideEffects:
 
 def record_comments(target):
     comments: list[tuple[int, str]] = []
-    target.post_comment = lambda issue_number, body: comments.append((issue_number, body)) or True
+    github_target = getattr(target, "github", target)
+    github_target.post_comment = lambda issue_number, body: comments.append((issue_number, body)) or True
     return comments
 
 
 def record_comment_dicts(target):
     comments = []
-    target.post_comment = lambda issue_number, body: comments.append({"issue_number": issue_number, "body": body}) or True
+    github_target = getattr(target, "github", target)
+    github_target.post_comment = lambda issue_number, body: comments.append({"issue_number": issue_number, "body": body}) or True
     return comments
 
 
 def record_reactions(target):
     reactions: list[tuple[int, str]] = []
-    target.add_reaction = lambda comment_id, reaction: reactions.append((comment_id, reaction)) or True
+    github_target = getattr(target, "github", target)
+    github_target.add_reaction = lambda comment_id, reaction: reactions.append((comment_id, reaction)) or True
     return reactions
 
 

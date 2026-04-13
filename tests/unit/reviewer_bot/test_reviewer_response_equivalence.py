@@ -76,7 +76,7 @@ def _build_scenario(monkeypatch, scenario_id: str):
             [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="bob")],
         )
         runtime = _runtime(monkeypatch, routes)
-        runtime.get_user_permission_status = lambda username, required_permission="triage": "denied"
+        runtime.github.get_user_permission_status = lambda username, required_permission="triage": "denied"
         return runtime, review
 
     if scenario_id == "projection_failed_pull_request_unavailable":
@@ -96,7 +96,7 @@ def _build_scenario(monkeypatch, scenario_id: str):
             [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="alice")],
         )
         runtime = _runtime(monkeypatch, routes)
-        runtime.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
+        runtime.github.get_user_permission_status = lambda username, required_permission="triage": "unavailable"
         return runtime, review
 
     raise AssertionError(f"Unhandled scenario: {scenario_id}")

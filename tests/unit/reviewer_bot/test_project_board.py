@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import project_board, reviews
 from scripts.reviewer_bot_lib.config import (
     REVIEWER_BOARD_FIELD_NEEDS_ATTENTION,
@@ -9,6 +10,8 @@ from scripts.reviewer_bot_lib.config import (
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
 )
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+from tests.fixtures.focused_fake_services import GraphQLTransportStub
+from tests.fixtures.http_responses import FakeGitHubResponse
 from tests.fixtures.reviewer_bot import (
     accept_reviewer_comment,
     accept_reviewer_review,
@@ -33,13 +36,24 @@ def test_reviewer_board_preflight_validates_manifest(monkeypatch):
     runtime = _runtime(monkeypatch)
     runtime.set_config_value("REVIEWER_BOARD_ENABLED", "true")
     runtime.set_config_value("REVIEWER_BOARD_TOKEN", "board-token")
-    runtime.github_graphql = lambda query, variables=None, *, token=None: valid_reviewer_board_metadata()
+    runtime.graphql_transport.stub_sequence([FakeGitHubResponse(200, valid_reviewer_board_metadata(), "ok")])
 
     preflight = project_board.reviewer_board_preflight(runtime)
 
     assert preflight.enabled is True
     assert preflight.valid is True
     assert preflight.project_id == "PVT_kwDOB"
+
+
+def test_bootstrapped_runtime_resolves_reviewer_board_metadata(monkeypatch):
+    runtime = reviewer_bot._runtime_bot()
+    runtime.set_config_value("REVIEWER_BOARD_TOKEN", "board-token")
+    runtime.graphql_transport = GraphQLTransportStub()
+    runtime.graphql_transport.stub_sequence([FakeGitHubResponse(200, valid_reviewer_board_metadata(), "ok")])
+
+    metadata = project_board.resolve_project_metadata(runtime)
+
+    assert metadata.project_id == "PVT_kwDOB"
 
 
 def test_reviewer_board_preflight_is_disabled_without_runtime_flag(monkeypatch):
@@ -56,7 +70,7 @@ def test_preview_board_projection_valid_manifest_yields_preview_output(monkeypat
     state = make_state()
     make_tracked_review_state(state, 42, reviewer="alice", assigned_at="2026-03-20T12:34:56Z", active_cycle_started_at="2026-03-20T12:34:56Z")
     runtime = _runtime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
 
     preview = project_board.preview_board_projection_for_item(runtime, state, 42)
 
@@ -71,7 +85,7 @@ def test_preview_board_projection_consumes_only_stable_reviewer_response_fields(
     state = make_state()
     make_tracked_review_state(state, 42, reviewer="alice", assigned_at="2026-03-20T12:34:56Z", active_cycle_started_at="2026-03-20T12:34:56Z")
     runtime = _runtime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
     runtime.adapters.review_state.compute_reviewer_response_state = lambda issue_number, review_data, **kwargs: {
         "state": "awaiting_reviewer_response",
         "anchor_timestamp": "2026-03-21T08:00:00Z",
@@ -90,7 +104,7 @@ def test_preview_board_projection_tracked_unassigned_maps_to_unassigned(monkeypa
     state = make_state()
     make_tracked_review_state(state, 42)
     runtime = _runtime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
 
     preview = project_board.preview_board_projection_for_item(runtime, state, 42)
 
@@ -104,7 +118,7 @@ def test_preview_board_projection_closed_item_maps_to_archive_intent(monkeypatch
     state = make_state()
     make_tracked_review_state(state, 42, reviewer="alice")
     runtime = _runtime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="closed")
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="closed")
 
     preview = project_board.preview_board_projection_for_item(runtime, state, 42)
 
@@ -117,7 +131,7 @@ def test_preview_board_projection_closed_item_maps_to_archive_intent(monkeypatch
 def test_preview_board_projection_open_untracked_maps_to_archive_intent(monkeypatch):
     state = make_state()
     runtime = _runtime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
 
     preview = project_board.preview_board_projection_for_item(runtime, state, 42)
 
@@ -134,7 +148,7 @@ def test_preview_board_projection_formats_dates_at_day_granularity(monkeypatch):
     routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1"))
     routes.add_pull_request_reviews(42, [])
     runtime = _runtime(monkeypatch, routes)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
     runtime.adapters.review_state.compute_reviewer_response_state = lambda issue_number, review_data, **kwargs: {
         "state": "awaiting_reviewer_response",
         "anchor_timestamp": "2026-03-21T08:00:00Z",
@@ -159,8 +173,8 @@ def test_preview_board_projection_keeps_parity_with_refreshed_live_review_state(
         ],
     )
     runtime = _runtime(monkeypatch, routes)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
-    runtime.get_user_permission_status = lambda username, required_permission="push": "granted"
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     desired_labels, _ = reviews.project_status_labels_for_item(runtime, 42, state)
     preview = project_board.preview_board_projection_for_item(runtime, state, 42)
@@ -181,7 +195,7 @@ def test_preview_board_projection_marks_projection_repair_as_attention(monkeypat
         repair_needed={"kind": "projection_failure", "reason": "projection_failed"},
     )
     runtime = _runtime(monkeypatch)
-    runtime.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
+    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open")
 
     preview = project_board.preview_board_projection_for_item(runtime, state, 42)
 

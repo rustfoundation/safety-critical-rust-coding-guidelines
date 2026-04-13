@@ -9,6 +9,7 @@ pytestmark = pytest.mark.contract
 
 from scripts import reviewer_bot
 from scripts.reviewer_bot_lib import event_inputs, lease_lock, review_state
+from scripts.reviewer_bot_lib.config import AssignmentAttempt, GitHubApiResult
 from scripts.reviewer_bot_lib.runtime import ReviewerBotRuntime, StdErrLogger
 from scripts.reviewer_bot_lib.runtime_protocols import (
     CommentApplicationRuntimeContext,
@@ -20,6 +21,7 @@ from scripts.reviewer_bot_lib.runtime_protocols import (
     ReconcileWorkflowRuntimeContext,
 )
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
+from tests.fixtures.http_responses import FakeGitHubResponse
 from tests.fixtures.reviewer_bot import make_state
 
 
@@ -95,6 +97,29 @@ def test_runtime_head_repair_contract_is_runtime_scoped():
     hints = get_type_hints(ReconcileReviewStateAdapterContext.maybe_record_head_observation_repair)
 
     assert hints["return"].__name__ == "HeadObservationRepairResult"
+
+
+def test_bootstrapped_runtime_re_exposes_retained_github_type_homes():
+    runtime = reviewer_bot._runtime_bot()
+
+    assert runtime.AssignmentAttempt is AssignmentAttempt
+    assert runtime.GitHubApiResult is GitHubApiResult
+
+
+def test_bootstrapped_runtime_supports_typed_rest_and_assignment_paths(monkeypatch):
+    runtime = reviewer_bot._runtime_bot()
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    runtime.rest_transport = SimpleNamespace(
+        request=lambda *args, **kwargs: FakeGitHubResponse(201, {"ok": True}, "ok")
+    )
+
+    response = runtime.github_api_request("GET", "issues/42")
+    attempt = runtime.github.request_pr_reviewer_assignment(42, "alice")
+
+    assert isinstance(response, GitHubApiResult)
+    assert response.ok is True
+    assert isinstance(attempt, AssignmentAttempt)
+    assert attempt.success is True
 
 
 def _protocol_member_names(protocol_type) -> set[str]:
@@ -546,6 +571,9 @@ def test_f2a_runtime_surface_inventory_fixture_records_retained_triples():
     capabilities = {entry["capability"]: entry for entry in inventory["capability_triples"]}
 
     assert capabilities["comment-event dispatch"]["classification"] == "retained final surface"
+    assert capabilities["typed REST request result"]["classification"] == "retained final surface"
+    assert capabilities["typed assignment helper result"]["classification"] == "retained final surface"
+    assert capabilities["reviewer-board GraphQL metadata read"]["classification"] == "retained final surface"
     assert "workflow-run dispatch" not in capabilities
     assert "refresh reviewer review from live preferred review" not in capabilities
     assert "repair missing reviewer review state" not in capabilities
@@ -570,6 +598,13 @@ def test_f2a_runtime_surface_inventory_matches_bootstrap_adapter_examples():
     )
     assert capabilities["mandatory approver satisfaction"]["bootstrap_adapter"].endswith(
         "satisfy_mandatory_approver_requirement"
+    )
+    assert capabilities["typed REST request result"]["bootstrap_adapter"].endswith("github_api_request")
+    assert capabilities["typed assignment helper result"]["bootstrap_adapter"].endswith(
+        "request_pr_reviewer_assignment"
+    )
+    assert capabilities["reviewer-board GraphQL metadata read"]["bootstrap_adapter"].endswith(
+        "github_graphql_request"
     )
 
 

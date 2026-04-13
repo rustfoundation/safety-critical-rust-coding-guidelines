@@ -49,7 +49,7 @@ def test_accept_no_fls_changes_honors_explicit_target_repo_root(monkeypatch, tmp
         observed["cwd"] = repo_root
         return ["README.md"]
 
-    harness.runtime.list_changed_files = fake_list_changed_files
+    harness.runtime.adapters.automation.list_changed_files = fake_list_changed_files
 
     message, success = harness.handle_accept_no_fls_changes(42, "alice", request=request)
 
@@ -78,7 +78,7 @@ def test_accept_no_fls_changes_uses_locked_nested_uv_commands(monkeypatch, tmp_p
     runner.when(["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"])
     runner.when(["uv", "run", "--locked", "python", "./make.py", "--update-spec-lock-file"])
 
-    harness.runtime.list_changed_files = fake_list_changed_files
+    harness.runtime.adapters.automation.list_changed_files = fake_list_changed_files
 
     message, success = harness.handle_accept_no_fls_changes(42, "alice", request=request)
 
@@ -100,7 +100,7 @@ def test_accept_no_fls_changes_surfaces_locked_uv_failure_details(monkeypatch, t
         issue_labels=(FLS_AUDIT_LABEL,),
     )
     harness.stub_permission("granted")
-    harness.runtime.list_changed_files = lambda repo_root: []
+    harness.runtime.adapters.automation.list_changed_files = lambda repo_root: []
     runner = harness.automation_runner()
     runner.when(
         ["uv", "run", "--locked", "python", "scripts/fls_audit.py", "--summary-only", "--fail-on-impact"],
@@ -188,8 +188,8 @@ def test_accept_no_fls_changes_freezes_ordered_execution_plan_branch_name_and_pr
     runner.when(["git", "push", "origin", "chore/spec-lock-2026-04-06-issue-42"])
 
     monkeypatch.setattr(automation, "datetime", FrozenDateTime)
-    harness.runtime.list_changed_files = fake_list_changed_files
-    harness.runtime.get_default_branch = lambda: "main"
+    harness.runtime.adapters.automation.list_changed_files = fake_list_changed_files
+    harness.runtime.adapters.automation.get_default_branch = lambda: "main"
     monkeypatch.setattr(
         automation,
         "create_pull_request",

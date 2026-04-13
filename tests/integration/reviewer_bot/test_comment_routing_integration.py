@@ -23,7 +23,7 @@ def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypa
         comment_body="@guidelines-bot /accept-no-fls-changes",
     )
     effects = harness.capture_comment_side_effects()
-    harness.runtime.get_user_permission_status = lambda username, required_permission="triage": "granted"
+    harness.runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
 
     assert comment_routing.handle_comment_event(harness.runtime, state, request) is True
     pending = state["active_reviews"]["42"]["sidecars"]["pending_privileged_commands"]
@@ -32,7 +32,7 @@ def test_handle_non_pr_issue_comment_creates_pending_privileged_command(monkeypa
         (
             42,
             "✅ Recorded pending privileged command `accept-no-fls-changes` from trusted live validation. "
-            "Use the isolated privileged workflow to execute it from issue `#314` state.",
+            "Use the isolated privileged workflow to execute it from issue `the configured state issue` state.",
         )
     ]
     assert effects.reactions == []
@@ -65,7 +65,7 @@ def test_closed_non_pr_command_comment_does_not_create_pending_privileged_comman
     )
     effects = harness.capture_comment_side_effects()
     harness.runtime.set_config_value("ISSUE_LABELS", f'["{FLS_AUDIT_LABEL}"]')
-    harness.runtime.check_user_permission = lambda username, required_permission="triage": True
+    harness.runtime.github.check_user_permission = lambda username, required_permission="triage": True
 
     assert comment_routing.handle_comment_event(harness.runtime, state, request) is False
     assert state["active_reviews"] == {}
