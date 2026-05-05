@@ -117,6 +117,16 @@ def record_state_issue_write_receipt(
     return receipt
 
 
+def _store_state_issue_write_receipt(state: dict, receipt: StateIssueWriteReceipt) -> bool:
+    receipts = state.setdefault("state_issue_write_receipts", {})
+    if not isinstance(receipts, dict):
+        receipts = {}
+        state["state_issue_write_receipts"] = receipts
+    key = f"{receipt.mutation_kind}:{receipt.issue_number or 'global'}:{receipt.recorded_at or 'pending'}"
+    receipts[key] = receipt.to_output()
+    return True
+
+
 def _stable_state_hash(state: dict | None) -> str | None:
     if not isinstance(state, dict):
         return None
@@ -485,6 +495,17 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 workflow_run_result=workflow_run_result,
             )
             state_hash_after = _stable_state_hash(state)
+            success_receipt = build_state_issue_write_receipt(
+                issue_number=_primary_issue_number(context, touched_items),
+                mutation_kind=f"{event_name}:{event_action or context.manual_action or 'none'}",
+                issue_body_hash_before=loaded_state_hash,
+                issue_body_hash_after=state_hash_after,
+                external_side_effects_recorded=save_side_effects,
+                state_save_attempted=True,
+                state_save_succeeded=True,
+                recorded_at=bot.datetime.now(bot.timezone.utc).isoformat(),
+            )
+            _store_state_issue_write_receipt(state, success_receipt)
             if not bot.state_store.save_state(state):
                 record_state_issue_write_receipt(
                     bot,
@@ -501,16 +522,8 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                     "State updates were computed but could not be persisted. "
                     "Failing this run to avoid silent success."
                 )
-            record_state_issue_write_receipt(
-                bot,
-                issue_number=_primary_issue_number(context, touched_items),
-                mutation_kind=f"{event_name}:{event_action or context.manual_action or 'none'}",
-                issue_body_hash_before=loaded_state_hash,
-                issue_body_hash_after=state_hash_after,
-                external_side_effects_recorded=save_side_effects,
-                state_save_attempted=True,
-                state_save_succeeded=True,
-            )
+            if hasattr(bot, "logger"):
+                bot.logger.event("info", "state issue write receipt", **success_receipt.to_output())
 
             if touched_items:
                 state = bot.state_store.load_state(fail_on_unavailable=True)

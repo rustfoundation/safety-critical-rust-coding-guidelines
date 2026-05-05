@@ -14,7 +14,7 @@ from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 pytestmark = pytest.mark.integration
 
 
-def test_pr264_canonical_replay_card_suppresses_same_scope_reviewer_activity_after_reconcile(monkeypatch):
+def test_pr264_canonical_replay_card_keeps_plain_lgtm_diagnostic_only(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(
         state,
@@ -47,9 +47,10 @@ def test_pr264_canonical_replay_card_suppresses_same_scope_reviewer_activity_aft
         author_association="CONTRIBUTOR",
     )
 
-    assert harness.run(state) is True
+    assert harness.run(state) is False
     assert review["reviewer_comment"].get("accepted") is None
-    assert review["sidecars"]["reconciled_source_events"]["issue_comment:210"]["source_event_key"] == "issue_comment:210"
+    assert "issue_comment:210" not in review["sidecars"]["reconciled_source_events"]
+    assert "issue_comment:210" not in review["sidecars"]["deferred_gaps"]
 
     routes = RouteGitHubApi().add_request(
         "GET",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from . import assignment_flow
 from .config import TRANSITION_NOTICE_MARKER_PREFIX, TRANSITION_WARNING_MARKER_PREFIX
@@ -253,6 +254,18 @@ def build_reminder_delivery_persistence_result(
     )
 
 
+def _parse_reminder_timestamp(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return timestamp if timestamp.tzinfo is not None else timestamp.replace(tzinfo=timezone.utc)
+
+
 def derive_reminder_cadence_decision(
     response,
     *,
@@ -262,23 +275,38 @@ def derive_reminder_cadence_decision(
     review_deadline_days: int,
     transition_period_days: int,
 ) -> ReminderCadenceDecision:
-    del now, review_deadline_days, transition_period_days
     issue_number = int(getattr(response, "scope", None).issue_number or 0) if getattr(response, "scope", None) else 0
     reviewer = getattr(getattr(response, "scope", None), "reviewer", None)
     effective_receipt = receipt if receipt is not None and receipt.receipt_kind != "none" else None
     legacy_duplicate_count = reminder_scan.baseline_count if reminder_scan is not None else 0
     exhausted = (effective_receipt is not None and effective_receipt.receipt_kind in {"transition", "legacy_transition"}) or legacy_duplicate_count >= 2
+    now_dt = _parse_reminder_timestamp(now)
+    anchor_dt = _parse_reminder_timestamp(getattr(response, "anchor_timestamp", None))
+    receipt_dt = _parse_reminder_timestamp(effective_receipt.created_at if effective_receipt else None)
+    cadence_state = "exhausted" if exhausted else "not_started"
+    may_post_warning = False
+    may_post_transition = False
+    if not exhausted and getattr(response, "response_state", None) == "awaiting_reviewer_response":
+        if effective_receipt is not None and effective_receipt.receipt_kind in {"warning", "legacy_warning_or_reminder"}:
+            if now_dt is not None and receipt_dt is not None and (now_dt - receipt_dt).days >= transition_period_days:
+                cadence_state = "transition_due"
+                may_post_transition = True
+        elif effective_receipt is None and now_dt is not None and anchor_dt is not None and (now_dt - anchor_dt).days >= review_deadline_days:
+            cadence_state = "warning_due"
+            may_post_warning = True
+        elif now_dt is None or (effective_receipt is None and anchor_dt is None):
+            cadence_state = "blocked"
     return ReminderCadenceDecision(
         issue_number=issue_number,
         reviewer=reviewer,
         scope=getattr(response, "scope", None),
-        cadence_state="exhausted" if exhausted else "not_started",
+        cadence_state=cadence_state,
         exhaustion_reason="legacy_duplicate_reminders_exhausted" if legacy_duplicate_count >= 2 else "transition_notice_sent" if exhausted else "not_exhausted",
         warning_receipt=effective_receipt if effective_receipt and effective_receipt.receipt_kind in {"warning", "legacy_warning_or_reminder"} else None,
         transition_receipt=effective_receipt if effective_receipt and effective_receipt.receipt_kind in {"transition", "legacy_transition"} else None,
         legacy_duplicate_count=legacy_duplicate_count,
-        may_post_warning=not exhausted and effective_receipt is None,
-        may_post_transition=not exhausted and effective_receipt is not None and effective_receipt.receipt_kind == "warning",
+        may_post_warning=may_post_warning,
+        may_post_transition=may_post_transition,
         must_project_reassignment_needed=exhausted,
     )
 
@@ -295,10 +323,10 @@ def decide_overdue_reminder(
     if getattr(response, "response_state", None) != "awaiting_reviewer_response" or cadence.must_project_reassignment_needed:
         action = "none"
         reason = cadence.exhaustion_reason or "not_awaiting_reviewer_response"
-    elif cadence.may_post_transition:
+    elif cadence.cadence_state == "transition_due" and cadence.may_post_transition:
         action = "transition"
         reason = "transition_due"
-    elif cadence.may_post_warning:
+    elif cadence.cadence_state == "warning_due" and cadence.may_post_warning:
         action = "warning"
         reason = "warning_due"
     else:
@@ -469,6 +497,7 @@ def _effective_response_with_cadence(bot, issue_number: int, review_data: dict, 
     response_payload.setdefault("issue_number", issue_number)
     response_payload.setdefault("current_reviewer", review_data.get("current_reviewer"))
     response = reviewer_response_policy.to_reviewer_response_decision(response_payload)
+    reminder_scan = _scan_live_reminder_comments(bot, issue_number)
     receipt = derive_reminder_scope_receipt(
         issue_number=issue_number,
         reviewer=getattr(response.scope, "reviewer", None) if response.scope else review_data.get("current_reviewer"),
@@ -476,9 +505,8 @@ def _effective_response_with_cadence(bot, issue_number: int, review_data: dict, 
         cycle_key=getattr(response.scope, "cycle_key", None) if response.scope else None,
         scope_key=getattr(response.scope, "scope_key", None) if response.scope else None,
         persisted_state=review_data,
-        scanned_comments=(),
+        scanned_comments=reminder_scan.records if reminder_scan is not None else (),
     )
-    reminder_scan = _scan_live_reminder_comments(bot, issue_number)
     cadence = derive_reminder_cadence_decision(
         response,
         receipt=receipt,
@@ -598,46 +626,15 @@ def evaluate_overdue_review_preview(bot, state: dict, issue_number: int) -> dict
     }
     if authority["authority_status"] != "tracked_reviewer_confirmed":
         return preview
-    if cadence.must_project_reassignment_needed:
-        return preview
-    if response_name != "awaiting_reviewer_response":
-        return preview
-    current_reviewer = review_data.get("current_reviewer")
-    anchor_timestamp = effective_response.anchor_timestamp
-    if not isinstance(current_reviewer, str) or not current_reviewer.strip() or not isinstance(anchor_timestamp, str) or not anchor_timestamp:
-        return preview
-    try:
-        now = bot.datetime.now(bot.timezone.utc)
-        anchor_dt = bot.datetime.fromisoformat(anchor_timestamp.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return preview
-    transition_warning_sent = review_data.get("transition_warning_sent")
-    if isinstance(transition_warning_sent, str) and transition_warning_sent:
-        try:
-            warning_dt = bot.datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
-            return preview
-        if (now - warning_dt).days < bot.TRANSITION_PERIOD_DAYS:
-            return preview
-        existing_notice = find_existing_transition_notice_result(
-            bot,
-            issue_number,
-            transition_warning_sent,
-            current_reviewer,
-        )
-        preview["would_post_transition"] = existing_notice.get("status") == "missing"
-        return preview
-    if (now - anchor_dt).days < bot.REVIEW_DEADLINE_DAYS:
-        return preview
-    existing_warning = _find_existing_warning_comment(
-        bot,
-        issue_number,
-        current_reviewer,
-        anchor_timestamp,
-        current_scope_key=current_scope_key,
-        current_scope_basis=current_scope_basis,
+    reminder_decision = decide_overdue_reminder(
+        effective_response,
+        cadence=cadence,
+        now=bot.datetime.now(bot.timezone.utc),
+        review_deadline_days=bot.REVIEW_DEADLINE_DAYS,
+        transition_period_days=bot.TRANSITION_PERIOD_DAYS,
     )
-    preview["would_post_warning"] = existing_warning.get("status") == "missing"
+    preview["would_post_warning"] = reminder_decision.action == "warning"
+    preview["would_post_transition"] = reminder_decision.action == "transition"
     return preview
 
 
@@ -659,9 +656,6 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             continue
 
         if review_data.get("review_completed_at"):
-            continue
-
-        if review_data.get("transition_notice_sent_at"):
             continue
 
         current_reviewer = review_data.get("current_reviewer")
@@ -756,30 +750,27 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
         if days_since_activity < bot.REVIEW_DEADLINE_DAYS:
             continue
 
-        transition_warning_sent = review_data.get("transition_warning_sent")
-        if transition_warning_sent:
-            try:
-                warning_dt = bot.datetime.fromisoformat(transition_warning_sent.replace("Z", "+00:00"))
-                days_since_warning = (now - warning_dt).days
-
-                if days_since_warning >= bot.TRANSITION_PERIOD_DAYS:
-                    overdue.append(
-                        {
-                            "issue_number": issue_number,
-                            "reviewer": current_reviewer,
-                            "days_overdue": days_since_activity,
-                            "days_since_warning": days_since_warning,
-                            "needs_warning": False,
-                            "needs_transition": True,
-                            "anchor_reason": anchor_reason,
-                            "anchor_timestamp": last_activity,
-                            "current_scope_key": current_scope_key,
-                            "current_scope_basis": current_scope_basis,
-                        }
-                    )
-            except (ValueError, AttributeError):
-                pass
-        else:
+        if reminder_decision.action == "transition":
+            warning_dt = _parse_reminder_timestamp(
+                reminder_decision.receipt.created_at if reminder_decision.receipt is not None else None
+            )
+            if warning_dt is None:
+                continue
+            overdue.append(
+                {
+                    "issue_number": issue_number,
+                    "reviewer": current_reviewer,
+                    "days_overdue": days_since_activity,
+                    "days_since_warning": (now - warning_dt).days,
+                    "needs_warning": False,
+                    "needs_transition": True,
+                    "anchor_reason": anchor_reason,
+                    "anchor_timestamp": last_activity,
+                    "current_scope_key": current_scope_key,
+                    "current_scope_basis": current_scope_basis,
+                }
+            )
+        elif reminder_decision.action == "warning":
             overdue.append(
                 {
                     "issue_number": issue_number,

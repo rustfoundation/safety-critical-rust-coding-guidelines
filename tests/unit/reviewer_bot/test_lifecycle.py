@@ -16,6 +16,7 @@ from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.comment_routing_harness import CommentRoutingHarness
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import make_state
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 
 def test_handle_pull_request_target_synchronize_returns_true_for_head_only_mutation(monkeypatch):
@@ -73,7 +74,28 @@ def test_pr_comment_direct_path_is_epoch_gated(monkeypatch):
 
 
 def test_check_overdue_reviews_skips_transition_after_transition_notice_sent(monkeypatch):
-    runtime = FakeReviewerBotRuntime(monkeypatch)
+    github = (
+        RouteGitHubApi()
+        .add_request(
+            "GET",
+            "issues/42",
+            status_code=200,
+            payload={"number": 42, "state": "open", "pull_request": {}, "labels": []},
+        )
+        .add_request(
+            "GET",
+            "pulls/42",
+            status_code=200,
+            payload={"number": 42, "state": "open", "requested_reviewers": [{"login": "alice"}]},
+        )
+        .add_request(
+            "GET",
+            "issues/42/comments?per_page=100&page=1",
+            status_code=200,
+            payload=[],
+        )
+    )
+    runtime = FakeReviewerBotRuntime(monkeypatch, github=github)
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -82,7 +104,7 @@ def test_check_overdue_reviews_skips_transition_after_transition_notice_sent(mon
     review["last_reviewer_activity"] = "2026-03-01T00:00:00Z"
     review["transition_warning_sent"] = "2026-03-10T00:00:00Z"
     review["transition_notice_sent_at"] = "2026-03-25T00:00:00Z"
-    runtime.github.get_issue_or_pr_snapshot = lambda issue_number: {"number": issue_number, "state": "open", "pull_request": {}, "labels": []}
+    runtime.github.get_user_permission_status = lambda username, required_permission="triage": "granted"
     runtime.get_pull_request_reviews = lambda issue_number: []
 
     assert maintenance.check_overdue_reviews(runtime, state) == []

@@ -750,8 +750,10 @@ def test_deferred_review_comment_reconcile_keeps_reviewer_freshness_diagnostic_o
     )
     harness.runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
-    assert harness.run(state) is True
+    assert harness.run(state) is False
     assert review["reviewer_comment"]["accepted"] is None
+    assert "pull_request_review_comment:302" not in _reconciled_source_events(review)
+    assert "pull_request_review_comment:302" not in _deferred_gaps(review)
 
 
 def test_deferred_review_comment_missing_live_object_preserves_source_time_freshness(monkeypatch):

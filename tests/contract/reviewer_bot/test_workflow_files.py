@@ -108,6 +108,16 @@ def test_reconcile_workflow_permissions_cover_live_replay_reads():
     assert permissions["pull-requests"] in {"read", "write"}
 
 
+def test_reconcile_workflow_does_not_gate_completed_observers_by_success():
+    workflow_text = Path(".github/workflows/reviewer-bot-reconcile.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(workflow_text)
+    reconcile_job = workflow["jobs"]["reconcile"]
+
+    assert "if" not in reconcile_job
+    assert "github.event.workflow_run.conclusion == 'success'" not in workflow_text
+    assert "WORKFLOW_RUN_TRIGGERING_CONCLUSION: ${{ github.event.workflow_run.conclusion }}" in workflow_text
+
+
 @pytest.mark.parametrize(
     "workflow_path",
     [
@@ -401,6 +411,17 @@ def test_workflow_policy_split_and_lock_only_boundaries():
                         assert value == "./.github/actions/reviewer-bot-source"
                     else:
                         assert "@" in value and len(value.split("@", 1)[1]) == 40
+
+
+def test_reviewer_bot_workflows_use_shared_source_action_without_raw_extraction():
+    workflows_dir = Path(".github/workflows")
+    for path in sorted(workflows_dir.glob("reviewer-bot-*.yml")):
+        text = path.read_text(encoding="utf-8")
+        assert "archive.extractall(" not in text
+        assert "tar.extractall(" not in text
+        if 'uv run --project "$BOT_SRC_ROOT"' in text or 'python "$BOT_SRC_ROOT/scripts/reviewer_bot.py"' in text:
+            assert "uses: ./.github/actions/reviewer-bot-source" in text
+            assert "BOT_SRC_ROOT: ${{ steps.bot-source.outputs.bot-src-root }}" in text
 
 def test_workflow_summaries_and_runbook_references_exist():
     runbook = Path("docs/reviewer-bot-review-freshness-operator-runbook.md")

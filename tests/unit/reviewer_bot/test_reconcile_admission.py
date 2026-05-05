@@ -39,6 +39,23 @@ def test_command_receipt_blocks_closeout_when_state_save_failed():
     assert receipt.result == "blocked_state_save_failed"
 
 
+def test_command_receipt_diagnostic_only_is_not_replay_closeout_authority():
+    receipt = build_command_replay_receipt(
+        source_event_key="issue_comment:1",
+        issue_number=264,
+        command_name=None,
+        replay_attempted=False,
+        command_side_effects_attempted=(),
+        state_save_required=False,
+        state_save_succeeded=False,
+        mark_reconciled_allowed=True,
+        clear_gap_allowed=True,
+    )
+
+    assert receipt.result == "pass_diagnostic_only"
+    assert receipt.replay_attempted is False
+
+
 def test_dismissed_review_plan_rebuilds_but_does_not_closeout_without_exact_time():
     plan = decide_review_dismissed_replay_plan(
         source_event_key="pull_request_review_dismissed:20",

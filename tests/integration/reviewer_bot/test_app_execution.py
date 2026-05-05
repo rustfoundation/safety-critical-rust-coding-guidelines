@@ -343,6 +343,9 @@ def test_execute_run_opened_issue_adopts_existing_single_live_assignee(monkeypat
     assert result.exit_code == 0
     assert result.state_changed is True
     assert saved[-1]["active_reviews"]["42"]["current_reviewer"] == "alice"
+    receipt = next(iter(saved[-1]["state_issue_write_receipts"].values()))
+    assert receipt["write_status"] == "persisted"
+    assert receipt["state_save_succeeded"] is True
 
 def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
     harness = AppHarness(monkeypatch)
@@ -358,6 +361,9 @@ def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
 
     assert result.exit_code == 1
     assert result.state_changed is True
+    receipt_logs = [record for record in harness.runtime.logger.records if record["message"] == "state issue write receipt"]
+    assert receipt_logs[-1]["fields"]["write_status"] == "failed_after_external_side_effect"
+    assert receipt_logs[-1]["fields"]["next_recovery_action"] == "recover_from_live_github_receipt"
 
 
 def test_execute_run_releases_lock_after_save_failure(monkeypatch):

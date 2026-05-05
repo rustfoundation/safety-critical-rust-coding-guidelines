@@ -790,7 +790,7 @@ def _reconcile_deferred_comment(
     if (
         decision.mark_reconciled
         and admission.mark_reconciled_allowed
-        and command_receipt.result in {"pass_replayed_and_persisted", "pass_diagnostic_only"}
+        and command_receipt.result == "pass_replayed_and_persisted"
     ):
         reconciled_changed = gap_bookkeeping.mark_reconciled_source_event(
             review_data,
