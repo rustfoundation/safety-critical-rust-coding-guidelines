@@ -14,6 +14,7 @@ Old module no longer preferred for these reviewer-response decision changes:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from . import live_review_support, reviewer_review_helpers
@@ -39,6 +40,163 @@ _REVIEWER_ACTIVITY_GAP_KINDS = frozenset(
         "pull_request_review_comment:created",
     }
 )
+
+
+@dataclass(frozen=True)
+class ReviewCycleScope:
+    issue_number: int | None
+    reviewer: str | None
+    head_sha: str | None
+    cycle_key: str | None
+    scope_key: str | None
+    scope_basis: str | None
+    anchor_timestamp: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "reviewer": self.reviewer,
+            "head_sha": self.head_sha,
+            "cycle_key": self.cycle_key,
+            "scope_key": self.scope_key,
+            "scope_basis": self.scope_basis,
+            "anchor_timestamp": self.anchor_timestamp,
+        }
+
+
+@dataclass(frozen=True)
+class ReviewerResponseDecision:
+    response_state: str
+    reason: str | None
+    suppression_reason: str | None
+    scope: ReviewCycleScope | None
+    current_head_sha: str | None
+    anchor_timestamp: str | None
+    reviewer_authority_outcome: str | None
+    latest_reviewer_activity_kind: str | None
+    latest_reviewer_activity_timestamp: str | None
+    latest_contributor_handoff_timestamp: str | None
+    suppresses_overdue_reminder: bool
+    suppresses_reassignment_followup: bool
+    completion_state: str | None
+    write_approval_authority: dict[str, object] | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "response_state": self.response_state,
+            "reason": self.reason,
+            "suppression_reason": self.suppression_reason,
+            "scope": self.scope.to_output() if self.scope is not None else None,
+            "current_head_sha": self.current_head_sha,
+            "anchor_timestamp": self.anchor_timestamp,
+            "reviewer_authority_outcome": self.reviewer_authority_outcome,
+            "latest_reviewer_activity_kind": self.latest_reviewer_activity_kind,
+            "latest_reviewer_activity_timestamp": self.latest_reviewer_activity_timestamp,
+            "latest_contributor_handoff_timestamp": self.latest_contributor_handoff_timestamp,
+            "suppresses_overdue_reminder": self.suppresses_overdue_reminder,
+            "suppresses_reassignment_followup": self.suppresses_reassignment_followup,
+            "completion_state": self.completion_state,
+            "write_approval_authority": self.write_approval_authority,
+        }
+
+
+@dataclass(frozen=True)
+class ReviewerActivityRecord:
+    kind: str
+    actor: str | None
+    timestamp: str | None
+    source_event_key: str | None
+    reviewed_head_sha: str | None
+    activity_scope: str
+    payload: dict[str, object]
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "kind": self.kind,
+            "actor": self.actor,
+            "timestamp": self.timestamp,
+            "source_event_key": self.source_event_key,
+            "reviewed_head_sha": self.reviewed_head_sha,
+            "activity_scope": self.activity_scope,
+            "payload": dict(self.payload),
+        }
+
+
+def derive_review_cycle_scope(
+    payload: dict[str, object],
+    *,
+    issue_number: int | None = None,
+    reviewer: str | None = None,
+) -> ReviewCycleScope | None:
+    scope_key = payload.get("current_scope_key") or payload.get("scope_key")
+    if not isinstance(scope_key, str) or not scope_key.strip():
+        return None
+    return ReviewCycleScope(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        head_sha=payload.get("current_head_sha") if isinstance(payload.get("current_head_sha"), str) else None,
+        cycle_key=payload.get("cycle_key") if isinstance(payload.get("cycle_key"), str) else None,
+        scope_key=scope_key,
+        scope_basis=payload.get("current_scope_basis") if isinstance(payload.get("current_scope_basis"), str) else None,
+        anchor_timestamp=payload.get("anchor_timestamp") if isinstance(payload.get("anchor_timestamp"), str) else None,
+    )
+
+
+def to_reviewer_response_decision(payload: dict[str, object]) -> ReviewerResponseDecision:
+    response_state = str(payload.get("response_state") or payload.get("state") or "projection_failed")
+    scope = derive_review_cycle_scope(
+        payload,
+        issue_number=payload.get("issue_number") if isinstance(payload.get("issue_number"), int) else None,
+        reviewer=payload.get("current_reviewer") if isinstance(payload.get("current_reviewer"), str) else None,
+    )
+    return ReviewerResponseDecision(
+        response_state=response_state,
+        reason=payload.get("reason") if isinstance(payload.get("reason"), str) else None,
+        suppression_reason=payload.get("suppression_reason") if isinstance(payload.get("suppression_reason"), str) else None,
+        scope=scope,
+        current_head_sha=payload.get("current_head_sha") if isinstance(payload.get("current_head_sha"), str) else None,
+        anchor_timestamp=payload.get("anchor_timestamp") if isinstance(payload.get("anchor_timestamp"), str) else None,
+        reviewer_authority_outcome=payload.get("reviewer_authority_outcome") if isinstance(payload.get("reviewer_authority_outcome"), str) else None,
+        latest_reviewer_activity_kind=payload.get("latest_reviewer_activity_kind") if isinstance(payload.get("latest_reviewer_activity_kind"), str) else None,
+        latest_reviewer_activity_timestamp=payload.get("latest_reviewer_activity_timestamp") if isinstance(payload.get("latest_reviewer_activity_timestamp"), str) else None,
+        latest_contributor_handoff_timestamp=payload.get("latest_contributor_handoff_timestamp") if isinstance(payload.get("latest_contributor_handoff_timestamp"), str) else None,
+        suppresses_overdue_reminder=bool(payload.get("suppresses_overdue_reminder", response_state != "awaiting_reviewer_response")),
+        suppresses_reassignment_followup=bool(payload.get("suppresses_reassignment_followup", response_state in {"done", "closed", "untracked"})),
+        completion_state=payload.get("completion_state") if isinstance(payload.get("completion_state"), str) else None,
+        write_approval_authority=payload.get("write_approval_authority") if isinstance(payload.get("write_approval_authority"), dict) else None,
+    )
+
+
+def apply_reminder_cadence_overlay(response: ReviewerResponseDecision, cadence) -> ReviewerResponseDecision:
+    if cadence is None or not getattr(cadence, "must_project_reassignment_needed", False):
+        return response
+    reason = getattr(cadence, "exhaustion_reason", None) or "legacy_duplicate_reminders_exhausted"
+    return ReviewerResponseDecision(
+        response_state="reviewer_reassignment_needed",
+        reason=reason,
+        suppression_reason=reason,
+        scope=response.scope,
+        current_head_sha=response.current_head_sha,
+        anchor_timestamp=response.anchor_timestamp,
+        reviewer_authority_outcome=response.reviewer_authority_outcome,
+        latest_reviewer_activity_kind=response.latest_reviewer_activity_kind,
+        latest_reviewer_activity_timestamp=response.latest_reviewer_activity_timestamp,
+        latest_contributor_handoff_timestamp=response.latest_contributor_handoff_timestamp,
+        suppresses_overdue_reminder=True,
+        suppresses_reassignment_followup=True,
+        completion_state=response.completion_state,
+        write_approval_authority=response.write_approval_authority,
+    )
+
+
+def classify_reviewer_activity_scope(activity: ReviewerActivityRecord, *, current_head_sha: str | None) -> str:
+    if activity.activity_scope in {"current_head", "stale_head", "issue_thread", "diagnostic_only", "unknown"}:
+        return activity.activity_scope
+    if activity.reviewed_head_sha is None:
+        return "issue_thread" if activity.kind == "reviewer_comment" else "diagnostic_only"
+    if isinstance(current_head_sha, str) and activity.reviewed_head_sha == current_head_sha:
+        return "current_head"
+    return "stale_head"
 
 
 def _record_timestamp(record: dict | None, *, parse_timestamp) -> datetime | None:
@@ -289,13 +447,21 @@ def _decorate_response(
     scope_fields: dict[str, object],
     **payload,
 ) -> dict[str, object]:
-    return {
+    legacy = {
         "state": state,
         "response_state": state,
         "reason": reason,
         "suppression_reason": reason,
         **scope_fields,
         **payload,
+    }
+    decision = to_reviewer_response_decision(legacy)
+    return {
+        **legacy,
+        **decision.to_output(),
+        "state": decision.response_state,
+        "current_scope_key": scope_fields.get("current_scope_key"),
+        "current_scope_basis": scope_fields.get("current_scope_basis"),
     }
 
 
@@ -669,26 +835,7 @@ def derive_reviewer_response_state(
                 contributor_comment=contributor_comment,
                 contributor_handoff=contributor_handoff,
             )
-    if any(author.lower() != current_reviewer.lower() for author in approval_authors):
-        return _decorate_response(
-            state="awaiting_contributor_response",
-            reason="current_head_alternate_approval_present",
-            scope_fields=_current_scope_fields(
-                review_data,
-                current_reviewer,
-                current_head,
-                contributor_handoff,
-                alternate_current_head_approval=True,
-                alternate_current_head_cycle_boundary=alternate_current_head_cycle_boundary,
-            ),
-            anchor_timestamp=latest_reviewer_response.get("timestamp") if isinstance(latest_reviewer_response, dict) else None,
-            current_head_sha=current_head,
-            reviewer_comment=reviewer_comment,
-            reviewer_review=reviewer_review,
-            current_cycle_reviewer_handoff=reviewer_handoff,
-            contributor_comment=contributor_comment,
-            contributor_handoff=contributor_handoff,
-        )
+    del alternate_current_head_cycle_boundary
 
     latest_review_head = reviewer_review.get("reviewed_head_sha") if isinstance(reviewer_review, dict) else None
     if not isinstance(latest_review_head, str) or latest_review_head != current_head:
@@ -740,6 +887,30 @@ def derive_reviewer_response_state(
             current_cycle_reviewer_handoff=reviewer_handoff,
             contributor_comment=contributor_comment,
             contributor_handoff=contributor_handoff,
+        )
+    authority_response_state = write_approval.get("response_state")
+    if authority_response_state == "awaiting_contributor_response":
+        return _decorate_response(
+            state="awaiting_contributor_response",
+            reason="assigned_reviewer_review_submitted",
+            scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
+            anchor_timestamp=latest_reviewer_response.get("timestamp") if isinstance(latest_reviewer_response, dict) else None,
+            current_head_sha=current_head,
+            reviewer_comment=reviewer_comment,
+            reviewer_review=reviewer_review,
+            current_cycle_reviewer_handoff=reviewer_handoff,
+            contributor_comment=contributor_comment,
+            contributor_handoff=contributor_handoff,
+        )
+    if authority_response_state == "projection_failed":
+        authority = write_approval.get("authority_decision")
+        reason = "write_approval_authority_unavailable"
+        if isinstance(authority, dict) and isinstance(authority.get("diagnostic_reason"), str):
+            reason = str(authority["diagnostic_reason"])
+        return _decorate_response(
+            state="projection_failed",
+            reason=reason,
+            scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
         )
     if not write_approval.get("has_write_approval"):
         return _decorate_response(

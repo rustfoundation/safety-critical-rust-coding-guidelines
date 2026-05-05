@@ -50,12 +50,77 @@ class ExecuteOrdinaryCommandDecision:
     needs_assignment_request: bool
 
 
+@dataclass(frozen=True)
+class AssignmentCommandAuthorization:
+    command_name: str
+    actor: str
+    issue_number: int
+    target: str | None
+    current_reviewer: str | None
+    is_assigned: bool
+    actor_permission: str
+    authorized: bool
+    reason: str
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "command_name": self.command_name,
+            "actor": self.actor,
+            "issue_number": self.issue_number,
+            "target": self.target,
+            "current_reviewer": self.current_reviewer,
+            "is_assigned": self.is_assigned,
+            "actor_permission": self.actor_permission,
+            "authorized": self.authorized,
+            "reason": self.reason,
+        }
+
+
 CommentCommandDecision = (
     IgnoreDecision
     | InlineResponseDecision
     | DeferPrivilegedHandoffDecision
     | ExecuteOrdinaryCommandDecision
 )
+
+
+def authorize_assignment_command(
+    command_name: str,
+    *,
+    actor: str,
+    issue_number: int,
+    target: str | None,
+    current_reviewer: str | None,
+    actor_permission: str,
+) -> AssignmentCommandAuthorization:
+    permission = actor_permission.strip().lower() if isinstance(actor_permission, str) else ""
+    is_assigned = (
+        isinstance(current_reviewer, str)
+        and isinstance(actor, str)
+        and current_reviewer.strip()
+        and actor.lower() == current_reviewer.lower()
+    )
+    triage_or_better = permission in {"admin", "maintain", "write", "triage", "granted"}
+    if command_name in {OrdinaryCommandId.PASS.value, OrdinaryCommandId.RELEASE.value, OrdinaryCommandId.CLAIM.value}:
+        authorized = is_assigned or triage_or_better or command_name == OrdinaryCommandId.CLAIM.value
+        reason = "assigned_reviewer" if is_assigned else "triage_override" if triage_or_better else "claim_allowed" if authorized else "actor_not_authorized"
+    elif command_name in {OrdinaryCommandId.ASSIGN_SPECIFIC.value, OrdinaryCommandId.ASSIGN_FROM_QUEUE.value, "r?"}:
+        authorized = triage_or_better or is_assigned
+        reason = "triage_override" if triage_or_better else "assigned_reviewer" if is_assigned else "actor_not_authorized"
+    else:
+        authorized = False
+        reason = "not_assignment_command"
+    return AssignmentCommandAuthorization(
+        command_name=command_name,
+        actor=actor,
+        issue_number=issue_number,
+        target=target,
+        current_reviewer=current_reviewer,
+        is_assigned=bool(is_assigned),
+        actor_permission=permission or "unknown",
+        authorized=authorized,
+        reason=reason,
+    )
 
 
 def decide_comment_command(bot, request, classified, *, actor_class: str, commands_help: str) -> CommentCommandDecision:

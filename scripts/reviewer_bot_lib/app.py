@@ -1,6 +1,7 @@
 """Top-level reviewer-bot orchestration."""
 
 import sys
+from dataclasses import dataclass
 
 from . import maintenance, reconcile
 from .context import EventContext, ExecutionResult
@@ -11,6 +12,107 @@ from .maintenance import (
 )
 from .repair_records import projection_repair_marker, store_repair_marker
 from .runtime_protocols import AppEventContextRuntime, AppExecutionRuntime
+
+
+@dataclass(frozen=True)
+class StateIssueWriteReceipt:
+    issue_number: int | None
+    mutation_kind: str
+    issue_body_hash_before: str | None
+    issue_body_hash_after: str | None
+    external_side_effects_recorded: tuple[str, ...]
+    state_save_attempted: bool
+    state_save_succeeded: bool
+    write_status: str
+    failure_kind: str | None
+    next_recovery_action: str | None
+    recorded_at: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "mutation_kind": self.mutation_kind,
+            "issue_body_hash_before": self.issue_body_hash_before,
+            "issue_body_hash_after": self.issue_body_hash_after,
+            "external_side_effects_recorded": sorted(self.external_side_effects_recorded),
+            "state_save_attempted": self.state_save_attempted,
+            "state_save_succeeded": self.state_save_succeeded,
+            "write_status": self.write_status,
+            "failure_kind": self.failure_kind,
+            "next_recovery_action": self.next_recovery_action,
+            "recorded_at": self.recorded_at,
+        }
+
+
+def build_state_issue_write_receipt(
+    *,
+    issue_number: int | None,
+    mutation_kind: str,
+    issue_body_hash_before: str | None,
+    issue_body_hash_after: str | None,
+    external_side_effects_recorded: tuple[str, ...],
+    state_save_attempted: bool,
+    state_save_succeeded: bool,
+    failure_kind: str | None = None,
+    recorded_at: str | None = None,
+) -> StateIssueWriteReceipt:
+    if not state_save_attempted:
+        write_status = "not_attempted_read_only" if mutation_kind.endswith("preview") else "not_attempted_no_state_change"
+        recovery = "none"
+    elif state_save_succeeded:
+        write_status = "persisted"
+        recovery = "none"
+    elif external_side_effects_recorded:
+        write_status = "failed_after_external_side_effect"
+        recovery = (
+            "recover_from_live_github_receipt"
+            if any("comment" in item for item in external_side_effects_recorded)
+            else "retry_state_save_before_replay_closeout"
+        )
+    else:
+        write_status = "failed_before_external_side_effect"
+        recovery = "retry_state_save_before_replay_closeout"
+    return StateIssueWriteReceipt(
+        issue_number=issue_number,
+        mutation_kind=mutation_kind,
+        issue_body_hash_before=issue_body_hash_before,
+        issue_body_hash_after=issue_body_hash_after,
+        external_side_effects_recorded=external_side_effects_recorded,
+        state_save_attempted=state_save_attempted,
+        state_save_succeeded=state_save_succeeded,
+        write_status=write_status,
+        failure_kind=failure_kind,
+        next_recovery_action=recovery,
+        recorded_at=recorded_at,
+    )
+
+
+def record_state_issue_write_receipt(
+    bot,
+    *,
+    issue_number: int | None,
+    mutation_kind: str,
+    issue_body_hash_before: str | None,
+    issue_body_hash_after: str | None,
+    external_side_effects_recorded: tuple[str, ...],
+    state_save_attempted: bool,
+    state_save_succeeded: bool,
+    failure_kind: str | None = None,
+) -> StateIssueWriteReceipt:
+    receipt = build_state_issue_write_receipt(
+        issue_number=issue_number,
+        mutation_kind=mutation_kind,
+        issue_body_hash_before=issue_body_hash_before,
+        issue_body_hash_after=issue_body_hash_after,
+        external_side_effects_recorded=external_side_effects_recorded,
+        state_save_attempted=state_save_attempted,
+        state_save_succeeded=state_save_succeeded,
+        failure_kind=failure_kind,
+        recorded_at=bot.datetime.now(bot.timezone.utc).isoformat() if hasattr(bot, "datetime") else None,
+    )
+    if hasattr(bot, "logger"):
+        bot.logger.event("info", "state issue write receipt", **receipt.to_output())
+    return receipt
 
 
 def _log(bot: AppExecutionRuntime, level: str, message: str, **fields) -> None:
@@ -86,7 +188,7 @@ def _classify_event_intent_from_context(bot: AppEventContextRuntime, context: Ev
     if event_name == "workflow_run":
         if event_action != "completed":
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
-        if context.workflow_kind == "reconcile" and context.workflow_run_triggering_conclusion == "success":
+        if context.workflow_kind == "reconcile":
             return bot.EVENT_INTENT_MUTATING
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
@@ -163,7 +265,6 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             event_name == "workflow_run"
             and event_action == "completed"
             and context.workflow_kind == "reconcile"
-            and context.workflow_run_triggering_conclusion == "success"
             and reconcile.optional_router_payload_missing(bot, context)
         ):
             workflow_run_missing_optional_payload = True
@@ -265,7 +366,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                         "info",
                         "Skipping successful router workflow_run with no deferred artifact.",
                     )
-                elif context.workflow_kind == "reconcile" and context.workflow_run_triggering_conclusion == "success":
+                elif context.workflow_kind == "reconcile":
                     workflow_run_result = reconcile.handle_workflow_run_event_result(bot, state)
                     state_changed = workflow_run_result.state_changed
                 else:

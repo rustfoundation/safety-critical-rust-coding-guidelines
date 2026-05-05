@@ -2,11 +2,318 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from . import assignment_flow
 from .config import TRANSITION_NOTICE_MARKER_PREFIX, TRANSITION_WARNING_MARKER_PREFIX
+from .reminder_comments import ReminderCommentScan
 from .repair_records import clear_repair_marker, store_repair_marker
 
 _TRANSITION_NOTICE_AUTHORS = {"github-actions[bot]", "guidelines-bot"}
+
+
+@dataclass(frozen=True)
+class ReminderScopeReceipt:
+    issue_number: int
+    reviewer: str | None
+    head_sha: str | None
+    cycle_key: str | None
+    scope_key: str | None
+    receipt_kind: str
+    comment_id: int | str | None
+    created_at: str | None
+    source: str
+    status: str
+    reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "reviewer": self.reviewer,
+            "head_sha": self.head_sha,
+            "cycle_key": self.cycle_key,
+            "scope_key": self.scope_key,
+            "receipt_kind": self.receipt_kind,
+            "comment_id": self.comment_id,
+            "created_at": self.created_at,
+            "source": self.source,
+            "status": self.status,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class LegacyReminderFieldAuthority:
+    transition_warning_sent: str | None
+    transition_notice_sent_at: str | None
+    warning_scope_status: str
+    transition_scope_status: str
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "transition_warning_sent": self.transition_warning_sent,
+            "transition_notice_sent_at": self.transition_notice_sent_at,
+            "warning_scope_status": self.warning_scope_status,
+            "transition_scope_status": self.transition_scope_status,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+@dataclass(frozen=True)
+class ReminderDeliveryPersistenceResult:
+    issue_number: int
+    reviewer: str | None
+    head_sha: str | None
+    cycle_key: str | None
+    scope_key: str | None
+    receipt_kind: str
+    comment_posted: bool
+    comment_id: int | str | None
+    comment_created_at: str | None
+    state_save_attempted: bool
+    state_save_succeeded: bool
+    recovery_required: bool
+    recovered_receipt: dict[str, object] | None
+    result: str
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "reviewer": self.reviewer,
+            "head_sha": self.head_sha,
+            "cycle_key": self.cycle_key,
+            "scope_key": self.scope_key,
+            "receipt_kind": self.receipt_kind,
+            "comment_posted": self.comment_posted,
+            "comment_id": self.comment_id,
+            "comment_created_at": self.comment_created_at,
+            "state_save_attempted": self.state_save_attempted,
+            "state_save_succeeded": self.state_save_succeeded,
+            "recovery_required": self.recovery_required,
+            "recovered_receipt": self.recovered_receipt,
+            "result": self.result,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+@dataclass(frozen=True)
+class ReminderCadenceDecision:
+    issue_number: int
+    reviewer: str | None
+    scope: object | None
+    cadence_state: str
+    exhaustion_reason: str | None
+    warning_receipt: ReminderScopeReceipt | None
+    transition_receipt: ReminderScopeReceipt | None
+    legacy_duplicate_count: int
+    may_post_warning: bool
+    may_post_transition: bool
+    must_project_reassignment_needed: bool
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "reviewer": self.reviewer,
+            "scope": self.scope.to_output() if hasattr(self.scope, "to_output") else None,
+            "cadence_state": self.cadence_state,
+            "exhaustion_reason": self.exhaustion_reason,
+            "warning_receipt": self.warning_receipt.to_output() if self.warning_receipt else None,
+            "transition_receipt": self.transition_receipt.to_output() if self.transition_receipt else None,
+            "legacy_duplicate_count": self.legacy_duplicate_count,
+            "may_post_warning": self.may_post_warning,
+            "may_post_transition": self.may_post_transition,
+            "must_project_reassignment_needed": self.must_project_reassignment_needed,
+        }
+
+
+@dataclass(frozen=True)
+class OverdueReminderDecision:
+    issue_number: int
+    reviewer: str | None
+    action: str
+    anchor_timestamp: str | None
+    anchor_reason: str | None
+    scope: object | None
+    receipt: ReminderScopeReceipt | None
+    dedupe_marker: str | None
+    reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "reviewer": self.reviewer,
+            "action": self.action,
+            "anchor_timestamp": self.anchor_timestamp,
+            "anchor_reason": self.anchor_reason,
+            "scope": self.scope.to_output() if hasattr(self.scope, "to_output") else None,
+            "receipt": self.receipt.to_output() if self.receipt else None,
+            "dedupe_marker": self.dedupe_marker,
+            "reason": self.reason,
+        }
+
+
+def derive_reminder_scope_receipt(
+    *,
+    issue_number: int,
+    reviewer: str | None,
+    head_sha: str | None,
+    cycle_key: str | None,
+    scope_key: str | None,
+    persisted_state: dict,
+    scanned_comments: tuple[object, ...] = (),
+) -> ReminderScopeReceipt:
+    warning = persisted_state.get("transition_warning_sent") if isinstance(persisted_state, dict) else None
+    notice = persisted_state.get("transition_notice_sent_at") if isinstance(persisted_state, dict) else None
+    if isinstance(notice, str) and notice.strip():
+        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "transition", None, notice, "state", "found", None)
+    if isinstance(warning, str) and warning.strip():
+        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "warning", None, warning, "state", "found", None)
+    if scanned_comments:
+        record = sorted(scanned_comments, key=lambda item: getattr(item, "created_at", ""))[-1]
+        shape = getattr(record, "matched_shape", "")
+        kind = "legacy_transition" if "transition" in shape else "legacy_warning_or_reminder"
+        return ReminderScopeReceipt(
+            issue_number,
+            reviewer,
+            head_sha,
+            cycle_key,
+            scope_key,
+            kind,
+            getattr(record, "comment_id", None),
+            getattr(record, "created_at", None),
+            "comment_scan",
+            "found",
+            None,
+        )
+    return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "none", None, None, "derived_absent", "missing", None)
+
+
+def classify_legacy_reminder_field_authority(
+    *,
+    transition_warning_sent: object,
+    transition_notice_sent_at: object,
+    issue_number: int,
+    reviewer: str | None,
+    head_sha: str | None,
+    cycle_key: str | None,
+    scope_key: str | None,
+) -> LegacyReminderFieldAuthority:
+    del issue_number, reviewer, head_sha, cycle_key, scope_key
+    warning = transition_warning_sent if isinstance(transition_warning_sent, str) and transition_warning_sent.strip() else None
+    notice = transition_notice_sent_at if isinstance(transition_notice_sent_at, str) and transition_notice_sent_at.strip() else None
+    warning_status = "legacy_scope_unbound" if warning else "ignored_stale_scope"
+    transition_status = "legacy_scope_unbound" if notice else "ignored_stale_scope"
+    if warning and notice:
+        transition_status = "legacy_duplicate_exhausted"
+    return LegacyReminderFieldAuthority(warning, notice, warning_status, transition_status, None)
+
+
+def build_reminder_delivery_persistence_result(
+    *,
+    issue_number: int,
+    reviewer: str | None,
+    head_sha: str | None,
+    cycle_key: str | None,
+    scope_key: str | None,
+    receipt_kind: str,
+    comment_posted: bool,
+    comment_id: int | str | None,
+    comment_created_at: str | None,
+    state_save_attempted: bool,
+    state_save_succeeded: bool,
+    recovered_receipt: ReminderScopeReceipt | None = None,
+    diagnostic_reason: str | None = None,
+) -> ReminderDeliveryPersistenceResult:
+    if comment_posted and state_save_attempted and not state_save_succeeded:
+        result = "posted_save_failed_recoverable" if recovered_receipt is not None else "posted_save_failed_unrecoverable"
+    elif recovered_receipt is not None and not comment_posted:
+        result = "not_posted_existing_receipt"
+    elif state_save_succeeded or not state_save_attempted:
+        result = "persisted"
+    else:
+        result = "blocked"
+    return ReminderDeliveryPersistenceResult(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        head_sha=head_sha,
+        cycle_key=cycle_key,
+        scope_key=scope_key,
+        receipt_kind=receipt_kind,
+        comment_posted=comment_posted,
+        comment_id=comment_id,
+        comment_created_at=comment_created_at,
+        state_save_attempted=state_save_attempted,
+        state_save_succeeded=state_save_succeeded,
+        recovery_required=result.startswith("posted_save_failed"),
+        recovered_receipt=recovered_receipt.to_output() if recovered_receipt else None,
+        result=result,
+        diagnostic_reason=diagnostic_reason,
+    )
+
+
+def derive_reminder_cadence_decision(
+    response,
+    *,
+    receipt: ReminderScopeReceipt | None,
+    reminder_scan: ReminderCommentScan | None,
+    now: object,
+    review_deadline_days: int,
+    transition_period_days: int,
+) -> ReminderCadenceDecision:
+    del now, review_deadline_days, transition_period_days
+    issue_number = int(getattr(response, "scope", None).issue_number or 0) if getattr(response, "scope", None) else 0
+    reviewer = getattr(getattr(response, "scope", None), "reviewer", None)
+    legacy_duplicate_count = reminder_scan.baseline_count if reminder_scan is not None else 0
+    exhausted = (receipt is not None and receipt.receipt_kind in {"transition", "legacy_transition"}) or legacy_duplicate_count >= 2
+    return ReminderCadenceDecision(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        scope=getattr(response, "scope", None),
+        cadence_state="exhausted" if exhausted else "not_started",
+        exhaustion_reason="legacy_duplicate_reminders_exhausted" if legacy_duplicate_count >= 2 else "transition_notice_sent" if exhausted else "not_exhausted",
+        warning_receipt=receipt if receipt and receipt.receipt_kind in {"warning", "legacy_warning_or_reminder"} else None,
+        transition_receipt=receipt if receipt and receipt.receipt_kind in {"transition", "legacy_transition"} else None,
+        legacy_duplicate_count=legacy_duplicate_count,
+        may_post_warning=not exhausted and receipt is None,
+        may_post_transition=not exhausted and receipt is not None and receipt.receipt_kind == "warning",
+        must_project_reassignment_needed=exhausted,
+    )
+
+
+def decide_overdue_reminder(
+    response,
+    *,
+    cadence: ReminderCadenceDecision,
+    now: object,
+    review_deadline_days: int,
+    transition_period_days: int,
+) -> OverdueReminderDecision:
+    del now, review_deadline_days, transition_period_days
+    if getattr(response, "response_state", None) != "awaiting_reviewer_response" or cadence.must_project_reassignment_needed:
+        action = "none"
+        reason = cadence.exhaustion_reason or "not_awaiting_reviewer_response"
+    elif cadence.may_post_transition:
+        action = "transition"
+        reason = "transition_due"
+    elif cadence.may_post_warning:
+        action = "warning"
+        reason = "warning_due"
+    else:
+        action = "none"
+        reason = "existing_receipt"
+    return OverdueReminderDecision(
+        issue_number=cadence.issue_number,
+        reviewer=cadence.reviewer,
+        action=action,
+        anchor_timestamp=getattr(response, "anchor_timestamp", None),
+        anchor_reason=getattr(response, "reason", None),
+        scope=cadence.scope,
+        receipt=cadence.transition_receipt or cadence.warning_receipt,
+        dedupe_marker=None,
+        reason=reason,
+    )
 
 
 def _log(bot, level: str, message: str, **fields) -> None:

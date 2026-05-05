@@ -1,8 +1,31 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from . import live_review_support
+
+
+@dataclass(frozen=True)
+class ReviewSnapshotRecord:
+    review_id: int | str
+    state: str
+    author: str | None
+    submitted_at: str | None
+    commit_id: str | None
+    source_precedence: int
+    payload: dict[str, object]
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "review_id": self.review_id,
+            "state": self.state,
+            "author": self.author,
+            "submitted_at": self.submitted_at,
+            "commit_id": self.commit_id,
+            "source_precedence": self.source_precedence,
+            "payload": dict(self.payload),
+        }
 
 
 def compare_records(
@@ -111,21 +134,40 @@ def get_preferred_current_reviewer_review_for_cycle(
 
 
 def build_reviewer_review_record_from_live_review(review: dict, *, actor: str | None = None) -> dict | None:
+    snapshot = build_review_snapshot_record(review, actor=actor)
+    if snapshot is None:
+        return None
+    if snapshot.submitted_at is None or snapshot.commit_id is None or snapshot.author is None:
+        return None
+    return {
+        "semantic_key": f"pull_request_review:{snapshot.review_id}",
+        "timestamp": snapshot.submitted_at,
+        "actor": snapshot.author,
+        "reviewed_head_sha": snapshot.commit_id,
+        "source_precedence": 1,
+        "payload": snapshot.to_output(),
+    }
+
+
+def build_review_snapshot_record(review: dict, *, actor: str | None = None) -> ReviewSnapshotRecord | None:
     if not isinstance(review, dict):
         return None
     review_id = review.get("id")
+    state = review.get("state")
     submitted_at = review.get("submitted_at")
     commit_id = review.get("commit_id")
     author = actor if isinstance(actor, str) and actor.strip() else review.get("user", {}).get("login")
-    if not isinstance(review_id, int) or not isinstance(submitted_at, str) or not isinstance(commit_id, str):
+    if not isinstance(review_id, (int, str)) or not str(review_id).strip():
         return None
-    if not isinstance(author, str) or not author.strip():
+    if not isinstance(state, str) or not state.strip():
         return None
-    return {
-        "semantic_key": f"pull_request_review:{review_id}",
-        "timestamp": submitted_at,
-        "actor": author,
-        "reviewed_head_sha": commit_id,
-        "source_precedence": 1,
-        "payload": {},
-    }
+    payload = {key: value for key, value in review.items() if key not in {"body"}}
+    return ReviewSnapshotRecord(
+        review_id=review_id,
+        state=state.upper(),
+        author=author if isinstance(author, str) and author.strip() else None,
+        submitted_at=submitted_at if isinstance(submitted_at, str) and submitted_at.strip() else None,
+        commit_id=commit_id if isinstance(commit_id, str) and commit_id.strip() else None,
+        source_precedence=1,
+        payload=payload,
+    )

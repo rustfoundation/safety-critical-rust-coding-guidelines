@@ -309,7 +309,8 @@ def test_pr_comment_router_core_policy_covers_workflow_route_outcomes(scenario):
 def test_pr_comment_router_workflow_builds_payload_inline_from_trusted_source():
     workflow = Path(".github/workflows/reviewer-bot-pr-comment-router.yml").read_text(encoding="utf-8")
     assert "build_pr_comment_observer_payload" not in workflow
-    assert "Fetch trusted bot source tarball" in workflow
+    assert "uses: ./.github/actions/reviewer-bot-source" in workflow
+    assert "BOT_SRC_ROOT: ${{ steps.bot-source.outputs.bot-src-root }}" in workflow
     assert 'uv run --project "$BOT_SRC_ROOT" python' in workflow
 
 def test_pr_comment_router_workflow_contains_route_and_trusted_jobs_in_order():
@@ -318,16 +319,18 @@ def test_pr_comment_router_workflow_contains_route_and_trusted_jobs_in_order():
     route_steps = data["jobs"]["route-pr-comment"]["steps"]
     trusted_steps = data["jobs"]["trusted-direct"]["steps"]
     assert route_steps[0]["name"] == "Install uv"
-    assert route_steps[1]["name"] == "Fetch trusted bot source tarball"
-    assert route_steps[2]["name"] == "Route PR comment"
-    assert route_steps[3]["name"] == "Upload deferred comment artifact"
+    assert route_steps[1]["name"] == "Checkout trusted bot source"
+    assert route_steps[2]["name"] == "Select trusted bot source"
+    assert route_steps[3]["name"] == "Route PR comment"
+    assert route_steps[4]["name"] == "Upload deferred comment artifact"
     assert trusted_steps[0]["name"] == "Install uv"
-    assert trusted_steps[1]["name"] == "Fetch trusted bot source tarball"
-    assert trusted_steps[2]["name"] == "Run reviewer bot"
+    assert trusted_steps[1]["name"] == "Checkout trusted bot source"
+    assert trusted_steps[2]["name"] == "Select trusted bot source"
+    assert trusted_steps[3]["name"] == "Run reviewer bot"
 
 def test_pr_comment_router_upload_is_emitted_only_for_deferred_reconcile():
     data = yaml.safe_load(Path(".github/workflows/reviewer-bot-pr-comment-router.yml").read_text(encoding="utf-8"))
-    upload_step = data["jobs"]["route-pr-comment"]["steps"][3]
+    upload_step = data["jobs"]["route-pr-comment"]["steps"][4]
     assert upload_step["if"] == "${{ steps.route.outputs.route_outcome == 'deferred_reconcile' }}"
 
 def test_review_comment_observer_workflow_exists_and_is_read_only():
@@ -389,15 +392,15 @@ def test_workflow_policy_split_and_lock_only_boundaries():
             if "observer" in path:
                 assert permissions.get("contents") == "read"
                 assert all("checkout" not in value for value in uses_values)
-            if permissions.get("contents") == "write" and path not in {
-                "reviewer-bot-privileged-commands.yml",
-                "reviewer-bot-pr-comment-router.yml",
-            }:
-                assert all("checkout" not in value for value in uses_values)
+            if permissions.get("contents") == "write":
+                assert "uses: ./.github/actions/reviewer-bot-source" in text
                 assert "Temporary lock debt" in text
             for value in uses_values:
                 if value:
-                    assert "@" in value and len(value.split("@", 1)[1]) == 40
+                    if value.startswith("./"):
+                        assert value == "./.github/actions/reviewer-bot-source"
+                    else:
+                        assert "@" in value and len(value.split("@", 1)[1]) == 40
 
 def test_workflow_summaries_and_runbook_references_exist():
     runbook = Path("docs/reviewer-bot-review-freshness-operator-runbook.md")

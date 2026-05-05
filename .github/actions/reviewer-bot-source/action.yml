@@ -1,0 +1,18 @@
+name: Reviewer Bot Source
+description: Select the trusted checked-out reviewer-bot source root.
+outputs:
+  bot-src-root:
+    description: Absolute path to the trusted reviewer-bot source checkout.
+    value: ${{ steps.source-root.outputs.bot-src-root }}
+runs:
+  using: composite
+  steps:
+    - id: source-root
+      shell: bash
+      run: |
+        if [ ! -f "$GITHUB_WORKSPACE/scripts/reviewer_bot.py" ]; then
+          echo "reviewer-bot source checkout is missing scripts/reviewer_bot.py" >&2
+          exit 1
+        fi
+        printf 'bot-src-root=%s\n' "$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
+        printf 'BOT_SRC_ROOT=%s\n' "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"

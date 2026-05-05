@@ -32,6 +32,28 @@ class ReviewReplayDecision:
     clear_gap: bool
 
 
+@dataclass(frozen=True)
+class DismissedReviewReplayPlan:
+    record_channel_event: bool
+    rebuild_live_approval: bool
+    mark_reconciled: bool
+    clear_gap: bool
+    replay_timestamp: str | None
+    diagnostic_reason: str | None
+    failure_kind: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "record_channel_event": self.record_channel_event,
+            "rebuild_live_approval": self.rebuild_live_approval,
+            "mark_reconciled": self.mark_reconciled,
+            "clear_gap": self.clear_gap,
+            "replay_timestamp": self.replay_timestamp,
+            "diagnostic_reason": self.diagnostic_reason,
+            "failure_kind": self.failure_kind,
+        }
+
+
 def decide_comment_replay(
     *,
     comment_id: int,
@@ -154,4 +176,43 @@ def decide_review_dismissed_replay(*, source_event_key: str, timestamp: str) -> 
         actor_login=None,
         mark_reconciled=True,
         clear_gap=True,
+    )
+
+
+def decide_review_dismissed_replay_plan(
+    *,
+    source_event_key: str,
+    dismissal_timestamp: str | None,
+    dismissal_exact: bool,
+    live_pr_readable: bool,
+) -> DismissedReviewReplayPlan:
+    del source_event_key
+    if not live_pr_readable:
+        return DismissedReviewReplayPlan(
+            record_channel_event=False,
+            rebuild_live_approval=False,
+            mark_reconciled=False,
+            clear_gap=False,
+            replay_timestamp=None,
+            diagnostic_reason="live_pr_unreadable",
+            failure_kind="live_pr_unreadable",
+        )
+    if not dismissal_exact or not isinstance(dismissal_timestamp, str) or not dismissal_timestamp.strip():
+        return DismissedReviewReplayPlan(
+            record_channel_event=False,
+            rebuild_live_approval=True,
+            mark_reconciled=False,
+            clear_gap=False,
+            replay_timestamp=None,
+            diagnostic_reason="dismissal_time_not_exact",
+            failure_kind="dismissal_time_unavailable",
+        )
+    return DismissedReviewReplayPlan(
+        record_channel_event=True,
+        rebuild_live_approval=True,
+        mark_reconciled=True,
+        clear_gap=True,
+        replay_timestamp=dismissal_timestamp,
+        diagnostic_reason=None,
+        failure_kind=None,
     )

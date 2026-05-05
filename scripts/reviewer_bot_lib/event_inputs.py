@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -27,6 +28,69 @@ class InvalidEventInput(RuntimeError):
         self.builder = builder
         self.problems = problems
         super().__init__(f"{builder}: {'; '.join(problems)}")
+
+
+@dataclass(frozen=True)
+class LifecycleEventTimestampEvidence:
+    event_name: str
+    event_action: str
+    source_created_at: str | None
+    source_updated_at: str | None
+    source_closed_at: str | None
+    selected_timestamp: str | None
+    selection_kind: str
+    selection_reason: str
+    is_authoritative: bool
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "event_name": self.event_name,
+            "event_action": self.event_action,
+            "source_created_at": self.source_created_at,
+            "source_updated_at": self.source_updated_at,
+            "source_closed_at": self.source_closed_at,
+            "selected_timestamp": self.selected_timestamp,
+            "selection_kind": self.selection_kind,
+            "selection_reason": self.selection_reason,
+            "is_authoritative": self.is_authoritative,
+        }
+
+
+def derive_lifecycle_event_timestamp(
+    *,
+    event_name: str,
+    event_action: str,
+    source_created_at: str | None,
+    source_updated_at: str | None,
+    source_closed_at: str | None,
+) -> LifecycleEventTimestampEvidence:
+    selected = None
+    kind = "blocked"
+    reason = "unsupported_action"
+    if event_action == "opened":
+        selected = source_created_at
+        kind = "created_at"
+        reason = "opened_uses_created_at"
+    elif event_action == "closed":
+        selected = source_closed_at
+        kind = "closed_at"
+        reason = "closed_uses_closed_at"
+    elif event_action in {"edited", "assigned", "unassigned", "labeled", "unlabeled", "reopened", "synchronize"}:
+        selected = source_updated_at
+        kind = "explicit_action_proxy"
+        reason = f"{event_action}_uses_updated_at_proxy"
+    authoritative = isinstance(selected, str) and selected.strip() and _is_parseable_iso8601(selected)
+    return LifecycleEventTimestampEvidence(
+        event_name=event_name,
+        event_action=event_action,
+        source_created_at=source_created_at,
+        source_updated_at=source_updated_at,
+        source_closed_at=source_closed_at,
+        selected_timestamp=selected if authoritative else None,
+        selection_kind=kind if authoritative else "blocked",
+        selection_reason=reason if authoritative else "invalid_or_missing_timestamp",
+        is_authoritative=bool(authoritative),
+    )
 
 
 def _parse_optional_int(value: str) -> int | None:
@@ -137,10 +201,15 @@ def _lifecycle_timestamp_config_name(*, action: str, is_pull_request: bool) -> s
 
 
 def _derive_lifecycle_event_created_at(bot: EventInputsContext, *, action: str, is_pull_request: bool) -> str:
-    config_name = _lifecycle_timestamp_config_name(action=action, is_pull_request=is_pull_request)
-    if config_name is None:
-        return ""
-    return bot.get_config_value(config_name).strip()
+    event_name = "pull_request_target" if is_pull_request else "issues"
+    evidence = derive_lifecycle_event_timestamp(
+        event_name=event_name,
+        event_action=action,
+        source_created_at=bot.get_config_value("PR_CREATED_AT" if is_pull_request else "ISSUE_CREATED_AT").strip() or None,
+        source_updated_at=bot.get_config_value("PR_UPDATED_AT" if is_pull_request else "ISSUE_UPDATED_AT").strip() or None,
+        source_closed_at=bot.get_config_value("PR_CLOSED_AT" if is_pull_request else "ISSUE_CLOSED_AT").strip() or None,
+    )
+    return evidence.selected_timestamp or ""
 
 
 def _validate_lifecycle_event_created_at(
@@ -278,6 +347,8 @@ def build_comment_event_request(bot: EventInputsContext, *, issue_number: int | 
         comment_installation_id=comment_installation_id,
         comment_performed_via_github_app=comment_performed_via_github_app,
         comment_author_association=comment_author_association,
+        comment_source_kind="issue_comment",
+        reviewed_head_sha=None,
     )
 
 
@@ -479,6 +550,8 @@ def build_replay_comment_event_request(
     issue_labels = payload.issue_labels
     if live_pr is not None and not issue_labels:
         issue_labels = live_pr.issue_labels
+    payload_kind = getattr(payload.identity.payload_kind, "value", str(payload.identity.payload_kind))
+    source_kind = "pull_request_review_comment" if payload_kind == "deferred_review_comment" else "issue_comment"
     return CommentEventRequest(
         issue_number=payload.identity.pr_number,
         is_pull_request=True,
@@ -495,4 +568,6 @@ def build_replay_comment_event_request(
         comment_sender_type=comment_sender_type,
         comment_installation_id=comment_installation_id,
         comment_performed_via_github_app=comment_performed_via_github_app,
+        comment_source_kind=source_kind,
+        reviewed_head_sha=payload.source_commit_id if source_kind == "pull_request_review_comment" else None,
     )

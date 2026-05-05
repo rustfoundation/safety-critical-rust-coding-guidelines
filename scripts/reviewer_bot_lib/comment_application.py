@@ -31,6 +31,32 @@ class CommandExecutionResult:
     state_changed: bool
 
 
+@dataclass(frozen=True)
+class ReviewerFeedbackHandoffDecision:
+    authorized: bool
+    issue_number: int
+    actor: str
+    source_event_key: str
+    timestamp: str
+    reviewed_head_sha: str | None
+    replace_existing: bool
+    response_state: str
+    reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "authorized": self.authorized,
+            "issue_number": self.issue_number,
+            "actor": self.actor,
+            "source_event_key": self.source_event_key,
+            "timestamp": self.timestamp,
+            "reviewed_head_sha": self.reviewed_head_sha,
+            "replace_existing": self.replace_existing,
+            "response_state": self.response_state,
+            "reason": self.reason,
+        }
+
+
 def _route_comment_application(classified: dict, *, comment_id: int) -> str:
     comment_class = str(classified.get("comment_class", ""))
     command_count = int(classified.get("command_count", 0))
@@ -74,7 +100,9 @@ def record_conversation_freshness(
             if authority.get("authority_status") == "tracked_reviewer_confirmed":
                 confirmed_reviewer = authority.get("tracked_reviewer")
         effective_review_data["current_reviewer"] = confirmed_reviewer
-    decision = comment_freshness_policy.decide_comment_freshness(effective_review_data, request)
+    current_head_sha = review_data.get("active_head_sha") if isinstance(review_data.get("active_head_sha"), str) else None
+    event = comment_freshness_policy.build_comment_freshness_event(effective_review_data, request)
+    decision = comment_freshness_policy.decide_comment_freshness_event(event, current_head_sha=current_head_sha)
     if decision.kind != "accept_channel_event":
         return False
     changed = accept_channel_event(
@@ -289,6 +317,38 @@ def _feedback_handoff_should_replace(existing: object, candidate: dict) -> bool:
     return candidate_source == existing_source
 
 
+def build_reviewer_feedback_handoff_decision(
+    review_data: dict,
+    request: CommentEventRequest,
+    authority,
+    *,
+    current_head_sha: str | None,
+) -> ReviewerFeedbackHandoffDecision:
+    source_event_key = request.comment_source_event_key or f"issue_comment:{request.comment_id}"
+    reviewed_head_sha = current_head_sha if request.is_pull_request else None
+    authorized = bool(authority.get("authorized") if isinstance(authority, dict) else False)
+    reason = None if authorized else str((authority or {}).get("reason") or "unauthorized")
+    handoff = {
+        "source_event_key": source_event_key,
+        "timestamp": request.comment_created_at,
+        "actor": request.comment_author,
+        "command_name": comment_command_policy.OrdinaryCommandId.FEEDBACK.value,
+        "reviewed_head_sha": reviewed_head_sha,
+    }
+    replace_existing = _feedback_handoff_should_replace(review_data.get("current_cycle_reviewer_handoff"), handoff)
+    return ReviewerFeedbackHandoffDecision(
+        authorized=authorized,
+        issue_number=request.issue_number,
+        actor=request.comment_author,
+        source_event_key=source_event_key,
+        timestamp=request.comment_created_at,
+        reviewed_head_sha=reviewed_head_sha,
+        replace_existing=replace_existing,
+        response_state="awaiting_contributor_response" if authorized else "projection_failed",
+        reason=reason,
+    )
+
+
 def handle_feedback_command(bot, state: dict, request: CommentEventRequest, decision) -> CommandExecutionResult:
     if request.issue_state.lower() != "open":
         return CommandExecutionResult(
@@ -321,15 +381,21 @@ def handle_feedback_command(bot, state: dict, request: CommentEventRequest, deci
                 state_changed=False,
             )
         reviewed_head_sha = active_head_sha
+    handoff_decision = build_reviewer_feedback_handoff_decision(
+        review_data,
+        request,
+        authority,
+        current_head_sha=reviewed_head_sha,
+    )
     handoff = {
-        "source_event_key": request.comment_source_event_key or f"issue_comment:{request.comment_id}",
-        "timestamp": request.comment_created_at,
-        "actor": decision.actor,
+        "source_event_key": handoff_decision.source_event_key,
+        "timestamp": handoff_decision.timestamp,
+        "actor": handoff_decision.actor,
         "command_name": comment_command_policy.OrdinaryCommandId.FEEDBACK.value,
-        "reviewed_head_sha": reviewed_head_sha,
+        "reviewed_head_sha": handoff_decision.reviewed_head_sha,
     }
     before = review_data.get("current_cycle_reviewer_handoff")
-    if not _feedback_handoff_should_replace(before, handoff):
+    if not handoff_decision.replace_existing:
         return CommandExecutionResult(
             response="ℹ️ Ignored stale `/feedback` handoff because a newer or same-time reviewer handoff is already recorded.",
             success=True,

@@ -131,7 +131,7 @@ def test_l1_fake_runtime_and_bootstrap_keep_override_wiring_explicit_without_can
     assert "_mark_canonical" not in bootstrap_text
 
 
-def test_reviewer_comment_clears_warning_and_transition_notice_markers(monkeypatch):
+def test_plain_reviewer_comment_does_not_clear_warning_or_transition_notice(monkeypatch):
     harness = CommentRoutingHarness(monkeypatch)
     state = make_state()
     review = review_state.ensure_review_entry(state, 42, create=True)
@@ -159,9 +159,9 @@ def test_reviewer_comment_clears_warning_and_transition_notice_markers(monkeypat
     )
     harness.runtime.github.get_issue_assignees = lambda issue_number, is_pull_request=None: ["alice"]
 
-    assert comment_routing.handle_comment_event(harness.runtime, state, request, trust_context) is True
-    assert review["transition_warning_sent"] is None
-    assert review["transition_notice_sent_at"] is None
+    assert comment_routing.handle_comment_event(harness.runtime, state, request, trust_context) is False
+    assert review["transition_warning_sent"] == "2026-03-10T00:00:00Z"
+    assert review["transition_notice_sent_at"] == "2026-03-25T00:00:00Z"
 
 
 def test_reviewer_comment_does_not_count_as_reviewer_activity_when_live_assignee_differs(monkeypatch):

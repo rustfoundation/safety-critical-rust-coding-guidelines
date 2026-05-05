@@ -683,7 +683,7 @@ def test_workflow_run_reconcile_uses_artifact_contract_for_router_no_artifact_su
     assert result == reconcile.WorkflowRunHandlerResult(False, [])
 
 
-def test_workflow_run_reconcile_rejects_non_success_before_gap_mutation(monkeypatch):
+def test_workflow_run_reconcile_records_non_success_diagnostic_without_closeout(monkeypatch):
     state = make_state(epoch="freshness_v15")
     review = review_state.ensure_review_entry(state, 42, create=True)
     assert review is not None
@@ -705,10 +705,11 @@ def test_workflow_run_reconcile_rejects_non_success_before_gap_mutation(monkeypa
     )
     harness.set_trigger_from_payload(harness.payload, conclusion="failure")
 
-    with pytest.raises(RuntimeError, match="requires successful triggering conclusion"):
-        reconcile.handle_workflow_run_event_result(harness.runtime, state)
+    result = reconcile.handle_workflow_run_event_result(harness.runtime, state)
 
-    assert review["sidecars"]["deferred_gaps"] == {"issue_comment:210": {"reason": "artifact_missing"}}
+    assert result == reconcile.WorkflowRunHandlerResult(True, [42])
+    assert review["sidecars"]["deferred_gaps"]["issue_comment:210"]["reason"] == "observer_failed"
+    assert review["sidecars"]["deferred_gaps"]["issue_comment:210"]["failure_kind"] == "failure"
     assert review["sidecars"]["reconciled_source_events"] == {}
 
 
@@ -759,7 +760,7 @@ def test_reconcile_module_delegates_replay_decision_logic_to_core_policy():
     assert "reconcile_replay_policy" in reconcile_text
     assert "reconcile_replay_policy.decide_comment_replay(" in reconcile_text
     assert "reconcile_replay_policy.decide_review_submitted_replay(" in reconcile_text
-    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in reconcile_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay_plan(" in reconcile_text
 
 
 @pytest.mark.parametrize(

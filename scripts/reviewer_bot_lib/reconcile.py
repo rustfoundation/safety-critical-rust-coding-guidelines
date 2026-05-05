@@ -78,6 +78,225 @@ class WorkflowRunHandlerResult:
     touched_items: list[int]
 
 
+@dataclass(frozen=True)
+class LiveReviewObservation:
+    review_id: int | str
+    live_found: bool
+    read_status: str
+    visibility_status: str
+    commit_id: str | None
+    submitted_at: str | None
+    state: str | None
+    author: str | None
+    failure_kind: str | None
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "review_id": self.review_id,
+            "live_found": self.live_found,
+            "read_status": self.read_status,
+            "visibility_status": self.visibility_status,
+            "commit_id": self.commit_id,
+            "submitted_at": self.submitted_at,
+            "state": self.state,
+            "author": self.author,
+            "failure_kind": self.failure_kind,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+@dataclass(frozen=True)
+class WorkflowRunReplayAdmission:
+    source_event_key: str | None
+    triggering_conclusion: str | None
+    payload_kind: str | None
+    admission_state: str
+    replay_allowed: bool
+    diagnostic_allowed: bool
+    mark_reconciled_allowed: bool
+    clear_gap_allowed: bool
+    reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "source_event_key": self.source_event_key,
+            "triggering_conclusion": self.triggering_conclusion,
+            "payload_kind": self.payload_kind,
+            "admission_state": self.admission_state,
+            "replay_allowed": self.replay_allowed,
+            "diagnostic_allowed": self.diagnostic_allowed,
+            "mark_reconciled_allowed": self.mark_reconciled_allowed,
+            "clear_gap_allowed": self.clear_gap_allowed,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class ReviewReplayDecisionInput:
+    pr_number: int
+    review_id: int
+    source_event_key: str
+    actor_login: str | None
+    current_reviewer: str | None
+    live_observation: LiveReviewObservation
+    current_head_sha: str | None
+    admission: WorkflowRunReplayAdmission
+
+
+@dataclass(frozen=True)
+class OpenItemReconcileRecoveryContext:
+    pr_number: int
+    source_event_key: str
+    source_event_name: str
+    source_event_action: str
+    live_pr_state: str | None
+    live_head_sha: str | None
+    live_author: str | None
+    live_labels: tuple[str, ...]
+    recovered_current_reviewer: str | None
+    recovery_status: str
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "pr_number": self.pr_number,
+            "source_event_key": self.source_event_key,
+            "source_event_name": self.source_event_name,
+            "source_event_action": self.source_event_action,
+            "live_pr_state": self.live_pr_state,
+            "live_head_sha": self.live_head_sha,
+            "live_author": self.live_author,
+            "live_labels": sorted(self.live_labels),
+            "recovered_current_reviewer": self.recovered_current_reviewer,
+            "recovery_status": self.recovery_status,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+@dataclass(frozen=True)
+class CommandReplayReceipt:
+    source_event_key: str
+    issue_number: int | None
+    command_name: str | None
+    replay_attempted: bool
+    command_side_effects_attempted: tuple[str, ...]
+    state_save_required: bool
+    state_save_succeeded: bool
+    mark_reconciled_allowed: bool
+    clear_gap_allowed: bool
+    result: str
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "source_event_key": self.source_event_key,
+            "issue_number": self.issue_number,
+            "command_name": self.command_name,
+            "replay_attempted": self.replay_attempted,
+            "command_side_effects_attempted": sorted(self.command_side_effects_attempted),
+            "state_save_required": self.state_save_required,
+            "state_save_succeeded": self.state_save_succeeded,
+            "mark_reconciled_allowed": self.mark_reconciled_allowed,
+            "clear_gap_allowed": self.clear_gap_allowed,
+            "result": self.result,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+@dataclass(frozen=True)
+class ReconcileTarget:
+    pr_number: int
+    source_event_key: str
+    payload_kind: str | None
+    parsed_payload: object | None
+    recovered_identity: object | None
+    live_pr_state: str | None
+    admission: WorkflowRunReplayAdmission
+
+
+def build_workflow_run_replay_admission(
+    *,
+    source_event_key: str | None,
+    triggering_conclusion: str | None,
+    payload_kind: str | None,
+    source_authority_status: str | None,
+    payload_valid: bool,
+    identity_present: bool,
+) -> WorkflowRunReplayAdmission:
+    if triggering_conclusion and triggering_conclusion != "success":
+        return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "non_success_diagnostic_only", False, True, False, False, f"observer_{triggering_conclusion}")
+    if not identity_present:
+        return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "blocked_missing_identity", False, True, False, False, "missing_identity")
+    if not payload_valid:
+        return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "blocked_payload_invalid", False, True, False, False, "payload_invalid")
+    if source_authority_status not in {"trusted_exact_identity", "trusted_legacy_identity", None}:
+        return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "blocked_untrusted_source", False, True, False, False, source_authority_status)
+    return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "trusted_success_replay_allowed", True, True, True, True, None)
+
+
+def build_command_replay_receipt(
+    *,
+    source_event_key: str,
+    issue_number: int | None,
+    command_name: str | None,
+    replay_attempted: bool,
+    command_side_effects_attempted: tuple[str, ...],
+    state_save_required: bool,
+    state_save_succeeded: bool,
+    mark_reconciled_allowed: bool,
+    clear_gap_allowed: bool,
+    diagnostic_reason: str | None = None,
+) -> CommandReplayReceipt:
+    if not replay_attempted:
+        result = "pass_diagnostic_only"
+    elif not mark_reconciled_allowed or not clear_gap_allowed:
+        result = "blocked_authority_missing"
+    elif state_save_required and not state_save_succeeded:
+        result = "blocked_state_save_failed"
+    else:
+        result = "pass_replayed_and_persisted"
+    return CommandReplayReceipt(
+        source_event_key=source_event_key,
+        issue_number=issue_number,
+        command_name=command_name,
+        replay_attempted=replay_attempted,
+        command_side_effects_attempted=command_side_effects_attempted,
+        state_save_required=state_save_required,
+        state_save_succeeded=state_save_succeeded,
+        mark_reconciled_allowed=mark_reconciled_allowed,
+        clear_gap_allowed=clear_gap_allowed,
+        result=result,
+        diagnostic_reason=diagnostic_reason,
+    )
+
+
+def decide_review_submitted_replay_from_input(inputs: ReviewReplayDecisionInput):
+    return reconcile_replay_policy.decide_review_submitted_replay(
+        source_event_key=inputs.source_event_key,
+        actor_login=inputs.actor_login,
+        current_reviewer=inputs.current_reviewer,
+        live_commit_id=inputs.live_observation.commit_id if inputs.admission.replay_allowed else None,
+        live_submitted_at=inputs.live_observation.submitted_at if inputs.admission.replay_allowed else None,
+    )
+
+
+def apply_reconcile_command_with_receipt(bot, state: dict, target: ReconcileTarget) -> CommandReplayReceipt:
+    del bot, state
+    return build_command_replay_receipt(
+        source_event_key=target.source_event_key,
+        issue_number=target.pr_number,
+        command_name=None,
+        replay_attempted=False,
+        command_side_effects_attempted=(),
+        state_save_required=False,
+        state_save_succeeded=False,
+        mark_reconciled_allowed=target.admission.mark_reconciled_allowed,
+        clear_gap_allowed=target.admission.clear_gap_allowed,
+        diagnostic_reason=target.admission.reason,
+    )
+
+
 def _log(bot: ReconcileWorkflowRuntimeContext, level: str, message: str, **fields) -> None:
     bot.logger.event(level, message, **fields)
 
@@ -466,8 +685,23 @@ def _reconcile_deferred_comment(
             ) or changed
         except InvalidEventInput as exc:
             return record_artifact_invalid(exc)
+    command_receipt = build_command_replay_receipt(
+        source_event_key=str(payload.get("source_event_key", "")),
+        issue_number=pr_number,
+        command_name=str(live_classified.get("command")) if live_classified.get("command") else None,
+        replay_attempted=bool(decision.replay_comment_command),
+        command_side_effects_attempted=("comment_command",) if decision.replay_comment_command else (),
+        state_save_required=bool(decision.replay_comment_command),
+        state_save_succeeded=bool(decision.replay_comment_command),
+        mark_reconciled_allowed=bool(decision.mark_reconciled),
+        clear_gap_allowed=bool(decision.clear_gap),
+        diagnostic_reason=None,
+    )
+    review_data.setdefault("sidecars", {}).setdefault("command_replay_receipts", {})[
+        command_receipt.source_event_key
+    ] = command_receipt.to_output()
     reconciled_changed = False
-    if decision.mark_reconciled:
+    if decision.mark_reconciled and command_receipt.result in {"pass_replayed_and_persisted", "pass_diagnostic_only"}:
         reconciled_changed = gap_bookkeeping.mark_reconciled_source_event(
             review_data,
             str(payload.get("source_event_key", "")),
@@ -523,8 +757,9 @@ def _handle_review_submitted_workflow_run(
     pr_number = context.pr_number
     source_event_key = context.source_event_key
     review_id = context.review_id
+    actor = context.actor_login
     live_review = _read_optional_reconcile_object(bot, f"pulls/{pr_number}/reviews/{review_id}", label=f"live review #{review_id}")
-    _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number}")
+    live_pr = _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number}")
     live_commit_id = None
     live_submitted_at = parsed_payload.source_submitted_at
     live_state = parsed_payload.source_review_state
@@ -532,16 +767,42 @@ def _handle_review_submitted_workflow_run(
         live_commit_id = live_review.get("commit_id")
         live_submitted_at = live_review.get("submitted_at") or live_submitted_at
         live_state = live_review.get("state") or live_state
-    else:
-        live_commit_id = parsed_payload.source_commit_id
-    actor = context.actor_login
-    state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(pr_number, review_data).changed
-    decision = reconcile_replay_policy.decide_review_submitted_replay(
+    head = live_pr.get("head") if isinstance(live_pr, dict) else None
+    current_head_sha = head.get("sha") if isinstance(head, dict) and isinstance(head.get("sha"), str) else None
+    live_observation = LiveReviewObservation(
+        review_id=review_id,
+        live_found=isinstance(live_review, dict),
+        read_status="pass" if isinstance(live_review, dict) else "not_found",
+        visibility_status="visible" if isinstance(live_review, dict) else "missing",
+        commit_id=live_commit_id if isinstance(live_commit_id, str) else None,
+        submitted_at=live_submitted_at if isinstance(live_submitted_at, str) else None,
+        state=live_state if isinstance(live_state, str) else None,
+        author=actor,
+        failure_kind=None,
+        diagnostic_reason=None if isinstance(live_review, dict) else "live_review_not_found",
+    )
+    admission = build_workflow_run_replay_admission(
         source_event_key=source_event_key,
-        actor_login=actor,
-        current_reviewer=review_data.get("current_reviewer"),
-        live_commit_id=live_commit_id if isinstance(live_commit_id, str) else None,
-        live_submitted_at=live_submitted_at if isinstance(live_submitted_at, str) else None,
+        triggering_conclusion=bot.get_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION").strip() or "success",
+        payload_kind=parsed_payload.identity.payload_kind.value,
+        source_authority_status="trusted_exact_identity",
+        payload_valid=True,
+        identity_present=True,
+    )
+    if not isinstance(live_review, dict):
+        live_commit_id = parsed_payload.source_commit_id
+    state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(pr_number, review_data).changed
+    decision = decide_review_submitted_replay_from_input(
+        ReviewReplayDecisionInput(
+            pr_number=pr_number,
+            review_id=review_id,
+            source_event_key=source_event_key,
+            actor_login=actor,
+            current_reviewer=review_data.get("current_reviewer"),
+            live_observation=live_observation,
+            current_head_sha=current_head_sha,
+            admission=admission,
+        )
     )
     if decision.accept_reviewer_review:
         accept_channel_event(
@@ -557,12 +818,16 @@ def _handle_review_submitted_workflow_run(
         state_changed = True
     if _record_review_rebuild(bot, state, pr_number, review_data):
         state_changed = True
-    reconciled_changed = gap_bookkeeping.mark_reconciled_source_event(
-        review_data,
-        source_event_key,
-        reconciled_at=_now_iso(bot),
-    )
-    gap_cleared_changed = gap_bookkeeping.clear_deferred_gap(review_data, source_event_key)
+    reconciled_changed = False
+    gap_cleared_changed = False
+    if decision.mark_reconciled and admission.mark_reconciled_allowed:
+        reconciled_changed = gap_bookkeeping.mark_reconciled_source_event(
+            review_data,
+            source_event_key,
+            reconciled_at=_now_iso(bot),
+        )
+    if decision.clear_gap and admission.clear_gap_allowed:
+        gap_cleared_changed = gap_bookkeeping.clear_deferred_gap(review_data, source_event_key)
     return state_changed or reconciled_changed or gap_cleared_changed
 
 
@@ -584,8 +849,28 @@ def _handle_review_dismissed_workflow_run(
         context.review_id,
         parsed_payload.raw_payload,
     )
-    if not dismissal_time.exact:
-        return gap_bookkeeping.record_deferred_gap_diagnostic(
+    dismissal_plan = reconcile_replay_policy.decide_review_dismissed_replay_plan(
+        source_event_key=source_event_key,
+        dismissal_timestamp=str(dismissal_time.timestamp) if dismissal_time.timestamp is not None else None,
+        dismissal_exact=dismissal_time.exact,
+        live_pr_readable=True,
+    )
+    if not dismissal_plan.record_channel_event:
+        state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(context.pr_number, review_data).changed
+        live_pr_readable = True
+        if dismissal_plan.rebuild_live_approval:
+            try:
+                state_changed = _record_review_rebuild(bot, state, context.pr_number, review_data) or state_changed
+            except (AssertionError, ReconcileReadError):
+                live_pr_readable = False
+        if not live_pr_readable:
+            dismissal_plan = reconcile_replay_policy.decide_review_dismissed_replay_plan(
+                source_event_key=source_event_key,
+                dismissal_timestamp=None,
+                dismissal_exact=False,
+                live_pr_readable=False,
+            )
+        gap_changed = gap_bookkeeping.record_deferred_gap_diagnostic(
             bot,
             review_data,
             parsed_payload.raw_payload,
@@ -595,32 +880,30 @@ def _handle_review_dismissed_workflow_run(
                 f"dismissal replay suppressed ({dismissal_time.reason or 'unavailable'}). "
                 f"See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
             ),
-            failure_kind=dismissal_time.failure_kind,
+            failure_kind=dismissal_time.failure_kind or dismissal_plan.failure_kind,
         )
-    decision = reconcile_replay_policy.decide_review_dismissed_replay(
-        source_event_key=source_event_key,
-        timestamp=str(dismissal_time.timestamp),
-    )
+        return state_changed or gap_changed
     state_changed = False
-    if decision.accept_review_dismissal:
+    if dismissal_plan.record_channel_event:
         state_changed = accept_channel_event(
             review_data,
             "review_dismissal",
             semantic_key=source_event_key,
-            timestamp=str(decision.replay_timestamp),
+            timestamp=str(dismissal_plan.replay_timestamp),
             dismissal_only=True,
         ) or state_changed
     state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(context.pr_number, review_data).changed or state_changed
-    state_changed = _record_review_rebuild(bot, state, context.pr_number, review_data) or state_changed
+    if dismissal_plan.rebuild_live_approval:
+        state_changed = _record_review_rebuild(bot, state, context.pr_number, review_data) or state_changed
     reconciled_changed = False
-    if decision.mark_reconciled:
+    if dismissal_plan.mark_reconciled:
         reconciled_changed = gap_bookkeeping.mark_reconciled_source_event(
             review_data,
             source_event_key,
             reconciled_at=_now_iso(bot),
         )
     gap_cleared_changed = False
-    if decision.clear_gap:
+    if dismissal_plan.clear_gap:
         gap_cleared_changed = gap_bookkeeping.clear_deferred_gap(review_data, source_event_key)
     return state_changed or reconciled_changed or gap_cleared_changed
 
@@ -651,8 +934,6 @@ def _workflow_run_handler_for_payload(parsed_payload: ParsedWorkflowRunPayload):
 def handle_workflow_run_event_result(bot: ReconcileWorkflowRuntimeContext, state: dict) -> WorkflowRunHandlerResult:
     bot.assert_lock_held("handle_workflow_run_event")
     event_context = build_event_context(bot)
-    if event_context.workflow_run_triggering_conclusion != "success":
-        raise RuntimeError("workflow_run reconcile requires successful triggering conclusion")
     if str(state.get("freshness_runtime_epoch", "")).strip() != "freshness_v15":
         _log(bot, "info", "V18 workflow_run reconcile safe-noop before epoch flip")
         return WorkflowRunHandlerResult(False, [])
@@ -663,6 +944,41 @@ def handle_workflow_run_event_result(bot: ReconcileWorkflowRuntimeContext, state
             state_changed=state_changed,
             touched_items=touched_items,
         )
+
+    if event_context.workflow_run_triggering_conclusion != "success":
+        try:
+            payload = _load_deferred_context(bot)
+            recovered_identity = _reconcile_payloads.recover_deferred_payload_identity(payload)
+        except RuntimeError:
+            _log(
+                bot,
+                "warning",
+                "Non-success observer workflow_run had no recoverable deferred identity; retained diagnostic only.",
+                workflow_conclusion=event_context.workflow_run_triggering_conclusion or "<missing>",
+            )
+            return WorkflowRunHandlerResult(False, [])
+        pr_number = recovered_identity.pr_number
+        review_data = ensure_review_entry(state, pr_number)
+        if review_data is None:
+            return WorkflowRunHandlerResult(False, [])
+        bot.collect_touched_item(pr_number)
+        admission = build_workflow_run_replay_admission(
+            source_event_key=recovered_identity.source_event_key,
+            triggering_conclusion=event_context.workflow_run_triggering_conclusion,
+            payload_kind=str(payload.get("payload_kind")) if isinstance(payload, dict) and payload.get("payload_kind") else None,
+            source_authority_status="diagnostic_non_success_identity",
+            payload_valid=isinstance(payload, dict),
+            identity_present=True,
+        )
+        gap_changed = gap_bookkeeping.record_deferred_gap_diagnostic(
+            bot,
+            review_data,
+            recovered_identity.diagnostic_payload,
+            "observer_failed" if event_context.workflow_run_triggering_conclusion != "cancelled" else "observer_cancelled",
+            f"Deferred observer concluded {event_context.workflow_run_triggering_conclusion}; replay suppressed by {admission.admission_state}.",
+            failure_kind=event_context.workflow_run_triggering_conclusion,
+        )
+        return _build_result(gap_changed, pr_number)
 
     try:
         payload = _load_deferred_context(bot)

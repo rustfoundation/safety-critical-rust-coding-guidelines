@@ -547,7 +547,7 @@ def test_deferred_comment_missing_live_object_preserves_source_time_freshness(mo
     )
 
     assert harness.run(state) is True
-    assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"]["semantic_key"] == "issue_comment:99"
+    assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"] is None
     gap = state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]["issue_comment:99"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
@@ -697,6 +697,7 @@ def test_deferred_review_comment_reconcile_records_contributor_freshness(monkeyp
             in_reply_to_id=200,
             source_run_id=701,
             source_run_attempt=1,
+            source_commit_id="head-1",
         ),
     )
     harness.add_pull_request(pr_number=42, author="dana", requested_reviewers=["alice"])
@@ -715,7 +716,7 @@ def test_deferred_review_comment_reconcile_records_contributor_freshness(monkeyp
     assert accepted["semantic_key"] == "pull_request_review_comment:301"
 
 
-def test_deferred_review_comment_reconcile_records_reviewer_freshness(monkeypatch):
+def test_deferred_review_comment_reconcile_keeps_reviewer_freshness_diagnostic_only(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="alice")
     live_body = "reviewer reply in thread"
@@ -736,6 +737,7 @@ def test_deferred_review_comment_reconcile_records_reviewer_freshness(monkeypatc
             in_reply_to_id=200,
             source_run_id=702,
             source_run_attempt=1,
+            source_commit_id="head-1",
         ),
     )
     harness.add_pull_request(pr_number=42, author="dana", requested_reviewers=["alice"])
@@ -749,7 +751,7 @@ def test_deferred_review_comment_reconcile_records_reviewer_freshness(monkeypatc
     harness.runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
-    assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:302"
+    assert review["reviewer_comment"]["accepted"] is None
 
 
 def test_deferred_review_comment_missing_live_object_preserves_source_time_freshness(monkeypatch):
@@ -785,7 +787,7 @@ def test_deferred_review_comment_missing_live_object_preserves_source_time_fresh
     harness.runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
-    assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:303"
+    assert review["reviewer_comment"]["accepted"] is None
     gap = _deferred_gaps(review)["pull_request_review_comment:303"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
@@ -1550,7 +1552,7 @@ def test_c4c_reconcile_deletion_manifest_and_adapter_cleanup_are_explicit():
     assert "no longer resolves to exactly one command" not in module_text
     assert "reconcile_replay_policy.decide_comment_replay(" in module_text
     assert "reconcile_replay_policy.decide_review_submitted_replay(" in module_text
-    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay_plan(" in module_text
 
 
 def test_d2_reconcile_replay_path_stays_decode_read_apply_orchestration_only():
@@ -1565,4 +1567,4 @@ def test_d2_reconcile_replay_path_stays_decode_read_apply_orchestration_only():
     assert "clear_deferred_gap(" in module_text
     assert "reconcile_replay_policy.decide_comment_replay(" in module_text
     assert "reconcile_replay_policy.decide_review_submitted_replay(" in module_text
-    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay_plan(" in module_text

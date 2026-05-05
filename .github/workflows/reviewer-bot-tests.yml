@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_core/**'
       - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
       - 'tests/**'
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_core/**'
       - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
       - 'tests/**'
@@ -83,6 +85,7 @@ jobs:
           COVERAGE_FILE=artifacts/coverage/.coverage
           uv run pytest tests/unit/reviewer_bot tests/integration/reviewer_bot
           --cov=scripts.reviewer_bot
+          --cov=scripts.reviewer_bot_core
           --cov=scripts.reviewer_bot_lib
           --cov-branch
           --cov-report=term-missing
