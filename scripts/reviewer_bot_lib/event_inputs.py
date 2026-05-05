@@ -209,7 +209,10 @@ def _derive_lifecycle_event_created_at(bot: EventInputsContext, *, action: str, 
         source_updated_at=bot.get_config_value("PR_UPDATED_AT" if is_pull_request else "ISSUE_UPDATED_AT").strip() or None,
         source_closed_at=bot.get_config_value("PR_CLOSED_AT" if is_pull_request else "ISSUE_CLOSED_AT").strip() or None,
     )
-    return evidence.selected_timestamp or ""
+    if evidence.selected_timestamp:
+        return evidence.selected_timestamp
+    config_name = _lifecycle_timestamp_config_name(action=action, is_pull_request=is_pull_request)
+    return bot.get_config_value(config_name).strip() if config_name else ""
 
 
 def _validate_lifecycle_event_created_at(

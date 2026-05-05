@@ -311,6 +311,51 @@ def compute_reviewer_response_state(
     )
 
 
+def compute_effective_reviewer_response_state(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    issue_snapshot: dict | None = None,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> dict[str, object]:
+    from scripts.reviewer_bot_core import reviewer_response_policy
+
+    from . import overdue
+
+    response_state = compute_reviewer_response_state(
+        bot,
+        issue_number,
+        review_data,
+        issue_snapshot=issue_snapshot,
+        pull_request=pull_request,
+        reviews=reviews,
+    )
+    response_payload = dict(response_state)
+    response_payload.setdefault("issue_number", issue_number)
+    response_payload.setdefault("current_reviewer", review_data.get("current_reviewer"))
+    response = reviewer_response_policy.to_reviewer_response_decision(response_payload)
+    receipt = overdue.derive_reminder_scope_receipt(
+        issue_number=issue_number,
+        reviewer=getattr(response.scope, "reviewer", None) if response.scope else review_data.get("current_reviewer"),
+        head_sha=getattr(response.scope, "head_sha", None) if response.scope else None,
+        cycle_key=getattr(response.scope, "cycle_key", None) if response.scope else None,
+        scope_key=getattr(response.scope, "scope_key", None) if response.scope else None,
+        persisted_state=review_data,
+        scanned_comments=(),
+    )
+    cadence = overdue.derive_reminder_cadence_decision(
+        response,
+        receipt=receipt,
+        reminder_scan=None,
+        now=bot.datetime.now(bot.timezone.utc) if hasattr(bot, "datetime") else None,
+        review_deadline_days=getattr(bot, "REVIEW_DEADLINE_DAYS", 0),
+        transition_period_days=getattr(bot, "TRANSITION_PERIOD_DAYS", 0),
+    )
+    return reviewer_response_policy.apply_reminder_cadence_overlay(response, cadence).to_output()
+
+
 def project_status_labels_for_item(
     bot,
     issue_number: int,
@@ -332,8 +377,8 @@ def project_status_labels_for_item(
     if not isinstance(current_reviewer, str) or not current_reviewer.strip():
         return set(), {"state": "untracked", "reason": "no_current_reviewer"}
 
-    response_state = compute_reviewer_response_state(bot, issue_number, review_data, issue_snapshot=issue_snapshot)
-    state_name = response_state.get("state")
+    response_state = compute_effective_reviewer_response_state(bot, issue_number, review_data, issue_snapshot=issue_snapshot)
+    state_name = response_state.get("state") or response_state.get("response_state")
     reason = response_state.get("reason")
     return desired_labels_from_response_state(str(state_name), None if reason is None else str(reason))
 

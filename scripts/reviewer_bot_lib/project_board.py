@@ -9,6 +9,7 @@ from typing import Any
 from scripts.reviewer_bot_core import live_review_support, reviewer_response_policy
 
 from . import deferred_gap_bookkeeping as gap_bookkeeping
+from . import overdue
 from .config import (
     REVIEWER_BOARD_ENABLED_ENV,
     REVIEWER_BOARD_FIELD_ASSIGNED_AT,
@@ -295,14 +296,36 @@ def _derive_review_state(
         preview_review_data,
         issue_snapshot=copy.deepcopy(issue_snapshot),
     )
-    state = str(derived.get("state", "projection_failed"))
+    response_payload = dict(derived)
+    response_payload.setdefault("issue_number", issue_number)
+    response_payload.setdefault("current_reviewer", preview_review_data.get("current_reviewer"))
+    response = reviewer_response_policy.to_reviewer_response_decision(response_payload)
+    receipt = overdue.derive_reminder_scope_receipt(
+        issue_number=issue_number,
+        reviewer=getattr(response.scope, "reviewer", None) if response.scope else preview_review_data.get("current_reviewer"),
+        head_sha=getattr(response.scope, "head_sha", None) if response.scope else None,
+        cycle_key=getattr(response.scope, "cycle_key", None) if response.scope else None,
+        scope_key=getattr(response.scope, "scope_key", None) if response.scope else None,
+        persisted_state=preview_review_data,
+        scanned_comments=(),
+    )
+    cadence = overdue.derive_reminder_cadence_decision(
+        response,
+        receipt=receipt,
+        reminder_scan=None,
+        now=None,
+        review_deadline_days=0,
+        transition_period_days=0,
+    )
+    effective_response = reviewer_response_policy.apply_reminder_cadence_overlay(response, cadence)
+    state = effective_response.response_state
     return ReviewStateDerivation(
         state=state,
-        anchor_timestamp=derived.get("anchor_timestamp") if isinstance(derived.get("anchor_timestamp"), str) else None,
-        reason=derived.get("reason") if isinstance(derived.get("reason"), str) else None,
-        current_scope_key=derived.get("current_scope_key") if isinstance(derived.get("current_scope_key"), str) else None,
-        current_scope_basis=derived.get("current_scope_basis") if isinstance(derived.get("current_scope_basis"), str) else None,
-        current_head_sha=derived.get("current_head_sha") if isinstance(derived.get("current_head_sha"), str) else None,
+        anchor_timestamp=effective_response.anchor_timestamp,
+        reason=effective_response.reason,
+        current_scope_key=effective_response.scope.scope_key if effective_response.scope else None,
+        current_scope_basis=effective_response.scope.scope_basis if effective_response.scope else None,
+        current_head_sha=effective_response.current_head_sha,
     )
 
 
@@ -371,6 +394,7 @@ def derive_board_projection(input: BoardProjectionInput) -> BoardProjectionValue
         "awaiting_reviewer_response": REVIEWER_BOARD_OPTION_AWAITING_REVIEWER,
         "awaiting_contributor_response": REVIEWER_BOARD_OPTION_AWAITING_CONTRIBUTOR,
         "awaiting_write_approval": REVIEWER_BOARD_OPTION_AWAITING_WRITE_APPROVAL,
+        "reviewer_reassignment_needed": REVIEWER_BOARD_OPTION_AWAITING_REVIEWER,
         "done": REVIEWER_BOARD_OPTION_DONE,
     }
     review_state = review_state_map.get(derivation.state)
@@ -389,7 +413,7 @@ def derive_board_projection(input: BoardProjectionInput) -> BoardProjectionValue
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_PROJECTION_REPAIR_REQUIRED
     elif review_data.get("mandatory_approver_required"):
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_TRIAGE_APPROVAL_REQUIRED
-    elif derivation.state != "awaiting_reviewer_response":
+    elif derivation.state not in {"awaiting_reviewer_response", "reviewer_reassignment_needed"}:
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_NO
     elif _timestamp_at_or_after_anchor(review_data.get("transition_notice_sent_at"), derivation.anchor_timestamp):
         needs_attention = REVIEWER_BOARD_OPTION_ATTENTION_TRANSITION_NOTICE_SENT

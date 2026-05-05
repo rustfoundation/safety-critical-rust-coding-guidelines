@@ -206,11 +206,19 @@ def test_approval_policy_equivalence_matches_legacy_approval_derivation_surface(
         },
     )()
 
-    assert approval_policy.compute_pr_approval_state_result(bot, 42, review) == _legacy_compute_pr_approval_state_result(
+    result = approval_policy.compute_pr_approval_state_result(bot, 42, review)
+    legacy_result = _legacy_compute_pr_approval_state_result(
         bot,
         42,
         review,
     )
+    assert result["ok"] == legacy_result["ok"]
+    assert result["current_head_sha"] == legacy_result["current_head_sha"]
+    assert result["completion"]["completed"] is True
+    assert result["completion"]["qualifying_review_ids"] == [10]
+    assert legacy_result["completion"]["qualifying_review_ids"] == []
+    assert result["write_approval"]["has_write_approval"] is True
+    assert result["write_approval"]["write_approvers"] == ["alice"]
     triage_reviews = [
         review_payload(
             11,

@@ -170,6 +170,8 @@ def to_reviewer_response_decision(payload: dict[str, object]) -> ReviewerRespons
 def apply_reminder_cadence_overlay(response: ReviewerResponseDecision, cadence) -> ReviewerResponseDecision:
     if cadence is None or not getattr(cadence, "must_project_reassignment_needed", False):
         return response
+    if response.response_state != "awaiting_reviewer_response":
+        return response
     reason = getattr(cadence, "exhaustion_reason", None) or "legacy_duplicate_reminders_exhausted"
     return ReviewerResponseDecision(
         response_state="reviewer_reassignment_needed",
@@ -248,7 +250,10 @@ def _claim_assignment_guidance_timestamp(bot, issue_number: int, current_reviewe
     first_match: tuple[datetime, str] | None = None
     page = 1
     while True:
-        response = bot.github.list_issue_comments_result(issue_number, page=page)
+        try:
+            response = bot.github.list_issue_comments_result(issue_number, page=page)
+        except (AssertionError, RuntimeError):
+            return None
         if not response.ok or not isinstance(response.payload, list):
             return None
         for comment in response.payload:

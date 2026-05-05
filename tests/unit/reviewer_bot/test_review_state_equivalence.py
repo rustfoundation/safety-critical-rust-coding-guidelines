@@ -307,6 +307,7 @@ def test_review_state_live_repair_behavior_no_longer_depends_on_reviews_parallel
         pull_request_result = {"ok": True, "pull_request": {"head": {"sha": "head-1"}}}
         preferred_review = {
             "id": 10,
+            "state": "COMMENTED",
             "submitted_at": "2026-03-17T10:01:00Z",
             "commit_id": "head-1",
             "user": {"login": "alice"},

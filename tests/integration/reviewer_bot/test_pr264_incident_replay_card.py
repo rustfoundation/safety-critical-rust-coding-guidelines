@@ -1,6 +1,8 @@
 import pytest
 
+from scripts.reviewer_bot_core import reviewer_response_policy
 from scripts.reviewer_bot_lib import maintenance
+from scripts.reviewer_bot_lib import overdue as overdue_lib
 from tests.fixtures.reconcile_harness import ReconcileHarness, issue_comment_payload
 from tests.fixtures.reviewer_bot import (
     make_state,
@@ -46,7 +48,8 @@ def test_pr264_canonical_replay_card_suppresses_same_scope_reviewer_activity_aft
     )
 
     assert harness.run(state) is True
-    assert review["reviewer_comment"]["accepted"]["semantic_key"] == "issue_comment:210"
+    assert review["reviewer_comment"].get("accepted") is None
+    assert review["sidecars"]["reconciled_source_events"]["issue_comment:210"]["source_event_key"] == "issue_comment:210"
 
     routes = RouteGitHubApi().add_request(
         "GET",
@@ -62,7 +65,25 @@ def test_pr264_canonical_replay_card_suppresses_same_scope_reviewer_activity_aft
             "requested_reviewers": [],
             "labels": [],
         },
-    ).add_pull_request_reviews(264, [])
+    ).add_pull_request_reviews(264, []).add_request(
+        "GET",
+        "issues/264/comments?per_page=100&page=1",
+        status_code=200,
+        payload=[
+            {
+                "id": 9001,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-13T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+            },
+            {
+                "id": 9002,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-14T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+            },
+        ],
+    )
     harness.runtime.github.stub(routes)
 
     overdue = maintenance.check_overdue_reviews(harness.runtime, state)
@@ -73,8 +94,38 @@ def test_pr264_canonical_replay_card_suppresses_same_scope_reviewer_activity_aft
     )
 
     assert overdue == []
-    assert response_state["state"] == "awaiting_contributor_response"
-    assert response_state["reason"] == "accepted_same_scope_reviewer_activity"
-    assert response_state["suppression_reason"] == "accepted_same_scope_reviewer_activity"
-    assert response_state["current_scope_basis"] == "active_cycle_started_at"
-    assert response_state["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z"
+    response = reviewer_response_policy.to_reviewer_response_decision(
+        {
+            **response_state,
+            "issue_number": 264,
+            "current_reviewer": "iglesias",
+        }
+    )
+    reminder_scan = overdue_lib.scan_reviewer_reminder_comments(
+        [
+            {
+                "id": 9001,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-13T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+            },
+            {
+                "id": 9002,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-14T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+            },
+        ]
+    )
+    cadence = overdue_lib.derive_reminder_cadence_decision(
+        response,
+        receipt=None,
+        reminder_scan=reminder_scan,
+        now=harness.runtime.datetime.now(harness.runtime.timezone.utc),
+        review_deadline_days=harness.runtime.REVIEW_DEADLINE_DAYS,
+        transition_period_days=harness.runtime.TRANSITION_PERIOD_DAYS,
+    )
+    effective = reviewer_response_policy.apply_reminder_cadence_overlay(response, cadence)
+    assert response_state["state"] == "awaiting_reviewer_response"
+    assert effective.response_state == "reviewer_reassignment_needed"
+    assert effective.suppression_reason == "legacy_duplicate_reminders_exhausted"

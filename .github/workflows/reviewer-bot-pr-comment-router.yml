@@ -152,6 +152,7 @@ jobs:
                   'source_workflow_file': '.github/workflows/reviewer-bot-pr-comment-router.yml',
                   'source_run_id': int(os.environ['GITHUB_RUN_ID']),
                   'source_run_attempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+                  'source_artifact_name': f"reviewer-bot-comment-context-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}",
                   'source_event_name': 'issue_comment',
                   'source_event_action': 'created',
                   'source_event_key': f"issue_comment:{comment['id']}",

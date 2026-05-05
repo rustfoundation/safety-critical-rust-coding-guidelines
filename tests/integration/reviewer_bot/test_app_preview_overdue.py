@@ -62,6 +62,24 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
     ).add_pull_request_reviews(
         264,
         [review_payload(501, state="APPROVED", submitted_at="2026-03-18T12:10:42Z", commit_id="head-live", author="plaindocs")],
+    ).add_request(
+        "GET",
+        "issues/264/comments?per_page=100&page=1",
+        status_code=200,
+        payload=[
+            {
+                "id": 9001,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-13T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+            },
+            {
+                "id": 9002,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-14T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+            },
+        ],
     )
     harness.runtime.github.stub(routes)
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
@@ -83,11 +101,11 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
         "validation_nonce": "nonce-pr264",
         "head_sha": "workflow-head",
         "workflow_path": ".github/workflows/reviewer-bot-preview.yml",
-        "response_state": "awaiting_contributor_response",
+        "response_state": "reviewer_reassignment_needed",
         "reviewer_authority_outcome": "tracked_reviewer_confirmed",
-        "suppression_reason": "current_head_alternate_approval_present",
-        "current_scope_key": "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=none",
-        "current_scope_basis": "alternate_current_head_approval",
+        "suppression_reason": "legacy_duplicate_reminders_exhausted",
+        "current_scope_key": "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z",
+        "current_scope_basis": "active_cycle_started_at",
         "would_post_warning": False,
         "would_post_transition": False,
         "lock_attempted": False,
@@ -172,10 +190,10 @@ def test_execute_run_preview_check_overdue_backfills_claim_cycle_from_assignment
 
     assert result.exit_code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=none"
-    assert payload["current_scope_basis"] == "alternate_current_head_approval"
-    assert payload["suppression_reason"] == "current_head_alternate_approval_present"
-    assert payload["would_post_warning"] is False
+    assert payload["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-26T04:58:03.401345+00:00|anchor=2026-02-26T04:58:03.401345+00:00"
+    assert payload["current_scope_basis"] == "assigned_at"
+    assert payload["suppression_reason"] == "review_head_stale"
+    assert payload["would_post_warning"] is True
     assert payload["would_post_transition"] is False
 
 

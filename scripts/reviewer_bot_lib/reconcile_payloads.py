@@ -444,7 +444,9 @@ def derive_deferred_artifact_source_authority(
     expected_key = f"{contract.source_event_key_prefix}{object_id}"
     status = "trusted_exact_identity"
     reason = None
-    if identity is None or missing_identity:
+    if identity is not None and identity.schema_version == 2:
+        status = "trusted_legacy_identity"
+    elif identity is None or missing_identity:
         status = "blocked_missing_identity"
         reason = "missing_identity_fields:" + ",".join(missing_identity)
     elif missing_payload:

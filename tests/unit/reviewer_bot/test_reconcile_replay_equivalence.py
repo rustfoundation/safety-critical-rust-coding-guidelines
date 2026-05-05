@@ -121,6 +121,6 @@ def test_h3_deferred_comment_replay_success_path_stays_policy_owned():
 
     assert "if context.payload.comment_class in {\"command_only\", \"command_plus_text\"}:" not in reconcile_text
     assert "if decision.replay_comment_command:" in reconcile_text
-    assert "if decision.mark_reconciled:" in reconcile_text
-    assert "if decision.clear_gap:" in reconcile_text
+    assert "if (\n        decision.mark_reconciled" in reconcile_text
+    assert "if decision.clear_gap and admission.clear_gap_allowed:" in reconcile_text
     assert "def decide_comment_replay(" in policy_text

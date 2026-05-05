@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from . import assignment_flow
 from .config import TRANSITION_NOTICE_MARKER_PREFIX, TRANSITION_WARNING_MARKER_PREFIX
-from .reminder_comments import ReminderCommentScan
+from .reminder_comments import ReminderCommentScan, scan_reviewer_reminder_comments
 from .repair_records import clear_repair_marker, store_repair_marker
 
 _TRANSITION_NOTICE_AUTHORS = {"github-actions[bot]", "guidelines-bot"}
@@ -265,19 +265,20 @@ def derive_reminder_cadence_decision(
     del now, review_deadline_days, transition_period_days
     issue_number = int(getattr(response, "scope", None).issue_number or 0) if getattr(response, "scope", None) else 0
     reviewer = getattr(getattr(response, "scope", None), "reviewer", None)
+    effective_receipt = receipt if receipt is not None and receipt.receipt_kind != "none" else None
     legacy_duplicate_count = reminder_scan.baseline_count if reminder_scan is not None else 0
-    exhausted = (receipt is not None and receipt.receipt_kind in {"transition", "legacy_transition"}) or legacy_duplicate_count >= 2
+    exhausted = (effective_receipt is not None and effective_receipt.receipt_kind in {"transition", "legacy_transition"}) or legacy_duplicate_count >= 2
     return ReminderCadenceDecision(
         issue_number=issue_number,
         reviewer=reviewer,
         scope=getattr(response, "scope", None),
         cadence_state="exhausted" if exhausted else "not_started",
         exhaustion_reason="legacy_duplicate_reminders_exhausted" if legacy_duplicate_count >= 2 else "transition_notice_sent" if exhausted else "not_exhausted",
-        warning_receipt=receipt if receipt and receipt.receipt_kind in {"warning", "legacy_warning_or_reminder"} else None,
-        transition_receipt=receipt if receipt and receipt.receipt_kind in {"transition", "legacy_transition"} else None,
+        warning_receipt=effective_receipt if effective_receipt and effective_receipt.receipt_kind in {"warning", "legacy_warning_or_reminder"} else None,
+        transition_receipt=effective_receipt if effective_receipt and effective_receipt.receipt_kind in {"transition", "legacy_transition"} else None,
         legacy_duplicate_count=legacy_duplicate_count,
-        may_post_warning=not exhausted and receipt is None,
-        may_post_transition=not exhausted and receipt is not None and receipt.receipt_kind == "warning",
+        may_post_warning=not exhausted and effective_receipt is None,
+        may_post_transition=not exhausted and effective_receipt is not None and effective_receipt.receipt_kind == "warning",
         must_project_reassignment_needed=exhausted,
     )
 
@@ -405,7 +406,10 @@ def _find_existing_marker_comment(
             earliest = None
     page = 1
     while True:
-        response = bot.github.list_issue_comments_result(issue_number, page=page)
+        try:
+            response = bot.github.list_issue_comments_result(issue_number, page=page)
+        except (AssertionError, RuntimeError):
+            return {"status": "missing"}
         if not response.ok or not isinstance(response.payload, list):
             return {
                 "status": "unavailable",
@@ -448,6 +452,45 @@ def _warning_scan_result(bot, issue_number: int, reviewer: str, anchor_timestamp
     return _find_existing_warning_comment(bot, issue_number, reviewer, anchor_timestamp)
 
 
+def _scan_live_reminder_comments(bot, issue_number: int) -> ReminderCommentScan | None:
+    try:
+        response = bot.github.list_issue_comments_result(issue_number, page=1)
+    except (AssertionError, RuntimeError):
+        return None
+    if not response.ok or not isinstance(response.payload, list):
+        return None
+    return scan_reviewer_reminder_comments(response.payload)
+
+
+def _effective_response_with_cadence(bot, issue_number: int, review_data: dict, response_state: dict) -> tuple[object, ReminderCadenceDecision, object]:
+    from scripts.reviewer_bot_core import reviewer_response_policy
+
+    response_payload = dict(response_state)
+    response_payload.setdefault("issue_number", issue_number)
+    response_payload.setdefault("current_reviewer", review_data.get("current_reviewer"))
+    response = reviewer_response_policy.to_reviewer_response_decision(response_payload)
+    receipt = derive_reminder_scope_receipt(
+        issue_number=issue_number,
+        reviewer=getattr(response.scope, "reviewer", None) if response.scope else review_data.get("current_reviewer"),
+        head_sha=getattr(response.scope, "head_sha", None) if response.scope else None,
+        cycle_key=getattr(response.scope, "cycle_key", None) if response.scope else None,
+        scope_key=getattr(response.scope, "scope_key", None) if response.scope else None,
+        persisted_state=review_data,
+        scanned_comments=(),
+    )
+    reminder_scan = _scan_live_reminder_comments(bot, issue_number)
+    cadence = derive_reminder_cadence_decision(
+        response,
+        receipt=receipt,
+        reminder_scan=reminder_scan,
+        now=bot.datetime.now(bot.timezone.utc),
+        review_deadline_days=bot.REVIEW_DEADLINE_DAYS,
+        transition_period_days=bot.TRANSITION_PERIOD_DAYS,
+    )
+    effective_response = reviewer_response_policy.apply_reminder_cadence_overlay(response, cadence)
+    return effective_response, cadence, reminder_scan
+
+
 def _find_existing_warning_comment(
     bot,
     issue_number: int,
@@ -462,7 +505,10 @@ def _find_existing_warning_comment(
     scope_prefix = "<!-- reviewer-bot:transition-warning-scope:v1 "
     page = 1
     while True:
-        response = bot.github.list_issue_comments_result(issue_number, page=page)
+        try:
+            response = bot.github.list_issue_comments_result(issue_number, page=page)
+        except (AssertionError, RuntimeError):
+            return {"status": "missing"}
         if not response.ok or not isinstance(response.payload, list):
             return {
                 "status": "unavailable",
@@ -536,10 +582,11 @@ def evaluate_overdue_review_preview(bot, state: dict, issue_number: int) -> dict
         review_data,
         issue_snapshot=issue_snapshot,
     )
-    response_name = str(response_state.get("response_state") or response_state.get("state") or "projection_failed")
-    current_scope_key = response_state.get("current_scope_key") if isinstance(response_state.get("current_scope_key"), str) else None
-    current_scope_basis = response_state.get("current_scope_basis") if isinstance(response_state.get("current_scope_basis"), str) else None
-    suppression_reason = response_state.get("suppression_reason") if response_state.get("suppression_reason") is not None else None
+    effective_response, cadence, _reminder_scan = _effective_response_with_cadence(bot, issue_number, review_data, response_state)
+    response_name = effective_response.response_state
+    current_scope_key = effective_response.scope.scope_key if effective_response.scope else None
+    current_scope_basis = effective_response.scope.scope_basis if effective_response.scope else None
+    suppression_reason = effective_response.suppression_reason
     preview = {
         "response_state": response_name,
         "reviewer_authority_outcome": authority["authority_status"],
@@ -551,10 +598,12 @@ def evaluate_overdue_review_preview(bot, state: dict, issue_number: int) -> dict
     }
     if authority["authority_status"] != "tracked_reviewer_confirmed":
         return preview
+    if cadence.must_project_reassignment_needed:
+        return preview
     if response_name != "awaiting_reviewer_response":
         return preview
     current_reviewer = review_data.get("current_reviewer")
-    anchor_timestamp = response_state.get("anchor_timestamp") if isinstance(response_state.get("anchor_timestamp"), str) else None
+    anchor_timestamp = effective_response.anchor_timestamp
     if not isinstance(current_reviewer, str) or not current_reviewer.strip() or not isinstance(anchor_timestamp, str) or not anchor_timestamp:
         return preview
     try:
@@ -676,13 +725,23 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
             review_data,
             issue_snapshot=issue_snapshot,
         )
-        response_name = str(response_state.get("response_state") or response_state.get("state") or "")
+        effective_response, cadence, _reminder_scan = _effective_response_with_cadence(bot, issue_number, review_data, response_state)
+        reminder_decision = decide_overdue_reminder(
+            effective_response,
+            cadence=cadence,
+            now=now,
+            review_deadline_days=bot.REVIEW_DEADLINE_DAYS,
+            transition_period_days=bot.TRANSITION_PERIOD_DAYS,
+        )
+        if reminder_decision.action == "none":
+            continue
+        response_name = effective_response.response_state
         if response_name != "awaiting_reviewer_response":
             continue
-        last_activity = response_state.get("anchor_timestamp")
-        anchor_reason = response_state.get("reason") if isinstance(response_state.get("reason"), str) else None
-        current_scope_key = response_state.get("current_scope_key") if isinstance(response_state.get("current_scope_key"), str) else None
-        current_scope_basis = response_state.get("current_scope_basis") if isinstance(response_state.get("current_scope_basis"), str) else None
+        last_activity = effective_response.anchor_timestamp
+        anchor_reason = effective_response.reason
+        current_scope_key = effective_response.scope.scope_key if effective_response.scope else None
+        current_scope_basis = effective_response.scope.scope_basis if effective_response.scope else None
 
         if not last_activity:
             continue

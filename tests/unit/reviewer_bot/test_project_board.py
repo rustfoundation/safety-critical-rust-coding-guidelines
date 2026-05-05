@@ -9,6 +9,7 @@ from scripts.reviewer_bot_lib.config import (
     REVIEWER_BOARD_OPTION_ATTENTION_TRANSITION_NOTICE_SENT,
     REVIEWER_BOARD_OPTION_ATTENTION_WARNING_SENT,
     REVIEWER_BOARD_OPTION_AWAITING_CONTRIBUTOR,
+    REVIEWER_BOARD_OPTION_AWAITING_REVIEWER,
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
 )
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
@@ -313,9 +314,9 @@ def test_preview_board_projection_keeps_pr264_alternate_approval_boundary(monkey
 
     assert preview.classification == "open_tracked_assigned"
     assert preview.desired is not None
-    assert preview.desired.review_state == REVIEWER_BOARD_OPTION_AWAITING_CONTRIBUTOR
-    assert preview.desired.waiting_since is None
-    assert preview.desired.needs_attention == "No"
+    assert preview.desired.review_state == REVIEWER_BOARD_OPTION_AWAITING_REVIEWER
+    assert preview.desired.waiting_since == "2026-02-10"
+    assert preview.desired.needs_attention == "Transition Notice Sent"
 
 
 def test_preview_board_projection_marks_fail_closed_current_scope_gap_as_attention(monkeypatch):

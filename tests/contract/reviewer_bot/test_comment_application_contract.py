@@ -235,7 +235,8 @@ def test_comment_application_no_longer_owns_privileged_handoff_validation_or_met
 def test_comment_application_no_longer_owns_direct_comment_freshness_decision_branching():
     module_text = Path("scripts/reviewer_bot_lib/comment_application.py").read_text(encoding="utf-8")
 
-    assert "comment_freshness_policy.decide_comment_freshness(effective_review_data, request)" in module_text
+    assert "comment_freshness_policy.build_comment_freshness_event(effective_review_data, request)" in module_text
+    assert "comment_freshness_policy.decide_comment_freshness_event(event, current_head_sha=current_head_sha)" in module_text
     assert "assignment_flow.resolve_reviewer_authority(" in module_text
     assert 'bot.github.get_issue_assignees(' not in module_text
     assert "if isinstance(current_reviewer, str) and current_reviewer.lower() == comment_author.lower():" not in module_text

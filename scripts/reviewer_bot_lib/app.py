@@ -1,5 +1,7 @@
 """Top-level reviewer-bot orchestration."""
 
+import hashlib
+import json
 import sys
 from dataclasses import dataclass
 
@@ -113,6 +115,50 @@ def record_state_issue_write_receipt(
     if hasattr(bot, "logger"):
         bot.logger.event("info", "state issue write receipt", **receipt.to_output())
     return receipt
+
+
+def _stable_state_hash(state: dict | None) -> str | None:
+    if not isinstance(state, dict):
+        return None
+    try:
+        payload = json.dumps(state, sort_keys=True, separators=(",", ":"), default=str)
+    except TypeError:
+        return None
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _primary_issue_number(context: EventContext, touched_items: list[int]) -> int | None:
+    if isinstance(context.issue_number, int) and context.issue_number > 0:
+        return context.issue_number
+    if len(touched_items) == 1:
+        return touched_items[0]
+    return None
+
+
+def _external_side_effects_for_save(
+    *,
+    context: EventContext,
+    state_changed: bool,
+    sync_changes: list[str],
+    restored: list[str],
+    schedule_result: reconcile.WorkflowRunHandlerResult | maintenance.ScheduleHandlerResult | None,
+    workflow_run_result: reconcile.WorkflowRunHandlerResult | None,
+) -> tuple[str, ...]:
+    effects: list[str] = []
+    if sync_changes:
+        effects.append("member_sync")
+    if restored:
+        effects.append("pass_until_restore")
+    if state_changed:
+        if context.event_name == "issue_comment":
+            effects.append("comment_command_or_freshness")
+        elif context.event_name == "workflow_run" and workflow_run_result is not None:
+            effects.append("workflow_replay")
+        elif schedule_result is not None:
+            effects.append("scheduled_maintenance_or_reminder")
+        else:
+            effects.append(f"{context.event_name}:{context.event_action or 'none'}")
+    return tuple(dict.fromkeys(effects))
 
 
 def _log(bot: AppExecutionRuntime, level: str, message: str, **fields) -> None:
@@ -259,6 +305,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
     projection_epoch_repair = False
     workflow_run_result: reconcile.WorkflowRunHandlerResult | None = None
     schedule_result: maintenance.ScheduleHandlerResult | None = None
+    loaded_state_hash: str | None = None
 
     try:
         if (
@@ -285,6 +332,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             lock_acquired = True
 
         state = bot.state_store.load_state(fail_on_unavailable=lock_required)
+        loaded_state_hash = _stable_state_hash(state)
         active_reviews = state.get("active_reviews")
         if isinstance(active_reviews, dict):
             loaded_active_reviews_count = len(active_reviews)
@@ -428,11 +476,41 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
 
             _log(bot, "info", "State updates detected; attempting to persist reviewer-bot state.")
             _revalidate_epoch(bot, loaded_epoch, "authoritative save")
+            save_side_effects = _external_side_effects_for_save(
+                context=context,
+                state_changed=state_changed,
+                sync_changes=sync_changes,
+                restored=restored,
+                schedule_result=schedule_result,
+                workflow_run_result=workflow_run_result,
+            )
+            state_hash_after = _stable_state_hash(state)
             if not bot.state_store.save_state(state):
+                record_state_issue_write_receipt(
+                    bot,
+                    issue_number=_primary_issue_number(context, touched_items),
+                    mutation_kind=f"{event_name}:{event_action or context.manual_action or 'none'}",
+                    issue_body_hash_before=loaded_state_hash,
+                    issue_body_hash_after=state_hash_after,
+                    external_side_effects_recorded=save_side_effects,
+                    state_save_attempted=True,
+                    state_save_succeeded=False,
+                    failure_kind="state_save_failed",
+                )
                 raise RuntimeError(
                     "State updates were computed but could not be persisted. "
                     "Failing this run to avoid silent success."
                 )
+            record_state_issue_write_receipt(
+                bot,
+                issue_number=_primary_issue_number(context, touched_items),
+                mutation_kind=f"{event_name}:{event_action or context.manual_action or 'none'}",
+                issue_body_hash_before=loaded_state_hash,
+                issue_body_hash_after=state_hash_after,
+                external_side_effects_recorded=save_side_effects,
+                state_save_attempted=True,
+                state_save_succeeded=True,
+            )
 
             if touched_items:
                 state = bot.state_store.load_state(fail_on_unavailable=True)

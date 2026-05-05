@@ -8,7 +8,8 @@ def test_privileged_commands_workflow_executes_source_entrypoint():
     workflow_text = Path(".github/workflows/reviewer-bot-privileged-commands.yml").read_text(
         encoding="utf-8"
     )
-    assert "Fetch trusted bot source tarball" in workflow_text
+    assert "uses: ./.github/actions/reviewer-bot-source" in workflow_text
+    assert "BOT_SRC_ROOT: ${{ steps.bot-source.outputs.bot-src-root }}" in workflow_text
     assert 'python "$BOT_SRC_ROOT/scripts/reviewer_bot.py"' in workflow_text
 
 

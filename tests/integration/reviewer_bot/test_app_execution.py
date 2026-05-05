@@ -222,17 +222,17 @@ def test_execute_run_non_success_workflow_run_reconcile_stays_read_only_and_non_
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: calls.append("pass_until") or (current, []))
     harness.stub_sync_members(lambda current: calls.append("sync_members") or (current, []))
-    monkeypatch.setattr(
-        reconcile,
-        "handle_workflow_run_event_result",
-        lambda bot, current: pytest.fail("non-success workflow_run must not enter reconcile"),
-    )
+    def fake_reconcile(bot, current):
+        calls.append("reconcile_diagnostic")
+        return reconcile.WorkflowRunHandlerResult(state_changed=False, touched_items=[])
+
+    monkeypatch.setattr(reconcile, "handle_workflow_run_event_result", fake_reconcile)
 
     result = harness.run_execute()
 
     assert result.exit_code == 0
     assert result.state_changed is False
-    assert calls == []
+    assert calls == ["lock_acquire", "pass_until", "sync_members", "reconcile_diagnostic", "lock_release"]
     assert harness.state_store.save_calls == []
     assert review["sidecars"]["deferred_gaps"] == {"pull_request_review:11": {"reason": "artifact_missing"}}
     assert review["sidecars"]["reconciled_source_events"] == {}
