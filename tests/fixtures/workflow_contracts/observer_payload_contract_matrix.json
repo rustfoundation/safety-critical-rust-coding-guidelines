@@ -98,6 +98,7 @@
         "source_event_key",
         "pr_number",
         "review_id",
+        "source_dismissed_at",
         "source_commit_id",
         "actor_login",
         "actor_id"

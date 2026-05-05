@@ -155,6 +155,58 @@ class OverdueReminderDecision:
         }
 
 
+def _scoped_delivery_receipt(
+    *,
+    issue_number: int,
+    reviewer: str | None,
+    head_sha: str | None,
+    cycle_key: str | None,
+    scope_key: str | None,
+    persisted_state: dict,
+) -> ReminderScopeReceipt | None:
+    sidecars = persisted_state.get("sidecars") if isinstance(persisted_state, dict) else None
+    receipts = sidecars.get("reminder_delivery_receipts") if isinstance(sidecars, dict) else None
+    if not isinstance(receipts, dict):
+        return None
+    candidates: list[tuple[str, ReminderScopeReceipt]] = []
+    for row in receipts.values():
+        if not isinstance(row, dict):
+            continue
+        row_scope = row.get("scope_key") if isinstance(row.get("scope_key"), str) else None
+        if scope_key is not None and row_scope != scope_key:
+            continue
+        row_reviewer = row.get("reviewer") if isinstance(row.get("reviewer"), str) else None
+        if reviewer and row_reviewer and row_reviewer.lower() != reviewer.lower():
+            continue
+        row_head = row.get("head_sha") if isinstance(row.get("head_sha"), str) else None
+        if head_sha and row_head and row_head != head_sha:
+            continue
+        row_cycle = row.get("cycle_key") if isinstance(row.get("cycle_key"), str) else None
+        if cycle_key and row_cycle and row_cycle != cycle_key:
+            continue
+        kind = row.get("receipt_kind")
+        created_at = row.get("comment_created_at")
+        if kind not in {"warning", "transition"} or not isinstance(created_at, str) or not created_at.strip():
+            continue
+        receipt = ReminderScopeReceipt(
+            issue_number,
+            row_reviewer or reviewer,
+            row_head or head_sha,
+            row_cycle or cycle_key,
+            row_scope or scope_key,
+            str(kind),
+            row.get("comment_id"),
+            created_at,
+            "state_delivery_receipt",
+            "found",
+            None,
+        )
+        candidates.append((created_at, receipt))
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item[0])[-1][1]
+
+
 def derive_reminder_scope_receipt(
     *,
     issue_number: int,
@@ -165,12 +217,16 @@ def derive_reminder_scope_receipt(
     persisted_state: dict,
     scanned_comments: tuple[object, ...] = (),
 ) -> ReminderScopeReceipt:
-    warning = persisted_state.get("transition_warning_sent") if isinstance(persisted_state, dict) else None
-    notice = persisted_state.get("transition_notice_sent_at") if isinstance(persisted_state, dict) else None
-    if isinstance(notice, str) and notice.strip():
-        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "transition", None, notice, "state", "found", None)
-    if isinstance(warning, str) and warning.strip():
-        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "warning", None, warning, "state", "found", None)
+    scoped_receipt = _scoped_delivery_receipt(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        head_sha=head_sha,
+        cycle_key=cycle_key,
+        scope_key=scope_key,
+        persisted_state=persisted_state,
+    )
+    if scoped_receipt is not None:
+        return scoped_receipt
     if scanned_comments:
         record = sorted(scanned_comments, key=lambda item: getattr(item, "created_at", ""))[-1]
         shape = getattr(record, "matched_shape", "")
@@ -188,6 +244,12 @@ def derive_reminder_scope_receipt(
             "found",
             None,
         )
+    warning = persisted_state.get("transition_warning_sent") if isinstance(persisted_state, dict) else None
+    notice = persisted_state.get("transition_notice_sent_at") if isinstance(persisted_state, dict) else None
+    if isinstance(notice, str) and notice.strip():
+        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "transition", None, notice, "legacy_state_field", "found", "scope_unbound_legacy_field")
+    if isinstance(warning, str) and warning.strip():
+        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "warning", None, warning, "legacy_state_field", "found", "scope_unbound_legacy_field")
     return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "none", None, None, "derived_absent", "missing", None)
 
 
@@ -229,6 +291,8 @@ def build_reminder_delivery_persistence_result(
 ) -> ReminderDeliveryPersistenceResult:
     if comment_posted and state_save_attempted and not state_save_succeeded:
         result = "posted_save_failed_recoverable" if recovered_receipt is not None else "posted_save_failed_unrecoverable"
+    elif comment_posted and not state_save_attempted:
+        result = "pending_state_save_with_receipt" if recovered_receipt is not None else "pending_state_save_missing_receipt"
     elif recovered_receipt is not None and not comment_posted:
         result = "not_posted_existing_receipt"
     elif state_save_succeeded or not state_save_attempted:
@@ -467,9 +531,9 @@ def _find_existing_marker_comment(
             first_line = lines[0].strip() if lines else ""
             if first_line == marker:
                 if first_match is None or created_dt < first_match[0]:
-                    first_match = (created_dt, created_at)
+                    first_match = (created_dt, created_at, comment.get("id"))
         if first_match is not None:
-            return {"status": "found", "timestamp": first_match[1]}
+            return {"status": "found", "timestamp": first_match[1], "comment_id": first_match[2]}
         if len(response.payload) < 100:
             break
         page += 1
@@ -480,10 +544,54 @@ def _warning_scan_result(bot, issue_number: int, reviewer: str, anchor_timestamp
     return _find_existing_warning_comment(bot, issue_number, reviewer, anchor_timestamp)
 
 
+def _warning_receipt_from_result(
+    *,
+    issue_number: int,
+    reviewer: str | None,
+    head_sha: str | None,
+    cycle_key: str | None,
+    scope_key: str | None,
+    result: dict[str, object],
+    source: str,
+) -> ReminderScopeReceipt | None:
+    timestamp = result.get("timestamp") or result.get("created_at")
+    if result.get("status") not in {"found", "posted"} or not isinstance(timestamp, str) or not timestamp.strip():
+        return None
+    return ReminderScopeReceipt(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        head_sha=head_sha,
+        cycle_key=cycle_key,
+        scope_key=scope_key,
+        receipt_kind="warning",
+        comment_id=result.get("comment_id"),
+        created_at=timestamp,
+        source=source,
+        status="found",
+        reason=None,
+    )
+
+
+def _store_reminder_delivery_result(review_data: dict, result: ReminderDeliveryPersistenceResult) -> bool:
+    sidecars = review_data.setdefault("sidecars", {})
+    if not isinstance(sidecars, dict):
+        sidecars = {}
+        review_data["sidecars"] = sidecars
+    receipts = sidecars.setdefault("reminder_delivery_receipts", {})
+    if not isinstance(receipts, dict):
+        receipts = {}
+        sidecars["reminder_delivery_receipts"] = receipts
+    key = f"{result.receipt_kind}:{result.scope_key or result.issue_number}:{result.comment_id or result.comment_created_at or 'pending'}"
+    row = result.to_output()
+    previous = receipts.get(key)
+    receipts[key] = row
+    return previous != row
+
+
 def _scan_live_reminder_comments(bot, issue_number: int) -> ReminderCommentScan | None:
     try:
         response = bot.github.list_issue_comments_result(issue_number, page=1)
-    except (AssertionError, RuntimeError):
+    except (AssertionError, AttributeError, RuntimeError):
         return None
     if not response.ok or not isinstance(response.payload, list):
         return None
@@ -569,9 +677,9 @@ def _find_existing_warning_comment(
             except (ValueError, AttributeError):
                 continue
             if first_match is None or created_dt < first_match[0]:
-                first_match = (created_dt, created_at)
+                first_match = (created_dt, created_at, comment.get("id"))
         if first_match is not None:
-            return {"status": "found", "timestamp": first_match[1]}
+            return {"status": "found", "timestamp": first_match[1], "comment_id": first_match[2]}
         if len(response.payload) < 100:
             break
         page += 1
@@ -898,7 +1006,33 @@ def handle_overdue_review_warning(
         )
     changed = _clear_transport_failure(bot, review_data, issue_number, phase="warning_dedupe_read")
     if existing_warning.get("status") == "found":
-        review_data["transition_warning_sent"] = existing_warning.get("timestamp")
+        receipt = _warning_receipt_from_result(
+            issue_number=issue_number,
+            reviewer=reviewer,
+            head_sha=review_data.get("active_head_sha") if isinstance(review_data.get("active_head_sha"), str) else None,
+            cycle_key=review_data.get("cycle_key") if isinstance(review_data.get("cycle_key"), str) else None,
+            scope_key=current_scope_key,
+            result=existing_warning,
+            source="live_comment_scan",
+        )
+        if receipt is None:
+            return changed
+        review_data["transition_warning_sent"] = receipt.created_at
+        delivery_result = build_reminder_delivery_persistence_result(
+            issue_number=issue_number,
+            reviewer=reviewer,
+            head_sha=receipt.head_sha,
+            cycle_key=receipt.cycle_key,
+            scope_key=receipt.scope_key,
+            receipt_kind="warning",
+            comment_posted=False,
+            comment_id=receipt.comment_id,
+            comment_created_at=receipt.created_at,
+            state_save_attempted=False,
+            state_save_succeeded=False,
+            recovered_receipt=receipt,
+        )
+        changed = _store_reminder_delivery_result(review_data, delivery_result) or changed
         bot.collect_touched_item(issue_number)
         return True
 
@@ -941,7 +1075,35 @@ _Life happens! If you're dealing with something, just let us know._"""
                 current_scope_basis=current_scope_basis,
             )
             if existing_warning.get("status") == "found":
-                review_data["transition_warning_sent"] = existing_warning.get("timestamp")
+                receipt = _warning_receipt_from_result(
+                    issue_number=issue_number,
+                    reviewer=reviewer,
+                    head_sha=review_data.get("active_head_sha") if isinstance(review_data.get("active_head_sha"), str) else None,
+                    cycle_key=review_data.get("cycle_key") if isinstance(review_data.get("cycle_key"), str) else None,
+                    scope_key=current_scope_key,
+                    result=existing_warning,
+                    source="live_comment_scan_after_post_failure",
+                )
+                if receipt is None:
+                    changed = _record_transport_failure(bot, review_data, issue_number, phase="warning_post", result=post_result)
+                    return changed or changed
+                review_data["transition_warning_sent"] = receipt.created_at
+                delivery_result = build_reminder_delivery_persistence_result(
+                    issue_number=issue_number,
+                    reviewer=reviewer,
+                    head_sha=receipt.head_sha,
+                    cycle_key=receipt.cycle_key,
+                    scope_key=receipt.scope_key,
+                    receipt_kind="warning",
+                    comment_posted=True,
+                    comment_id=receipt.comment_id,
+                    comment_created_at=receipt.created_at,
+                    state_save_attempted=True,
+                    state_save_succeeded=False,
+                    recovered_receipt=receipt,
+                    diagnostic_reason=post_result.failure_kind,
+                )
+                changed = _store_reminder_delivery_result(review_data, delivery_result) or changed
                 _clear_transport_failure(bot, review_data, issue_number, phase="warning_post")
                 bot.collect_touched_item(issue_number)
                 return True
@@ -950,8 +1112,58 @@ _Life happens! If you're dealing with something, just let us know._"""
 
     changed = _clear_transport_failure(bot, review_data, issue_number, phase="warning_post") or changed
 
-    now = bot.datetime.now(bot.timezone.utc).isoformat()
-    review_data["transition_warning_sent"] = now
+    posted_payload = post_result.payload if isinstance(post_result.payload, dict) else {}
+    posted_result = {
+        "status": "posted",
+        "timestamp": posted_payload.get("created_at"),
+        "created_at": posted_payload.get("created_at"),
+        "comment_id": posted_payload.get("id"),
+    }
+    receipt = _warning_receipt_from_result(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        head_sha=review_data.get("active_head_sha") if isinstance(review_data.get("active_head_sha"), str) else None,
+        cycle_key=review_data.get("cycle_key") if isinstance(review_data.get("cycle_key"), str) else None,
+        scope_key=current_scope_key,
+        result=posted_result,
+        source="post_comment_response",
+    )
+    if receipt is None:
+        rescanned_warning = _find_existing_warning_comment(
+            bot,
+            issue_number,
+            reviewer,
+            anchor_timestamp,
+            current_scope_key=current_scope_key,
+            current_scope_basis=current_scope_basis,
+        )
+        receipt = _warning_receipt_from_result(
+            issue_number=issue_number,
+            reviewer=reviewer,
+            head_sha=review_data.get("active_head_sha") if isinstance(review_data.get("active_head_sha"), str) else None,
+            cycle_key=review_data.get("cycle_key") if isinstance(review_data.get("cycle_key"), str) else None,
+            scope_key=current_scope_key,
+            result=rescanned_warning,
+            source="live_comment_scan_after_post_success",
+        )
+    if receipt is not None:
+        review_data["transition_warning_sent"] = receipt.created_at
+    delivery_result = build_reminder_delivery_persistence_result(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        head_sha=receipt.head_sha if receipt is not None else None,
+        cycle_key=receipt.cycle_key if receipt is not None else None,
+        scope_key=current_scope_key,
+        receipt_kind="warning",
+        comment_posted=True,
+        comment_id=receipt.comment_id if receipt is not None else None,
+        comment_created_at=receipt.created_at if receipt is not None else None,
+        state_save_attempted=False,
+        state_save_succeeded=False,
+        recovered_receipt=receipt,
+        diagnostic_reason=None if receipt is not None else "posted_comment_missing_created_at_receipt",
+    )
+    changed = _store_reminder_delivery_result(review_data, delivery_result) or changed
     bot.collect_touched_item(issue_number)
 
     _log(bot, "info", f"Posted overdue warning for #{issue_number} to @{reviewer}", issue_number=issue_number, reviewer=reviewer)

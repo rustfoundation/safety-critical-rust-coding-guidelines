@@ -125,9 +125,10 @@ def test_late_workflow_run_reconcile_missing_row_is_diagnostic_safe_noop(monkeyp
 
     result = reconcile.handle_workflow_run_event_result(harness.runtime, state)
 
-    assert result == reconcile.WorkflowRunHandlerResult(False, [])
+    assert result == reconcile.WorkflowRunHandlerResult(True, [42])
     assert state["active_reviews"] == {}
-    assert harness.runtime.drain_touched_items() == []
+    orphan = state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]
+    assert orphan["recovery_status"] == "orphaned_deferred_event"
 
 
 @pytest.mark.parametrize(
@@ -1240,8 +1241,10 @@ def test_deferred_legacy_review_comment_hydrates_source_commit_id_from_live_comm
 
     assert harness.run(state) is True
     gap = _deferred_gaps(review)["pull_request_review_comment:305"]
-    assert gap["reason"] == "reconcile_failed_closed"
-    assert gap["source_commit_id"] == "head-1"
+    assert gap["reason"] == "artifact_invalid"
+    assert gap["failure_kind"] == "blocked_untrusted_source"
+    assert "diagnostic_legacy_identity" in gap["diagnostic_summary"]
+    assert review["reviewer_comment"]["accepted"] is None
 
 
 def test_deferred_legacy_review_comment_without_live_commit_id_records_artifact_invalid(monkeypatch):
@@ -1270,8 +1273,8 @@ def test_deferred_legacy_review_comment_without_live_commit_id_records_artifact_
     assert review["reviewer_comment"]["accepted"] is None
     gap = _deferred_gaps(review)["pull_request_review_comment:306"]
     assert gap["reason"] == "artifact_invalid"
-    assert gap["failure_kind"] == "invalid_payload"
-    assert "source_commit_id could not be recovered" in gap["diagnostic_summary"]
+    assert gap["failure_kind"] == "blocked_untrusted_source"
+    assert "diagnostic_legacy_identity" in gap["diagnostic_summary"]
     assert "source_commit_id" not in gap
 
 
@@ -1394,7 +1397,10 @@ def test_deferred_legacy_comment_reconcile_hydrates_live_pr_context_for_contribu
     harness.runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
-    assert state["active_reviews"]["42"]["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:211"
+    gap = _deferred_gaps(state["active_reviews"]["42"])["issue_comment:211"]
+    assert gap["reason"] == "artifact_invalid"
+    assert gap["failure_kind"] == "blocked_untrusted_source"
+    assert state["active_reviews"]["42"]["contributor_comment"]["accepted"] is None
     assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"] is None
 
 

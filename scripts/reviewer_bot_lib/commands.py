@@ -3,6 +3,8 @@
 import re
 from datetime import datetime
 
+from scripts.reviewer_bot_core import comment_command_policy
+
 from . import assignment_flow, review_state
 from .config import CODING_GUIDELINE_LABEL
 from .context import AssignmentRequest
@@ -127,6 +129,47 @@ def _apply_assignment_transition(
         emit_guidance=True,
         emit_failure_comment=False,
     )
+
+
+def _assignment_command_authorization(
+    bot,
+    state: dict,
+    request: AssignmentRequest,
+    *,
+    command_name: str,
+    actor: str | None,
+    target: str | None,
+) -> comment_command_policy.AssignmentCommandAuthorization:
+    issue_data = review_state.ensure_review_entry(state, request.issue_number)
+    current_reviewer = issue_data.get("current_reviewer") if isinstance(issue_data, dict) else None
+    actor_login = actor.strip() if isinstance(actor, str) and actor.strip() else ""
+    if actor_login:
+        actor_permission = bot.github.get_user_permission_status(actor_login, "triage")
+    else:
+        actor_login = "legacy-direct-command"
+        actor_permission = "granted"
+    authorization = comment_command_policy.authorize_assignment_command(
+        command_name,
+        actor=actor_login,
+        issue_number=request.issue_number,
+        target=target,
+        current_reviewer=current_reviewer if isinstance(current_reviewer, str) else None,
+        actor_permission=actor_permission,
+    )
+    if isinstance(issue_data, dict):
+        authorizations = issue_data.setdefault("sidecars", {}).setdefault("assignment_command_authorizations", {})
+        if isinstance(authorizations, dict):
+            key = f"{command_name}:{actor_login or '<missing>'}:{target or '<none>'}"
+            authorizations[key] = authorization.to_output()
+    return authorization
+
+
+def _assignment_authorization_failure(command_name: str, authorization) -> str:
+    if not authorization.actor:
+        return f"❌ Unable to identify the actor for `/{command_name}`; refusing to mutate reviewer assignment."
+    if authorization.actor_permission == "unavailable":
+        return f"❌ Unable to verify @{authorization.actor}'s assignment permissions right now; refusing to continue."
+    return f"❌ @{authorization.actor} is not authorized to use `/{command_name}` for this review."
 
 
 def _current_assignees_or_error(bot, issue_number: int) -> tuple[list[str] | None, str | None]:
@@ -521,11 +564,23 @@ def handle_assign_command(
     issue_number: int,
     username: str,
     request: AssignmentRequest | None = None,
+    actor: str | None = None,
 ) -> tuple[str, bool]:
     assignment_request = request or build_assignment_request(bot, issue_number=issue_number)
     username = username.lstrip("@")
     if not username:
         return (f"❌ Missing username. Usage: `{bot.BOT_MENTION} /r? @username`"), False
+    actor = actor or bot.get_config_value("COMMENT_AUTHOR").strip()
+    authorization = _assignment_command_authorization(
+        bot,
+        state,
+        assignment_request,
+        command_name=comment_command_policy.OrdinaryCommandId.ASSIGN_SPECIFIC.value,
+        actor=actor,
+        target=username,
+    )
+    if not authorization.authorized:
+        return _assignment_authorization_failure("r?", authorization), False
     is_producer = any(member["github"].lower() == username.lower() for member in state["queue"])
     is_away = any(member["github"].lower() == username.lower() for member in state.get("pass_until", []))
     if not is_producer and not is_away:
@@ -559,8 +614,20 @@ def handle_assign_from_queue_command(
     state: dict,
     issue_number: int,
     request: AssignmentRequest | None = None,
+    actor: str | None = None,
 ) -> tuple[str, bool]:
     assignment_request = request or build_assignment_request(bot, issue_number=issue_number)
+    actor = actor or bot.get_config_value("COMMENT_AUTHOR").strip()
+    authorization = _assignment_command_authorization(
+        bot,
+        state,
+        assignment_request,
+        command_name=comment_command_policy.OrdinaryCommandId.ASSIGN_FROM_QUEUE.value,
+        actor=actor,
+        target="producers",
+    )
+    if not authorization.authorized:
+        return _assignment_authorization_failure("r?", authorization), False
     current_assignees, assignee_error = _current_assignees_or_error(bot, issue_number)
     if assignee_error:
         return assignee_error, False

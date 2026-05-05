@@ -63,6 +63,7 @@ from .review_state import (
     ensure_review_entry,
     record_reviewer_activity,
     refresh_reviewer_review_from_live_preferred_review,
+    set_current_reviewer,
 )
 from .reviews import rebuild_pr_approval_state_result
 from .runtime_protocols import (
@@ -233,7 +234,7 @@ def build_workflow_run_replay_admission(
         return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "blocked_missing_identity", False, True, False, False, "missing_identity")
     if not payload_valid:
         return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "blocked_payload_invalid", False, True, False, False, "payload_invalid")
-    if source_authority_status not in {"trusted_exact_identity", "trusted_legacy_identity", None}:
+    if source_authority_status not in {"trusted_exact_identity", None}:
         return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "blocked_untrusted_source", False, True, False, False, source_authority_status)
     return WorkflowRunReplayAdmission(source_event_key, triggering_conclusion, payload_kind, "trusted_success_replay_allowed", True, True, True, True, None)
 
@@ -306,6 +307,46 @@ def apply_reconcile_command_with_receipt(bot, state: dict, target: ReconcileTarg
     )
 
 
+def _store_command_replay_receipt(review_data: dict, receipt: CommandReplayReceipt) -> bool:
+    receipts = review_data.setdefault("sidecars", {}).setdefault("command_replay_receipts", {})
+    if not isinstance(receipts, dict):
+        receipts = {}
+        review_data.setdefault("sidecars", {})["command_replay_receipts"] = receipts
+    row = receipt.to_output()
+    previous = receipts.get(receipt.source_event_key)
+    receipts[receipt.source_event_key] = row
+    return previous != row
+
+
+def _persisted_command_replay_receipt(
+    review_data: dict,
+    source_event_key: str,
+    *,
+    admission: WorkflowRunReplayAdmission,
+) -> CommandReplayReceipt | None:
+    receipts = review_data.get("sidecars", {}).get("command_replay_receipts") if isinstance(review_data.get("sidecars"), dict) else None
+    row = receipts.get(source_event_key) if isinstance(receipts, dict) else None
+    if not isinstance(row, dict) or not row.get("replay_attempted"):
+        return None
+    if not row.get("state_save_required"):
+        return None
+    if row.get("result") not in {"blocked_state_save_failed", "pass_replayed_and_persisted"}:
+        return None
+    side_effects = tuple(str(item) for item in row.get("command_side_effects_attempted", ()))
+    return build_command_replay_receipt(
+        source_event_key=source_event_key,
+        issue_number=row.get("issue_number") if isinstance(row.get("issue_number"), int) else None,
+        command_name=row.get("command_name") if isinstance(row.get("command_name"), str) else None,
+        replay_attempted=True,
+        command_side_effects_attempted=side_effects,
+        state_save_required=True,
+        state_save_succeeded=True,
+        mark_reconciled_allowed=bool(row.get("mark_reconciled_allowed") and admission.mark_reconciled_allowed),
+        clear_gap_allowed=bool(row.get("clear_gap_allowed") and admission.clear_gap_allowed),
+        diagnostic_reason="persisted_command_replay_receipt_recovered",
+    )
+
+
 def _derive_parsed_payload_authority(
     parsed_payload: ParsedWorkflowRunPayload,
     *,
@@ -374,6 +415,183 @@ def _read_live_pr_state_for_reconcile(bot: ReconcileWorkflowRuntimeContext, pr_n
     if not isinstance(live_state, str) or not live_state.strip():
         raise ReconcileReadError(f"live PR #{pr_number} state is invalid", failure_kind="invalid_payload")
     return live_state.strip().lower()
+
+
+def _login_values(values: object) -> tuple[str, ...]:
+    if not isinstance(values, list):
+        return ()
+    logins: list[str] = []
+    for value in values:
+        login = value.get("login") if isinstance(value, dict) else value
+        if isinstance(login, str) and login.strip():
+            logins.append(login.strip())
+    return tuple(logins)
+
+
+def _live_pr_recovery_context(
+    pr_number: int,
+    source_event_key: str,
+    source_event_name: str,
+    source_event_action: str,
+    live_pr: dict,
+    *,
+    recovered_current_reviewer: str | None,
+    recovery_status: str,
+    diagnostic_reason: str | None,
+) -> OpenItemReconcileRecoveryContext:
+    head = live_pr.get("head") if isinstance(live_pr.get("head"), dict) else {}
+    author = live_pr.get("user") if isinstance(live_pr.get("user"), dict) else {}
+    labels = tuple(
+        str(label.get("name"))
+        for label in live_pr.get("labels", [])
+        if isinstance(label, dict) and isinstance(label.get("name"), str)
+    )
+    return OpenItemReconcileRecoveryContext(
+        pr_number=pr_number,
+        source_event_key=source_event_key,
+        source_event_name=source_event_name,
+        source_event_action=source_event_action,
+        live_pr_state=str(live_pr.get("state")) if isinstance(live_pr.get("state"), str) else None,
+        live_head_sha=head.get("sha") if isinstance(head.get("sha"), str) else None,
+        live_author=author.get("login") if isinstance(author.get("login"), str) else None,
+        live_labels=labels,
+        recovered_current_reviewer=recovered_current_reviewer,
+        recovery_status=recovery_status,
+        diagnostic_reason=diagnostic_reason,
+    )
+
+
+def _record_missing_row_orphan(state: dict, context: OpenItemReconcileRecoveryContext) -> bool:
+    sidecars = state.setdefault("sidecars", {})
+    if not isinstance(sidecars, dict):
+        sidecars = {}
+        state["sidecars"] = sidecars
+    orphans = sidecars.setdefault("orphaned_deferred_reconcile_events", {})
+    if not isinstance(orphans, dict):
+        orphans = {}
+        sidecars["orphaned_deferred_reconcile_events"] = orphans
+    previous = orphans.get(context.source_event_key)
+    row = context.to_output()
+    orphans[context.source_event_key] = row
+    return previous != row
+
+
+def _recover_missing_active_review_entry(
+    bot: ReconcileWorkflowRuntimeContext,
+    state: dict,
+    *,
+    pr_number: int,
+    source_event_key: str,
+    source_event_name: str,
+    source_event_action: str,
+    allow_reconstruction: bool = True,
+) -> tuple[dict | None, bool]:
+    try:
+        live_pr = _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number}")
+    except (AssertionError, RuntimeError) as exc:
+        context = OpenItemReconcileRecoveryContext(
+            pr_number=pr_number,
+            source_event_key=source_event_key,
+            source_event_name=source_event_name,
+            source_event_action=source_event_action,
+            live_pr_state=None,
+            live_head_sha=None,
+            live_author=None,
+            live_labels=(),
+            recovered_current_reviewer=None,
+            recovery_status="orphaned_deferred_event",
+            diagnostic_reason=str(exc),
+        )
+        changed = _record_missing_row_orphan(state, context)
+        if changed:
+            bot.collect_touched_item(pr_number)
+        return None, changed
+
+    state_value = str(live_pr.get("state") or "").lower()
+    if state_value == "closed":
+        return None, False
+    if not allow_reconstruction:
+        context = _live_pr_recovery_context(
+            pr_number,
+            source_event_key,
+            source_event_name,
+            source_event_action,
+            live_pr,
+            recovered_current_reviewer=None,
+            recovery_status="orphaned_deferred_event",
+            diagnostic_reason="reconstruction_not_allowed_for_diagnostic_admission",
+        )
+        changed = _record_missing_row_orphan(state, context)
+        if changed:
+            bot.collect_touched_item(pr_number)
+        return None, changed
+    if state_value != "open":
+        context = _live_pr_recovery_context(
+            pr_number,
+            source_event_key,
+            source_event_name,
+            source_event_action,
+            live_pr,
+            recovered_current_reviewer=None,
+            recovery_status="orphaned_deferred_event",
+            diagnostic_reason="live_pr_state_not_open",
+        )
+        changed = _record_missing_row_orphan(state, context)
+        if changed:
+            bot.collect_touched_item(pr_number)
+        return None, changed
+
+    author = live_pr.get("user") if isinstance(live_pr.get("user"), dict) else {}
+    author_login = author.get("login") if isinstance(author.get("login"), str) else None
+    candidate_logins = {
+        login.lower(): login
+        for login in (*_login_values(live_pr.get("requested_reviewers")), *_login_values(live_pr.get("assignees")))
+        if not (isinstance(author_login, str) and login.lower() == author_login.lower())
+    }
+    if len(candidate_logins) != 1:
+        context = _live_pr_recovery_context(
+            pr_number,
+            source_event_key,
+            source_event_name,
+            source_event_action,
+            live_pr,
+            recovered_current_reviewer=None,
+            recovery_status="orphaned_deferred_event",
+            diagnostic_reason="missing_row_recovery_requires_exactly_one_live_reviewer",
+        )
+        changed = _record_missing_row_orphan(state, context)
+        if changed:
+            bot.collect_touched_item(pr_number)
+        return None, changed
+
+    reviewer = next(iter(candidate_logins.values()))
+    set_current_reviewer(
+        state,
+        pr_number,
+        reviewer,
+        assignment_method="deferred_reconcile_recovery",
+        at=_now_iso(bot),
+    )
+    review_data = ensure_review_entry(state, pr_number, create=True)
+    if review_data is None:
+        return None, False
+    head = live_pr.get("head") if isinstance(live_pr.get("head"), dict) else {}
+    if isinstance(head.get("sha"), str) and head.get("sha"):
+        review_data["active_head_sha"] = head["sha"]
+    context = _live_pr_recovery_context(
+        pr_number,
+        source_event_key,
+        source_event_name,
+        source_event_action,
+        live_pr,
+        recovered_current_reviewer=reviewer,
+        recovery_status="recovered_minimal_context",
+        diagnostic_reason=None,
+    )
+    recoveries = review_data.setdefault("sidecars", {}).setdefault("open_item_reconcile_recoveries", {})
+    recoveries[source_event_key] = context.to_output()
+    bot.collect_touched_item(pr_number)
+    return review_data, True
 
 
 def _now_iso(bot: ReconcileWorkflowRuntimeContext) -> str:
@@ -751,41 +969,51 @@ def _reconcile_deferred_comment(
             failure_kind=decision.failure_kind,
         )
         return changed or gap_changed
+    source_event_key = str(payload.get("source_event_key", ""))
+    command_state_changed = False
+    command_receipt = None
     if decision.replay_comment_command:
+        command_receipt = _persisted_command_replay_receipt(
+            review_data,
+            source_event_key,
+            admission=admission,
+        )
+    if decision.replay_comment_command and command_receipt is None:
         try:
-            changed = process_comment_event(
+            command_state_changed = process_comment_event(
                 bot,
                 state,
                 replay_request(comment_context, comment_body=live_body),
                 classify_comment_payload=lambda _bot, _body: live_classified,
                 classify_issue_comment_actor=classify_issue_comment_actor,
-            ) or changed
+            )
+            changed = command_state_changed or changed
         except InvalidEventInput as exc:
             return record_artifact_invalid(exc)
-    command_receipt = apply_reconcile_command_with_receipt(
-        bot,
-        state,
-        ReconcileTarget(
-            pr_number=pr_number,
-            source_event_key=str(payload.get("source_event_key", "")),
-            payload_kind=context.payload.identity.payload_kind.value,
-            parsed_payload={
-                "command_name": str(live_classified.get("command")) if live_classified.get("command") else None,
-                "replay_attempted": bool(decision.replay_comment_command),
-                "command_side_effects_attempted": ("comment_command",) if decision.replay_comment_command else (),
-                "state_save_required": bool(decision.replay_comment_command),
-                "state_save_succeeded": bool(decision.replay_comment_command),
-                "mark_reconciled_requested": bool(decision.mark_reconciled),
-                "clear_gap_requested": bool(decision.clear_gap),
-            },
-            recovered_identity=None,
-            live_pr_state="open",
-            admission=admission,
-        ),
-    )
-    review_data.setdefault("sidecars", {}).setdefault("command_replay_receipts", {})[
-        command_receipt.source_event_key
-    ] = command_receipt.to_output()
+    if command_receipt is None:
+        command_receipt = apply_reconcile_command_with_receipt(
+            bot,
+            state,
+            ReconcileTarget(
+                pr_number=pr_number,
+                source_event_key=source_event_key,
+                payload_kind=context.payload.identity.payload_kind.value,
+                parsed_payload={
+                    "command_name": str(live_classified.get("command")) if live_classified.get("command") else None,
+                    "replay_attempted": bool(decision.replay_comment_command),
+                    "command_side_effects_attempted": ("comment_command",) if decision.replay_comment_command else (),
+                    "state_save_required": command_state_changed,
+                    "state_save_succeeded": not command_state_changed,
+                    "mark_reconciled_requested": bool(decision.mark_reconciled),
+                    "clear_gap_requested": bool(decision.clear_gap),
+                },
+                recovered_identity=None,
+                live_pr_state="open",
+                admission=admission,
+            ),
+        )
+    if command_receipt.replay_attempted or not admission.replay_allowed:
+        changed = _store_command_replay_receipt(review_data, command_receipt) or changed
     reconciled_changed = False
     if (
         decision.mark_reconciled
@@ -794,12 +1022,12 @@ def _reconcile_deferred_comment(
     ):
         reconciled_changed = gap_bookkeeping.mark_reconciled_source_event(
             review_data,
-            str(payload.get("source_event_key", "")),
+            source_event_key,
             reconciled_at=_now_iso(bot),
         )
         gap_cleared_changed = False
         if decision.clear_gap and admission.clear_gap_allowed:
-            gap_cleared_changed = gap_bookkeeping.clear_deferred_gap(review_data, str(payload.get("source_event_key", "")))
+            gap_cleared_changed = gap_bookkeeping.clear_deferred_gap(review_data, source_event_key)
         return changed or reconciled_changed or gap_cleared_changed
     return changed
 
@@ -1047,7 +1275,17 @@ def handle_workflow_run_event_result(bot: ReconcileWorkflowRuntimeContext, state
         pr_number = recovered_identity.pr_number
         review_data = ensure_review_entry(state, pr_number)
         if review_data is None:
-            return WorkflowRunHandlerResult(False, [])
+            review_data, recovery_changed = _recover_missing_active_review_entry(
+                bot,
+                state,
+                pr_number=pr_number,
+                source_event_key=recovered_identity.source_event_key,
+                source_event_name=recovered_identity.source_event_name,
+                source_event_action=recovered_identity.source_event_action,
+                allow_reconstruction=False,
+            )
+            if review_data is None:
+                return _build_result(recovery_changed, pr_number)
         bot.collect_touched_item(pr_number)
         admission = build_workflow_run_replay_admission(
             source_event_key=recovered_identity.source_event_key,
@@ -1085,14 +1323,16 @@ def handle_workflow_run_event_result(bot: ReconcileWorkflowRuntimeContext, state
         pr_number = recovered_identity.pr_number
         review_data = ensure_review_entry(state, pr_number)
         if review_data is None:
-            _log(
+            _recovered_review_data, recovery_changed = _recover_missing_active_review_entry(
                 bot,
-                "info",
-                f"Ignoring invalid deferred workflow_run for missing active review entry on PR #{pr_number}",
-                issue_number=pr_number,
+                state,
+                pr_number=pr_number,
                 source_event_key=recovered_identity.source_event_key,
+                source_event_name=recovered_identity.source_event_name,
+                source_event_action=recovered_identity.source_event_action,
+                allow_reconstruction=False,
             )
-            return WorkflowRunHandlerResult(False, [])
+            return _build_result(recovery_changed, pr_number)
         try:
             live_pr_state = _read_live_pr_state_for_reconcile(bot, pr_number)
             if live_pr_state == "closed":
@@ -1138,14 +1378,16 @@ def handle_workflow_run_event_result(bot: ReconcileWorkflowRuntimeContext, state
         raise RuntimeError("Deferred context is missing a valid PR number")
     review_data = ensure_review_entry(state, pr_number)
     if review_data is None:
-        _log(
+        review_data, recovery_changed = _recover_missing_active_review_entry(
             bot,
-            "info",
-            f"Ignoring deferred workflow_run for missing active review entry on PR #{pr_number}",
-            issue_number=pr_number,
+            state,
+            pr_number=pr_number,
             source_event_key=parsed_payload.identity.source_event_key,
+            source_event_name=parsed_payload.identity.source_event_name,
+            source_event_action=parsed_payload.identity.source_event_action,
         )
-        return WorkflowRunHandlerResult(False, [])
+        if review_data is None:
+            return _build_result(recovery_changed, pr_number)
     try:
         live_pr_state = _read_live_pr_state_for_reconcile(bot, pr_number)
         if live_pr_state == "closed":

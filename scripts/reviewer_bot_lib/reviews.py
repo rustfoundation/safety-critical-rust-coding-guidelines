@@ -336,6 +336,12 @@ def compute_effective_reviewer_response_state(
     response_payload.setdefault("issue_number", issue_number)
     response_payload.setdefault("current_reviewer", review_data.get("current_reviewer"))
     response = reviewer_response_policy.to_reviewer_response_decision(response_payload)
+    reminder_scan = None
+    scanned_comments = ()
+    if response.response_state == "awaiting_reviewer_response":
+        reminder_scan = overdue._scan_live_reminder_comments(bot, issue_number)
+        if reminder_scan is not None and reminder_scan.scan_status == "pass":
+            scanned_comments = reminder_scan.records
     receipt = overdue.derive_reminder_scope_receipt(
         issue_number=issue_number,
         reviewer=getattr(response.scope, "reviewer", None) if response.scope else review_data.get("current_reviewer"),
@@ -343,12 +349,12 @@ def compute_effective_reviewer_response_state(
         cycle_key=getattr(response.scope, "cycle_key", None) if response.scope else None,
         scope_key=getattr(response.scope, "scope_key", None) if response.scope else None,
         persisted_state=review_data,
-        scanned_comments=(),
+        scanned_comments=scanned_comments,
     )
     cadence = overdue.derive_reminder_cadence_decision(
         response,
         receipt=receipt,
-        reminder_scan=None,
+        reminder_scan=reminder_scan,
         now=bot.datetime.now(bot.timezone.utc) if hasattr(bot, "datetime") else None,
         review_deadline_days=getattr(bot, "REVIEW_DEADLINE_DAYS", 0),
         transition_period_days=getattr(bot, "TRANSITION_PERIOD_DAYS", 0),

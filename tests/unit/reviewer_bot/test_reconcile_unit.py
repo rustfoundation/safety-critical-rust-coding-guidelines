@@ -668,6 +668,135 @@ def test_reconcile_deferred_comment_replays_payload_provenance_to_actor_classifi
     assert captured["actor_class"] == "github_app_or_other_automation"
 
 
+def test_reconcile_deferred_command_uses_persisted_receipt_before_closeout(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    state = make_state(epoch="freshness_v15")
+    review = review_state.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    payload = issue_comment_payload(
+        pr_number=42,
+        comment_id=210,
+        source_event_key="issue_comment:210",
+        body="@guidelines-bot /feedback",
+        comment_class="command_only",
+        has_non_command_text=False,
+        source_created_at="2026-03-17T10:00:00Z",
+        actor_login="alice",
+        source_run_id=610,
+        source_run_attempt=1,
+    )
+    parsed_payload = reconcile.parse_deferred_context_payload(payload)
+    context = reconcile.build_deferred_comment_replay_context(
+        parsed_payload,
+        expected_event_name="issue_comment",
+        live_comment_endpoint="issues/comments/210",
+    )
+    admission = reconcile.build_workflow_run_replay_admission(
+        source_event_key="issue_comment:210",
+        triggering_conclusion="success",
+        payload_kind="deferred_comment",
+        source_authority_status="trusted_exact_identity",
+        payload_valid=True,
+        identity_present=True,
+    )
+    monkeypatch.setattr(
+        reconcile,
+        "_read_live_pr_replay_context",
+        lambda bot, pr_number: SimpleNamespace(issue_author="dana", issue_labels=("coding guideline",)),
+    )
+    monkeypatch.setattr(
+        reconcile,
+        "_read_reconcile_object",
+        lambda bot, endpoint, *, label: {
+            "body": "@guidelines-bot /feedback",
+            "user": {"login": "alice", "type": "User"},
+            "author_association": "MEMBER",
+            "performed_via_github_app": False,
+        },
+    )
+    monkeypatch.setattr(
+        reconcile,
+        "classify_comment_payload",
+        lambda bot, body: {
+            "comment_class": "command_only",
+            "has_non_command_text": False,
+            "command_count": 1,
+            "command": "feedback",
+            "args": [],
+            "normalized_body": body,
+        },
+    )
+    monkeypatch.setattr(reconcile, "record_conversation_freshness", lambda *args, **kwargs: False)
+    calls = {"process": 0}
+
+    def fake_process_comment_event(*args, **kwargs):
+        calls["process"] += 1
+        return True
+
+    monkeypatch.setattr(reconcile, "process_comment_event", fake_process_comment_event)
+
+    assert reconcile._reconcile_deferred_comment(runtime, state, review, context, admission) is True
+    receipt = review["sidecars"]["command_replay_receipts"]["issue_comment:210"]
+    assert receipt["result"] == "blocked_state_save_failed"
+    assert "issue_comment:210" not in review["sidecars"]["reconciled_source_events"]
+    assert calls["process"] == 1
+
+    monkeypatch.setattr(
+        reconcile,
+        "process_comment_event",
+        lambda *args, **kwargs: pytest.fail("persisted receipt recovery must not re-run command"),
+    )
+
+    assert reconcile._reconcile_deferred_comment(runtime, state, review, context, admission) is True
+    recovered_receipt = review["sidecars"]["command_replay_receipts"]["issue_comment:210"]
+    assert recovered_receipt["result"] == "pass_replayed_and_persisted"
+    assert recovered_receipt["state_save_succeeded"] is True
+    assert "issue_comment:210" in review["sidecars"]["reconciled_source_events"]
+
+
+def test_legacy_deferred_comment_identity_is_diagnostic_only(monkeypatch):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    state = make_state(epoch="freshness_v15")
+    review = review_state.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    payload = {
+        "schema_version": 2,
+        "source_event_name": "issue_comment",
+        "source_event_action": "created",
+        "source_event_key": "issue_comment:210",
+        "pr_number": 42,
+        "comment_id": 210,
+        "comment_class": "command_only",
+        "has_non_command_text": False,
+        "source_body_digest": "digest",
+        "source_created_at": "2026-03-17T10:00:00Z",
+        "actor_login": "alice",
+        "source_run_id": 610,
+        "source_run_attempt": 1,
+    }
+    runtime.ACTIVE_LEASE_CONTEXT = object()
+    runtime.stub_deferred_payload(payload)
+    set_workflow_run_event_payload(runtime.config, "Reviewer Bot PR Comment Router")
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_ID", "610")
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_ATTEMPT", "1")
+    runtime.set_config_value("WORKFLOW_RUN_TRIGGERING_CONCLUSION", "success")
+    monkeypatch.setattr(reconcile, "_read_live_pr_state_for_reconcile", lambda bot, pr_number: "open")
+    monkeypatch.setattr(
+        reconcile,
+        "process_comment_event",
+        lambda *args, **kwargs: pytest.fail("legacy deferred payloads must not replay commands"),
+    )
+
+    result = reconcile.handle_workflow_run_event_result(runtime, state)
+
+    assert result == reconcile.WorkflowRunHandlerResult(True, [42])
+    gap = review["sidecars"]["deferred_gaps"]["issue_comment:210"]
+    assert gap["reason"] == "artifact_invalid"
+    assert "diagnostic_legacy_identity" in gap["diagnostic_summary"]
+    assert review["sidecars"]["reconciled_source_events"] == {}
+
+
 def test_workflow_run_reconcile_uses_artifact_contract_for_router_no_artifact_success(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.ACTIVE_LEASE_CONTEXT = object()
@@ -711,6 +840,41 @@ def test_workflow_run_reconcile_records_non_success_diagnostic_without_closeout(
     assert review["sidecars"]["deferred_gaps"]["issue_comment:210"]["reason"] == "observer_failed"
     assert review["sidecars"]["deferred_gaps"]["issue_comment:210"]["failure_kind"] == "failure"
     assert review["sidecars"]["reconciled_source_events"] == {}
+
+
+def test_non_success_missing_row_records_orphan_without_reconstruction(monkeypatch):
+    state = make_state(epoch="freshness_v15")
+    harness = ReconcileHarness(
+        monkeypatch,
+        issue_comment_payload(
+            pr_number=42,
+            comment_id=210,
+            source_event_key="issue_comment:210",
+            body="@guidelines-bot /queue",
+            comment_class="command_only",
+            has_non_command_text=False,
+            source_created_at="2026-03-17T10:00:00Z",
+            actor_login="bob",
+            source_run_id=610,
+            source_run_attempt=1,
+        ),
+    )
+    harness.set_trigger_from_payload(harness.payload, conclusion="failure")
+    harness.add_pull_request(
+        pr_number=42,
+        head_sha="head-1",
+        author="dana",
+        labels=["coding guideline"],
+        requested_reviewers=["alice"],
+    )
+
+    result = reconcile.handle_workflow_run_event_result(harness.runtime, state)
+
+    assert result == reconcile.WorkflowRunHandlerResult(True, [42])
+    assert "42" not in state["active_reviews"]
+    orphan = state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]
+    assert orphan["recovery_status"] == "orphaned_deferred_event"
+    assert orphan["diagnostic_reason"] == "reconstruction_not_allowed_for_diagnostic_admission"
 
 
 def test_read_reconcile_reviews_rejects_non_list_payload(monkeypatch):

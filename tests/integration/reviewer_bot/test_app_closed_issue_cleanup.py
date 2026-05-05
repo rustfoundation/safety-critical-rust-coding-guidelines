@@ -142,7 +142,7 @@ def test_execute_run_closed_pr_comment_safe_noop_does_not_save_or_project(monkey
     assert sync_calls == []
 
 
-def test_execute_run_late_workflow_run_reconcile_missing_row_safe_noop(monkeypatch):
+def test_execute_run_late_workflow_run_reconcile_missing_row_records_orphan(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_workflow_run_name("Reviewer Bot PR Comment Router")
     harness.set_event(
@@ -185,5 +185,6 @@ def test_execute_run_late_workflow_run_reconcile_missing_row_safe_noop(monkeypat
 
     assert result.exit_code == 0
     assert state["active_reviews"] == {}
-    assert save_called["value"] is False
-    assert sync_calls == []
+    assert state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]["recovery_status"] == "orphaned_deferred_event"
+    assert save_called["value"] is True
+    assert sync_calls == [[42]]

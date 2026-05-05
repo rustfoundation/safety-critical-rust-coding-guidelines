@@ -719,28 +719,40 @@ def confirm_reviewer_assignment(
             "diagnostic_changed": diagnostic_changed,
         }
     final_normalized = _normalize_logins(final_assignees)
-    if len(final_assignees) == 1 and final_normalized[0] == reviewer.lower():
-        set_current_reviewer(
+    confirmation = derive_reviewer_assignment_confirmation(
+        request,
+        reviewer=reviewer,
+        assignment_method=assignment_method,
+        previous_reviewer=stored_reviewer if isinstance(stored_reviewer, str) else None,
+        live_before=tuple(live_before),
+        live_after=tuple(final_assignees),
+        assignment_attempt=assignment_attempt,
+        removal_attempts=removal_attempts,
+        same_reviewer_noop=False,
+        guidance_emitted=emit_guidance,
+    )
+    if confirmation.state_tracking_allowed and confirmation.set_current_reviewer:
+        state_changed = apply_reviewer_assignment_confirmation(
+            bot,
             state,
-            issue_number,
-            reviewer,
-            assignment_method=assignment_method,
-            at=cycle_started_at or _now_iso(bot),
+            request,
+            confirmation,
+            pr_head_sha=pr_head_sha,
+            record_assignment=record_assignment,
+            emit_guidance=emit_guidance,
         )
         review_data = ensure_review_entry(state, issue_number, create=True)
-        if request.is_pull_request and isinstance(review_data, dict) and isinstance(pr_head_sha, str) and pr_head_sha:
-            review_data["active_head_sha"] = pr_head_sha
-        if record_assignment:
-            bot.adapters.queue.record_assignment(
-                state,
-                reviewer,
-                issue_number,
-                "pr" if request.is_pull_request else "issue",
-            )
-        if emit_guidance:
-            _post_assignment_guidance(bot, request, reviewer)
-        bot.collect_touched_item(issue_number)
+        if state_changed and isinstance(review_data, dict) and isinstance(cycle_started_at, str) and cycle_started_at:
+            review_data["cycle_started_at"] = cycle_started_at
+            review_data["active_cycle_started_at"] = cycle_started_at
+            review_data["assigned_at"] = cycle_started_at
+            review_data["last_reviewer_activity"] = cycle_started_at
+        if state_changed:
+            bot.collect_touched_item(issue_number)
         if isinstance(review_data, dict):
+            review_data.setdefault("sidecars", {}).setdefault("assignment_confirmations", {})[
+                f"{assignment_method}:{reviewer}"
+            ] = confirmation.to_output()
             diagnostic_changed = _clear_assignment_marker(bot, review_data, issue_number, phase="assignment_add_write") or diagnostic_changed
             diagnostic_changed = _clear_assignment_marker(bot, review_data, issue_number, phase="assignment_remove_write") or diagnostic_changed
             diagnostic_changed = _clear_assignment_marker(bot, review_data, issue_number, phase="assignment_confirm_read") or diagnostic_changed
@@ -751,15 +763,16 @@ def confirm_reviewer_assignment(
             "final_assignees": final_assignees,
             "assignment_attempt": assignment_attempt or _success_attempt(bot),
             "removal_attempts": removal_attempts,
+            "assignment_confirmation": confirmation.to_output(),
             "diagnostic_changed": diagnostic_changed,
         }
     cleared = False
-    if len(final_assignees) != 1 or (
+    if confirmation.clear_current_reviewer or len(final_assignees) != 1 or (
         len(final_assignees) == 1
         and isinstance(stored_reviewer, str)
         and final_normalized[0] != stored_reviewer.lower()
     ):
-        cleared = clear_current_reviewer(state, issue_number)
+        cleared = clear_current_reviewer(state, issue_number) if confirmation.clear_current_reviewer else False
         if cleared:
             bot.collect_touched_item(issue_number)
     if isinstance(review_data, dict):
@@ -790,6 +803,7 @@ def confirm_reviewer_assignment(
         "final_assignees": final_assignees,
         "assignment_attempt": assignment_attempt,
         "removal_attempts": removal_attempts,
+        "assignment_confirmation": confirmation.to_output(),
         "failure_comment": failure_comment,
         "cleared_current_reviewer": cleared,
         "diagnostic_changed": diagnostic_changed,

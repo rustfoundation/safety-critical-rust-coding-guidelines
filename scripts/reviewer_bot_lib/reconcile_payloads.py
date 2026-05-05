@@ -126,7 +126,7 @@ class DeferredReviewSubmittedPayload(DeferredReviewPayload):
 
 @dataclass(frozen=True)
 class DeferredReviewDismissedPayload(DeferredReviewPayload):
-    pass
+    source_dismissed_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -445,7 +445,8 @@ def derive_deferred_artifact_source_authority(
     status = "trusted_exact_identity"
     reason = None
     if identity is not None and identity.schema_version == 2:
-        status = "trusted_legacy_identity"
+        status = "diagnostic_legacy_identity"
+        reason = "legacy_payload_missing_workflow_artifact_authority"
     elif identity is None or missing_identity:
         status = "blocked_missing_identity"
         reason = "missing_identity_fields:" + ",".join(missing_identity)
@@ -869,12 +870,7 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
         _validate_deferred_review_artifact(payload)
         review_id = int(payload["review_id"])
         _validate_identity_object_key(identity, review_id)
-        payload_type = (
-            DeferredReviewSubmittedPayload
-            if identity.payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED
-            else DeferredReviewDismissedPayload
-        )
-        return payload_type(
+        common = dict(
             identity=identity,
             review_id=review_id,
             source_submitted_at=(str(payload["source_submitted_at"]) if payload.get("source_submitted_at") is not None else None),
@@ -882,6 +878,12 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
             source_commit_id=(str(payload["source_commit_id"]) if payload.get("source_commit_id") is not None else None),
             actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
             raw_payload=payload,
+        )
+        if identity.payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED:
+            return DeferredReviewSubmittedPayload(**common)
+        return DeferredReviewDismissedPayload(
+            **common,
+            source_dismissed_at=(str(payload["source_dismissed_at"]) if payload.get("source_dismissed_at") is not None else None),
         )
     raise RuntimeError("Unsupported deferred workflow_run payload")
 

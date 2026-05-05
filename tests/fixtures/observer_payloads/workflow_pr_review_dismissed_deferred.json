@@ -17,6 +17,7 @@
     "source_event_key": "pull_request_review_dismissed:602",
     "pr_number": 42,
     "review_id": 602,
+    "source_dismissed_at": "2026-03-17T10:15:00Z",
     "source_commit_id": "fedcba654321",
     "actor_login": "maintainer1",
     "actor_id": 7003,

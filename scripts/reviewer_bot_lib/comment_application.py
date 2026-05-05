@@ -415,14 +415,27 @@ def _execute_assign_specific(bot, state: dict, decision, assignment_request: Ass
     username = decision.raw_args[0] if decision.raw_args else ""
     return _build_execution_result(
         decision.command_id,
-        commands_module.handle_assign_command(bot, state, decision.issue_number, username, request=assignment_request),
+        commands_module.handle_assign_command(
+            bot,
+            state,
+            decision.issue_number,
+            username,
+            request=assignment_request,
+            actor=decision.actor,
+        ),
     )
 
 
 def _execute_assign_from_queue(bot, state: dict, decision, assignment_request: AssignmentRequest | None) -> CommandExecutionResult:
     return _build_execution_result(
         decision.command_id,
-        commands_module.handle_assign_from_queue_command(bot, state, decision.issue_number, request=assignment_request),
+        commands_module.handle_assign_from_queue_command(
+            bot,
+            state,
+            decision.issue_number,
+            request=assignment_request,
+            actor=decision.actor,
+        ),
     )
 
 

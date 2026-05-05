@@ -492,13 +492,14 @@ def test_observer_workflow_fixtures_match_trigger_event_shape(
     assert expected_event_name in on_block
 
 
-def test_dismissed_review_observer_does_not_export_submitted_at_as_dismissal_time():
+def test_dismissed_review_observer_exports_source_dismissal_time_without_submitted_at_fallback():
     workflow_text = Path(".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml").read_text(
         encoding="utf-8"
     )
     fixture = _load_fixture_payload("tests/fixtures/observer_payloads/workflow_pr_review_dismissed_deferred.json")
 
-    assert "source_dismissed_at" not in workflow_text
+    assert "source_dismissed_at" in workflow_text
+    assert "SOURCE_DISMISSED_AT" in workflow_text
     assert "github.event.review.submitted_at" not in workflow_text
     assert "github.event.review.updated_at" not in workflow_text
-    assert "source_dismissed_at" not in fixture
+    assert fixture["source_dismissed_at"] == "2026-03-17T10:15:00Z"

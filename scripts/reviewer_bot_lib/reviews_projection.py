@@ -6,6 +6,7 @@ from .config import (
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
     STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
     STATUS_AWAITING_WRITE_APPROVAL_LABEL,
+    STATUS_REVIEWER_REASSIGNMENT_NEEDED_LABEL,
 )
 
 __all__ = [
@@ -25,4 +26,6 @@ def desired_labels_from_response_state(
         return {STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}, {"state": state_name, "reason": reason}
     if state_name == "awaiting_write_approval":
         return {STATUS_AWAITING_WRITE_APPROVAL_LABEL}, {"state": state_name, "reason": reason}
+    if state_name == "reviewer_reassignment_needed":
+        return {STATUS_REVIEWER_REASSIGNMENT_NEEDED_LABEL}, {"state": state_name, "reason": reason}
     return set(), {"state": state_name, "reason": reason}

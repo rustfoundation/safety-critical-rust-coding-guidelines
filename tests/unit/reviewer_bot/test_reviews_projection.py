@@ -4,7 +4,10 @@ from types import SimpleNamespace
 
 from scripts.reviewer_bot_core import approval_policy, live_review_support
 from scripts.reviewer_bot_lib import reviews
-from scripts.reviewer_bot_lib.config import GitHubApiResult
+from scripts.reviewer_bot_lib.config import (
+    STATUS_REVIEWER_REASSIGNMENT_NEEDED_LABEL,
+    GitHubApiResult,
+)
 from tests.fixtures.reviewer_bot import (
     make_state,
     make_tracked_review_state,
@@ -169,6 +172,63 @@ def test_apply_pr_approval_state_mutates_expected_fields():
     assert review["current_cycle_completion"]["completed"] is True
     assert review["current_cycle_write_approval"]["has_write_approval"] is True
     assert review["review_completion_source"] == "live_review_rebuild"
+
+
+def test_status_projection_projects_reassignment_needed_from_legacy_duplicate_reminders(monkeypatch):
+    state = make_state()
+    review = make_tracked_review_state(
+        state,
+        42,
+        reviewer="alice",
+        active_cycle_started_at="2026-03-17T09:00:00Z",
+    )
+    bot = _bot()
+    bot.github.list_issue_comments_result = lambda issue_number, page=1, per_page=100: GitHubApiResult(
+        200,
+        [
+            {
+                "id": 9001,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-10T00:00:00Z",
+                "body": "**Review Reminder**\n\ntransition period",
+            },
+            {
+                "id": 9002,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-14T00:44:23Z",
+                "body": "**Review Reminder**\n\ntransition period",
+            },
+        ],
+        {},
+        "ok",
+        True,
+        None,
+        0,
+        None,
+    )
+    monkeypatch.setattr(
+        reviews,
+        "compute_reviewer_response_state",
+        lambda *args, **kwargs: {
+            "state": "awaiting_reviewer_response",
+            "reason": "review_head_stale",
+            "current_head_sha": "head-1",
+            "current_scope_key": "scope-1",
+            "current_scope_basis": "assigned_reviewer_current_head_formal_review",
+            "anchor_timestamp": "2026-03-17T09:00:00Z",
+        },
+    )
+
+    desired, metadata = reviews.project_status_labels_for_item(
+        bot,
+        42,
+        state,
+        issue_snapshot={"number": 42, "state": "open", "pull_request": {}, "labels": []},
+    )
+
+    assert desired == {STATUS_REVIEWER_REASSIGNMENT_NEEDED_LABEL}
+    assert metadata == {"state": "reviewer_reassignment_needed", "reason": "legacy_duplicate_reminders_exhausted"}
+    assert review["current_reviewer"] == "alice"
 
 
 def test_compute_pr_approval_state_from_reviews_is_pure():
