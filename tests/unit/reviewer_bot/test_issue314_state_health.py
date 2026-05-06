@@ -1,0 +1,203 @@
+import json
+
+import pytest
+
+from scripts.reviewer_bot_core.reviewer_response_policy import (
+    to_reviewer_response_decision,
+)
+from scripts.reviewer_bot_lib import issue314_state_health, reviews_projection
+from scripts.reviewer_bot_lib.reminder_comments import scan_reviewer_reminder_comments
+
+
+def _projection(issue_number: int, actual_labels: tuple[str, ...], state: str):
+    decision = to_reviewer_response_decision(
+        {
+            "issue_number": issue_number,
+            "current_reviewer": "iglesias",
+            "response_state": state,
+            "suppression_reason": "legacy_duplicate_reminders_exhausted"
+            if state == "reviewer_reassignment_needed"
+            else None,
+            "current_scope_key": "scope",
+            "current_scope_basis": "reminder_cadence_exhausted",
+        }
+    )
+    return decision, reviews_projection.derive_status_label_projection(
+        reviews_projection.StatusLabelProjectionInput(
+            issue_number=issue_number,
+            issue_state="open",
+            actual_labels=actual_labels,
+            reviewer_response=decision,
+            reviewer_authority_outcome="tracked_reviewer_confirmed",
+            freshness_runtime_epoch="freshness_v15",
+            status_projection_epoch="status_projection_v2",
+        )
+    )
+
+
+def test_issue314_classifier_marks_pr264_stale_label_as_operator_action_without_ping_risk():
+    decision, projection = _projection(
+        264,
+        ("status: awaiting reviewer response",),
+        "reviewer_reassignment_needed",
+    )
+    scan = scan_reviewer_reminder_comments(
+        [
+            {
+                "id": 1,
+                "created_at": "2026-04-13T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+                "user": {"login": "github-actions[bot]"},
+            },
+            {
+                "id": 2,
+                "created_at": "2026-04-14T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\ntransition period",
+                "user": {"login": "github-actions[bot]"},
+            },
+        ]
+    )
+    input = issue314_state_health.Issue314StateHealthClassificationInput(
+        state_issue_number=314,
+        validation_nonce="nonce",
+        active_review_rows=(
+            {
+                "issue_number": 264,
+                "review_data": {
+                    "current_reviewer": "iglesias",
+                    "active_head_sha": "7d8864fa0c00b5bf9da20dd66047f039a049fd8b",
+                },
+            },
+        ),
+        live_snapshots={
+            264: {
+                "number": 264,
+                "state": "open",
+                "pull_request": {},
+                "labels": [{"name": "status: awaiting reviewer response"}],
+            }
+        },
+        reviewer_responses={264: decision},
+        status_projections={264: projection},
+        reminder_scans={264: scan},
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="1",
+        run_attempt="1",
+    )
+
+    summary = issue314_state_health.classify_issue314_state_health(input)
+    payload = summary.to_output()
+
+    assert payload["preview_action"] == "preview-issue314-state-health"
+    assert payload["issue_number"] == 314
+    assert payload["rows_operator_action_required"] == [264]
+    assert payload["rows_blocked"] == []
+    assert payload["pr264_no_ping_status"] == "pass"
+    row = payload["row_inventory"][0]
+    assert row["health_classification"] == "operator_action_required"
+    assert row["status_label_risk"] == "operator_visible_stale"
+    assert row["automated_reminder_risk"] is False
+    assert payload["output_keys"] == sorted(payload.keys())
+
+
+def test_issue314_classifier_blocks_rows_with_automated_reminder_risk():
+    decision, projection = _projection(42, (), "awaiting_reviewer_response")
+    input = issue314_state_health.Issue314StateHealthClassificationInput(
+        state_issue_number=314,
+        validation_nonce="nonce",
+        active_review_rows=({"issue_number": 42, "review_data": {"current_reviewer": "alice"}},),
+        live_snapshots={42: {"number": 42, "state": "open", "pull_request": {}, "labels": []}},
+        reviewer_responses={42: decision},
+        status_projections={42: projection},
+        reminder_scans={42: scan_reviewer_reminder_comments([])},
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="1",
+        run_attempt="1",
+    )
+
+    summary = issue314_state_health.classify_issue314_state_health(input)
+
+    assert summary.rows_blocked == (42,)
+    assert summary.row_inventory[0].automated_reminder_risk is True
+    assert summary.row_inventory[0].status_label_risk == "blocked_unknown"
+
+
+def test_issue314_repair_summary_writer_requires_artifact_path(monkeypatch):
+    monkeypatch.delenv("ISSUE314_STATE_HEALTH_REPAIR_SUMMARY_PATH", raising=False)
+    summary = issue314_state_health.Issue314StateHealthRepairSummary(
+        schema_version=1,
+        repair_action="repair-issue314-state-health",
+        state_issue_number=314,
+        issue_number=314,
+        validation_nonce="nonce",
+        target_collection_mode="global_issue314_state_health",
+        active_rows_inspected=(264,),
+        rows_repaired=(),
+        rows_removed_closed=(),
+        rows_operator_action_required=(264,),
+        rows_blocked=(),
+        status_labels_changed=(),
+        reviewer_facing_reminder_posts_attempted=0,
+        manual_issue314_edit_status="not_attempted",
+        state_store_mutation_mode="not_required",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-sweeper-repair.yml",
+        run_id="1",
+        run_attempt="1",
+        artifact_name="reviewer-bot-repair-output-1-attempt-1",
+        artifact_file="issue314-state-health-repair-summary.json",
+        output_keys=(),
+        result="already_healthy",
+    )
+
+    with pytest.raises(RuntimeError, match="issue314_state_health_repair_summary_path_missing"):
+        issue314_state_health.emit_issue314_state_health_repair_summary(summary)
+
+
+def test_issue314_repair_summary_writer_emits_identity_fields(monkeypatch, tmp_path):
+    summary = issue314_state_health.Issue314StateHealthRepairSummary(
+        schema_version=1,
+        repair_action="repair-issue314-state-health",
+        state_issue_number=314,
+        issue_number=314,
+        validation_nonce="nonce",
+        target_collection_mode="global_issue314_state_health",
+        active_rows_inspected=(42, 264),
+        rows_repaired=(42,),
+        rows_removed_closed=(),
+        rows_operator_action_required=(264,),
+        rows_blocked=(),
+        status_labels_changed=(42,),
+        reviewer_facing_reminder_posts_attempted=0,
+        manual_issue314_edit_status="not_attempted",
+        state_store_mutation_mode="not_required",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-sweeper-repair.yml",
+        run_id="1",
+        run_attempt="2",
+        artifact_name="reviewer-bot-repair-output-1-attempt-2",
+        artifact_file="issue314-state-health-repair-summary.json",
+        output_keys=(),
+        result="changed",
+    )
+    path = tmp_path / "repair" / "issue314-state-health-repair-summary.json"
+    monkeypatch.setenv("ISSUE314_STATE_HEALTH_REPAIR_SUMMARY_PATH", str(path))
+
+    issue314_state_health.emit_issue314_state_health_repair_summary(summary)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["target_collection_mode"] == "global_issue314_state_health"
+    assert payload["reviewer_facing_reminder_posts_attempted"] == 0
+    assert payload["manual_issue314_edit_status"] == "not_attempted"
+    assert payload["artifact_file"] == "issue314-state-health-repair-summary.json"
+    assert payload["output_keys"] == sorted(payload.keys())

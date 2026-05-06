@@ -2,8 +2,13 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from scripts.reviewer_bot_core import approval_policy, live_review_support
-from scripts.reviewer_bot_lib import reviews
+from scripts.reviewer_bot_core.reviewer_response_policy import (
+    to_reviewer_response_decision,
+)
+from scripts.reviewer_bot_lib import github_api, reviews, reviews_projection
 from scripts.reviewer_bot_lib.config import GitHubApiResult
 from tests.fixtures.reviewer_bot import (
     make_state,
@@ -302,3 +307,93 @@ def test_h1a_reviewer_response_matrix_fixture_exists_and_stays_reviewer_response
         "projection_failed_pull_request_head_unavailable",
         "projection_failed_live_review_state_unknown",
     ]
+
+
+def test_status_projection_maps_reassignment_needed_and_exposes_decision_output():
+    decision = to_reviewer_response_decision(
+        {
+            "issue_number": 264,
+            "current_reviewer": "iglesias",
+            "response_state": "reviewer_reassignment_needed",
+            "suppression_reason": "legacy_duplicate_reminders_exhausted",
+            "current_scope_key": "scope-1",
+            "current_scope_basis": "reminder_cadence_exhausted",
+        }
+    )
+
+    result = reviews_projection.derive_status_label_projection(
+        reviews_projection.StatusLabelProjectionInput(
+            issue_number=264,
+            issue_state="open",
+            actual_labels=("status: awaiting reviewer response",),
+            reviewer_response=decision,
+            reviewer_authority_outcome="tracked_reviewer_confirmed",
+            freshness_runtime_epoch="freshness_v15",
+            status_projection_epoch="status_projection_v2",
+        )
+    )
+    payload = reviews_projection.status_label_projection_output(
+        result,
+        preview_action="preview-status-label-projection",
+        validation_nonce="nonce",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="1",
+        run_attempt="2",
+        artifact_name="reviewer-bot-preview-output-1-attempt-2",
+        artifact_file="preview-output.json",
+    )
+
+    assert result.delta.desired_status_labels == ("status: reviewer reassignment needed",)
+    assert result.delta.labels_to_add == ("status: reviewer reassignment needed",)
+    assert result.delta.labels_to_remove == ("status: awaiting reviewer response",)
+    assert result.projection_metadata["source"] == "reviewer_response_decision"
+    assert result.projection_metadata["decision_output"] == decision.to_output()
+    assert payload["desired_status_labels"] == ["status: reviewer reassignment needed"]
+    assert payload["output_keys"] == sorted(payload.keys())
+
+
+@pytest.mark.parametrize("state_name", ["projection_failed", "live_read_unavailable", "unknown"])
+def test_status_projection_fail_closed_states_never_clear_existing_labels(state_name):
+    decision = to_reviewer_response_decision({"response_state": state_name})
+
+    with pytest.raises(RuntimeError, match="status_label_projection_blocked"):
+        reviews_projection.derive_status_label_projection(
+            reviews_projection.StatusLabelProjectionInput(
+                issue_number=42,
+                issue_state="open",
+                actual_labels=("status: awaiting reviewer response",),
+                reviewer_response=decision,
+                reviewer_authority_outcome="tracked_reviewer_confirmed",
+                freshness_runtime_epoch=None,
+                status_projection_epoch=None,
+            )
+        )
+
+
+def test_apply_status_label_delta_is_mutation_boundary(monkeypatch):
+    calls = []
+    bot = _bot()
+    bot.github.ensure_label_exists = lambda label, **kwargs: calls.append(("ensure", label, kwargs)) or True
+    monkeypatch.setattr(github_api, "add_label_with_status", lambda bot, issue_number, label: calls.append(("add", issue_number, label)) or True)
+    monkeypatch.setattr(github_api, "remove_label_with_status", lambda bot, issue_number, label: calls.append(("remove", issue_number, label)) or True)
+    delta = reviews_projection.status_label_delta(
+        ("status: awaiting reviewer response",),
+        ("status: reviewer reassignment needed",),
+    )
+
+    result = reviews.apply_status_label_delta(bot, 264, delta)
+
+    assert result.to_output() == {
+        "issue_number": 264,
+        "before_status_labels": ["status: awaiting reviewer response"],
+        "desired_status_labels": ["status: reviewer reassignment needed"],
+        "labels_added": ["status: reviewer reassignment needed"],
+        "labels_removed": ["status: awaiting reviewer response"],
+        "changed": True,
+    }
+    assert calls[0][0:2] == ("ensure", "status: reviewer reassignment needed")
+    assert ("remove", 264, "status: awaiting reviewer response") in calls
+    assert ("add", 264, "status: reviewer reassignment needed") in calls

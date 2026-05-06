@@ -37,6 +37,19 @@ def test_classify_event_intent_preview_check_overdue_is_non_mutating(monkeypatch
     assert intent == runtime.EVENT_INTENT_NON_MUTATING_READONLY
 
 
+@pytest.mark.parametrize(
+    "manual_action",
+    ["preview-status-label-projection", "preview-issue314-state-health"],
+)
+def test_classify_event_intent_projection_previews_are_non_mutating(monkeypatch, manual_action):
+    runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.set_config_value("MANUAL_ACTION", manual_action)
+
+    intent = app.classify_event_intent(runtime, "workflow_dispatch", "")
+
+    assert intent == runtime.EVENT_INTENT_NON_MUTATING_READONLY
+
+
 def test_classify_event_intent_same_repo_review_is_read_only(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     intent = app.classify_event_intent(runtime, "pull_request_review", "submitted")

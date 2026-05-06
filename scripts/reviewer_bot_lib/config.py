@@ -122,11 +122,13 @@ MANDATORY_TRIAGE_APPROVER_LABEL = "triage approver required"
 STATUS_AWAITING_REVIEWER_RESPONSE_LABEL = "status: awaiting reviewer response"
 STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL = "status: awaiting contributor response"
 STATUS_AWAITING_WRITE_APPROVAL_LABEL = "status: awaiting write approval"
+STATUS_REVIEWER_REASSIGNMENT_NEEDED_LABEL = "status: reviewer reassignment needed"
 STATUS_AWAITING_REVIEW_COMPLETION_LABEL = STATUS_AWAITING_REVIEWER_RESPONSE_LABEL
 STATUS_LABELS = {
     STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
     STATUS_AWAITING_WRITE_APPROVAL_LABEL,
+    STATUS_REVIEWER_REASSIGNMENT_NEEDED_LABEL,
 }
 STATUS_LABEL_CONFIG = {
     STATUS_AWAITING_REVIEWER_RESPONSE_LABEL: {
@@ -140,6 +142,10 @@ STATUS_LABEL_CONFIG = {
     STATUS_AWAITING_WRITE_APPROVAL_LABEL: {
         "color": "1d76db",
         "description": "Assigned review is complete but no visible write+ approval is present",
+    },
+    STATUS_REVIEWER_REASSIGNMENT_NEEDED_LABEL: {
+        "color": "d93f0b",
+        "description": "Reviewer-bot exhausted the active reviewer cycle and reassignment may be needed",
     },
     MANDATORY_TRIAGE_APPROVER_LABEL: {
         "color": "d73a4a",
