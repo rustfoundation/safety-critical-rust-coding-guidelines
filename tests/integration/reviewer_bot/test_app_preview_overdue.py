@@ -27,6 +27,9 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
         ISSUE_NUMBER=264,
         VALIDATION_NONCE="nonce-pr264",
         GITHUB_SHA="workflow-head",
+        GITHUB_REPOSITORY="rustfoundation/safety-critical-rust-coding-guidelines",
+        GITHUB_RUN_ID="777",
+        GITHUB_RUN_ATTEMPT="2",
     )
 
     state = make_state()
@@ -94,25 +97,30 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
 
     assert result.exit_code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload == {
-        "schema_version": 1,
-        "preview_action": "preview-check-overdue",
-        "issue_number": 264,
-        "validation_nonce": "nonce-pr264",
-        "head_sha": "workflow-head",
-        "workflow_path": ".github/workflows/reviewer-bot-preview.yml",
-        "response_state": "reviewer_reassignment_needed",
-        "reviewer_authority_outcome": "tracked_reviewer_confirmed",
-        "suppression_reason": "legacy_duplicate_reminders_exhausted",
-        "current_scope_key": "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z",
-        "current_scope_basis": "active_cycle_started_at",
-        "would_post_warning": False,
-        "would_post_transition": False,
-        "lock_attempted": False,
-        "state_save_attempted": False,
-        "tracked_state_mutations_attempted": False,
-        "touched_projection_attempted": False,
-    }
+    assert payload["schema_version"] == 1
+    assert payload["preview_action"] == "preview-check-overdue"
+    assert payload["issue_number"] == 264
+    assert payload["validation_nonce"] == "nonce-pr264"
+    assert payload["evaluated_repo"] == "rustfoundation/safety-critical-rust-coding-guidelines"
+    assert payload["head_sha"] == "workflow-head"
+    assert payload["evaluated_ref"] == "workflow-head"
+    assert payload["workflow_path"] == ".github/workflows/reviewer-bot-preview.yml"
+    assert payload["run_id"] == "777"
+    assert payload["run_attempt"] == "2"
+    assert payload["artifact_name"] == "reviewer-bot-preview-output-777-attempt-2"
+    assert payload["artifact_file"] == "preview-output.json"
+    assert payload["output_keys"] == sorted(payload.keys())
+    assert payload["response_state"] == "reviewer_reassignment_needed"
+    assert payload["reviewer_authority_outcome"] == "tracked_reviewer_confirmed"
+    assert payload["suppression_reason"] == "legacy_duplicate_reminders_exhausted"
+    assert payload["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z"
+    assert payload["current_scope_basis"] == "reminder_cadence_exhausted"
+    assert payload["would_post_warning"] is False
+    assert payload["would_post_transition"] is False
+    assert payload["lock_attempted"] is False
+    assert payload["state_save_attempted"] is False
+    assert payload["tracked_state_mutations_attempted"] is False
+    assert payload["touched_projection_attempted"] is False
 
 
 def test_execute_run_preview_check_overdue_backfills_claim_cycle_from_assignment_guidance(monkeypatch, capsys):

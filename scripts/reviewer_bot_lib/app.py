@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 
 from . import maintenance, reconcile
-from .context import EventContext, ExecutionResult
+from .context import EventContext, ExecutionResult, ManualDispatchRequest
 from .event_inputs import build_event_context as decode_event_context
 from .maintenance import (
     collect_status_projection_repair_items,
@@ -249,7 +249,13 @@ def _classify_event_intent_from_context(bot: AppEventContextRuntime, context: Ev
         return bot.EVENT_INTENT_NON_MUTATING_READONLY
 
     if event_name == "workflow_dispatch":
-        if context.manual_action in {"show-state", "preview-check-overdue", "preview-reviewer-board"}:
+        if context.manual_action in {
+            "show-state",
+            "preview-check-overdue",
+            "preview-status-label-projection",
+            "preview-issue314-state-health",
+            "preview-reviewer-board",
+        }:
             return bot.EVENT_INTENT_NON_MUTATING_READONLY
         return bot.EVENT_INTENT_MUTATING
 
@@ -316,6 +322,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
     workflow_run_result: reconcile.WorkflowRunHandlerResult | None = None
     schedule_result: maintenance.ScheduleHandlerResult | None = None
     loaded_state_hash: str | None = None
+    manual_projection_policy: maintenance.ManualDispatchProjectionPolicy | None = None
 
     try:
         if (
@@ -352,6 +359,13 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 if isinstance(issue_key, str) and issue_key.isdigit()
             }
         loaded_epoch = state.get("freshness_runtime_epoch") if isinstance(state.get("freshness_runtime_epoch"), str) else None
+        if event_name == "workflow_dispatch":
+            manual_projection_policy = maintenance.derive_manual_dispatch_projection_policy(
+                ManualDispatchRequest(
+                    action=context.manual_action or "",
+                    issue_number=context.issue_number,
+                )
+            )
 
         if lock_required:
             state, restored = bot.adapters.workflow.process_pass_until_expirations(state)
@@ -442,7 +456,17 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             touched_items = schedule_result.touched_items
         else:
             touched_items = bot.drain_touched_items()
-        if lock_required and event_name in {"schedule", "workflow_dispatch"} and status_projection_repair_needed(bot, state):
+        allow_epoch_repair_expansion = (
+            manual_projection_policy.allow_epoch_repair_expansion
+            if manual_projection_policy is not None
+            else True
+        )
+        if (
+            lock_required
+            and event_name in {"schedule", "workflow_dispatch"}
+            and allow_epoch_repair_expansion
+            and status_projection_repair_needed(bot, state)
+        ):
             touched_items = sorted(
                 {
                     *touched_items,
@@ -534,6 +558,8 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             if touched_items:
                 state = bot.state_store.load_state(fail_on_unavailable=True)
 
+        maintenance.emit_pending_issue314_state_health_repair_summary(bot)
+
         if touched_items:
             if not lock_acquired:
                 raise RuntimeError(
@@ -542,7 +568,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                 )
             _revalidate_epoch(bot, loaded_epoch, "status-label projection")
             try:
-                    status_labels_changed = bot.adapters.workflow.sync_status_labels_for_items(state, touched_items)
+                status_labels_changed = bot.adapters.workflow.sync_status_labels_for_items(state, touched_items)
             except RuntimeError as exc:
                 projection_failure = exc
                 _log(

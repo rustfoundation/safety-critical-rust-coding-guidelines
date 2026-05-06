@@ -732,7 +732,7 @@ def test_bootstrapped_runtime_pr_metadata_closed_executes_real_status_label_proj
     assert runtime.ACTIVE_LEASE_CONTEXT is None
 
 
-def test_bootstrapped_runtime_workflow_dispatch_repair_status_labels_uses_real_projection_path(monkeypatch):
+def test_bootstrapped_runtime_workflow_dispatch_repair_status_labels_uses_real_projection_path(monkeypatch, tmp_path):
     state = make_state()
     runtime, label_ops = _configure_bootstrapped_runtime_with_real_status_projection(
         monkeypatch, state, issue_state="open"
@@ -741,11 +741,17 @@ def test_bootstrapped_runtime_workflow_dispatch_repair_status_labels_uses_real_p
     monkeypatch.setenv("EVENT_NAME", "workflow_dispatch")
     monkeypatch.setenv("EVENT_ACTION", "")
     monkeypatch.setenv("MANUAL_ACTION", "repair-review-status-labels")
+    monkeypatch.setenv("VALIDATION_NONCE", "repair-nonce")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "rustfoundation/safety-critical-rust-coding-guidelines")
+    monkeypatch.setenv("GITHUB_RUN_ID", "9001")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    monkeypatch.setenv("GITHUB_SHA", "workflow-head")
+    monkeypatch.setenv("REPAIR_SUMMARY_PATH", str(tmp_path / "repair-summary.json"))
 
     result = reviewer_bot.execute_run(reviewer_bot.build_event_context(runtime), runtime)
 
     assert result.exit_code == 0
-    assert result.state_changed is True
+    assert result.state_changed is False
     assert label_ops == [("remove", STATUS_AWAITING_REVIEWER_RESPONSE_LABEL)]
     assert runtime.ACTIVE_LEASE_CONTEXT is None
 

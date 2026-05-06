@@ -25,7 +25,13 @@ def test_legacy_response_dict_normalizes_to_typed_decision():
 
 
 def test_cadence_overlay_projects_reassignment_needed_once():
-    base = to_reviewer_response_decision({"response_state": "awaiting_reviewer_response"})
+    base = to_reviewer_response_decision(
+        {
+            "response_state": "awaiting_reviewer_response",
+            "current_scope_key": "reviewer=iglesias|head=head-a|cycle=none|anchor=assigned",
+            "current_scope_basis": "assigned_at",
+        }
+    )
     cadence = ReminderCadenceDecision(
         issue_number=264,
         reviewer="iglesias",
@@ -45,3 +51,5 @@ def test_cadence_overlay_projects_reassignment_needed_once():
     assert decision.response_state == "reviewer_reassignment_needed"
     assert decision.suppresses_overdue_reminder is True
     assert decision.reason == "legacy_duplicate_reminders_exhausted"
+    assert decision.scope.scope_basis == "reminder_cadence_exhausted"
+    assert base.scope.scope_basis == "assigned_at"

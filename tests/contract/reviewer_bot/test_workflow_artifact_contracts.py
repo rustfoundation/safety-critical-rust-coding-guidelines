@@ -9,7 +9,15 @@ import yaml
 
 pytestmark = pytest.mark.contract
 
-from scripts.reviewer_bot_lib import reconcile_payloads
+from scripts.reviewer_bot_core.reviewer_response_policy import (
+    to_reviewer_response_decision,
+)
+from scripts.reviewer_bot_lib import (
+    issue314_state_health,
+    maintenance,
+    reconcile_payloads,
+    reviews_projection,
+)
 
 
 def _load_fixture_payload(relative_path: str) -> dict:
@@ -339,3 +347,158 @@ def test_validate_workflow_run_artifact_identity_requires_successful_conclusion(
 
     with pytest.raises(RuntimeError, match="did not conclude successfully"):
         reconcile_payloads.validate_workflow_run_artifact_identity(bot, payload)
+
+
+def test_status_projection_preview_output_carries_standard_artifact_identity():
+    decision = to_reviewer_response_decision(
+        {
+            "issue_number": 264,
+            "response_state": "reviewer_reassignment_needed",
+            "current_scope_key": "scope",
+            "current_scope_basis": "reminder_cadence_exhausted",
+            "suppression_reason": "legacy_duplicate_reminders_exhausted",
+        }
+    )
+    projection = reviews_projection.derive_status_label_projection(
+        reviews_projection.StatusLabelProjectionInput(
+            issue_number=264,
+            issue_state="open",
+            actual_labels=("status: awaiting reviewer response",),
+            reviewer_response=decision,
+            reviewer_authority_outcome="tracked_reviewer_confirmed",
+            freshness_runtime_epoch="freshness_v15",
+            status_projection_epoch="status_projection_v2",
+        )
+    )
+
+    payload = reviews_projection.status_label_projection_output(
+        projection,
+        preview_action="preview-status-label-projection",
+        validation_nonce="nonce",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="1",
+        run_attempt="1",
+        artifact_name="reviewer-bot-preview-output-1-attempt-1",
+        artifact_file="preview-output.json",
+    )
+
+    for key in [
+        "schema_version",
+        "preview_action",
+        "issue_number",
+        "validation_nonce",
+        "workflow_path",
+        "evaluated_repo",
+        "head_sha",
+        "evaluated_ref",
+        "run_id",
+        "run_attempt",
+        "artifact_name",
+        "artifact_file",
+        "output_keys",
+    ]:
+        assert key in payload
+    assert payload["output_keys"] == sorted(payload.keys())
+
+
+def test_status_label_repair_summary_carries_standard_artifact_identity():
+    summary = maintenance.StatusLabelRepairSummary(
+        schema_version=1,
+        repair_action="repair-review-status-labels",
+        issue_number=264,
+        issue_numbers=(264,),
+        validation_nonce="nonce",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-sweeper-repair.yml",
+        run_id="2",
+        run_attempt="1",
+        artifact_name="reviewer-bot-repair-output-2-attempt-1",
+        artifact_file="repair-summary.json",
+        output_keys=(),
+        status_projection_epoch="status_projection_v2",
+        before=(),
+        after=(),
+        labels_added=(),
+        labels_removed=(),
+        state_save_attempted=False,
+        tracked_state_mutations_attempted=False,
+        touched_projection_attempted=False,
+        target_collection_mode="issue_scoped",
+        result="already_aligned",
+    )
+    payload = summary.to_output()
+
+    assert payload["repair_action"] == "repair-review-status-labels"
+    assert payload["artifact_name"] == "reviewer-bot-repair-output-2-attempt-1"
+    assert payload["artifact_file"] == "repair-summary.json"
+    assert payload["output_keys"] == sorted(payload.keys())
+
+
+def test_issue314_preview_and_repair_outputs_carry_standard_artifact_identity():
+    preview = issue314_state_health.Issue314StateHealthSummary(
+        schema_version=1,
+        preview_action="preview-issue314-state-health",
+        state_issue_number=314,
+        issue_number=314,
+        validation_nonce="nonce",
+        active_review_row_count=0,
+        active_rows_inspected=(),
+        row_inventory=(),
+        row_health_summary={},
+        status_projection_summary={},
+        rows_repairable=(),
+        rows_operator_action_required=(),
+        rows_blocked=(),
+        pr264_no_ping_status="pass",
+        lock_attempted=False,
+        state_save_attempted=False,
+        tracked_state_mutations_attempted=False,
+        touched_projection_attempted=False,
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="3",
+        run_attempt="1",
+        artifact_name="reviewer-bot-preview-output-3-attempt-1",
+        artifact_file="preview-output.json",
+        output_keys=(),
+    ).to_output()
+    repair = issue314_state_health.Issue314StateHealthRepairSummary(
+        schema_version=1,
+        repair_action="repair-issue314-state-health",
+        state_issue_number=314,
+        issue_number=314,
+        validation_nonce="nonce",
+        target_collection_mode="global_issue314_state_health",
+        active_rows_inspected=(),
+        rows_repaired=(),
+        rows_removed_closed=(),
+        rows_operator_action_required=(),
+        rows_blocked=(),
+        status_labels_changed=(),
+        reviewer_facing_reminder_posts_attempted=0,
+        manual_issue314_edit_status="not_attempted",
+        state_store_mutation_mode="not_required",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-sweeper-repair.yml",
+        run_id="4",
+        run_attempt="1",
+        artifact_name="reviewer-bot-repair-output-4-attempt-1",
+        artifact_file="issue314-state-health-repair-summary.json",
+        output_keys=(),
+        result="already_healthy",
+    ).to_output()
+
+    assert preview["preview_action"] == "preview-issue314-state-health"
+    assert preview["output_keys"] == sorted(preview.keys())
+    assert repair["repair_action"] == "repair-issue314-state-health"
+    assert repair["target_collection_mode"] == "global_issue314_state_health"
+    assert repair["output_keys"] == sorted(repair.keys())

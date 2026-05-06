@@ -1,3 +1,6 @@
+import json
+from types import SimpleNamespace
+
 import pytest
 
 from scripts.reviewer_bot_lib import (
@@ -183,6 +186,103 @@ def test_manual_dispatch_result_routes_check_overdue_through_structured_schedule
     monkeypatch.setattr(maintenance, "handle_scheduled_check_result", lambda bot, state: expected)
 
     assert maintenance.handle_manual_dispatch_result(bot, state) == expected
+
+
+def test_targeted_status_label_repair_policy_and_collection_do_not_broaden(monkeypatch):
+    bot = FakeReviewerBotRuntime(monkeypatch)
+    state = make_state(epoch="freshness_v15")
+    request = maintenance.StatusLabelRepairRequest(
+        action="repair-review-status-labels",
+        issue_number=264,
+        validation_nonce="nonce",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-sweeper-repair.yml",
+        run_id="1",
+        run_attempt="1",
+    )
+    monkeypatch.setattr(
+        maintenance.reviews,
+        "list_open_items_with_status_labels",
+        lambda bot: (_ for _ in ()).throw(AssertionError("targeted repair broadened")),
+    )
+    policy = maintenance.derive_manual_dispatch_projection_policy(
+        SimpleNamespace(action="repair-review-status-labels", issue_number=264)
+    )
+
+    assert policy.allow_epoch_repair_expansion is False
+    assert policy.allow_status_label_sync is True
+    assert policy.reason == "targeted_status_label_repair"
+    assert maintenance.collect_status_label_repair_targets(bot, state, request) == (264,)
+
+
+def test_broad_status_label_repair_collection_is_explicit(monkeypatch):
+    bot = FakeReviewerBotRuntime(monkeypatch)
+    request = maintenance.StatusLabelRepairRequest(
+        action="repair-review-status-labels",
+        issue_number=None,
+        validation_nonce="nonce",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-sweeper-repair.yml",
+        run_id="1",
+        run_attempt="1",
+    )
+    monkeypatch.setattr(maintenance.reviews, "list_open_items_with_status_labels", lambda bot: [42, 264])
+
+    assert maintenance.collect_status_label_repair_targets(bot, make_state(), request) == (42, 264)
+
+
+def test_issue314_state_health_repair_policy_does_not_broaden_epoch_repair():
+    policy = maintenance.derive_manual_dispatch_projection_policy(
+        SimpleNamespace(action="repair-issue314-state-health", issue_number=314)
+    )
+
+    assert policy.allow_epoch_repair_expansion is False
+    assert policy.allow_status_label_sync is True
+    assert policy.reason == "issue314_state_health_repair"
+
+
+def test_status_label_repair_summary_writes_machine_readable_artifact(monkeypatch, tmp_path):
+    summary = maintenance.StatusLabelRepairSummary(
+        schema_version=1,
+        repair_action="repair-review-status-labels",
+        issue_number=264,
+        issue_numbers=(264,),
+        validation_nonce="nonce",
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-sweeper-repair.yml",
+        run_id="1",
+        run_attempt="1",
+        artifact_name="reviewer-bot-repair-output-1-attempt-1",
+        artifact_file="repair-summary.json",
+        output_keys=(),
+        status_projection_epoch="status_projection_v2",
+        before=(),
+        after=(),
+        labels_added=("status: reviewer reassignment needed",),
+        labels_removed=("status: awaiting reviewer response",),
+        state_save_attempted=False,
+        tracked_state_mutations_attempted=False,
+        touched_projection_attempted=False,
+        target_collection_mode="issue_scoped",
+        result="changed",
+    )
+    path = tmp_path / "repair-output" / "repair-summary.json"
+    monkeypatch.setenv("REPAIR_SUMMARY_PATH", str(path))
+
+    maintenance.emit_status_label_repair_summary(summary)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["repair_action"] == "repair-review-status-labels"
+    assert payload["issue_number"] == 264
+    assert payload["issue_numbers"] == [264]
+    assert payload["target_collection_mode"] == "issue_scoped"
+    assert payload["output_keys"] == sorted(payload.keys())
 
 
 def test_scheduled_check_collects_touched_item_for_warning_diagnostic_mutation(monkeypatch):

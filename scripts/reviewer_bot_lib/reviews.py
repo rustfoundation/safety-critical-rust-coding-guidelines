@@ -8,15 +8,21 @@ from urllib.parse import quote
 
 from scripts.reviewer_bot_core import live_review_support
 
-from . import review_state
+from . import assignment_flow, overdue, review_state
 from .config import (
     MANDATORY_TRIAGE_APPROVER_LABEL,
     MANDATORY_TRIAGE_ESCALATION_TEMPLATE,
     MANDATORY_TRIAGE_SATISFIED_TEMPLATE,
+    STATUS_LABEL_CONFIG,
     STATUS_LABELS,
 )
 from .reviews_projection import (
-    desired_labels_from_response_state,
+    StatusLabelProjectionInput,
+    StatusLabelProjectionResult,
+    StatusLabelSyncResult,
+    actual_status_labels_from_snapshot,
+    derive_status_label_projection,
+    status_label_delta,
 )
 
 
@@ -311,6 +317,86 @@ def compute_reviewer_response_state(
     )
 
 
+def project_status_label_projection_for_item(
+    bot,
+    issue_number: int,
+    state: dict,
+    *,
+    issue_snapshot: dict | None = None,
+) -> StatusLabelProjectionResult:
+    if issue_snapshot is None:
+        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
+    if not isinstance(issue_snapshot, dict):
+        raise RuntimeError("status_label_projection_blocked:live_read_unavailable")
+    issue_state = str(issue_snapshot.get("state", "")).lower()
+    actual_status_labels = actual_status_labels_from_snapshot(issue_snapshot)
+    review_data = review_state.ensure_review_entry(state, issue_number)
+    if issue_state == "closed":
+        from scripts.reviewer_bot_core import reviewer_response_policy
+
+        decision = reviewer_response_policy.to_reviewer_response_decision(
+            {"response_state": "closed", "reason": None}
+        )
+        return derive_status_label_projection(
+            StatusLabelProjectionInput(
+                issue_number=issue_number,
+                issue_state=issue_state,
+                actual_labels=actual_status_labels,
+                reviewer_response=decision,
+                reviewer_authority_outcome="closed",
+                freshness_runtime_epoch=state.get("freshness_runtime_epoch") if isinstance(state.get("freshness_runtime_epoch"), str) else None,
+                status_projection_epoch=state.get("status_projection_epoch") if isinstance(state.get("status_projection_epoch"), str) else None,
+            )
+        )
+    if review_data is None:
+        from scripts.reviewer_bot_core import reviewer_response_policy
+
+        decision = reviewer_response_policy.to_reviewer_response_decision(
+            {"response_state": "untracked", "reason": "no_review_entry"}
+        )
+        return derive_status_label_projection(
+            StatusLabelProjectionInput(
+                issue_number=issue_number,
+                issue_state=issue_state,
+                actual_labels=actual_status_labels,
+                reviewer_response=decision,
+                reviewer_authority_outcome="no_tracked_reviewer",
+                freshness_runtime_epoch=state.get("freshness_runtime_epoch") if isinstance(state.get("freshness_runtime_epoch"), str) else None,
+                status_projection_epoch=state.get("status_projection_epoch") if isinstance(state.get("status_projection_epoch"), str) else None,
+            )
+        )
+    is_pull_request = isinstance(issue_snapshot.get("pull_request"), dict)
+    authority = assignment_flow.resolve_reviewer_authority(
+        bot,
+        issue_number,
+        review_data,
+        is_pull_request=is_pull_request,
+    )
+    authority_status = str(authority.get("authority_status") or "unknown")
+    if authority_status == "live_read_unavailable":
+        raise RuntimeError("status_label_projection_blocked:live_read_unavailable")
+    response_state = compute_reviewer_response_state(bot, issue_number, review_data, issue_snapshot=issue_snapshot)
+    response_state = dict(response_state)
+    response_state["reviewer_authority_outcome"] = authority_status
+    effective_response, _cadence, _reminder_scan = overdue._effective_response_with_cadence(
+        bot,
+        issue_number,
+        review_data,
+        response_state,
+    )
+    return derive_status_label_projection(
+        StatusLabelProjectionInput(
+            issue_number=issue_number,
+            issue_state=issue_state,
+            actual_labels=actual_status_labels,
+            reviewer_response=effective_response,
+            reviewer_authority_outcome=authority_status,
+            freshness_runtime_epoch=state.get("freshness_runtime_epoch") if isinstance(state.get("freshness_runtime_epoch"), str) else None,
+            status_projection_epoch=state.get("status_projection_epoch") if isinstance(state.get("status_projection_epoch"), str) else None,
+        )
+    )
+
+
 def project_status_labels_for_item(
     bot,
     issue_number: int,
@@ -318,47 +404,61 @@ def project_status_labels_for_item(
     *,
     issue_snapshot: dict | None = None,
 ) -> tuple[set[str] | None, dict[str, str | None]]:
-    if issue_snapshot is None:
-        issue_snapshot = bot.github.get_issue_or_pr_snapshot(issue_number)
-    if not isinstance(issue_snapshot, dict):
-        return None, {"state": "projection_failed", "reason": "issue_snapshot_unavailable"}
-    if str(issue_snapshot.get("state", "")).lower() == "closed":
-        return set(), {"state": "closed", "reason": None}
-
-    review_data = review_state.ensure_review_entry(state, issue_number)
-    if review_data is None:
-        return set(), {"state": "untracked", "reason": "no_review_entry"}
-    current_reviewer = review_data.get("current_reviewer")
-    if not isinstance(current_reviewer, str) or not current_reviewer.strip():
-        return set(), {"state": "untracked", "reason": "no_current_reviewer"}
-
-    response_state = compute_reviewer_response_state(bot, issue_number, review_data, issue_snapshot=issue_snapshot)
-    state_name = response_state.get("state")
-    reason = response_state.get("reason")
-    return desired_labels_from_response_state(str(state_name), None if reason is None else str(reason))
+    result = project_status_label_projection_for_item(
+        bot,
+        issue_number,
+        state,
+        issue_snapshot=issue_snapshot,
+    )
+    return set(result.delta.desired_status_labels), {
+        "state": result.response_state,
+        "reason": result.suppression_reason,
+    }
 
 
-def sync_status_labels(bot, issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
+def apply_status_label_delta(bot, issue_number: int, delta) -> StatusLabelSyncResult:
     from . import github_api
 
-    actual_status_labels = {label for label in actual_labels if label in STATUS_LABELS}
-    to_add = desired_labels - actual_status_labels
-    to_remove = actual_status_labels - desired_labels
+    actual_status_labels = set(delta.actual_status_labels)
+    to_add = set(delta.labels_to_add)
+    to_remove = set(delta.labels_to_remove)
     if not to_add and not to_remove:
-        return False
-    for label in STATUS_LABELS:
-        if not bot.github.ensure_label_exists(label):
+        return StatusLabelSyncResult(
+            issue_number=issue_number,
+            before_status_labels=tuple(sorted(actual_status_labels)),
+            desired_status_labels=tuple(sorted(delta.desired_status_labels)),
+            labels_added=(),
+            labels_removed=(),
+            changed=False,
+        )
+    for label in sorted(to_add):
+        config = STATUS_LABEL_CONFIG.get(label, {})
+        if not bot.github.ensure_label_exists(
+            label,
+            color=config.get("color"),
+            description=config.get("description"),
+        ):
             raise RuntimeError(f"Unable to ensure reviewer-bot status label exists: {label}")
-    changed = False
     for label in sorted(to_remove):
         if not github_api.remove_label_with_status(bot, issue_number, label):
             raise RuntimeError(f"Unable to remove reviewer-bot status label '{label}' from #{issue_number}")
-        changed = True
     for label in sorted(to_add):
         if not github_api.add_label_with_status(bot, issue_number, label):
             raise RuntimeError(f"Unable to add reviewer-bot status label '{label}' to #{issue_number}")
-        changed = True
-    return changed
+    return StatusLabelSyncResult(
+        issue_number=issue_number,
+        before_status_labels=tuple(sorted(actual_status_labels)),
+        desired_status_labels=tuple(sorted(delta.desired_status_labels)),
+        labels_added=tuple(sorted(to_add)),
+        labels_removed=tuple(sorted(to_remove)),
+        changed=True,
+    )
+
+
+def sync_status_labels(bot, issue_number: int, desired_labels: set[str], actual_labels: Iterable[str]) -> bool:
+    actual_status_labels = tuple(sorted(label for label in actual_labels if isinstance(label, str) and label.startswith("status: ")))
+    delta = status_label_delta(actual_status_labels, tuple(sorted(desired_labels)))
+    return apply_status_label_delta(bot, issue_number, delta).changed
 
 
 def sync_status_labels_for_items(bot, state: dict, issue_numbers: Iterable[int]) -> bool:
@@ -371,15 +471,9 @@ def sync_status_labels_for_items(bot, state: dict, issue_numbers: Iterable[int])
             raise RuntimeError(f"Failed to derive reviewer-bot status labels for #{issue_number}: {reason}")
         if not isinstance(issue_snapshot, dict):
             raise RuntimeError(f"Failed to refresh issue/PR snapshot for #{issue_number}")
-        labels = issue_snapshot.get("labels", [])
-        actual_labels = set()
-        if isinstance(labels, list):
-            for label in labels:
-                if isinstance(label, dict):
-                    name = label.get("name")
-                    if isinstance(name, str):
-                        actual_labels.add(name)
-        if sync_status_labels(bot, issue_number, desired_labels, actual_labels):
+        actual_labels = actual_status_labels_from_snapshot(issue_snapshot)
+        delta = status_label_delta(actual_labels, tuple(sorted(desired_labels)))
+        if apply_status_label_delta(bot, issue_number, delta).changed:
             changed = True
     return changed
 

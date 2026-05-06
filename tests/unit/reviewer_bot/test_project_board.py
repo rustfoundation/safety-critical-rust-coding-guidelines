@@ -26,11 +26,12 @@ from tests.fixtures.reviewer_bot import (
     review_payload,
     valid_reviewer_board_metadata,
 )
-from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
+from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 
 
 def _runtime(monkeypatch, routes=None):
     runtime = FakeReviewerBotRuntime(monkeypatch)
+    runtime.github.get_issue_assignees_result = lambda issue_number, is_pull_request=None: github_result(200, [])
     if routes is not None:
         runtime.github.stub(routes)
     return runtime

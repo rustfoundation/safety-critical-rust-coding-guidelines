@@ -20,7 +20,12 @@ def test_preview_workflow_exposes_exact_dispatch_inputs_and_actions():
     workflow_dispatch = on_block["workflow_dispatch"]
     assert sorted(workflow_dispatch["inputs"]) == ["action", "issue_number", "validation_nonce"]
     action_input = workflow_dispatch["inputs"]["action"]
-    assert action_input["options"] == ["preview-check-overdue", "preview-reviewer-board"]
+    assert action_input["options"] == [
+        "preview-check-overdue",
+        "preview-status-label-projection",
+        "preview-issue314-state-health",
+        "preview-reviewer-board",
+    ]
     assert workflow_dispatch["inputs"]["issue_number"]["required"] is True
     assert workflow_dispatch["inputs"]["issue_number"]["type"] == "string"
     assert workflow_dispatch["inputs"]["validation_nonce"]["required"] is True
@@ -47,6 +52,11 @@ def test_preview_workflow_run_name_and_env_contract_are_frozen():
     assert "MANUAL_ACTION: ${{ github.event.inputs.action }}" in text
     assert "ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}" in text
     assert "VALIDATION_NONCE: ${{ github.event.inputs.validation_nonce }}" in text
+    assert "EVALUATED_REPO: ${{ github.repository }}" in text
+    assert "HEAD_SHA: ${{ github.sha }}" in text
+    assert "EVALUATED_REF: ${{ github.sha }}" in text
+    assert "GITHUB_RUN_ID: ${{ github.run_id }}" in text
+    assert "GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}" in text
     assert "WORKFLOW_RUN_ID: ${{ github.run_id }}" in text
     assert "WORKFLOW_NAME: ${{ github.workflow }}" in text
     assert "WORKFLOW_JOB_NAME: ${{ github.job }}" in text

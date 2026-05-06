@@ -415,8 +415,6 @@ def compute_pr_approval_state_result(
         permission_evidence=permission_evidence,
         dismissal_evidence=None,
     )
-    if write_decision.response_state == "projection_failed":
-        return live_review_support.projection_failure_result(write_decision.diagnostic_reason or write_decision.write_approval_state)
     completion = {
         "completed": completion_decision.can_set_review_completed_at,
         "current_head_sha": current_head,
@@ -425,6 +423,20 @@ def compute_pr_approval_state_result(
         ),
         "authority_decision": completion_decision.to_output(),
     }
+    if write_decision.response_state == "projection_failed":
+        result = live_review_support.projection_failure_result(
+            write_decision.diagnostic_reason or write_decision.write_approval_state
+        )
+        result["completion"] = completion
+        result["write_approval"] = {
+            "has_write_approval": False,
+            "write_approvers": [],
+            "current_head_sha": current_head,
+            "response_state": write_decision.response_state,
+            "authority_decision": write_decision.to_output(),
+        }
+        result["current_head_sha"] = current_head
+        return result
     write_approval = {
         "has_write_approval": write_decision.response_state == "done",
         "write_approvers": [write_decision.approving_reviewer] if write_decision.response_state == "done" and write_decision.approving_reviewer else [],

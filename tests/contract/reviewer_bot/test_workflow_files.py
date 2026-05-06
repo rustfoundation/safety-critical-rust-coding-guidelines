@@ -430,6 +430,41 @@ def test_workflow_summaries_and_runbook_references_exist():
     assert "docs/reviewer-bot-review-freshness-operator-runbook.md" in reconcile
 
 
+def test_sweeper_repair_workflow_exposes_nonce_identity_and_repair_artifacts():
+    workflow_path = ".github/workflows/reviewer-bot-sweeper-repair.yml"
+    text = Path(workflow_path).read_text(encoding="utf-8")
+    workflow = yaml.safe_load(text)
+    on_block = workflow.get("on", workflow.get(True))
+    inputs = on_block["workflow_dispatch"]["inputs"]
+
+    assert workflow["run-name"] == "repair ${{ github.event.inputs.action }} issue ${{ github.event.inputs.issue_number }} nonce ${{ github.event.inputs.validation_nonce }}"
+    upload_step = next(
+        step
+        for step in workflow["jobs"]["reviewer-bot-sweeper-repair"]["steps"]
+        if step["name"] == "Upload repair artifact"
+    )
+    assert upload_step["if"] == "${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'repair-review-status-labels' || github.event.inputs.action == 'repair-issue314-state-health') }}"
+    assert inputs["action"]["options"] == [
+        "sync-members",
+        "show-state",
+        "check-overdue",
+        "repair-review-status-labels",
+        "repair-issue314-state-health",
+    ]
+    assert inputs["validation_nonce"]["type"] == "string"
+    assert inputs["validation_nonce"]["required"] is True
+    assert "VALIDATION_NONCE: ${{ github.event.inputs.validation_nonce }}" in text
+    assert "EVALUATED_REPO: ${{ github.repository }}" in text
+    assert "HEAD_SHA: ${{ github.sha }}" in text
+    assert "EVALUATED_REF: ${{ github.sha }}" in text
+    assert "GITHUB_RUN_ID: ${{ github.run_id }}" in text
+    assert "GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}" in text
+    assert "REPAIR_SUMMARY_PATH: ${{ runner.temp }}/reviewer-bot-repair-output-${{ github.run_id }}-attempt-${{ github.run_attempt }}/repair-summary.json" in text
+    assert "ISSUE314_STATE_HEALTH_REPAIR_SUMMARY_PATH: ${{ runner.temp }}/reviewer-bot-repair-output-${{ github.run_id }}-attempt-${{ github.run_attempt }}/issue314-state-health-repair-summary.json" in text
+    assert "actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808" in text
+    assert "if-no-files-found: error" in text
+
+
 def test_reconcile_workflow_selects_at_most_one_recursive_json_payload():
     workflow_text = Path(".github/workflows/reviewer-bot-reconcile.yml").read_text(encoding="utf-8")
 

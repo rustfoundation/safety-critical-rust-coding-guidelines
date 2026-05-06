@@ -180,6 +180,9 @@ def test_execute_run_preview_reviewer_board_keeps_pr264_alternate_approval_proje
         ISSUE_NUMBER=264,
         VALIDATION_NONCE="board-preview-pr264",
         GITHUB_SHA="workflow-head",
+        GITHUB_REPOSITORY="rustfoundation/safety-critical-rust-coding-guidelines",
+        GITHUB_RUN_ID="1004",
+        GITHUB_RUN_ATTEMPT="1",
     )
     monkeypatch.setattr(harness.runtime, "_reviewer_board_project_metadata", None, raising=False)
 
@@ -233,24 +236,29 @@ def test_execute_run_preview_reviewer_board_keeps_pr264_alternate_approval_proje
 
     assert result.exit_code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload == {
-        "schema_version": 1,
-        "preview_action": "preview-reviewer-board",
-        "issue_number": 264,
-        "validation_nonce": "board-preview-pr264",
-        "head_sha": "workflow-head",
-        "workflow_path": ".github/workflows/reviewer-bot-preview.yml",
-        "response_state": "reviewer_reassignment_needed",
-        "reviewer_authority_outcome": "tracked_reviewer_confirmed",
-        "suppression_reason": "transition_notice_sent",
-        "current_scope_key": "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z",
-        "current_scope_basis": "active_cycle_started_at",
-        "would_post_warning": False,
-        "would_post_transition": False,
-        "lock_attempted": False,
-        "state_save_attempted": False,
-        "tracked_state_mutations_attempted": False,
-        "touched_projection_attempted": False,
-        "board_attention": "Transition Notice Sent",
-        "board_waiting_since": "2026-02-10",
-    }
+    assert payload["schema_version"] == 1
+    assert payload["preview_action"] == "preview-reviewer-board"
+    assert payload["issue_number"] == 264
+    assert payload["validation_nonce"] == "board-preview-pr264"
+    assert payload["evaluated_repo"] == "rustfoundation/safety-critical-rust-coding-guidelines"
+    assert payload["head_sha"] == "workflow-head"
+    assert payload["evaluated_ref"] == "workflow-head"
+    assert payload["workflow_path"] == ".github/workflows/reviewer-bot-preview.yml"
+    assert payload["run_id"] == "1004"
+    assert payload["run_attempt"] == "1"
+    assert payload["artifact_name"] == "reviewer-bot-preview-output-1004-attempt-1"
+    assert payload["artifact_file"] == "preview-output.json"
+    assert payload["response_state"] == "reviewer_reassignment_needed"
+    assert payload["reviewer_authority_outcome"] == "tracked_reviewer_confirmed"
+    assert payload["suppression_reason"] == "transition_notice_sent"
+    assert payload["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z"
+    assert payload["current_scope_basis"] == "reminder_cadence_exhausted"
+    assert payload["would_post_warning"] is False
+    assert payload["would_post_transition"] is False
+    assert payload["lock_attempted"] is False
+    assert payload["state_save_attempted"] is False
+    assert payload["tracked_state_mutations_attempted"] is False
+    assert payload["touched_projection_attempted"] is False
+    assert payload["board_attention"] == "Transition Notice Sent"
+    assert payload["board_waiting_since"] == "2026-02-10"
+    assert payload["output_keys"] == sorted(payload.keys())

@@ -14,7 +14,7 @@ Old module no longer preferred for these reviewer-response decision changes:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 
 from . import live_review_support, reviewer_review_helpers
@@ -173,11 +173,16 @@ def apply_reminder_cadence_overlay(response: ReviewerResponseDecision, cadence) 
     if response.response_state != "awaiting_reviewer_response":
         return response
     reason = getattr(cadence, "exhaustion_reason", None) or "legacy_duplicate_reminders_exhausted"
+    scope = (
+        replace(response.scope, scope_basis="reminder_cadence_exhausted")
+        if response.scope is not None
+        else None
+    )
     return ReviewerResponseDecision(
         response_state="reviewer_reassignment_needed",
         reason=reason,
         suppression_reason=reason,
-        scope=response.scope,
+        scope=scope,
         current_head_sha=response.current_head_sha,
         anchor_timestamp=response.anchor_timestamp,
         reviewer_authority_outcome=response.reviewer_authority_outcome,
@@ -468,6 +473,13 @@ def _decorate_response(
         "current_scope_key": scope_fields.get("current_scope_key"),
         "current_scope_basis": scope_fields.get("current_scope_basis"),
     }
+
+
+def _write_approval_authority_payload(write_approval: object) -> dict[str, object] | None:
+    if not isinstance(write_approval, dict):
+        return None
+    authority = write_approval.get("authority_decision")
+    return dict(authority) if isinstance(authority, dict) else None
 
 
 def _record_for_current_reviewer(record: dict | None | object, current_reviewer: str) -> dict | None:
@@ -872,14 +884,19 @@ def derive_reviewer_response_state(
         )
 
     if not isinstance(approval_result, dict) or not approval_result.get("ok"):
+        write_approval_authority = _write_approval_authority_payload(
+            approval_result.get("write_approval") if isinstance(approval_result, dict) else None
+        )
         return _decorate_response(
             state="projection_failed",
             reason="live_review_state_unknown",
             scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
+            write_approval_authority=write_approval_authority,
         )
 
     completion = approval_result["completion"]
     write_approval = approval_result["write_approval"]
+    write_approval_authority = _write_approval_authority_payload(write_approval)
     if not completion.get("completed"):
         return _decorate_response(
             state="awaiting_contributor_response",
@@ -906,6 +923,7 @@ def derive_reviewer_response_state(
             current_cycle_reviewer_handoff=reviewer_handoff,
             contributor_comment=contributor_comment,
             contributor_handoff=contributor_handoff,
+            write_approval_authority=write_approval_authority,
         )
     if authority_response_state == "projection_failed":
         authority = write_approval.get("authority_decision")
@@ -916,6 +934,7 @@ def derive_reviewer_response_state(
             state="projection_failed",
             reason=reason,
             scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
+            write_approval_authority=write_approval_authority,
         )
     if not write_approval.get("has_write_approval"):
         return _decorate_response(
@@ -929,6 +948,7 @@ def derive_reviewer_response_state(
             current_cycle_reviewer_handoff=reviewer_handoff,
             contributor_comment=contributor_comment,
             contributor_handoff=contributor_handoff,
+            write_approval_authority=write_approval_authority,
         )
     return _decorate_response(
         state="done",
@@ -941,6 +961,7 @@ def derive_reviewer_response_state(
         current_cycle_reviewer_handoff=reviewer_handoff,
         contributor_comment=contributor_comment,
         contributor_handoff=contributor_handoff,
+        write_approval_authority=write_approval_authority,
     )
 
 
