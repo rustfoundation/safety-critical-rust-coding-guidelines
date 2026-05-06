@@ -12,6 +12,10 @@ def test_reviewer_bot_tests_cover_core_policy_paths():
 
     assert "scripts/reviewer_bot_core/**" in on_block["push"]["paths"]
     assert "scripts/reviewer_bot_core/**" in on_block["pull_request"]["paths"]
+    assert ".github/actions/reviewer-bot-source/action.yml" in on_block["push"]["paths"]
+    assert ".github/actions/reviewer-bot-source/action.yml" in on_block["pull_request"]["paths"]
+    assert "uv.lock" in on_block["push"]["paths"]
+    assert "uv.lock" in on_block["pull_request"]["paths"]
 
 
 def test_reviewer_bot_coverage_includes_core_package():

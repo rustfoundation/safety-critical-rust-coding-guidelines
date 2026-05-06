@@ -278,10 +278,14 @@ def build_command_replay_receipt(
 def decide_review_submitted_replay_from_input(inputs: ReviewReplayDecisionInput):
     return reconcile_replay_policy.decide_review_submitted_replay(
         source_event_key=inputs.source_event_key,
-        actor_login=inputs.actor_login,
+        actor_login=inputs.live_observation.author,
         current_reviewer=inputs.current_reviewer,
         live_commit_id=inputs.live_observation.commit_id if inputs.admission.replay_allowed else None,
         live_submitted_at=inputs.live_observation.submitted_at if inputs.admission.replay_allowed else None,
+        current_head_sha=inputs.current_head_sha,
+        live_state=inputs.live_observation.state,
+        live_visibility_status=inputs.live_observation.visibility_status,
+        replay_allowed=inputs.admission.replay_allowed,
     )
 
 
@@ -1083,12 +1087,15 @@ def _handle_review_submitted_workflow_run(
     live_review = _read_optional_reconcile_object(bot, f"pulls/{pr_number}/reviews/{review_id}", label=f"live review #{review_id}")
     live_pr = _read_reconcile_object(bot, f"pulls/{pr_number}", label=f"live PR #{pr_number}")
     live_commit_id = None
-    live_submitted_at = parsed_payload.source_submitted_at
-    live_state = parsed_payload.source_review_state
+    live_submitted_at = None
+    live_state = None
+    live_author = None
     if isinstance(live_review, dict):
         live_commit_id = live_review.get("commit_id")
-        live_submitted_at = live_review.get("submitted_at") or live_submitted_at
-        live_state = live_review.get("state") or live_state
+        live_submitted_at = live_review.get("submitted_at")
+        live_state = live_review.get("state")
+        live_user = live_review.get("user")
+        live_author = live_user.get("login") if isinstance(live_user, dict) else None
     head = live_pr.get("head") if isinstance(live_pr, dict) else None
     current_head_sha = head.get("sha") if isinstance(head, dict) and isinstance(head.get("sha"), str) else None
     live_observation = LiveReviewObservation(
@@ -1099,12 +1106,10 @@ def _handle_review_submitted_workflow_run(
         commit_id=live_commit_id if isinstance(live_commit_id, str) else None,
         submitted_at=live_submitted_at if isinstance(live_submitted_at, str) else None,
         state=live_state if isinstance(live_state, str) else None,
-        author=actor,
+        author=live_author if isinstance(live_author, str) else None,
         failure_kind=None,
         diagnostic_reason=None if isinstance(live_review, dict) else "live_review_not_found",
     )
-    if not isinstance(live_review, dict):
-        live_commit_id = parsed_payload.source_commit_id
     state_changed = bot.adapters.review_state.maybe_record_head_observation_repair(pr_number, review_data).changed
     decision = decide_review_submitted_replay_from_input(
         ReviewReplayDecisionInput(
@@ -1132,6 +1137,19 @@ def _handle_review_submitted_workflow_run(
         state_changed = True
     if _record_review_rebuild(bot, state, pr_number, review_data):
         state_changed = True
+    if decision.diagnostic_reason is not None:
+        gap_changed = gap_bookkeeping.record_deferred_gap_diagnostic(
+            bot,
+            review_data,
+            parsed_payload.raw_payload,
+            "reconcile_failed_closed",
+            (
+                f"Deferred submitted review {review_id} lacks trusted current-head live authority; "
+                f"replay suppressed ({decision.diagnostic_reason}). See {bot.REVIEW_FRESHNESS_RUNBOOK_PATH}."
+            ),
+            failure_kind=decision.failure_kind,
+        )
+        return state_changed or gap_changed
     reconciled_changed = False
     gap_cleared_changed = False
     if decision.mark_reconciled and admission.mark_reconciled_allowed:

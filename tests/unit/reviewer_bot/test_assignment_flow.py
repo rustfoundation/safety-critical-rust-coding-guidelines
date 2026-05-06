@@ -122,6 +122,49 @@ def test_reviewer_assignment_confirmation_covers_pr_retention_and_mismatch_statu
     assert review["active_head_sha"] == "head-1"
 
 
+def test_reviewer_authority_resolution_uses_control_plane_snapshot(monkeypatch):
+    snapshot = assignment_flow.build_review_control_plane_snapshot(
+        {
+            "number": 42,
+            "pull_request": {},
+            "requested_reviewers": [{"login": "alice"}],
+            "assignees": [],
+            "user": {"login": "dana"},
+            "reviewDecision": "REVIEW_REQUIRED",
+            "head": {"sha": "head-1"},
+        },
+        tracked_reviewer="alice",
+    )
+    resolution = assignment_flow.derive_reviewer_authority_resolution(snapshot)
+
+    assert snapshot.to_output()["requested_reviewers"] == ["alice"]
+    assert snapshot.to_output()["review_decision"] == "REVIEW_REQUIRED"
+    assert snapshot.to_output()["head_sha"] == "head-1"
+    assert resolution.authority_status == "tracked_reviewer_confirmed"
+    assert resolution.reason == "present_in_live_control_plane"
+
+    bot = FakeReviewerBotRuntime(monkeypatch)
+    state = make_state()
+    review = review_state.ensure_review_entry(state, 42, create=True)
+    assert review is not None
+    review["current_reviewer"] = "alice"
+    bot.github.get_issue_assignees_result = lambda issue_number, is_pull_request=None: bot.GitHubApiResult(
+        200,
+        ["bob"],
+        {},
+        "ok",
+        True,
+        None,
+        0,
+        None,
+    )
+
+    legacy = assignment_flow.resolve_reviewer_authority(bot, 42, review, is_pull_request=True)
+
+    assert legacy["authority_status"] == "control_plane_mismatch"
+    assert legacy["live_control_plane_reviewers"] == ["bob"]
+
+
 def test_same_reviewer_assignment_confirmation_is_noop(monkeypatch):
     request = build_assignment_request(issue_number=42, issue_author="dana", is_pull_request=True)
     state = make_state()

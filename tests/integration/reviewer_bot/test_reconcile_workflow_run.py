@@ -71,7 +71,7 @@ def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping
     monkeypatch,
 ):
     state = make_state()
-    review = make_tracked_review_state(state, 42, reviewer="bob")
+    review = make_tracked_review_state(state, 42, reviewer="alice")
     _deferred_gaps(review)["pull_request_review:11"] = {"reason": "artifact_missing"}
     harness = ReconcileHarness(
         monkeypatch,
@@ -103,6 +103,78 @@ def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping
     assert "pull_request_review:11" in _reconciled_source_events(review)
     assert _reconciled_source_events(review)["pull_request_review:11"]["reconciled_at"] == "2026-01-01T00:00:00+00:00"
     assert "pull_request_review:11" not in _deferred_gaps(review)
+
+
+def test_submitted_review_replay_stale_live_head_records_gap_without_closeout(monkeypatch):
+    state = make_state()
+    review = make_tracked_review_state(state, 42, reviewer="alice")
+    _deferred_gaps(review)["pull_request_review:11"] = {"reason": "artifact_missing"}
+    harness = ReconcileHarness(
+        monkeypatch,
+        review_submitted_payload(
+            pr_number=42,
+            review_id=11,
+            source_event_key="pull_request_review:11",
+            source_submitted_at="2026-03-17T10:00:00Z",
+            source_review_state="COMMENTED",
+            source_commit_id="old-head",
+            actor_login="alice",
+            source_run_id=500,
+            source_run_attempt=2,
+        ),
+    )
+    harness.stub_review_rebuild(changed=False)
+    harness.stub_head_repair(changed=False)
+    harness.add_pull_request(pr_number=42, head_sha="new-head", author="dana")
+    harness.add_review(
+        pr_number=42,
+        review_id=11,
+        submitted_at="2026-03-17T10:00:00Z",
+        state="COMMENTED",
+        commit_id="old-head",
+        author="alice",
+    )
+
+    assert harness.run(state) is True
+    assert "pull_request_review:11" not in _reconciled_source_events(review)
+    assert review["sidecars"]["deferred_gaps"]["pull_request_review:11"]["failure_kind"] == "stale_head"
+    assert review.get("reviewer_review", {}).get("accepted") is None
+
+
+def test_submitted_review_replay_live_author_mismatch_records_gap_without_closeout(monkeypatch):
+    state = make_state()
+    review = make_tracked_review_state(state, 42, reviewer="alice")
+    _deferred_gaps(review)["pull_request_review:11"] = {"reason": "artifact_missing"}
+    harness = ReconcileHarness(
+        monkeypatch,
+        review_submitted_payload(
+            pr_number=42,
+            review_id=11,
+            source_event_key="pull_request_review:11",
+            source_submitted_at="2026-03-17T10:00:00Z",
+            source_review_state="COMMENTED",
+            source_commit_id="head-1",
+            actor_login="alice",
+            source_run_id=500,
+            source_run_attempt=2,
+        ),
+    )
+    harness.stub_review_rebuild(changed=False)
+    harness.stub_head_repair(changed=False)
+    harness.add_pull_request(pr_number=42, head_sha="head-1", author="dana")
+    harness.add_review(
+        pr_number=42,
+        review_id=11,
+        submitted_at="2026-03-17T10:00:00Z",
+        state="COMMENTED",
+        commit_id="head-1",
+        author="bob",
+    )
+
+    assert harness.run(state) is True
+    assert "pull_request_review:11" not in _reconciled_source_events(review)
+    assert review["sidecars"]["deferred_gaps"]["pull_request_review:11"]["failure_kind"] == "actor_mismatch"
+    assert review.get("reviewer_review", {}).get("accepted") is None
 
 
 def test_late_workflow_run_reconcile_missing_row_is_diagnostic_safe_noop(monkeypatch):

@@ -182,6 +182,92 @@ def build_review_control_plane_snapshot(issue_snapshot: dict, *, tracked_reviewe
     )
 
 
+def derive_reviewer_authority_resolution(snapshot: ReviewControlPlaneSnapshot) -> ReviewerAuthorityResolution:
+    tracked_reviewer = snapshot.tracked_reviewer
+    live_control_plane_reviewers = snapshot.requested_reviewers if snapshot.is_pull_request else snapshot.assignees
+    if not snapshot.live_read_ok:
+        return ReviewerAuthorityResolution(
+            authority_status="live_read_unavailable",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason=snapshot.diagnostic_reason or "live_read_unavailable",
+            is_pull_request=snapshot.is_pull_request,
+            live_read_ok=False,
+        )
+    if not isinstance(tracked_reviewer, str) or not tracked_reviewer.strip():
+        return ReviewerAuthorityResolution(
+            authority_status="no_tracked_reviewer",
+            tracked_reviewer=None,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="retained_without_live_pr_review_request",
+            is_pull_request=snapshot.is_pull_request,
+            live_read_ok=True,
+        )
+    normalized_reviewers = {value.lower() for value in live_control_plane_reviewers}
+    tracked_key = tracked_reviewer.lower()
+    if snapshot.is_pull_request:
+        if normalized_reviewers and tracked_key not in normalized_reviewers:
+            return ReviewerAuthorityResolution(
+                authority_status="control_plane_mismatch",
+                tracked_reviewer=tracked_reviewer,
+                live_control_plane_reviewers=live_control_plane_reviewers,
+                reason="tracked_reviewer_missing_from_live_control_plane",
+                is_pull_request=True,
+                live_read_ok=True,
+            )
+        return ReviewerAuthorityResolution(
+            authority_status="tracked_reviewer_confirmed",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="present_in_live_control_plane" if normalized_reviewers else "retained_without_live_pr_review_request",
+            is_pull_request=True,
+            live_read_ok=True,
+        )
+
+    if len(live_control_plane_reviewers) != 1:
+        return ReviewerAuthorityResolution(
+            authority_status="control_plane_mismatch",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="invalid_live_assignee_count",
+            is_pull_request=False,
+            live_read_ok=True,
+        )
+    if tracked_key != live_control_plane_reviewers[0].lower():
+        return ReviewerAuthorityResolution(
+            authority_status="control_plane_mismatch",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="tracked_reviewer_missing_from_live_control_plane",
+            is_pull_request=False,
+            live_read_ok=True,
+        )
+    return ReviewerAuthorityResolution(
+        authority_status="tracked_reviewer_confirmed",
+        tracked_reviewer=tracked_reviewer,
+        live_control_plane_reviewers=live_control_plane_reviewers,
+        reason="present_in_live_control_plane",
+        is_pull_request=False,
+        live_read_ok=True,
+    )
+
+
+def _control_plane_snapshot_from_live_reviewers(
+    *,
+    issue_number: int,
+    is_pull_request: bool,
+    tracked_reviewer: str | None,
+    live_control_plane_reviewers: tuple[str, ...],
+) -> ReviewControlPlaneSnapshot:
+    issue_snapshot: dict[str, object] = {"number": issue_number}
+    if is_pull_request:
+        issue_snapshot["pull_request"] = {}
+        issue_snapshot["requested_reviewers"] = list(live_control_plane_reviewers)
+    else:
+        issue_snapshot["assignees"] = list(live_control_plane_reviewers)
+    return build_review_control_plane_snapshot(issue_snapshot, tracked_reviewer=tracked_reviewer)
+
+
 def derive_claim_cycle_transition(review_data: dict | None, *, issue_number: int, reviewer: str, now: str) -> ClaimCycleTransition:
     previous = review_data.get("current_reviewer") if isinstance(review_data, dict) else None
     assigned_before = review_data.get("assigned_at") if isinstance(review_data, dict) and isinstance(review_data.get("assigned_at"), str) else None
@@ -407,72 +493,30 @@ def resolve_reviewer_authority(
     result = bot.github.get_issue_assignees_result(issue_number, is_pull_request=is_pull_request)
     _hard_fail_if_permission_denied(result, action="reviewer authority read", issue_number=issue_number)
     if not result.ok or not isinstance(result.payload, list):
-        return ReviewerAuthorityResolution(
-            authority_status="live_read_unavailable",
-            tracked_reviewer=tracked_reviewer,
-            live_control_plane_reviewers=(),
-            reason="live_read_unavailable",
-            is_pull_request=is_pull_request,
-            live_read_ok=False,
+        return derive_reviewer_authority_resolution(
+            ReviewControlPlaneSnapshot(
+                issue_number=issue_number,
+                is_pull_request=is_pull_request,
+                live_read_ok=False,
+                tracked_reviewer=tracked_reviewer if isinstance(tracked_reviewer, str) else None,
+                requested_reviewers=(),
+                assignees=(),
+                author_login=None,
+                review_decision=None,
+                head_sha=None,
+                snapshot_source="github_live_control_plane",
+                diagnostic_reason="live_read_unavailable",
+            )
         ).to_legacy_dict()
 
-    live_control_plane_reviewers = [value for value in result.payload if isinstance(value, str) and value.strip()]
-    if not isinstance(tracked_reviewer, str) or not tracked_reviewer.strip():
-        return ReviewerAuthorityResolution(
-            authority_status="no_tracked_reviewer",
-            tracked_reviewer=None,
-            live_control_plane_reviewers=tuple(live_control_plane_reviewers),
-            reason="retained_without_live_pr_review_request",
-            is_pull_request=is_pull_request,
-            live_read_ok=True,
-        ).to_legacy_dict()
-    normalized_reviewers = {value.lower() for value in live_control_plane_reviewers}
-    tracked_key = tracked_reviewer.lower()
-    if is_pull_request:
-        if normalized_reviewers and tracked_key not in normalized_reviewers:
-            return ReviewerAuthorityResolution(
-                authority_status="control_plane_mismatch",
-                tracked_reviewer=tracked_reviewer,
-                live_control_plane_reviewers=tuple(live_control_plane_reviewers),
-                reason="tracked_reviewer_missing_from_live_control_plane",
-                is_pull_request=True,
-                live_read_ok=True,
-            ).to_legacy_dict()
-        return ReviewerAuthorityResolution(
-            authority_status="tracked_reviewer_confirmed",
-            tracked_reviewer=tracked_reviewer,
-            live_control_plane_reviewers=tuple(live_control_plane_reviewers),
-            reason="present_in_live_control_plane" if normalized_reviewers else "retained_without_live_pr_review_request",
-            is_pull_request=True,
-            live_read_ok=True,
-        ).to_legacy_dict()
-
-    if len(live_control_plane_reviewers) != 1:
-        return ReviewerAuthorityResolution(
-            authority_status="control_plane_mismatch",
-            tracked_reviewer=tracked_reviewer,
-            live_control_plane_reviewers=tuple(live_control_plane_reviewers),
-            reason="invalid_live_assignee_count",
-            is_pull_request=False,
-            live_read_ok=True,
-        ).to_legacy_dict()
-    if tracked_key != live_control_plane_reviewers[0].lower():
-        return ReviewerAuthorityResolution(
-            authority_status="control_plane_mismatch",
-            tracked_reviewer=tracked_reviewer,
-            live_control_plane_reviewers=tuple(live_control_plane_reviewers),
-            reason="tracked_reviewer_missing_from_live_control_plane",
-            is_pull_request=False,
-            live_read_ok=True,
-        ).to_legacy_dict()
-    return ReviewerAuthorityResolution(
-        authority_status="tracked_reviewer_confirmed",
-        tracked_reviewer=tracked_reviewer,
-        live_control_plane_reviewers=tuple(live_control_plane_reviewers),
-        reason="present_in_live_control_plane",
-        is_pull_request=False,
-        live_read_ok=True,
-    ).to_legacy_dict()
+    live_control_plane_reviewers = tuple(value for value in result.payload if isinstance(value, str) and value.strip())
+    snapshot = _control_plane_snapshot_from_live_reviewers(
+        issue_number=issue_number,
+        is_pull_request=is_pull_request,
+        tracked_reviewer=tracked_reviewer if isinstance(tracked_reviewer, str) else None,
+        live_control_plane_reviewers=live_control_plane_reviewers,
+    )
+    return derive_reviewer_authority_resolution(snapshot).to_legacy_dict()
 
 
 def resolve_reviewer_command_authority(
