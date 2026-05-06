@@ -75,9 +75,12 @@ def parse_github_timestamp(value: Any) -> datetime | None:
     if not isinstance(value, str) or not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if timestamp.tzinfo is None:
+        return timestamp.replace(tzinfo=timezone.utc)
+    return timestamp.astimezone(timezone.utc)
 
 
 def projection_failure_result(reason: str, failure_kind: str | None = None) -> dict[str, object]:
@@ -174,7 +177,9 @@ def normalize_reviews_with_parsed_timestamps(reviews: list[dict], *, parse_times
 
 def _timestamp_value(value: object) -> datetime | None:
     if isinstance(value, datetime):
-        return value
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
     return parse_github_timestamp(value)
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.reviewer_bot_core.comment_routing_policy import PrCommentRouterOutcome
@@ -79,14 +79,15 @@ def derive_lifecycle_event_timestamp(
         selected = source_updated_at
         kind = "explicit_action_proxy"
         reason = f"{event_action}_uses_updated_at_proxy"
-    authoritative = isinstance(selected, str) and selected.strip() and _is_parseable_iso8601(selected)
+    normalized = _normalize_iso8601_timestamp(selected) if isinstance(selected, str) else None
+    authoritative = normalized is not None
     return LifecycleEventTimestampEvidence(
         event_name=event_name,
         event_action=event_action,
         source_created_at=source_created_at,
         source_updated_at=source_updated_at,
         source_closed_at=source_closed_at,
-        selected_timestamp=selected if authoritative else None,
+        selected_timestamp=normalized if authoritative else None,
         selection_kind=kind if authoritative else "blocked",
         selection_reason=reason if authoritative else "invalid_or_missing_timestamp",
         is_authoritative=bool(authoritative),
@@ -135,12 +136,21 @@ def parse_issue_labels(bot: EventInputsContext) -> list[str]:
     return list(_parse_labels(bot.get_config_value("ISSUE_LABELS", "[]")))
 
 
-def _is_parseable_iso8601(value: str) -> bool:
+def _normalize_iso8601_timestamp(value: str) -> str | None:
+    value = value.strip()
+    if not value:
+        return None
     try:
-        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return False
-    return True
+        return None
+    if timestamp.tzinfo is None:
+        return timestamp.replace(tzinfo=timezone.utc).isoformat()
+    return value
+
+
+def _is_parseable_iso8601(value: str) -> bool:
+    return _normalize_iso8601_timestamp(value) is not None
 
 
 def _raise_invalid(builder: str, problems: list[str]) -> None:
@@ -311,8 +321,12 @@ def build_comment_event_request(bot: EventInputsContext, *, issue_number: int | 
     comment_created_at = bot.get_config_value("COMMENT_CREATED_AT").strip()
     if not comment_created_at:
         problems.append("COMMENT_CREATED_AT must be non-empty")
-    elif not _is_parseable_iso8601(comment_created_at):
-        problems.append("COMMENT_CREATED_AT must be parseable ISO-8601")
+    else:
+        normalized_comment_created_at = _normalize_iso8601_timestamp(comment_created_at)
+        if normalized_comment_created_at is None:
+            problems.append("COMMENT_CREATED_AT must be parseable ISO-8601")
+        else:
+            comment_created_at = normalized_comment_created_at
     comment_source_event_key = bot.get_config_value("COMMENT_SOURCE_EVENT_KEY").strip()
     if not comment_source_event_key and comment_id > 0:
         comment_source_event_key = _derive_comment_source_event_key(bot, comment_id) or ""

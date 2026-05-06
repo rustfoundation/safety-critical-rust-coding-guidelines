@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 
 
@@ -525,7 +525,7 @@ def _recoverable_timestamp(payload: dict, field_names: tuple[str, ...]) -> str:
     except ValueError as exc:
         raise RuntimeError("Deferred context payload source event timestamp is not parseable ISO-8601") from exc
     if parsed.tzinfo is None:
-        raise RuntimeError("Deferred context payload source event timestamp must include timezone")
+        return parsed.replace(tzinfo=timezone.utc).isoformat()
     return timestamp
 
 

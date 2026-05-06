@@ -1,4 +1,6 @@
 
+from datetime import timezone
+
 from scripts.reviewer_bot_core import live_review_support
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
@@ -123,3 +125,11 @@ def test_parse_github_timestamp_rejects_invalid_values():
     assert live_review_support.parse_github_timestamp(None) is None
     assert live_review_support.parse_github_timestamp("") is None
     assert live_review_support.parse_github_timestamp("not-a-timestamp") is None
+
+
+def test_parse_github_timestamp_normalizes_timezone_less_values_to_utc():
+    parsed = live_review_support.parse_github_timestamp("2026-04-02T00:00:00")
+
+    assert parsed is not None
+    assert parsed.tzinfo == timezone.utc
+    assert parsed.isoformat() == "2026-04-02T00:00:00+00:00"

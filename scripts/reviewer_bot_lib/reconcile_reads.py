@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class ReconcileReadError(RuntimeError):
@@ -53,7 +53,7 @@ def _valid_exact_timestamp(value: object) -> str | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return None
+        return parsed.replace(tzinfo=timezone.utc).isoformat()
     return timestamp
 
 

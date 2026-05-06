@@ -419,6 +419,26 @@ def test_recover_deferred_payload_identity_builds_sanitized_payload_without_muta
     assert recovered.diagnostic_payload["source_event_created_at"] == "2026-03-17T10:00:00Z"
 
 
+def test_recover_deferred_payload_identity_normalizes_timezone_less_timestamp():
+    payload = issue_comment_payload(
+        pr_number=42,
+        comment_id=210,
+        source_event_key="issue_comment:210",
+        body="@guidelines-bot /queue",
+        comment_class="command_only",
+        has_non_command_text=False,
+        source_created_at="2026-03-17T10:00:00",
+        actor_login="bob",
+        source_run_id=610,
+        source_run_attempt=1,
+    )
+
+    recovered = reconcile_payloads.recover_deferred_payload_identity(payload)
+
+    assert recovered.source_event_created_at == "2026-03-17T10:00:00+00:00"
+    assert recovered.diagnostic_payload["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
+
+
 def test_recover_deferred_payload_identity_rejects_invalid_timestamp():
     payload = issue_comment_payload(
         pr_number=42,
