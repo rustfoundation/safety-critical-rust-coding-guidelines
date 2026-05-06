@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 
 from scripts.reviewer_bot_core import reviewer_response_policy
@@ -47,10 +49,18 @@ def test_pr264_canonical_replay_card_keeps_plain_lgtm_diagnostic_only(monkeypatc
         author_association="CONTRIBUTOR",
     )
 
-    assert harness.run(state) is False
+    before_state = deepcopy(state)
+
+    result = harness.handle_workflow_run_event_result(state)
+
+    assert result.state_changed is False
+    assert result.touched_items == [264]
+    assert state == before_state
     assert review["reviewer_comment"].get("accepted") is None
     assert "issue_comment:210" not in review["sidecars"]["reconciled_source_events"]
     assert "issue_comment:210" not in review["sidecars"]["deferred_gaps"]
+    assert all(call.method == "GET" for call in harness.github.request_calls)
+    assert harness.github.api_calls == []
 
     routes = RouteGitHubApi().add_request(
         "GET",

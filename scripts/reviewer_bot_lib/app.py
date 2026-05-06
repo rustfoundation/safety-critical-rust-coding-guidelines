@@ -461,6 +461,11 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             if manual_projection_policy is not None
             else True
         )
+        allow_status_label_sync = (
+            manual_projection_policy.allow_status_label_sync
+            if manual_projection_policy is not None
+            else True
+        )
         if (
             lock_required
             and event_name in {"schedule", "workflow_dispatch"}
@@ -560,7 +565,16 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
 
         maintenance.emit_pending_issue314_state_health_repair_summary(bot)
 
-        if touched_items:
+        if touched_items and not allow_status_label_sync:
+            _log(
+                bot,
+                "info",
+                "Skipping status-label sync because manual dispatch policy is read-only.",
+                manual_action=context.manual_action or "",
+                touched_items=touched_items,
+            )
+
+        if touched_items and allow_status_label_sync:
             if not lock_acquired:
                 raise RuntimeError(
                     "Status-label projection reached apply path without lease lock. "

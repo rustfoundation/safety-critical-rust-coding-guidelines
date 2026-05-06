@@ -445,6 +445,30 @@ def test_execute_run_persists_projection_repair_marker_after_projection_failure(
     assert saved_states[-1]["active_reviews"]["42"]["sidecars"]["repair_markers"]["status_label_projection"]["kind"] == "projection_failure"
 
 
+def test_execute_run_manual_read_only_policy_blocks_touched_status_label_sync(monkeypatch):
+    harness = AppHarness(monkeypatch)
+    harness.set_event(
+        EVENT_NAME="workflow_dispatch",
+        EVENT_ACTION="",
+        MANUAL_ACTION="preview-status-label-projection",
+        ISSUE_NUMBER=42,
+        VALIDATION_NONCE="nonce",
+    )
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+
+    def fake_manual_dispatch(state):
+        harness.runtime.collect_touched_item(42)
+        return False
+
+    harness.stub_handler("handle_manual_dispatch", fake_manual_dispatch)
+    harness.stub_sync_status_labels(lambda current, issue_numbers: pytest.fail("read-only manual policy must not sync labels"))
+
+    result = harness.run_execute()
+
+    assert result.exit_code == 0
+    assert result.state_changed is False
+
+
 def test_execute_run_returns_failure_when_lock_release_fails(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")

@@ -11,6 +11,7 @@ from .lifecycle import (
 )
 from .overdue import (
     backfill_transition_notice_if_present,
+    backfill_transition_warning_if_present,
     check_overdue_reviews,
     handle_overdue_review_warning,
 )
@@ -139,6 +140,16 @@ def _run_tracked_pr_maintenance(bot, state: dict) -> tuple[bool, list[int]]:
 
 def _run_overdue_pass(bot, state: dict) -> bool:
     changed = False
+    active_reviews = state.get("active_reviews")
+    if isinstance(active_reviews, dict):
+        for issue_key, review_data in active_reviews.items():
+            if not isinstance(review_data, dict):
+                continue
+            try:
+                issue_number = int(issue_key)
+            except ValueError:
+                continue
+            changed = backfill_transition_warning_if_present(bot, state, issue_number) or changed
     overdue_reviews = check_overdue_reviews(bot, state)
     for review in overdue_reviews:
         issue_number = review["issue_number"]

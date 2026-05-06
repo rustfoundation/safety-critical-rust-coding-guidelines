@@ -423,6 +423,18 @@ def test_reviewer_bot_workflows_use_shared_source_action_without_raw_extraction(
             assert "uses: ./.github/actions/reviewer-bot-source" in text
             assert "BOT_SRC_ROOT: ${{ steps.bot-source.outputs.bot-src-root }}" in text
 
+
+def test_reviewer_bot_source_action_validates_checkout_provenance():
+    action = Path(".github/actions/reviewer-bot-source/action.yml").read_text(encoding="utf-8")
+
+    assert 'git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel' in action
+    assert 'git -C "$GITHUB_WORKSPACE" rev-parse HEAD' in action
+    assert '"$checked_out_sha" != "$GITHUB_SHA"' in action
+    assert 'git -C "$GITHUB_WORKSPACE" config --get remote.origin.url' in action
+    assert '*"$GITHUB_REPOSITORY"*' in action
+    assert 'realpath "$GITHUB_WORKSPACE/scripts/reviewer_bot.py"' in action
+    assert "printf 'BOT_SRC_ROOT=%s\\n'" in action
+
 def test_workflow_summaries_and_runbook_references_exist():
     runbook = Path("docs/reviewer-bot-review-freshness-operator-runbook.md")
     assert runbook.exists()

@@ -10,8 +10,31 @@ runs:
     - id: source-root
       shell: bash
       run: |
+        workspace_root="$(git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel)"
+        if [ "$workspace_root" != "$GITHUB_WORKSPACE" ]; then
+          echo "reviewer-bot source checkout root does not match GITHUB_WORKSPACE" >&2
+          exit 1
+        fi
+        checked_out_sha="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+        if [ -n "${GITHUB_SHA:-}" ] && [ "$checked_out_sha" != "$GITHUB_SHA" ]; then
+          echo "reviewer-bot source checkout does not match GITHUB_SHA" >&2
+          exit 1
+        fi
+        remote_url="$(git -C "$GITHUB_WORKSPACE" config --get remote.origin.url || true)"
+        case "$remote_url" in
+          *"$GITHUB_REPOSITORY"*) ;;
+          *)
+            echo "reviewer-bot source checkout remote does not match GITHUB_REPOSITORY" >&2
+            exit 1
+            ;;
+        esac
         if [ ! -f "$GITHUB_WORKSPACE/scripts/reviewer_bot.py" ]; then
           echo "reviewer-bot source checkout is missing scripts/reviewer_bot.py" >&2
+          exit 1
+        fi
+        bot_entry="$(realpath "$GITHUB_WORKSPACE/scripts/reviewer_bot.py")"
+        if [ "$bot_entry" != "$GITHUB_WORKSPACE/scripts/reviewer_bot.py" ]; then
+          echo "reviewer-bot entrypoint must be a regular file inside the trusted checkout" >&2
           exit 1
         fi
         printf 'bot-src-root=%s\n' "$GITHUB_WORKSPACE" >> "$GITHUB_OUTPUT"
