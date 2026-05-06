@@ -71,7 +71,7 @@ def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping
     monkeypatch,
 ):
     state = make_state()
-    review = make_tracked_review_state(state, 42, reviewer="bob")
+    review = make_tracked_review_state(state, 42, reviewer="alice")
     _deferred_gaps(review)["pull_request_review:11"] = {"reason": "artifact_missing"}
     harness = ReconcileHarness(
         monkeypatch,
@@ -105,6 +105,78 @@ def test_handle_workflow_run_event_returns_true_for_submitted_review_bookkeeping
     assert "pull_request_review:11" not in _deferred_gaps(review)
 
 
+def test_submitted_review_replay_stale_live_head_records_gap_without_closeout(monkeypatch):
+    state = make_state()
+    review = make_tracked_review_state(state, 42, reviewer="alice")
+    _deferred_gaps(review)["pull_request_review:11"] = {"reason": "artifact_missing"}
+    harness = ReconcileHarness(
+        monkeypatch,
+        review_submitted_payload(
+            pr_number=42,
+            review_id=11,
+            source_event_key="pull_request_review:11",
+            source_submitted_at="2026-03-17T10:00:00Z",
+            source_review_state="COMMENTED",
+            source_commit_id="old-head",
+            actor_login="alice",
+            source_run_id=500,
+            source_run_attempt=2,
+        ),
+    )
+    harness.stub_review_rebuild(changed=False)
+    harness.stub_head_repair(changed=False)
+    harness.add_pull_request(pr_number=42, head_sha="new-head", author="dana")
+    harness.add_review(
+        pr_number=42,
+        review_id=11,
+        submitted_at="2026-03-17T10:00:00Z",
+        state="COMMENTED",
+        commit_id="old-head",
+        author="alice",
+    )
+
+    assert harness.run(state) is True
+    assert "pull_request_review:11" not in _reconciled_source_events(review)
+    assert review["sidecars"]["deferred_gaps"]["pull_request_review:11"]["failure_kind"] == "stale_head"
+    assert review.get("reviewer_review", {}).get("accepted") is None
+
+
+def test_submitted_review_replay_live_author_mismatch_records_gap_without_closeout(monkeypatch):
+    state = make_state()
+    review = make_tracked_review_state(state, 42, reviewer="alice")
+    _deferred_gaps(review)["pull_request_review:11"] = {"reason": "artifact_missing"}
+    harness = ReconcileHarness(
+        monkeypatch,
+        review_submitted_payload(
+            pr_number=42,
+            review_id=11,
+            source_event_key="pull_request_review:11",
+            source_submitted_at="2026-03-17T10:00:00Z",
+            source_review_state="COMMENTED",
+            source_commit_id="head-1",
+            actor_login="alice",
+            source_run_id=500,
+            source_run_attempt=2,
+        ),
+    )
+    harness.stub_review_rebuild(changed=False)
+    harness.stub_head_repair(changed=False)
+    harness.add_pull_request(pr_number=42, head_sha="head-1", author="dana")
+    harness.add_review(
+        pr_number=42,
+        review_id=11,
+        submitted_at="2026-03-17T10:00:00Z",
+        state="COMMENTED",
+        commit_id="head-1",
+        author="bob",
+    )
+
+    assert harness.run(state) is True
+    assert "pull_request_review:11" not in _reconciled_source_events(review)
+    assert review["sidecars"]["deferred_gaps"]["pull_request_review:11"]["failure_kind"] == "actor_mismatch"
+    assert review.get("reviewer_review", {}).get("accepted") is None
+
+
 def test_late_workflow_run_reconcile_missing_row_is_diagnostic_safe_noop(monkeypatch):
     state = make_state()
     harness = ReconcileHarness(
@@ -125,9 +197,10 @@ def test_late_workflow_run_reconcile_missing_row_is_diagnostic_safe_noop(monkeyp
 
     result = reconcile.handle_workflow_run_event_result(harness.runtime, state)
 
-    assert result == reconcile.WorkflowRunHandlerResult(False, [])
+    assert result == reconcile.WorkflowRunHandlerResult(True, [42])
     assert state["active_reviews"] == {}
-    assert harness.runtime.drain_touched_items() == []
+    orphan = state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]
+    assert orphan["recovery_status"] == "blocked_live_pr_unavailable"
 
 
 @pytest.mark.parametrize(
@@ -547,7 +620,7 @@ def test_deferred_comment_missing_live_object_preserves_source_time_freshness(mo
     )
 
     assert harness.run(state) is True
-    assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"]["semantic_key"] == "issue_comment:99"
+    assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"] is None
     gap = state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]["issue_comment:99"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
@@ -697,6 +770,7 @@ def test_deferred_review_comment_reconcile_records_contributor_freshness(monkeyp
             in_reply_to_id=200,
             source_run_id=701,
             source_run_attempt=1,
+            source_commit_id="head-1",
         ),
     )
     harness.add_pull_request(pr_number=42, author="dana", requested_reviewers=["alice"])
@@ -715,7 +789,7 @@ def test_deferred_review_comment_reconcile_records_contributor_freshness(monkeyp
     assert accepted["semantic_key"] == "pull_request_review_comment:301"
 
 
-def test_deferred_review_comment_reconcile_records_reviewer_freshness(monkeypatch):
+def test_deferred_review_comment_reconcile_keeps_reviewer_freshness_diagnostic_only(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="alice")
     live_body = "reviewer reply in thread"
@@ -736,6 +810,7 @@ def test_deferred_review_comment_reconcile_records_reviewer_freshness(monkeypatc
             in_reply_to_id=200,
             source_run_id=702,
             source_run_attempt=1,
+            source_commit_id="head-1",
         ),
     )
     harness.add_pull_request(pr_number=42, author="dana", requested_reviewers=["alice"])
@@ -748,8 +823,10 @@ def test_deferred_review_comment_reconcile_records_reviewer_freshness(monkeypatc
     )
     harness.runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
-    assert harness.run(state) is True
-    assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:302"
+    assert harness.run(state) is False
+    assert review["reviewer_comment"]["accepted"] is None
+    assert "pull_request_review_comment:302" not in _reconciled_source_events(review)
+    assert "pull_request_review_comment:302" not in _deferred_gaps(review)
 
 
 def test_deferred_review_comment_missing_live_object_preserves_source_time_freshness(monkeypatch):
@@ -785,7 +862,7 @@ def test_deferred_review_comment_missing_live_object_preserves_source_time_fresh
     harness.runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
-    assert review["reviewer_comment"]["accepted"]["semantic_key"] == "pull_request_review_comment:303"
+    assert review["reviewer_comment"]["accepted"] is None
     gap = _deferred_gaps(review)["pull_request_review_comment:303"]
     assert gap["reason"] == "reconcile_failed_closed"
     assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
@@ -1236,8 +1313,10 @@ def test_deferred_legacy_review_comment_hydrates_source_commit_id_from_live_comm
 
     assert harness.run(state) is True
     gap = _deferred_gaps(review)["pull_request_review_comment:305"]
-    assert gap["reason"] == "reconcile_failed_closed"
-    assert gap["source_commit_id"] == "head-1"
+    assert gap["reason"] == "artifact_invalid"
+    assert gap["failure_kind"] == "blocked_untrusted_source"
+    assert "trusted_legacy_identity" in gap["diagnostic_summary"]
+    assert review["reviewer_comment"]["accepted"] is None
 
 
 def test_deferred_legacy_review_comment_without_live_commit_id_records_artifact_invalid(monkeypatch):
@@ -1266,8 +1345,8 @@ def test_deferred_legacy_review_comment_without_live_commit_id_records_artifact_
     assert review["reviewer_comment"]["accepted"] is None
     gap = _deferred_gaps(review)["pull_request_review_comment:306"]
     assert gap["reason"] == "artifact_invalid"
-    assert gap["failure_kind"] == "invalid_payload"
-    assert "source_commit_id could not be recovered" in gap["diagnostic_summary"]
+    assert gap["failure_kind"] == "blocked_untrusted_source"
+    assert "trusted_legacy_identity" in gap["diagnostic_summary"]
     assert "source_commit_id" not in gap
 
 
@@ -1390,7 +1469,10 @@ def test_deferred_legacy_comment_reconcile_hydrates_live_pr_context_for_contribu
     harness.runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
 
     assert harness.run(state) is True
-    assert state["active_reviews"]["42"]["contributor_comment"]["accepted"]["semantic_key"] == "issue_comment:211"
+    gap = _deferred_gaps(state["active_reviews"]["42"])["issue_comment:211"]
+    assert gap["reason"] == "artifact_invalid"
+    assert gap["failure_kind"] == "blocked_untrusted_source"
+    assert state["active_reviews"]["42"]["contributor_comment"]["accepted"] is None
     assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"] is None
 
 
@@ -1550,7 +1632,7 @@ def test_c4c_reconcile_deletion_manifest_and_adapter_cleanup_are_explicit():
     assert "no longer resolves to exactly one command" not in module_text
     assert "reconcile_replay_policy.decide_comment_replay(" in module_text
     assert "reconcile_replay_policy.decide_review_submitted_replay(" in module_text
-    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay_plan(" in module_text
 
 
 def test_d2_reconcile_replay_path_stays_decode_read_apply_orchestration_only():
@@ -1565,4 +1647,4 @@ def test_d2_reconcile_replay_path_stays_decode_read_apply_orchestration_only():
     assert "clear_deferred_gap(" in module_text
     assert "reconcile_replay_policy.decide_comment_replay(" in module_text
     assert "reconcile_replay_policy.decide_review_submitted_replay(" in module_text
-    assert "reconcile_replay_policy.decide_review_dismissed_replay(" in module_text
+    assert "reconcile_replay_policy.decide_review_dismissed_replay_plan(" in module_text

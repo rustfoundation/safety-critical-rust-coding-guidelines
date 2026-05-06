@@ -103,6 +103,9 @@ def test_reconcile_replay_policy_covers_submitted_and_dismissed_review_rows():
         current_reviewer="alice",
         live_commit_id="head-1",
         live_submitted_at="2026-03-17T10:00:00Z",
+        current_head_sha="head-1",
+        live_state="COMMENTED",
+        live_visibility_status="visible",
     )
     dismissed = reconcile_replay_policy.decide_review_dismissed_replay(
         source_event_key="pull_request_review_dismissed:12",
@@ -115,12 +118,73 @@ def test_reconcile_replay_policy_covers_submitted_and_dismissed_review_rows():
     assert dismissed.clear_gap is True
 
 
+def test_submitted_review_replay_rejects_stale_live_head_without_closeout():
+    submitted = reconcile_replay_policy.decide_review_submitted_replay(
+        source_event_key="pull_request_review:11",
+        actor_login="alice",
+        current_reviewer="alice",
+        live_commit_id="old-head",
+        live_submitted_at="2026-03-17T10:00:00Z",
+        current_head_sha="new-head",
+        live_state="COMMENTED",
+        live_visibility_status="visible",
+    )
+
+    assert submitted.accept_reviewer_review is False
+    assert submitted.mark_reconciled is False
+    assert submitted.clear_gap is False
+    assert submitted.diagnostic_reason == "submitted_review_live_observation_untrusted"
+    assert submitted.failure_kind == "stale_head"
+
+
+def test_submitted_review_replay_rejects_untrusted_semantic_inputs_without_closeout():
+    unsupported = reconcile_replay_policy.decide_review_submitted_replay(
+        source_event_key="pull_request_review:11",
+        actor_login="alice",
+        current_reviewer="alice",
+        live_commit_id="head-1",
+        live_submitted_at="2026-03-17T10:00:00Z",
+        current_head_sha="head-1",
+        live_state="DISMISSED",
+        live_visibility_status="visible",
+    )
+    missing_timestamp = reconcile_replay_policy.decide_review_submitted_replay(
+        source_event_key="pull_request_review:11",
+        actor_login="alice",
+        current_reviewer="alice",
+        live_commit_id="head-1",
+        live_submitted_at=None,
+        current_head_sha="head-1",
+        live_state="COMMENTED",
+        live_visibility_status="visible",
+    )
+    blocked = reconcile_replay_policy.decide_review_submitted_replay(
+        source_event_key="pull_request_review:11",
+        actor_login="alice",
+        current_reviewer="alice",
+        live_commit_id="head-1",
+        live_submitted_at="2026-03-17T10:00:00Z",
+        current_head_sha="head-1",
+        live_state="COMMENTED",
+        live_visibility_status="visible",
+        replay_allowed=False,
+    )
+
+    assert unsupported.mark_reconciled is False
+    assert unsupported.clear_gap is False
+    assert unsupported.failure_kind == "unsupported_review_state"
+    assert missing_timestamp.failure_kind == "semantic_inputs_missing"
+    assert blocked.failure_kind == "replay_not_admitted"
+
+
 def test_h3_deferred_comment_replay_success_path_stays_policy_owned():
     reconcile_text = Path("scripts/reviewer_bot_lib/reconcile.py").read_text(encoding="utf-8")
     policy_text = Path("scripts/reviewer_bot_core/reconcile_replay_policy.py").read_text(encoding="utf-8")
 
     assert "if context.payload.comment_class in {\"command_only\", \"command_plus_text\"}:" not in reconcile_text
     assert "if decision.replay_comment_command:" in reconcile_text
-    assert "if decision.mark_reconciled:" in reconcile_text
-    assert "if decision.clear_gap:" in reconcile_text
+    assert "if (\n        decision.mark_reconciled" in reconcile_text
+    assert "if decision.clear_gap and admission.clear_gap_allowed:" in reconcile_text
+    assert "command_receipt.result == \"pass_replayed_and_persisted\"" in reconcile_text
+    assert "\"pass_diagnostic_only\"}" not in reconcile_text
     assert "def decide_comment_replay(" in policy_text

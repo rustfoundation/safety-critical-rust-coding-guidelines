@@ -24,12 +24,12 @@
     {
       "id": "awaiting_contributor_response_completion_missing",
       "state": "awaiting_contributor_response",
-      "reason": "completion_missing"
+      "reason": "assigned_reviewer_review_submitted"
     },
     {
       "id": "awaiting_write_approval_write_approval_missing",
-      "state": "awaiting_contributor_response",
-      "reason": "current_head_alternate_approval_present"
+      "state": "awaiting_reviewer_response",
+      "reason": "review_head_stale"
     },
     {
       "id": "projection_failed_pull_request_unavailable",

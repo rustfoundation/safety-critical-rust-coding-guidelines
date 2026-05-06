@@ -21,6 +21,7 @@ jobs:
           COMMIT_ID: ${{ github.event.review.commit_id }}
           REVIEW_AUTHOR: ${{ github.event.review.user.login }}
           REVIEW_AUTHOR_ID: ${{ github.event.review.user.id }}
+          SOURCE_DISMISSED_AT: ${{ github.event.review.dismissed_at }}
         run: |
           python - <<'PY'
           import json, os
@@ -36,6 +37,7 @@ jobs:
               'source_event_key': f"pull_request_review_dismissed:{os.environ['REVIEW_ID']}",
               'pr_number': int(os.environ['PR_NUMBER']),
               'review_id': int(os.environ['REVIEW_ID']),
+              'source_dismissed_at': os.environ['SOURCE_DISMISSED_AT'],
               'source_commit_id': os.environ['COMMIT_ID'],
               'actor_login': os.environ['REVIEW_AUTHOR'],
               'actor_id': int(os.environ['REVIEW_AUTHOR_ID']),

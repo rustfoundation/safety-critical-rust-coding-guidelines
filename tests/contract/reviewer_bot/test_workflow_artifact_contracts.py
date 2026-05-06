@@ -200,6 +200,7 @@ def test_pr_comment_router_workflow_payload_builder_emits_parseable_contract(mon
                 "GITHUB_RUN_ATTEMPT": "5",
                 "PR_NUMBER": "42",
                 "REVIEW_ID": "602",
+                "SOURCE_DISMISSED_AT": "2026-03-17T10:15:00Z",
                 "COMMIT_ID": "fedcba654321",
                 "REVIEW_AUTHOR": "maintainer1",
                 "REVIEW_AUTHOR_ID": "7003",
@@ -249,13 +250,13 @@ def test_observer_workflow_payload_builders_emit_parseable_contracts(
     assert parsed.raw_payload == fixture_payload
 
 
-def test_dismissed_review_payload_does_not_fabricate_source_dismissal_time_contract():
+def test_dismissed_review_payload_carries_source_dismissal_time_contract():
     payload = _load_fixture_payload("tests/fixtures/observer_payloads/workflow_pr_review_dismissed_deferred.json")
     matrix = json.loads(Path("tests/fixtures/workflow_contracts/observer_payload_contract_matrix.json").read_text(encoding="utf-8"))
     contract = next(item for item in matrix["payload_contracts"] if item["payload_kind"] == "deferred_review_dismissed")
 
-    assert "source_dismissed_at" not in contract["carried_edge_fields"]
-    assert "source_dismissed_at" not in payload
+    assert "source_dismissed_at" in contract["carried_edge_fields"]
+    assert payload["source_dismissed_at"] == "2026-03-17T10:15:00Z"
 
 
 @pytest.mark.parametrize(

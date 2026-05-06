@@ -222,17 +222,17 @@ def test_execute_run_non_success_workflow_run_reconcile_stays_read_only_and_non_
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_pass_until(lambda current: calls.append("pass_until") or (current, []))
     harness.stub_sync_members(lambda current: calls.append("sync_members") or (current, []))
-    monkeypatch.setattr(
-        reconcile,
-        "handle_workflow_run_event_result",
-        lambda bot, current: pytest.fail("non-success workflow_run must not enter reconcile"),
-    )
+    def fake_reconcile(bot, current):
+        calls.append("reconcile_diagnostic")
+        return reconcile.WorkflowRunHandlerResult(state_changed=False, touched_items=[])
+
+    monkeypatch.setattr(reconcile, "handle_workflow_run_event_result", fake_reconcile)
 
     result = harness.run_execute()
 
     assert result.exit_code == 0
     assert result.state_changed is False
-    assert calls == []
+    assert calls == ["lock_acquire", "pass_until", "sync_members", "reconcile_diagnostic", "lock_release"]
     assert harness.state_store.save_calls == []
     assert review["sidecars"]["deferred_gaps"] == {"pull_request_review:11": {"reason": "artifact_missing"}}
     assert review["sidecars"]["reconciled_source_events"] == {}
@@ -343,6 +343,9 @@ def test_execute_run_opened_issue_adopts_existing_single_live_assignee(monkeypat
     assert result.exit_code == 0
     assert result.state_changed is True
     assert saved[-1]["active_reviews"]["42"]["current_reviewer"] == "alice"
+    receipt = next(iter(saved[-1]["state_issue_write_receipts"].values()))
+    assert receipt["write_status"] == "persisted"
+    assert receipt["state_save_succeeded"] is True
 
 def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
     harness = AppHarness(monkeypatch)
@@ -358,6 +361,32 @@ def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
 
     assert result.exit_code == 1
     assert result.state_changed is True
+    receipt_logs = [record for record in harness.runtime.logger.records if record["message"] == "state issue write receipt"]
+    assert receipt_logs[-1]["fields"]["write_status"] == "failed_after_external_side_effect"
+    assert receipt_logs[-1]["fields"]["next_recovery_action"] == "recover_from_live_github_receipt"
+
+
+def test_execute_run_persists_recovery_receipt_after_initial_save_failure(monkeypatch):
+    harness = AppHarness(monkeypatch)
+    harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_comment_event", lambda state: True)
+    save_results = iter([False, True])
+    harness.stub_save_state(lambda state: next(save_results))
+
+    result = harness.run_execute()
+
+    assert result.exit_code == 1
+    assert len(harness.state_store.save_calls) == 2
+    receipts = harness.state_store.save_calls[-1]["state_issue_write_receipts"]
+    assert any(
+        receipt["write_status"] == "failed_after_external_side_effect"
+        and receipt["next_recovery_action"] == "recover_from_live_github_receipt"
+        for receipt in receipts.values()
+    )
 
 
 def test_execute_run_releases_lock_after_save_failure(monkeypatch):

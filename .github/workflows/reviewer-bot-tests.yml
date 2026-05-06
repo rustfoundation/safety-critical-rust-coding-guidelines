@@ -4,19 +4,25 @@ on:
   push:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_core/**'
       - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
       - 'tests/**'
       - '.github/workflows/reviewer-bot-*.yml'
+      - '.github/actions/reviewer-bot-source/action.yml'
       - 'pyproject.toml'
+      - 'uv.lock'
   pull_request:
     paths:
       - 'scripts/reviewer_bot.py'
+      - 'scripts/reviewer_bot_core/**'
       - 'scripts/reviewer_bot_lib/**'
       - 'scripts/*.py'
       - 'tests/**'
       - '.github/workflows/reviewer-bot-*.yml'
+      - '.github/actions/reviewer-bot-source/action.yml'
       - 'pyproject.toml'
+      - 'uv.lock'
   workflow_dispatch:
 
 jobs:
@@ -83,6 +89,7 @@ jobs:
           COVERAGE_FILE=artifacts/coverage/.coverage
           uv run pytest tests/unit/reviewer_bot tests/integration/reviewer_bot
           --cov=scripts.reviewer_bot
+          --cov=scripts.reviewer_bot_core
           --cov=scripts.reviewer_bot_lib
           --cov-branch
           --cov-report=term-missing

@@ -50,12 +50,118 @@ class ExecuteOrdinaryCommandDecision:
     needs_assignment_request: bool
 
 
+@dataclass(frozen=True)
+class AssignmentCommandAuthorization:
+    command_name: str
+    actor: str
+    issue_number: int
+    target: str | None
+    current_reviewer: str | None
+    is_assigned: bool
+    actor_permission: str
+    authorized: bool
+    reason: str
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "command_name": self.command_name,
+            "actor": self.actor,
+            "issue_number": self.issue_number,
+            "target": self.target,
+            "current_reviewer": self.current_reviewer,
+            "is_assigned": self.is_assigned,
+            "actor_permission": self.actor_permission,
+            "authorized": self.authorized,
+            "reason": self.reason,
+        }
+
+
 CommentCommandDecision = (
     IgnoreDecision
     | InlineResponseDecision
     | DeferPrivilegedHandoffDecision
     | ExecuteOrdinaryCommandDecision
 )
+
+
+def authorize_assignment_command(
+    command_name: str,
+    *,
+    actor: str,
+    issue_number: int,
+    target: str | None,
+    current_reviewer: str | None,
+    actor_permission: str,
+) -> AssignmentCommandAuthorization:
+    actor_login = actor.strip() if isinstance(actor, str) else ""
+    if not actor_login:
+        return AssignmentCommandAuthorization(
+            command_name=command_name,
+            actor="",
+            issue_number=issue_number,
+            target=target,
+            current_reviewer=current_reviewer,
+            is_assigned=False,
+            actor_permission="unknown",
+            authorized=False,
+            reason="missing_actor",
+        )
+    if not isinstance(issue_number, int) or issue_number <= 0:
+        return AssignmentCommandAuthorization(
+            command_name=command_name,
+            actor=actor_login,
+            issue_number=issue_number,
+            target=target,
+            current_reviewer=current_reviewer,
+            is_assigned=False,
+            actor_permission="unknown",
+            authorized=False,
+            reason="malformed_issue_number",
+        )
+    permission = actor_permission.strip().lower() if isinstance(actor_permission, str) else ""
+    if permission in {"", "unknown", "unavailable"}:
+        return AssignmentCommandAuthorization(
+            command_name=command_name,
+            actor=actor_login,
+            issue_number=issue_number,
+            target=target,
+            current_reviewer=current_reviewer,
+            is_assigned=False,
+            actor_permission=permission or "unknown",
+            authorized=False,
+            reason="permission_unavailable",
+        )
+    is_assigned = (
+        isinstance(current_reviewer, str)
+        and current_reviewer.strip()
+        and actor_login.lower() == current_reviewer.lower()
+    )
+    triage_or_better = permission in {"admin", "maintain", "write", "triage", "granted"}
+    if command_name == OrdinaryCommandId.ASSIGN_SPECIFIC.value:
+        authorized = triage_or_better
+        reason = "triage_override" if triage_or_better else "actor_not_authorized"
+    elif command_name in {OrdinaryCommandId.ASSIGN_FROM_QUEUE.value, "r?"}:
+        unassigned = not (isinstance(current_reviewer, str) and current_reviewer.strip())
+        authorized = triage_or_better or is_assigned
+        if not authorized and unassigned and (target or "").lower() == "producers":
+            authorized = True
+            reason = "unassigned_queue_request"
+        else:
+            reason = "triage_override" if triage_or_better else "assigned_reviewer_pass_semantics" if is_assigned else "actor_not_authorized"
+    else:
+        authorized = False
+        reason = "not_assignment_command"
+    return AssignmentCommandAuthorization(
+        command_name=command_name,
+        actor=actor_login,
+        issue_number=issue_number,
+        target=target,
+        current_reviewer=current_reviewer,
+        is_assigned=bool(is_assigned),
+        actor_permission=permission or "unknown",
+        authorized=authorized,
+        reason=reason,
+    )
 
 
 def decide_comment_command(bot, request, classified, *, actor_class: str, commands_help: str) -> CommentCommandDecision:

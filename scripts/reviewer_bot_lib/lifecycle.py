@@ -24,6 +24,26 @@ def _log(bot, level: str, message: str, **fields) -> None:
 
 
 @dataclass(frozen=True)
+class HeadObservation:
+    issue_number: int
+    live_state: str
+    live_head_sha: str | None
+    stored_head_sha: str | None
+    contributor_revision_head_sha: str | None
+
+
+@dataclass(frozen=True)
+class HeadObservationRepairDecision:
+    should_update_active_head: bool
+    should_record_contributor_revision: bool
+    should_clear_handoff: bool
+    should_clear_completion: bool
+    semantic_key: str | None
+    outcome: str
+    reason: str | None
+
+
+@dataclass(frozen=True)
 class HeadObservationRepairResult:
     changed: bool
     outcome: str
@@ -32,6 +52,65 @@ class HeadObservationRepairResult:
 
     def __bool__(self) -> bool:
         return self.changed
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "changed": self.changed,
+            "outcome": self.outcome,
+            "failure_kind": self.failure_kind,
+            "reason": self.reason,
+        }
+
+
+def derive_head_observation_repair_decision(observation: HeadObservation) -> HeadObservationRepairDecision:
+    if observation.live_state.lower() != "open":
+        return HeadObservationRepairDecision(False, False, False, False, None, "skipped_not_open", "pull_request_not_open")
+    if not observation.live_head_sha:
+        return HeadObservationRepairDecision(False, False, False, False, None, "invalid_live_payload", "pull_request_head_unavailable")
+    if observation.live_head_sha == observation.stored_head_sha:
+        return HeadObservationRepairDecision(False, False, False, False, None, "unchanged", None)
+    return HeadObservationRepairDecision(
+        should_update_active_head=True,
+        should_record_contributor_revision=observation.live_head_sha != observation.contributor_revision_head_sha,
+        should_clear_handoff=True,
+        should_clear_completion=True,
+        semantic_key=f"pull_request_head_observed:{observation.issue_number}:{observation.live_head_sha}",
+        outcome="changed",
+        reason="live_head_differs_from_stored_head",
+    )
+
+
+def apply_head_observation_repair(review_data: dict, decision: HeadObservationRepairDecision, *, timestamp: str) -> bool:
+    if not decision.should_update_active_head or decision.semantic_key is None:
+        return False
+    head_sha = decision.semantic_key.rsplit(":", 1)[-1]
+    changed = False
+    if decision.should_record_contributor_revision:
+        changed = accept_channel_event(
+            review_data,
+            "contributor_revision",
+            semantic_key=decision.semantic_key,
+            timestamp=timestamp,
+            reviewed_head_sha=head_sha,
+            source_precedence=0,
+        ) or changed
+    previous_head = review_data.get("active_head_sha")
+    review_data["active_head_sha"] = head_sha
+    changed = previous_head != head_sha or changed
+    if decision.should_clear_handoff:
+        changed = clear_current_cycle_reviewer_handoff(review_data) or changed
+    if decision.should_clear_completion:
+        for key in (
+            "current_cycle_completion",
+            "current_cycle_write_approval",
+            "review_completed_at",
+            "review_completed_by",
+            "review_completion_source",
+        ):
+            before = deepcopy(review_data.get(key))
+            review_data[key] = {} if key.startswith("current_cycle_") else None
+            changed = before != review_data.get(key) or changed
+    return changed
 
 
 def _now_iso() -> str:
@@ -500,29 +579,24 @@ def maybe_record_head_observation_repair(bot, issue_number: int, review_data: di
             reason="pull_request_head_unavailable",
         )
     head_sha = head_sha.strip()
-    current_head = review_data.get("active_head_sha")
-    if current_head == head_sha:
-        return HeadObservationRepairResult(changed=False, outcome="unchanged")
     contributor_revision = review_data.get("contributor_revision", {}).get("accepted")
-    if isinstance(contributor_revision, dict) and contributor_revision.get("reviewed_head_sha") == head_sha:
+    observation = HeadObservation(
+        issue_number=issue_number,
+        live_state=str(pull_request.get("state", "")),
+        live_head_sha=head_sha,
+        stored_head_sha=review_data.get("active_head_sha") if isinstance(review_data.get("active_head_sha"), str) else None,
+        contributor_revision_head_sha=(
+            contributor_revision.get("reviewed_head_sha") if isinstance(contributor_revision, dict) else None
+        ),
+    )
+    decision = derive_head_observation_repair_decision(observation)
+    if decision.outcome == "unchanged":
+        return HeadObservationRepairResult(changed=False, outcome="unchanged")
+    if not decision.should_record_contributor_revision:
         review_data["active_head_sha"] = head_sha
         clear_current_cycle_reviewer_handoff(review_data)
         return HeadObservationRepairResult(changed=True, outcome="changed")
-    changed = accept_channel_event(
-        review_data,
-        "contributor_revision",
-        semantic_key=f"pull_request_head_observed:{issue_number}:{head_sha}",
-        timestamp=_now_iso(),
-        reviewed_head_sha=head_sha,
-        source_precedence=0,
-    )
-    review_data["active_head_sha"] = head_sha
-    clear_current_cycle_reviewer_handoff(review_data)
-    review_data["current_cycle_completion"] = {}
-    review_data["current_cycle_write_approval"] = {}
-    review_data["review_completed_at"] = None
-    review_data["review_completed_by"] = None
-    review_data["review_completion_source"] = None
+    changed = apply_head_observation_repair(review_data, decision, timestamp=_now_iso())
     return HeadObservationRepairResult(changed=changed, outcome="changed" if changed else "unchanged")
 
 

@@ -164,7 +164,8 @@ def test_comment_application_delegates_freshness_decision_to_core_policy():
         module_text = handle.read()
 
     assert "comment_freshness_policy" in module_text
-    assert "decision = comment_freshness_policy.decide_comment_freshness(effective_review_data, request)" in module_text
+    assert "event = comment_freshness_policy.build_comment_freshness_event(effective_review_data, request)" in module_text
+    assert "decision = comment_freshness_policy.decide_comment_freshness_event(event, current_head_sha=current_head_sha)" in module_text
 
 
 def test_k2_comment_routing_entrypoints_use_narrow_comment_runtime_protocol():

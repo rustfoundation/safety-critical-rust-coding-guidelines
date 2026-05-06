@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from scripts.reviewer_bot_core import deferred_gap_diagnosis
@@ -12,7 +10,6 @@ from scripts.reviewer_bot_core import deferred_gap_diagnosis
 from . import deferred_gap_bookkeeping as gap_bookkeeping
 from . import retrying
 from . import sweeper_observer_correlation as observer_correlation
-from .config import REVIEW_FRESHNESS_RUNBOOK_PATH
 from .review_state import (
     get_current_cycle_boundary,
     semantic_key_seen,
@@ -33,24 +30,7 @@ def _github_repository(bot: SweeperContext) -> str:
 
 
 def _approval_pending_signature_from_runbook() -> dict | None:
-    runbook_path = Path(REVIEW_FRESHNESS_RUNBOOK_PATH)
-    if not runbook_path.exists():
-        return None
-    signature_prefix = "- exact accepted field/value signature:"
-    for line in runbook_path.read_text(encoding="utf-8").splitlines():
-        if not line.startswith(signature_prefix):
-            continue
-        raw = line.split(":", 1)[1].strip()
-        if not raw:
-            return None
-        if raw.startswith("`") and raw.endswith("`"):
-            raw = raw[1:-1]
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            return None
-        return parsed if isinstance(parsed, dict) else None
-    return None
+    return dict(deferred_gap_diagnosis.APPROVAL_PENDING_SIGNATURE)
 
 
 def parse_timestamp(value: Any) -> datetime | None:

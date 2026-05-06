@@ -30,6 +30,30 @@ class ReviewReplayDecision:
     actor_login: str | None
     mark_reconciled: bool
     clear_gap: bool
+    diagnostic_reason: str | None = None
+    failure_kind: str | None = None
+
+
+@dataclass(frozen=True)
+class DismissedReviewReplayPlan:
+    record_channel_event: bool
+    rebuild_live_approval: bool
+    mark_reconciled: bool
+    clear_gap: bool
+    replay_timestamp: str | None
+    diagnostic_reason: str | None
+    failure_kind: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "record_channel_event": self.record_channel_event,
+            "rebuild_live_approval": self.rebuild_live_approval,
+            "mark_reconciled": self.mark_reconciled,
+            "clear_gap": self.clear_gap,
+            "replay_timestamp": self.replay_timestamp,
+            "diagnostic_reason": self.diagnostic_reason,
+            "failure_kind": self.failure_kind,
+        }
 
 
 def decide_comment_replay(
@@ -127,15 +151,74 @@ def decide_comment_replay(
 def decide_review_submitted_replay(
     *,
     source_event_key: str,
-    actor_login: str,
+    actor_login: str | None,
     current_reviewer: str | None,
     live_commit_id: str | None,
     live_submitted_at: str | None,
+    current_head_sha: str | None = None,
+    live_state: str | None = None,
+    live_visibility_status: str | None = "visible",
+    replay_allowed: bool = True,
 ) -> ReviewReplayDecision:
-    actor_matches = isinstance(current_reviewer, str) and current_reviewer.lower() == actor_login.lower()
-    accept_reviewer_review = actor_matches and isinstance(live_commit_id, str) and isinstance(live_submitted_at, str)
+    del source_event_key
+    state = live_state.upper() if isinstance(live_state, str) else None
+    allowed_state = state in {"APPROVED", "COMMENTED", "CHANGES_REQUESTED"}
+    actor_key = actor_login.strip().lower() if isinstance(actor_login, str) else ""
+    current_reviewer_key = current_reviewer.strip().lower() if isinstance(current_reviewer, str) else ""
+    actor_matches = bool(actor_key and current_reviewer_key and actor_key == current_reviewer_key)
+    required_inputs_available = all(
+        isinstance(value, str) and value.strip()
+        for value in (actor_login, current_reviewer, live_commit_id, live_submitted_at, current_head_sha)
+    )
+    live_visible = live_visibility_status == "visible"
+    current_head_matches = isinstance(live_commit_id, str) and isinstance(current_head_sha, str) and live_commit_id == current_head_sha
+    if not replay_allowed:
+        return ReviewReplayDecision(
+            accept_reviewer_review=False,
+            accept_review_dismissal=False,
+            replay_timestamp=None,
+            reviewed_head_sha=None,
+            actor_login=actor_login,
+            mark_reconciled=False,
+            clear_gap=False,
+            diagnostic_reason="submitted_review_replay_not_admitted",
+            failure_kind="replay_not_admitted",
+        )
+    if not required_inputs_available:
+        return ReviewReplayDecision(
+            accept_reviewer_review=False,
+            accept_review_dismissal=False,
+            replay_timestamp=None,
+            reviewed_head_sha=None,
+            actor_login=actor_login,
+            mark_reconciled=False,
+            clear_gap=False,
+            diagnostic_reason="submitted_review_semantic_inputs_missing",
+            failure_kind="semantic_inputs_missing",
+        )
+    if not live_visible or not allowed_state or not current_head_matches or not actor_matches:
+        reason = "submitted_review_live_observation_untrusted"
+        if not current_head_matches:
+            failure_kind = "stale_head"
+        elif not allowed_state:
+            failure_kind = "unsupported_review_state"
+        elif not actor_matches:
+            failure_kind = "actor_mismatch"
+        else:
+            failure_kind = "live_review_untrusted"
+        return ReviewReplayDecision(
+            accept_reviewer_review=False,
+            accept_review_dismissal=False,
+            replay_timestamp=None,
+            reviewed_head_sha=None,
+            actor_login=actor_login,
+            mark_reconciled=False,
+            clear_gap=False,
+            diagnostic_reason=reason,
+            failure_kind=failure_kind,
+        )
     return ReviewReplayDecision(
-        accept_reviewer_review=accept_reviewer_review,
+        accept_reviewer_review=True,
         accept_review_dismissal=False,
         replay_timestamp=live_submitted_at,
         reviewed_head_sha=live_commit_id,
@@ -154,4 +237,43 @@ def decide_review_dismissed_replay(*, source_event_key: str, timestamp: str) -> 
         actor_login=None,
         mark_reconciled=True,
         clear_gap=True,
+    )
+
+
+def decide_review_dismissed_replay_plan(
+    *,
+    source_event_key: str,
+    dismissal_timestamp: str | None,
+    dismissal_exact: bool,
+    live_pr_readable: bool,
+) -> DismissedReviewReplayPlan:
+    del source_event_key
+    if not live_pr_readable:
+        return DismissedReviewReplayPlan(
+            record_channel_event=False,
+            rebuild_live_approval=False,
+            mark_reconciled=False,
+            clear_gap=False,
+            replay_timestamp=None,
+            diagnostic_reason="live_pr_unreadable",
+            failure_kind="live_pr_unreadable",
+        )
+    if not dismissal_exact or not isinstance(dismissal_timestamp, str) or not dismissal_timestamp.strip():
+        return DismissedReviewReplayPlan(
+            record_channel_event=False,
+            rebuild_live_approval=True,
+            mark_reconciled=False,
+            clear_gap=False,
+            replay_timestamp=None,
+            diagnostic_reason="dismissal_time_not_exact",
+            failure_kind="dismissal_time_unavailable",
+        )
+    return DismissedReviewReplayPlan(
+        record_channel_event=True,
+        rebuild_live_approval=True,
+        mark_reconciled=True,
+        clear_gap=True,
+        replay_timestamp=dismissal_timestamp,
+        diagnostic_reason=None,
+        failure_kind=None,
     )

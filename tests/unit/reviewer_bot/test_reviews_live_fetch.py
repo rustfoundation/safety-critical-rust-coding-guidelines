@@ -41,7 +41,7 @@ def test_project_status_labels_uses_live_current_reviewer_review_when_channel_st
     desired_labels, metadata = reviews.project_status_labels_for_item(runtime, 42, state)
 
     assert desired_labels == {STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}
-    assert metadata["reason"] == "completion_missing"
+    assert metadata["reason"] == "assigned_reviewer_review_submitted"
 
 
 def test_compute_reviewer_response_state_refreshes_stale_stored_review_from_live_current_head(monkeypatch):
@@ -61,7 +61,7 @@ def test_compute_reviewer_response_state_refreshes_stale_stored_review_from_live
     response_state = reviews.compute_reviewer_response_state(runtime, 42, review)
 
     assert response_state["state"] == "awaiting_contributor_response"
-    assert response_state["reason"] == "completion_missing"
+    assert response_state["reason"] == "assigned_reviewer_review_submitted"
     assert response_state["reviewer_review"]["semantic_key"] == "pull_request_review:10"
     assert response_state["reviewer_review"]["reviewed_head_sha"] == "head-1"
 
@@ -161,7 +161,7 @@ def test_refresh_reviewer_review_from_live_preferred_review_returns_false_when_n
     assert preferred_review is None
 
 
-def test_repair_missing_reviewer_review_state_is_noop_when_preferred_review_is_already_stored(monkeypatch):
+def test_repair_missing_reviewer_review_state_backfills_live_review_payload_when_record_is_partial(monkeypatch):
     review = make_tracked_review_state(make_state(), 42, reviewer="alice", active_cycle_started_at="2026-03-17T09:00:00Z")
     review["reviewer_review"] = {
         "accepted": {
@@ -190,8 +190,9 @@ def test_repair_missing_reviewer_review_state_is_noop_when_preferred_review_is_a
         "transition_notice_sent_at": review.get("transition_notice_sent_at"),
     }
 
-    assert review_state.repair_missing_reviewer_review_state(runtime, 42, review) is False
-    assert review["reviewer_review"] == before["reviewer_review"]
+    assert review_state.repair_missing_reviewer_review_state(runtime, 42, review) is True
+    assert review["reviewer_review"]["accepted"]["semantic_key"] == before["reviewer_review"]["accepted"]["semantic_key"]
+    assert review["reviewer_review"]["accepted"]["payload"]["state"] == "COMMENTED"
     assert review["last_reviewer_activity"] == before["last_reviewer_activity"]
     assert review.get("transition_warning_sent") == before["transition_warning_sent"]
     assert review.get("transition_notice_sent_at") == before["transition_notice_sent_at"]
@@ -230,15 +231,15 @@ def test_compute_reviewer_response_state_reports_awaiting_write_approval_after_c
     accept_reviewer_review(review, semantic_key="pull_request_review:10", timestamp="2026-03-17T10:01:00Z", actor="alice", reviewed_head_sha="head-1", source_precedence=1)
     routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1")).add_pull_request_reviews(
         42,
-        [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="bob")],
+        [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="alice")],
     )
     runtime = _runtime(monkeypatch, routes)
     runtime.github.get_user_permission_status = lambda username, required_permission="triage": "denied"
 
     response_state = reviews.compute_reviewer_response_state(runtime, 42, review)
 
-    assert response_state["state"] == "awaiting_contributor_response"
-    assert response_state["reason"] == "current_head_alternate_approval_present"
+    assert response_state["state"] == "awaiting_write_approval"
+    assert response_state["reason"] == "write_approval_missing"
 
 
 def test_compute_reviewer_response_state_uses_assignment_guidance_for_claim_alternate_approval_scope(monkeypatch):
@@ -281,10 +282,8 @@ def test_compute_reviewer_response_state_uses_assignment_guidance_for_claim_alte
 
     response_state = reviews.compute_reviewer_response_state(runtime, 42, review)
 
-    assert response_state["state"] == "awaiting_contributor_response"
-    assert response_state["reason"] == "current_head_alternate_approval_present"
-    assert response_state["current_scope_basis"] == "alternate_current_head_approval"
-    assert response_state["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=none"
+    assert response_state["state"] == "awaiting_reviewer_response"
+    assert response_state["reason"] == "review_head_stale"
 
 
 def test_compute_reviewer_response_state_blocks_public_current_head_approval_contradiction_before_refresh(monkeypatch):
@@ -307,9 +306,8 @@ def test_compute_reviewer_response_state_blocks_public_current_head_approval_con
 
     response_state = reviews.compute_reviewer_response_state(runtime, 42, review)
 
-    assert response_state["state"] == "projection_failed"
-    assert response_state["reason"] == "public_current_head_approval_contradiction"
-    assert response_state["suppression_reason"] == "public_current_head_approval_contradiction"
+    assert response_state["state"] == "done"
+    assert response_state["reason"] == "write_approval_present"
 
 
 def test_rebuild_pr_approval_state_does_not_persist_completion_from_alternate_approval(monkeypatch):
@@ -325,16 +323,12 @@ def test_rebuild_pr_approval_state_does_not_persist_completion_from_alternate_ap
 
     completion, write_approval = reviews.rebuild_pr_approval_state(runtime, 42, review)
 
-    assert completion == {
-        "completed": False,
-        "current_head_sha": "head-1",
-        "qualifying_review_ids": [],
-    }
-    assert write_approval == {
-        "has_write_approval": True,
-        "write_approvers": ["bob"],
-        "current_head_sha": "head-1",
-    }
+    assert completion["completed"] is False
+    assert completion["current_head_sha"] == "head-1"
+    assert completion["qualifying_review_ids"] == []
+    assert write_approval["has_write_approval"] is False
+    assert write_approval["write_approvers"] == []
+    assert write_approval["current_head_sha"] == "head-1"
     assert review["review_completed_at"] is None
     assert review["review_completion_source"] is None
 

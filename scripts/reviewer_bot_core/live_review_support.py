@@ -2,8 +2,65 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+
+
+@dataclass(frozen=True)
+class ReviewFreshnessClassification:
+    review_id: int | str
+    author: str | None
+    state: str | None
+    submitted_at: str | None
+    commit_id: str | None
+    classified_scope: str
+    is_assigned_reviewer: bool
+    is_current_head: bool
+    is_after_cycle_boundary: bool
+    is_dismissed_or_superseded: bool
+    diagnostic_reason: str | None
+    payload: dict[str, object]
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "review_id": self.review_id,
+            "author": self.author,
+            "state": self.state,
+            "submitted_at": self.submitted_at,
+            "commit_id": self.commit_id,
+            "classified_scope": self.classified_scope,
+            "is_assigned_reviewer": self.is_assigned_reviewer,
+            "is_current_head": self.is_current_head,
+            "is_after_cycle_boundary": self.is_after_cycle_boundary,
+            "is_dismissed_or_superseded": self.is_dismissed_or_superseded,
+            "diagnostic_reason": self.diagnostic_reason,
+            "payload": dict(self.payload),
+        }
+
+
+@dataclass(frozen=True)
+class CurrentReviewContext:
+    issue_number: int
+    current_head_sha: str | None
+    cycle_boundary: str | None
+    live_reviews_available: bool
+    live_reviews_failure_kind: str | None
+    classifications: tuple[ReviewFreshnessClassification, ...]
+
+    def to_output(self) -> dict[str, object]:
+        classifications = sorted(
+            self.classifications,
+            key=lambda item: (item.submitted_at or "", str(item.review_id), item.author or ""),
+        )
+        return {
+            "issue_number": self.issue_number,
+            "current_head_sha": self.current_head_sha,
+            "cycle_boundary": self.cycle_boundary,
+            "live_reviews_available": self.live_reviews_available,
+            "live_reviews_failure_kind": self.live_reviews_failure_kind,
+            "classifications": [item.to_output() for item in classifications],
+        }
 
 
 def get_current_cycle_boundary(review_data: dict, *, parse_timestamp) -> datetime | None:
@@ -115,6 +172,71 @@ def normalize_reviews_with_parsed_timestamps(reviews: list[dict], *, parse_times
     return normalized_reviews
 
 
+def _timestamp_value(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    return parse_github_timestamp(value)
+
+
+def classify_review_freshness(
+    review,
+    *,
+    current_head_sha: str | None,
+    cycle_boundary: object | None,
+    assigned_reviewer: str | None,
+) -> ReviewFreshnessClassification:
+    review_id = getattr(review, "review_id", None)
+    author = getattr(review, "author", None)
+    state = getattr(review, "state", None)
+    submitted_at = getattr(review, "submitted_at", None)
+    commit_id = getattr(review, "commit_id", None)
+    payload = getattr(review, "payload", {})
+    if not isinstance(payload, dict):
+        payload = {}
+    malformed = not review_id or not isinstance(state, str) or not state.strip()
+    is_dismissed = isinstance(state, str) and state.upper() == "DISMISSED"
+    submitted_dt = _timestamp_value(submitted_at)
+    boundary_dt = _timestamp_value(cycle_boundary)
+    is_after_boundary = boundary_dt is None or (submitted_dt is not None and submitted_dt >= boundary_dt)
+    is_current_head = isinstance(commit_id, str) and isinstance(current_head_sha, str) and commit_id.strip() == current_head_sha.strip()
+    is_assigned = isinstance(author, str) and isinstance(assigned_reviewer, str) and author.lower() == assigned_reviewer.lower()
+    if malformed:
+        scope = "malformed"
+        reason = "malformed_review_snapshot"
+    elif is_dismissed:
+        scope = "dismissed_or_superseded"
+        reason = "review_dismissed_or_superseded"
+    elif not is_after_boundary:
+        scope = "before_cycle"
+        reason = "review_before_cycle_boundary"
+    elif not is_current_head:
+        scope = "stale_head"
+        reason = "review_not_on_current_head"
+    elif is_assigned:
+        scope = "current_head_assigned_reviewer"
+        reason = None
+    elif isinstance(author, str) and author.strip():
+        scope = "current_head_alternate_reviewer"
+        reason = "alternate_reviewer_diagnostic_only"
+    else:
+        scope = "unknown"
+        reason = "unknown_review_author"
+    return ReviewFreshnessClassification(
+        review_id=review_id if isinstance(review_id, (int, str)) else "",
+        author=author if isinstance(author, str) and author.strip() else None,
+        state=state.upper() if isinstance(state, str) and state.strip() else None,
+        submitted_at=submitted_at if isinstance(submitted_at, str) and submitted_at.strip() else None,
+        commit_id=commit_id if isinstance(commit_id, str) and commit_id.strip() else None,
+        classified_scope=scope,
+        is_assigned_reviewer=is_assigned,
+        is_current_head=is_current_head,
+        is_after_cycle_boundary=is_after_boundary,
+        is_dismissed_or_superseded=is_dismissed,
+        diagnostic_reason=reason,
+        payload=payload,
+    )
+
+
 def filter_current_head_reviews_for_cycle(
     reviews: list[dict],
     *,
@@ -122,17 +244,27 @@ def filter_current_head_reviews_for_cycle(
     current_head: str,
 ) -> dict[str, dict]:
     survivors: dict[str, dict] = {}
+    from . import reviewer_review_helpers
+
     for review in reviews:
         if not isinstance(review, dict):
             continue
-        state = str(review.get("state", "")).upper()
-        if state == "DISMISSED":
+        snapshot = reviewer_review_helpers.build_review_snapshot_record(review)
+        if snapshot is None:
+            continue
+        classification = classify_review_freshness(
+            snapshot,
+            current_head_sha=current_head,
+            cycle_boundary=boundary,
+            assigned_reviewer=None,
+        )
+        if classification.classified_scope not in {
+            "current_head_assigned_reviewer",
+            "current_head_alternate_reviewer",
+        }:
             continue
         submitted_at = review.get("submitted_at")
-        if not isinstance(submitted_at, datetime) or submitted_at < boundary:
-            continue
-        commit_id = review.get("commit_id")
-        if not isinstance(commit_id, str) or not commit_id.strip() or commit_id.strip() != current_head:
+        if not isinstance(submitted_at, datetime):
             continue
         author = review.get("user", {}).get("login")
         if not isinstance(author, str) or not author.strip():
@@ -151,6 +283,57 @@ def filter_current_head_reviews_for_cycle(
         if candidate_key >= current_key:
             survivors[key] = review
     return survivors
+
+
+def build_current_review_context(
+    bot,
+    issue_number: int,
+    review_data: dict,
+    *,
+    pull_request: dict | None = None,
+    reviews: list[dict] | None = None,
+) -> CurrentReviewContext:
+    from . import reviewer_review_helpers
+
+    pull_request_result = read_pull_request_result(bot, issue_number, pull_request)
+    current_head_sha = None
+    if pull_request_result.get("ok"):
+        head = pull_request_result.get("pull_request", {}).get("head")
+        current_head_sha = head.get("sha") if isinstance(head, dict) else None
+    boundary = get_current_cycle_boundary(review_data, parse_timestamp=parse_github_timestamp)
+    cycle_boundary = boundary.isoformat() if isinstance(boundary, datetime) else None
+    reviews_result = read_pull_request_reviews_result(bot, issue_number, reviews)
+    if not reviews_result.get("ok"):
+        return CurrentReviewContext(
+            issue_number=issue_number,
+            current_head_sha=current_head_sha,
+            cycle_boundary=cycle_boundary,
+            live_reviews_available=False,
+            live_reviews_failure_kind=str(reviews_result.get("failure_kind") or reviews_result.get("reason") or "unavailable"),
+            classifications=(),
+        )
+    assigned_reviewer = review_data.get("current_reviewer") if isinstance(review_data.get("current_reviewer"), str) else None
+    classifications = []
+    for review in reviews_result.get("reviews", []):
+        snapshot = reviewer_review_helpers.build_review_snapshot_record(review)
+        if snapshot is None:
+            continue
+        classifications.append(
+            classify_review_freshness(
+                snapshot,
+                current_head_sha=current_head_sha,
+                cycle_boundary=cycle_boundary,
+                assigned_reviewer=assigned_reviewer,
+            )
+        )
+    return CurrentReviewContext(
+        issue_number=issue_number,
+        current_head_sha=current_head_sha if isinstance(current_head_sha, str) and current_head_sha.strip() else None,
+        cycle_boundary=cycle_boundary,
+        live_reviews_available=True,
+        live_reviews_failure_kind=None,
+        classifications=tuple(classifications),
+    )
 
 
 def collect_permission_statuses(survivors: dict[str, dict], *, permission_status) -> dict[str, str]:

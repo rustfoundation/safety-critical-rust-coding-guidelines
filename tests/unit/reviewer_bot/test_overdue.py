@@ -162,7 +162,7 @@ def test_check_overdue_reviews_suppresses_stale_reviewer_authority_and_records_d
     assert maintenance.check_overdue_reviews(runtime, state) == []
     marker = load_repair_marker(review, "assignment_confirm_read")
     assert marker is not None
-    assert marker["reason"] == "stored_reviewer_mismatch"
+    assert marker["reason"] == "tracked_reviewer_missing_from_live_control_plane"
 
 
 def test_handle_overdue_review_warning_only_records_successful_comment(monkeypatch):
@@ -457,8 +457,9 @@ def test_refresh_reviewer_review_from_live_preferred_review_does_not_clear_trans
 
     changed, preferred_review = review_state.refresh_reviewer_review_from_live_preferred_review(runtime, 42, review)
 
-    assert changed is False
+    assert changed is True
     assert preferred_review is not None
+    assert review["reviewer_review"]["accepted"]["payload"]["state"] == "COMMENTED"
     assert review["last_reviewer_activity"] == "2026-03-17T10:01:00Z"
     assert review["transition_warning_sent"] == "2026-04-01T12:12:04Z"
     assert review["transition_notice_sent_at"] == "2026-04-15T12:12:04Z"

@@ -277,7 +277,7 @@ def test_execute_run_workflow_run_deferred_review_comment_bookkeeping_only_recon
     ]
 
 
-def test_execute_run_workflow_run_missing_row_safe_noop_does_not_save_or_project(
+def test_execute_run_workflow_run_missing_row_records_orphan_then_projects(
     tmp_path, monkeypatch
 ):
     harness = AppHarness(monkeypatch)
@@ -321,10 +321,11 @@ def test_execute_run_workflow_run_missing_row_safe_noop_does_not_save_or_project
     result = harness.run_execute()
 
     assert result.exit_code == 0
-    assert result.state_changed is False
+    assert result.state_changed is True
     assert state["active_reviews"] == {}
-    assert save_snapshots == []
-    assert projected_issue_numbers == []
+    assert state["sidecars"]["orphaned_deferred_reconcile_events"]["pull_request_review_dismissed:12"]["recovery_status"] == "blocked_live_pr_unavailable"
+    assert save_snapshots
+    assert projected_issue_numbers == [42]
 
 
 def test_execute_run_workflow_run_closed_live_pr_safe_noop_does_not_save_or_project(

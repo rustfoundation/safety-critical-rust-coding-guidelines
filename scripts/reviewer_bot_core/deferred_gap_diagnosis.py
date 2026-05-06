@@ -9,6 +9,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+APPROVAL_PENDING_SIGNATURE = {
+    "status": "waiting",
+    "conclusion": None,
+    "name": "approval_pending",
+}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)

@@ -3,7 +3,159 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+
+
+@dataclass(frozen=True)
+class DeferredGap:
+    source_event_key: str
+    workflow_name: str | None
+    workflow_file: str | None
+    run_id: str | None
+    run_attempt: str | None
+    issue_number: int | None
+    source_event_action: str | None
+    failure_kind: str
+    diagnostic_reason: str | None
+    replay_allowed: bool
+    recorded_at: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "source_event_key": self.source_event_key,
+            "workflow_name": self.workflow_name,
+            "workflow_file": self.workflow_file,
+            "run_id": self.run_id,
+            "run_attempt": self.run_attempt,
+            "issue_number": self.issue_number,
+            "source_event_action": self.source_event_action,
+            "failure_kind": self.failure_kind,
+            "diagnostic_reason": self.diagnostic_reason,
+            "replay_allowed": self.replay_allowed,
+            "recorded_at": self.recorded_at,
+        }
+
+
+@dataclass(frozen=True)
+class ObserverWatermark:
+    workflow_name: str
+    workflow_file: str | None
+    run_id: str | None
+    run_attempt: str | None
+    conclusion: str | None
+    artifact_name: str | None
+    artifact_path: str | None
+    diagnostics_retained: bool
+    recorded_at: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "workflow_name": self.workflow_name,
+            "workflow_file": self.workflow_file,
+            "run_id": self.run_id,
+            "run_attempt": self.run_attempt,
+            "conclusion": self.conclusion,
+            "artifact_name": self.artifact_name,
+            "artifact_path": self.artifact_path,
+            "diagnostics_retained": self.diagnostics_retained,
+            "recorded_at": self.recorded_at,
+        }
+
+
+@dataclass(frozen=True)
+class ReconciledSourceEvent:
+    source_event_key: str
+    issue_number: int | None
+    source_event_action: str | None
+    replay_decision: str
+    mark_reconciled: bool
+    clear_gap: bool
+    reconciled_at: str | None
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "source_event_key": self.source_event_key,
+            "issue_number": self.issue_number,
+            "source_event_action": self.source_event_action,
+            "replay_decision": self.replay_decision,
+            "mark_reconciled": self.mark_reconciled,
+            "clear_gap": self.clear_gap,
+            "reconciled_at": self.reconciled_at,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+def _optional_str(value: object) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _optional_int(value: object) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def from_deferred_gap_state(row: dict[str, object]) -> DeferredGap:
+    return DeferredGap(
+        source_event_key=str(row.get("source_event_key") or ""),
+        workflow_name=_optional_str(row.get("workflow_name") or row.get("source_workflow_name")),
+        workflow_file=_optional_str(row.get("workflow_file") or row.get("source_workflow_file")),
+        run_id=str(row.get("source_run_id")) if row.get("source_run_id") is not None else None,
+        run_attempt=str(row.get("source_run_attempt")) if row.get("source_run_attempt") is not None else None,
+        issue_number=_optional_int(row.get("pr_number") or row.get("issue_number")),
+        source_event_action=_optional_str(row.get("source_event_kind") or row.get("source_event_action")),
+        failure_kind=str(row.get("failure_kind") or row.get("reason") or "unknown"),
+        diagnostic_reason=_optional_str(row.get("diagnostic_summary") or row.get("diagnostic_reason")),
+        replay_allowed=False,
+        recorded_at=_optional_str(row.get("last_checked_at") or row.get("first_noted_at")),
+    )
+
+
+def validate_deferred_gap(gap: DeferredGap) -> DeferredGap:
+    if not gap.source_event_key:
+        raise RuntimeError("DeferredGap.source_event_key must be non-empty")
+    return gap
+
+
+def from_observer_watermark_state(row: dict[str, object]) -> ObserverWatermark:
+    return ObserverWatermark(
+        workflow_name=str(row.get("workflow_name") or row.get("surface") or ""),
+        workflow_file=_optional_str(row.get("workflow_file")),
+        run_id=str(row.get("run_id")) if row.get("run_id") is not None else None,
+        run_attempt=str(row.get("run_attempt")) if row.get("run_attempt") is not None else None,
+        conclusion=_optional_str(row.get("conclusion")),
+        artifact_name=_optional_str(row.get("artifact_name")),
+        artifact_path=_optional_str(row.get("artifact_path")),
+        diagnostics_retained=bool(row.get("diagnostics_retained", False)),
+        recorded_at=_optional_str(row.get("last_scan_completed_at") or row.get("recorded_at")),
+    )
+
+
+def validate_observer_watermark(watermark: ObserverWatermark) -> ObserverWatermark:
+    if not watermark.workflow_name:
+        raise RuntimeError("ObserverWatermark.workflow_name must be non-empty")
+    return watermark
+
+
+def from_reconciled_source_event_state(row: dict[str, object]) -> ReconciledSourceEvent:
+    return ReconciledSourceEvent(
+        source_event_key=str(row.get("source_event_key") or ""),
+        issue_number=_optional_int(row.get("issue_number")),
+        source_event_action=_optional_str(row.get("source_event_action")),
+        replay_decision=str(row.get("replay_decision") or "pass_replayed_and_persisted"),
+        mark_reconciled=bool(row.get("mark_reconciled", True)),
+        clear_gap=bool(row.get("clear_gap", True)),
+        reconciled_at=_optional_str(row.get("reconciled_at")),
+        diagnostic_reason=_optional_str(row.get("diagnostic_reason")),
+    )
+
+
+def validate_reconciled_source_event(event: ReconciledSourceEvent) -> ReconciledSourceEvent:
+    if not event.source_event_key:
+        raise RuntimeError("ReconciledSourceEvent.source_event_key must be non-empty")
+    if event.mark_reconciled and not event.reconciled_at:
+        raise RuntimeError("ReconciledSourceEvent.reconciled_at is required when marked reconciled")
+    return event
 
 
 def _sidecars(review_data: dict) -> dict:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .config import CODING_GUIDELINE_LABEL
 from .guidance import (
     get_assignment_failure_comment,
@@ -16,6 +18,377 @@ from .review_state import (
     ensure_review_entry,
     set_current_reviewer,
 )
+
+
+@dataclass(frozen=True)
+class ReviewControlPlaneSnapshot:
+    issue_number: int
+    is_pull_request: bool
+    live_read_ok: bool
+    tracked_reviewer: str | None
+    requested_reviewers: tuple[str, ...]
+    assignees: tuple[str, ...]
+    author_login: str | None
+    review_decision: str | None
+    head_sha: str | None
+    snapshot_source: str
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "is_pull_request": self.is_pull_request,
+            "live_read_ok": self.live_read_ok,
+            "tracked_reviewer": self.tracked_reviewer,
+            "requested_reviewers": sorted(self.requested_reviewers),
+            "assignees": sorted(self.assignees),
+            "author_login": self.author_login,
+            "review_decision": self.review_decision,
+            "head_sha": self.head_sha,
+            "snapshot_source": self.snapshot_source,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+    def to_legacy_dict(self) -> dict[str, object]:
+        return self.to_output()
+
+
+@dataclass(frozen=True)
+class ReviewerAuthorityResolution:
+    authority_status: str
+    tracked_reviewer: str | None
+    live_control_plane_reviewers: tuple[str, ...]
+    reason: str
+    is_pull_request: bool
+    live_read_ok: bool
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "authority_status": self.authority_status,
+            "tracked_reviewer": self.tracked_reviewer,
+            "live_control_plane_reviewers": sorted(self.live_control_plane_reviewers),
+            "reason": self.reason,
+            "is_pull_request": self.is_pull_request,
+            "live_read_ok": self.live_read_ok,
+        }
+
+    def to_legacy_dict(self) -> dict[str, object]:
+        return self.to_output()
+
+
+@dataclass(frozen=True)
+class ClaimCycleTransition:
+    issue_number: int
+    reviewer: str
+    previous_reviewer: str | None
+    cycle_started_at: str
+    assigned_at_before: str | None
+    assigned_at_after: str | None
+    same_reviewer_noop: bool
+    state_changed: bool
+    guidance_emitted: bool
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "reviewer": self.reviewer,
+            "previous_reviewer": self.previous_reviewer,
+            "cycle_started_at": self.cycle_started_at,
+            "assigned_at_before": self.assigned_at_before,
+            "assigned_at_after": self.assigned_at_after,
+            "same_reviewer_noop": self.same_reviewer_noop,
+            "state_changed": self.state_changed,
+            "guidance_emitted": self.guidance_emitted,
+        }
+
+
+@dataclass(frozen=True)
+class ReviewerAssignmentConfirmation:
+    issue_number: int
+    reviewer: str
+    is_pull_request: bool
+    assignment_method: str
+    previous_reviewer: str | None
+    live_before: tuple[str, ...]
+    live_after: tuple[str, ...] | None
+    assignment_attempt_status_code: int | None
+    assignment_attempt_failure_kind: str | None
+    assignment_write_status: str
+    state_tracking_allowed: bool
+    set_current_reviewer: bool
+    clear_current_reviewer: bool
+    same_reviewer_noop: bool
+    guidance_emitted: bool
+    failure_comment: str | None
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "issue_number": self.issue_number,
+            "reviewer": self.reviewer,
+            "is_pull_request": self.is_pull_request,
+            "assignment_method": self.assignment_method,
+            "previous_reviewer": self.previous_reviewer,
+            "live_before": sorted(self.live_before),
+            "live_after": sorted(self.live_after) if self.live_after is not None else None,
+            "assignment_attempt_status_code": self.assignment_attempt_status_code,
+            "assignment_attempt_failure_kind": self.assignment_attempt_failure_kind,
+            "assignment_write_status": self.assignment_write_status,
+            "state_tracking_allowed": self.state_tracking_allowed,
+            "set_current_reviewer": self.set_current_reviewer,
+            "clear_current_reviewer": self.clear_current_reviewer,
+            "same_reviewer_noop": self.same_reviewer_noop,
+            "guidance_emitted": self.guidance_emitted,
+            "failure_comment": self.failure_comment,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+def _tuple_logins(values) -> tuple[str, ...]:
+    if not isinstance(values, (list, tuple, set)):
+        return ()
+    return tuple(str(value) for value in values if isinstance(value, str) and value.strip())
+
+
+def build_review_control_plane_snapshot(issue_snapshot: dict, *, tracked_reviewer: str | None) -> ReviewControlPlaneSnapshot:
+    issue_number = int(issue_snapshot.get("number") or issue_snapshot.get("issue_number") or 0)
+    pull_request = issue_snapshot.get("pull_request")
+    is_pull_request = isinstance(pull_request, dict)
+    requested = issue_snapshot.get("requested_reviewers") or issue_snapshot.get("review_requests") or ()
+    requested_reviewers = tuple(
+        str(item.get("login") if isinstance(item, dict) else item)
+        for item in requested
+        if isinstance(item, (dict, str))
+    )
+    assignees = tuple(
+        str(item.get("login") if isinstance(item, dict) else item)
+        for item in issue_snapshot.get("assignees", ())
+        if isinstance(item, (dict, str))
+    )
+    author = issue_snapshot.get("user")
+    head = issue_snapshot.get("head")
+    return ReviewControlPlaneSnapshot(
+        issue_number=issue_number,
+        is_pull_request=is_pull_request,
+        live_read_ok=True,
+        tracked_reviewer=tracked_reviewer,
+        requested_reviewers=tuple(value for value in requested_reviewers if value.strip()),
+        assignees=tuple(value for value in assignees if value.strip()),
+        author_login=author.get("login") if isinstance(author, dict) and isinstance(author.get("login"), str) else None,
+        review_decision=issue_snapshot.get("reviewDecision") if isinstance(issue_snapshot.get("reviewDecision"), str) else None,
+        head_sha=head.get("sha") if isinstance(head, dict) and isinstance(head.get("sha"), str) else None,
+        snapshot_source="github_live_snapshot",
+        diagnostic_reason=None,
+    )
+
+
+def derive_reviewer_authority_resolution(snapshot: ReviewControlPlaneSnapshot) -> ReviewerAuthorityResolution:
+    tracked_reviewer = snapshot.tracked_reviewer
+    live_control_plane_reviewers = snapshot.requested_reviewers if snapshot.is_pull_request else snapshot.assignees
+    if not snapshot.live_read_ok:
+        return ReviewerAuthorityResolution(
+            authority_status="live_read_unavailable",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason=snapshot.diagnostic_reason or "live_read_unavailable",
+            is_pull_request=snapshot.is_pull_request,
+            live_read_ok=False,
+        )
+    if not isinstance(tracked_reviewer, str) or not tracked_reviewer.strip():
+        return ReviewerAuthorityResolution(
+            authority_status="no_tracked_reviewer",
+            tracked_reviewer=None,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="retained_without_live_pr_review_request",
+            is_pull_request=snapshot.is_pull_request,
+            live_read_ok=True,
+        )
+    normalized_reviewers = {value.lower() for value in live_control_plane_reviewers}
+    tracked_key = tracked_reviewer.lower()
+    if snapshot.is_pull_request:
+        if normalized_reviewers and tracked_key not in normalized_reviewers:
+            return ReviewerAuthorityResolution(
+                authority_status="control_plane_mismatch",
+                tracked_reviewer=tracked_reviewer,
+                live_control_plane_reviewers=live_control_plane_reviewers,
+                reason="tracked_reviewer_missing_from_live_control_plane",
+                is_pull_request=True,
+                live_read_ok=True,
+            )
+        return ReviewerAuthorityResolution(
+            authority_status="tracked_reviewer_confirmed",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="present_in_live_control_plane" if normalized_reviewers else "retained_without_live_pr_review_request",
+            is_pull_request=True,
+            live_read_ok=True,
+        )
+
+    if len(live_control_plane_reviewers) != 1:
+        return ReviewerAuthorityResolution(
+            authority_status="control_plane_mismatch",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="invalid_live_assignee_count",
+            is_pull_request=False,
+            live_read_ok=True,
+        )
+    if tracked_key != live_control_plane_reviewers[0].lower():
+        return ReviewerAuthorityResolution(
+            authority_status="control_plane_mismatch",
+            tracked_reviewer=tracked_reviewer,
+            live_control_plane_reviewers=live_control_plane_reviewers,
+            reason="tracked_reviewer_missing_from_live_control_plane",
+            is_pull_request=False,
+            live_read_ok=True,
+        )
+    return ReviewerAuthorityResolution(
+        authority_status="tracked_reviewer_confirmed",
+        tracked_reviewer=tracked_reviewer,
+        live_control_plane_reviewers=live_control_plane_reviewers,
+        reason="present_in_live_control_plane",
+        is_pull_request=False,
+        live_read_ok=True,
+    )
+
+
+def _control_plane_snapshot_from_live_reviewers(
+    *,
+    issue_number: int,
+    is_pull_request: bool,
+    tracked_reviewer: str | None,
+    live_control_plane_reviewers: tuple[str, ...],
+) -> ReviewControlPlaneSnapshot:
+    issue_snapshot: dict[str, object] = {"number": issue_number}
+    if is_pull_request:
+        issue_snapshot["pull_request"] = {}
+        issue_snapshot["requested_reviewers"] = list(live_control_plane_reviewers)
+    else:
+        issue_snapshot["assignees"] = list(live_control_plane_reviewers)
+    return build_review_control_plane_snapshot(issue_snapshot, tracked_reviewer=tracked_reviewer)
+
+
+def derive_claim_cycle_transition(review_data: dict | None, *, issue_number: int, reviewer: str, now: str) -> ClaimCycleTransition:
+    previous = review_data.get("current_reviewer") if isinstance(review_data, dict) else None
+    assigned_before = review_data.get("assigned_at") if isinstance(review_data, dict) and isinstance(review_data.get("assigned_at"), str) else None
+    same_reviewer = isinstance(previous, str) and previous.lower() == reviewer.lower()
+    return ClaimCycleTransition(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        previous_reviewer=previous if isinstance(previous, str) else None,
+        cycle_started_at=now,
+        assigned_at_before=assigned_before,
+        assigned_at_after=assigned_before if same_reviewer else now,
+        same_reviewer_noop=same_reviewer,
+        state_changed=not same_reviewer,
+        guidance_emitted=not same_reviewer,
+    )
+
+
+def derive_reviewer_assignment_confirmation(
+    request,
+    *,
+    reviewer: str,
+    assignment_method: str,
+    previous_reviewer: str | None,
+    live_before: tuple[str, ...] | None,
+    live_after: tuple[str, ...] | None,
+    assignment_attempt: object | None,
+    removal_attempts: dict[str, object],
+    same_reviewer_noop: bool,
+    guidance_emitted: bool,
+) -> ReviewerAssignmentConfirmation:
+    del removal_attempts
+    status_code = getattr(assignment_attempt, "status_code", None)
+    failure_kind = getattr(assignment_attempt, "failure_kind", None)
+    before = live_before or ()
+    after = live_after
+    reviewer_key = reviewer.lower()
+    before_has = reviewer_key in {value.lower() for value in before}
+    after_has = reviewer_key in {value.lower() for value in after or ()}
+    if same_reviewer_noop or before_has and after is not None and after_has:
+        write_status = "already_live_assigned"
+        state_tracking_allowed = True
+        set_current = not same_reviewer_noop
+        diagnostic = None
+    elif after is None:
+        write_status = "blocked_live_read_unavailable"
+        state_tracking_allowed = False
+        set_current = False
+        diagnostic = "live_assignment_confirmation_unavailable"
+    elif after_has and len(after) == 1:
+        write_status = "live_assignment_confirmed"
+        state_tracking_allowed = True
+        set_current = True
+        diagnostic = None
+    elif status_code == 422 and request.is_pull_request:
+        write_status = "state_tracked_after_api_422"
+        state_tracking_allowed = True
+        set_current = True
+        diagnostic = "pr_reviewer_api_422_retained_tracked_state"
+    elif request.is_pull_request and not after:
+        write_status = "state_tracked_without_live_request"
+        state_tracking_allowed = True
+        set_current = True
+        diagnostic = "absent_live_pr_review_request_retained"
+    else:
+        write_status = "blocked_final_mismatch"
+        state_tracking_allowed = False
+        set_current = False
+        diagnostic = "live_control_plane_final_mismatch"
+    return ReviewerAssignmentConfirmation(
+        issue_number=request.issue_number,
+        reviewer=reviewer,
+        is_pull_request=bool(request.is_pull_request),
+        assignment_method=assignment_method,
+        previous_reviewer=previous_reviewer,
+        live_before=before,
+        live_after=after,
+        assignment_attempt_status_code=status_code,
+        assignment_attempt_failure_kind=failure_kind,
+        assignment_write_status=write_status,
+        state_tracking_allowed=state_tracking_allowed,
+        set_current_reviewer=set_current,
+        clear_current_reviewer=write_status == "blocked_final_mismatch" and not request.is_pull_request,
+        same_reviewer_noop=same_reviewer_noop,
+        guidance_emitted=guidance_emitted,
+        failure_comment=None,
+        diagnostic_reason=diagnostic,
+    )
+
+
+def apply_reviewer_assignment_confirmation(
+    bot,
+    state: dict,
+    request,
+    confirmation: ReviewerAssignmentConfirmation,
+    *,
+    pr_head_sha: str | None,
+    record_assignment: bool,
+    emit_guidance: bool,
+) -> bool:
+    if confirmation.same_reviewer_noop or not confirmation.state_tracking_allowed:
+        return False
+    if confirmation.clear_current_reviewer:
+        return clear_current_reviewer(state, confirmation.issue_number)
+    if not confirmation.set_current_reviewer:
+        return False
+    set_current_reviewer(
+        state,
+        confirmation.issue_number,
+        confirmation.reviewer,
+        assignment_method=confirmation.assignment_method,
+        at=_now_iso(bot),
+    )
+    review_data = ensure_review_entry(state, confirmation.issue_number, create=True)
+    if request.is_pull_request and isinstance(review_data, dict) and isinstance(pr_head_sha, str) and pr_head_sha:
+        review_data["active_head_sha"] = pr_head_sha
+    if record_assignment:
+        bot.adapters.queue.record_assignment(state, confirmation.reviewer, confirmation.issue_number, "pr" if request.is_pull_request else "issue")
+    if emit_guidance:
+        _post_assignment_guidance(bot, request, confirmation.reviewer)
+    bot.collect_touched_item(confirmation.issue_number)
+    return True
 
 
 def _log(bot, level: str, message: str, **fields) -> None:
@@ -120,58 +493,30 @@ def resolve_reviewer_authority(
     result = bot.github.get_issue_assignees_result(issue_number, is_pull_request=is_pull_request)
     _hard_fail_if_permission_denied(result, action="reviewer authority read", issue_number=issue_number)
     if not result.ok or not isinstance(result.payload, list):
-        return {
-            "authority_status": "live_read_unavailable",
-            "tracked_reviewer": tracked_reviewer,
-            "live_control_plane_reviewers": [],
-            "reason": str(result.failure_kind or "live_control_plane_unavailable"),
-        }
+        return derive_reviewer_authority_resolution(
+            ReviewControlPlaneSnapshot(
+                issue_number=issue_number,
+                is_pull_request=is_pull_request,
+                live_read_ok=False,
+                tracked_reviewer=tracked_reviewer if isinstance(tracked_reviewer, str) else None,
+                requested_reviewers=(),
+                assignees=(),
+                author_login=None,
+                review_decision=None,
+                head_sha=None,
+                snapshot_source="github_live_control_plane",
+                diagnostic_reason="live_read_unavailable",
+            )
+        ).to_legacy_dict()
 
-    live_control_plane_reviewers = [value for value in result.payload if isinstance(value, str) and value.strip()]
-    if not isinstance(tracked_reviewer, str) or not tracked_reviewer.strip():
-        return {
-            "authority_status": "no_tracked_reviewer",
-            "tracked_reviewer": None,
-            "live_control_plane_reviewers": live_control_plane_reviewers,
-            "reason": "no_tracked_reviewer",
-        }
-    normalized_reviewers = {value.lower() for value in live_control_plane_reviewers}
-    tracked_key = tracked_reviewer.lower()
-    if is_pull_request:
-        if normalized_reviewers and tracked_key not in normalized_reviewers:
-            return {
-                "authority_status": "control_plane_mismatch",
-                "tracked_reviewer": tracked_reviewer,
-                "live_control_plane_reviewers": live_control_plane_reviewers,
-                "reason": "tracked_reviewer_missing_from_live_control_plane",
-            }
-        return {
-            "authority_status": "tracked_reviewer_confirmed",
-            "tracked_reviewer": tracked_reviewer,
-            "live_control_plane_reviewers": live_control_plane_reviewers,
-            "reason": "tracked_reviewer_confirmed",
-        }
-
-    if len(live_control_plane_reviewers) != 1:
-        return {
-            "authority_status": "control_plane_mismatch",
-            "tracked_reviewer": tracked_reviewer,
-            "live_control_plane_reviewers": live_control_plane_reviewers,
-            "reason": "invalid_live_assignee_count",
-        }
-    if tracked_key != live_control_plane_reviewers[0].lower():
-        return {
-            "authority_status": "control_plane_mismatch",
-            "tracked_reviewer": tracked_reviewer,
-            "live_control_plane_reviewers": live_control_plane_reviewers,
-            "reason": "stored_reviewer_mismatch",
-        }
-    return {
-        "authority_status": "tracked_reviewer_confirmed",
-        "tracked_reviewer": tracked_reviewer,
-        "live_control_plane_reviewers": live_control_plane_reviewers,
-        "reason": "tracked_reviewer_confirmed",
-    }
+    live_control_plane_reviewers = tuple(value for value in result.payload if isinstance(value, str) and value.strip())
+    snapshot = _control_plane_snapshot_from_live_reviewers(
+        issue_number=issue_number,
+        is_pull_request=is_pull_request,
+        tracked_reviewer=tracked_reviewer if isinstance(tracked_reviewer, str) else None,
+        live_control_plane_reviewers=live_control_plane_reviewers,
+    )
+    return derive_reviewer_authority_resolution(snapshot).to_legacy_dict()
 
 
 def resolve_reviewer_command_authority(
@@ -335,6 +680,30 @@ def confirm_reviewer_assignment(
             "current_assignees": live_before,
             "diagnostic_changed": diagnostic_changed,
         }
+    if (
+        isinstance(stored_reviewer, str)
+        and stored_reviewer.lower() == reviewer.lower()
+        and _normalize_logins(live_before) == [reviewer.lower()]
+    ):
+        return {
+            "confirmed": True,
+            "reviewer": reviewer,
+            "current_assignees": live_before,
+            "final_assignees": live_before,
+            "assignment_confirmation": derive_reviewer_assignment_confirmation(
+                request,
+                reviewer=reviewer,
+                assignment_method=assignment_method,
+                previous_reviewer=stored_reviewer,
+                live_before=tuple(live_before),
+                live_after=tuple(live_before),
+                assignment_attempt=None,
+                removal_attempts={},
+                same_reviewer_noop=True,
+                guidance_emitted=False,
+            ).to_output(),
+            "diagnostic_changed": diagnostic_changed,
+        }
     removal_attempts = {}
     live_before_normalized = _normalize_logins(live_before)
     for assignee in live_before:
@@ -394,28 +763,40 @@ def confirm_reviewer_assignment(
             "diagnostic_changed": diagnostic_changed,
         }
     final_normalized = _normalize_logins(final_assignees)
-    if len(final_assignees) == 1 and final_normalized[0] == reviewer.lower():
-        set_current_reviewer(
+    confirmation = derive_reviewer_assignment_confirmation(
+        request,
+        reviewer=reviewer,
+        assignment_method=assignment_method,
+        previous_reviewer=stored_reviewer if isinstance(stored_reviewer, str) else None,
+        live_before=tuple(live_before),
+        live_after=tuple(final_assignees),
+        assignment_attempt=assignment_attempt,
+        removal_attempts=removal_attempts,
+        same_reviewer_noop=False,
+        guidance_emitted=emit_guidance,
+    )
+    if confirmation.state_tracking_allowed and confirmation.set_current_reviewer:
+        state_changed = apply_reviewer_assignment_confirmation(
+            bot,
             state,
-            issue_number,
-            reviewer,
-            assignment_method=assignment_method,
-            at=cycle_started_at or _now_iso(bot),
+            request,
+            confirmation,
+            pr_head_sha=pr_head_sha,
+            record_assignment=record_assignment,
+            emit_guidance=emit_guidance,
         )
         review_data = ensure_review_entry(state, issue_number, create=True)
-        if request.is_pull_request and isinstance(review_data, dict) and isinstance(pr_head_sha, str) and pr_head_sha:
-            review_data["active_head_sha"] = pr_head_sha
-        if record_assignment:
-            bot.adapters.queue.record_assignment(
-                state,
-                reviewer,
-                issue_number,
-                "pr" if request.is_pull_request else "issue",
-            )
-        if emit_guidance:
-            _post_assignment_guidance(bot, request, reviewer)
-        bot.collect_touched_item(issue_number)
+        if state_changed and isinstance(review_data, dict) and isinstance(cycle_started_at, str) and cycle_started_at:
+            review_data["cycle_started_at"] = cycle_started_at
+            review_data["active_cycle_started_at"] = cycle_started_at
+            review_data["assigned_at"] = cycle_started_at
+            review_data["last_reviewer_activity"] = cycle_started_at
+        if state_changed:
+            bot.collect_touched_item(issue_number)
         if isinstance(review_data, dict):
+            review_data.setdefault("sidecars", {}).setdefault("assignment_confirmations", {})[
+                f"{assignment_method}:{reviewer}"
+            ] = confirmation.to_output()
             diagnostic_changed = _clear_assignment_marker(bot, review_data, issue_number, phase="assignment_add_write") or diagnostic_changed
             diagnostic_changed = _clear_assignment_marker(bot, review_data, issue_number, phase="assignment_remove_write") or diagnostic_changed
             diagnostic_changed = _clear_assignment_marker(bot, review_data, issue_number, phase="assignment_confirm_read") or diagnostic_changed
@@ -426,15 +807,16 @@ def confirm_reviewer_assignment(
             "final_assignees": final_assignees,
             "assignment_attempt": assignment_attempt or _success_attempt(bot),
             "removal_attempts": removal_attempts,
+            "assignment_confirmation": confirmation.to_output(),
             "diagnostic_changed": diagnostic_changed,
         }
     cleared = False
-    if len(final_assignees) != 1 or (
+    if confirmation.clear_current_reviewer or len(final_assignees) != 1 or (
         len(final_assignees) == 1
         and isinstance(stored_reviewer, str)
         and final_normalized[0] != stored_reviewer.lower()
     ):
-        cleared = clear_current_reviewer(state, issue_number)
+        cleared = clear_current_reviewer(state, issue_number) if confirmation.clear_current_reviewer else False
         if cleared:
             bot.collect_touched_item(issue_number)
     if isinstance(review_data, dict):
@@ -465,6 +847,7 @@ def confirm_reviewer_assignment(
         "final_assignees": final_assignees,
         "assignment_attempt": assignment_attempt,
         "removal_attempts": removal_attempts,
+        "assignment_confirmation": confirmation.to_output(),
         "failure_comment": failure_comment,
         "cleared_current_reviewer": cleared,
         "diagnostic_changed": diagnostic_changed,

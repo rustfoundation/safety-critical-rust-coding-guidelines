@@ -118,6 +118,24 @@ def test_deferred_payload_parsing_does_not_require_artifact_name_helpers(fixture
         assert parsed.source_commit_id == payload["source_commit_id"]
 
 
+def test_review_request_events_are_classified_as_no_retained_trigger():
+    workflow_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in Path(".github/workflows").glob("reviewer-bot-*.yml")
+    )
+    classification = {
+        "review_requested": "classified_no_retained_trigger",
+        "review_request_removed": "classified_no_retained_trigger",
+    }
+
+    assert classification == {
+        "review_requested": "classified_no_retained_trigger",
+        "review_request_removed": "classified_no_retained_trigger",
+    }
+    assert "review_requested" not in workflow_text
+    assert "review_request_removed" not in workflow_text
+
+
 def test_read_reconcile_object_fails_closed_for_unavailable(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     routes = RouteGitHubApi().add_request(

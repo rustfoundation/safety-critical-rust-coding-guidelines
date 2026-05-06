@@ -38,6 +38,59 @@ class DeferredIdentityContract:
 
 
 @dataclass(frozen=True)
+class DeferredWorkflowSourceContract:
+    payload_kind: str
+    workflow_name: str
+    workflow_file: str
+    artifact_name_prefix: str
+    source_event_name: str
+    source_event_action: str
+    source_event_key_prefix: str
+    object_id_field: str
+    required_payload_fields: tuple[str, ...]
+    required_identity_fields: tuple[str, ...]
+    live_endpoint_kind: str
+
+
+@dataclass(frozen=True)
+class DeferredArtifactSourceAuthority:
+    workflow_name: str | None
+    workflow_file: str | None
+    run_id: str | None
+    run_attempt: str | None
+    artifact_name: str | None
+    artifact_path: str | None
+    source_event_key: str | None
+    source_event_name: str | None
+    source_event_action: str | None
+    source_issue_number: int | None
+    source_pr_number: int | None
+    source_head_sha: str | None
+    source_actor: str | None
+    authority_status: str
+    diagnostic_reason: str | None
+
+    def to_output(self) -> dict[str, object]:
+        return {
+            "workflow_name": self.workflow_name,
+            "workflow_file": self.workflow_file,
+            "run_id": self.run_id,
+            "run_attempt": self.run_attempt,
+            "artifact_name": self.artifact_name,
+            "artifact_path": self.artifact_path,
+            "source_event_key": self.source_event_key,
+            "source_event_name": self.source_event_name,
+            "source_event_action": self.source_event_action,
+            "source_issue_number": self.source_issue_number,
+            "source_pr_number": self.source_pr_number,
+            "source_head_sha": self.source_head_sha,
+            "source_actor": self.source_actor,
+            "authority_status": self.authority_status,
+            "diagnostic_reason": self.diagnostic_reason,
+        }
+
+
+@dataclass(frozen=True)
 class RecoveredDeferredPayloadIdentity:
     source_run_id: int
     source_run_attempt: int
@@ -64,6 +117,16 @@ class DeferredReviewPayload:
     @property
     def pr_number(self) -> int:
         return self.identity.pr_number
+
+
+@dataclass(frozen=True)
+class DeferredReviewSubmittedPayload(DeferredReviewPayload):
+    pass
+
+
+@dataclass(frozen=True)
+class DeferredReviewDismissedPayload(DeferredReviewPayload):
+    source_dismissed_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -187,6 +250,241 @@ _DEFERRED_CONTRACTS_BY_EVENT: dict[tuple[str, str], DeferredIdentityContract] = 
     (contract.source_event_name, contract.source_event_action): contract
     for contract in _DEFERRED_IDENTITY_CONTRACTS.values()
 }
+
+_COMMON_REQUIRED_IDENTITY_FIELDS = (
+    "workflow_name",
+    "workflow_file",
+    "run_id",
+    "run_attempt",
+    "artifact_name",
+    "source_event_name",
+    "source_event_action",
+    "source_event_key",
+    "source_pr_number",
+)
+_DEFERRED_WORKFLOW_SOURCE_CONTRACTS: dict[str, DeferredWorkflowSourceContract] = {
+    DeferredPayloadKind.DEFERRED_COMMENT.value: DeferredWorkflowSourceContract(
+        payload_kind=DeferredPayloadKind.DEFERRED_COMMENT.value,
+        workflow_name="Reviewer Bot PR Comment Router",
+        workflow_file=".github/workflows/reviewer-bot-pr-comment-router.yml",
+        artifact_name_prefix="reviewer-bot-comment-context-",
+        source_event_name="issue_comment",
+        source_event_action="created",
+        source_event_key_prefix="issue_comment:",
+        object_id_field="comment_id",
+        required_payload_fields=(
+            "payload_kind",
+            "schema_version",
+            "source_run_id",
+            "source_run_attempt",
+            "source_event_name",
+            "source_event_action",
+            "source_event_key",
+            "pr_number",
+            "comment_id",
+            "comment_body",
+            "comment_created_at",
+            "comment_author",
+            "comment_author_id",
+            "comment_user_type",
+            "comment_sender_type",
+            "comment_performed_via_github_app",
+            "issue_author",
+            "issue_state",
+            "issue_labels",
+        ),
+        required_identity_fields=_COMMON_REQUIRED_IDENTITY_FIELDS,
+        live_endpoint_kind="issue_comment",
+    ),
+    DeferredPayloadKind.DEFERRED_REVIEW_COMMENT.value: DeferredWorkflowSourceContract(
+        payload_kind=DeferredPayloadKind.DEFERRED_REVIEW_COMMENT.value,
+        workflow_name="Reviewer Bot PR Review Comment Observer",
+        workflow_file=".github/workflows/reviewer-bot-pr-review-comment-observer.yml",
+        artifact_name_prefix="reviewer-bot-review-comment-context-",
+        source_event_name="pull_request_review_comment",
+        source_event_action="created",
+        source_event_key_prefix="pull_request_review_comment:",
+        object_id_field="comment_id",
+        required_payload_fields=(
+            "payload_kind",
+            "schema_version",
+            "source_run_id",
+            "source_run_attempt",
+            "source_event_name",
+            "source_event_action",
+            "source_event_key",
+            "pr_number",
+            "comment_id",
+            "comment_body",
+            "comment_created_at",
+            "comment_author",
+            "comment_author_id",
+            "comment_user_type",
+            "comment_sender_type",
+            "comment_performed_via_github_app",
+            "issue_author",
+            "issue_state",
+            "issue_labels",
+            "source_commit_id",
+        ),
+        required_identity_fields=_COMMON_REQUIRED_IDENTITY_FIELDS,
+        live_endpoint_kind="review_comment",
+    ),
+    DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED.value: DeferredWorkflowSourceContract(
+        payload_kind=DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED.value,
+        workflow_name="Reviewer Bot PR Review Submitted Observer",
+        workflow_file=".github/workflows/reviewer-bot-pr-review-submitted-observer.yml",
+        artifact_name_prefix="reviewer-bot-review-submitted-context-",
+        source_event_name="pull_request_review",
+        source_event_action="submitted",
+        source_event_key_prefix="pull_request_review:",
+        object_id_field="review_id",
+        required_payload_fields=(
+            "payload_kind",
+            "schema_version",
+            "source_run_id",
+            "source_run_attempt",
+            "source_event_name",
+            "source_event_action",
+            "source_event_key",
+            "pr_number",
+            "review_id",
+            "source_submitted_at",
+            "source_review_state",
+            "source_commit_id",
+            "actor_login",
+        ),
+        required_identity_fields=_COMMON_REQUIRED_IDENTITY_FIELDS,
+        live_endpoint_kind="pull_request_review",
+    ),
+    DeferredPayloadKind.DEFERRED_REVIEW_DISMISSED.value: DeferredWorkflowSourceContract(
+        payload_kind=DeferredPayloadKind.DEFERRED_REVIEW_DISMISSED.value,
+        workflow_name="Reviewer Bot PR Review Dismissed Observer",
+        workflow_file=".github/workflows/reviewer-bot-pr-review-dismissed-observer.yml",
+        artifact_name_prefix="reviewer-bot-review-dismissed-context-",
+        source_event_name="pull_request_review",
+        source_event_action="dismissed",
+        source_event_key_prefix="pull_request_review_dismissed:",
+        object_id_field="review_id",
+        required_payload_fields=(
+            "payload_kind",
+            "schema_version",
+            "source_run_id",
+            "source_run_attempt",
+            "source_event_name",
+            "source_event_action",
+            "source_event_key",
+            "pr_number",
+            "review_id",
+        ),
+        required_identity_fields=_COMMON_REQUIRED_IDENTITY_FIELDS,
+        live_endpoint_kind="pull_request_review",
+    ),
+}
+
+
+def deferred_workflow_source_contract_for_payload_kind(payload_kind: str) -> DeferredWorkflowSourceContract:
+    try:
+        return _DEFERRED_WORKFLOW_SOURCE_CONTRACTS[payload_kind]
+    except KeyError as exc:
+        raise RuntimeError("Unsupported deferred workflow source contract payload kind") from exc
+
+
+def _raw_identity_value(identity: DeferredArtifactIdentity | None, raw_payload: dict, field_name: str) -> object:
+    if identity is not None:
+        if field_name == "run_id":
+            return identity.source_run_id
+        if field_name == "run_attempt":
+            return identity.source_run_attempt
+        if field_name == "source_event_name":
+            return identity.source_event_name
+        if field_name == "source_event_action":
+            return identity.source_event_action
+        if field_name == "source_event_key":
+            return identity.source_event_key
+        if field_name == "source_pr_number":
+            return identity.pr_number
+    aliases = {
+        "workflow_name": ("workflow_name", "source_workflow_name"),
+        "workflow_file": ("workflow_file", "source_workflow_file"),
+        "run_id": ("run_id", "source_run_id"),
+        "run_attempt": ("run_attempt", "source_run_attempt"),
+        "artifact_name": ("artifact_name", "source_artifact_name"),
+        "source_pr_number": ("source_pr_number", "pr_number"),
+    }.get(field_name, (field_name,))
+    for alias in aliases:
+        if alias in raw_payload:
+            return raw_payload.get(alias)
+    return None
+
+
+def derive_deferred_artifact_source_authority(
+    identity: DeferredArtifactIdentity | None,
+    raw_payload: dict,
+    *,
+    triggering_conclusion: str | None = None,
+    contract: DeferredWorkflowSourceContract | None = None,
+) -> DeferredArtifactSourceAuthority:
+    if not isinstance(raw_payload, dict):
+        raw_payload = {}
+    payload_kind = raw_payload.get("payload_kind")
+    if contract is None:
+        contract = deferred_workflow_source_contract_for_payload_kind(str(payload_kind))
+    missing_payload = [field for field in contract.required_payload_fields if field not in raw_payload]
+    missing_identity = [
+        field
+        for field in contract.required_identity_fields
+        if _raw_identity_value(identity, raw_payload, field) in {None, ""}
+    ]
+    workflow_name = _raw_identity_value(identity, raw_payload, "workflow_name")
+    workflow_file = _raw_identity_value(identity, raw_payload, "workflow_file")
+    artifact_name = _raw_identity_value(identity, raw_payload, "artifact_name")
+    source_event_key = _raw_identity_value(identity, raw_payload, "source_event_key")
+    object_id = raw_payload.get(contract.object_id_field)
+    expected_key = f"{contract.source_event_key_prefix}{object_id}"
+    status = "trusted_exact_identity"
+    reason = None
+    if identity is not None and identity.schema_version == 2:
+        status = "trusted_legacy_identity"
+        reason = "legacy_payload_missing_workflow_artifact_authority"
+    elif identity is None or missing_identity:
+        status = "blocked_missing_identity"
+        reason = "missing_identity_fields:" + ",".join(missing_identity)
+    elif missing_payload:
+        status = "blocked_source_mismatch"
+        reason = "missing_payload_fields:" + ",".join(missing_payload)
+    elif triggering_conclusion and triggering_conclusion != "success":
+        status = "diagnostic_non_success_identity"
+        reason = f"triggering_conclusion:{triggering_conclusion}"
+    elif workflow_name != contract.workflow_name or workflow_file != contract.workflow_file:
+        status = "blocked_source_mismatch"
+        reason = "workflow_identity_mismatch"
+    elif not isinstance(artifact_name, str) or not artifact_name.startswith(contract.artifact_name_prefix):
+        status = "blocked_source_mismatch"
+        reason = "artifact_name_prefix_mismatch"
+    elif raw_payload.get("source_event_name") != contract.source_event_name or raw_payload.get("source_event_action") != contract.source_event_action:
+        status = "blocked_action_mismatch"
+        reason = "source_event_action_mismatch"
+    elif source_event_key != expected_key:
+        status = "blocked_source_mismatch"
+        reason = "source_event_key_object_mismatch"
+    return DeferredArtifactSourceAuthority(
+        workflow_name=str(workflow_name) if workflow_name is not None else None,
+        workflow_file=str(workflow_file) if workflow_file is not None else None,
+        run_id=str(_raw_identity_value(identity, raw_payload, "run_id")) if _raw_identity_value(identity, raw_payload, "run_id") is not None else None,
+        run_attempt=str(_raw_identity_value(identity, raw_payload, "run_attempt")) if _raw_identity_value(identity, raw_payload, "run_attempt") is not None else None,
+        artifact_name=str(artifact_name) if artifact_name is not None else None,
+        artifact_path=str(raw_payload.get("artifact_path")) if raw_payload.get("artifact_path") is not None else None,
+        source_event_key=str(source_event_key) if source_event_key is not None else None,
+        source_event_name=str(raw_payload.get("source_event_name")) if raw_payload.get("source_event_name") is not None else None,
+        source_event_action=str(raw_payload.get("source_event_action")) if raw_payload.get("source_event_action") is not None else None,
+        source_issue_number=int(raw_payload["issue_number"]) if isinstance(raw_payload.get("issue_number"), int) else None,
+        source_pr_number=int(raw_payload["pr_number"]) if isinstance(raw_payload.get("pr_number"), int) else None,
+        source_head_sha=str(raw_payload.get("source_commit_id")) if raw_payload.get("source_commit_id") is not None else None,
+        source_actor=str(raw_payload.get("comment_author") or raw_payload.get("actor_login") or raw_payload.get("source_actor_login") or "") or None,
+        authority_status=status,
+        diagnostic_reason=reason,
+    )
 
 
 def _contract_for_event(source_event_name: object, source_event_action: object) -> DeferredIdentityContract | None:
@@ -572,7 +870,7 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
         _validate_deferred_review_artifact(payload)
         review_id = int(payload["review_id"])
         _validate_identity_object_key(identity, review_id)
-        return DeferredReviewPayload(
+        common = dict(
             identity=identity,
             review_id=review_id,
             source_submitted_at=(str(payload["source_submitted_at"]) if payload.get("source_submitted_at") is not None else None),
@@ -580,6 +878,12 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
             source_commit_id=(str(payload["source_commit_id"]) if payload.get("source_commit_id") is not None else None),
             actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
             raw_payload=payload,
+        )
+        if identity.payload_kind == DeferredPayloadKind.DEFERRED_REVIEW_SUBMITTED:
+            return DeferredReviewSubmittedPayload(**common)
+        return DeferredReviewDismissedPayload(
+            **common,
+            source_dismissed_at=(str(payload["source_dismissed_at"]) if payload.get("source_dismissed_at") is not None else None),
         )
     raise RuntimeError("Unsupported deferred workflow_run payload")
 

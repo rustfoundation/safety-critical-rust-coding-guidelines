@@ -12,6 +12,7 @@
     "source_workflow_file": ".github/workflows/reviewer-bot-pr-comment-router.yml",
     "source_run_id": 401,
     "source_run_attempt": 3,
+    "source_artifact_name": "reviewer-bot-comment-context-401-attempt-3",
     "source_event_name": "issue_comment",
     "source_event_action": "created",
     "source_event_key": "issue_comment:501",
