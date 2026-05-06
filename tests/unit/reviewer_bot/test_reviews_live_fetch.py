@@ -23,6 +23,7 @@ from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi, github_result
 def _runtime(monkeypatch, routes=None):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     runtime.github.get_issue_or_pr_snapshot = lambda issue_number: issue_snapshot(issue_number, state="open", is_pull_request=True)
+    runtime.github.get_issue_assignees_result = lambda issue_number, is_pull_request=None: github_result(200, [])
     runtime.github.get_user_permission_status = lambda username, required_permission="push": "granted"
     if routes is not None:
         runtime.github.stub(routes)
