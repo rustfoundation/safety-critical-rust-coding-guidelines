@@ -355,7 +355,7 @@ def test_parse_deferred_context_payload_accepts_legacy_comment_payload():
 
     assert isinstance(parsed, reconcile.DeferredCommentPayload)
     assert parsed.identity.payload_kind == reconcile_payloads.DeferredPayloadKind.DEFERRED_COMMENT
-    assert parsed.comment_created_at == "2026-03-17T10:00:00Z"
+    assert parsed.comment_created_at == "2026-03-17T10:00:00+00:00"
     assert parsed.comment_author == "alice"
     assert parsed.comment_author_id == 7001
     assert parsed.source_body_digest == "digest"
@@ -416,7 +416,7 @@ def test_recover_deferred_payload_identity_builds_sanitized_payload_without_muta
     assert recovered.source_event_key == "issue_comment:210"
     assert recovered.source_object_id == 210
     assert recovered.diagnostic_payload["source_comment_id"] == 210
-    assert recovered.diagnostic_payload["source_event_created_at"] == "2026-03-17T10:00:00Z"
+    assert recovered.diagnostic_payload["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
 
 
 def test_recover_deferred_payload_identity_normalizes_timezone_less_timestamp():
@@ -428,6 +428,26 @@ def test_recover_deferred_payload_identity_normalizes_timezone_less_timestamp():
         comment_class="command_only",
         has_non_command_text=False,
         source_created_at="2026-03-17T10:00:00",
+        actor_login="bob",
+        source_run_id=610,
+        source_run_attempt=1,
+    )
+
+    recovered = reconcile_payloads.recover_deferred_payload_identity(payload)
+
+    assert recovered.source_event_created_at == "2026-03-17T10:00:00+00:00"
+    assert recovered.diagnostic_payload["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
+
+
+def test_recover_deferred_payload_identity_normalizes_offset_timestamp_to_canonical_utc():
+    payload = issue_comment_payload(
+        pr_number=42,
+        comment_id=210,
+        source_event_key="issue_comment:210",
+        body="@guidelines-bot /queue",
+        comment_class="command_only",
+        has_non_command_text=False,
+        source_created_at="2026-03-17T12:30:00+02:30",
         actor_login="bob",
         source_run_id=610,
         source_run_attempt=1,

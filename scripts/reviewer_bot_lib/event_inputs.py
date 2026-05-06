@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.reviewer_bot_core.comment_routing_policy import PrCommentRouterOutcome
@@ -21,6 +20,7 @@ from .context import (
     PullRequestSyncRequest,
 )
 from .runtime_protocols import EventInputsContext
+from .timestamps import normalize_iso8601_utc_string
 
 
 class InvalidEventInput(RuntimeError):
@@ -137,16 +137,7 @@ def parse_issue_labels(bot: EventInputsContext) -> list[str]:
 
 
 def _normalize_iso8601_timestamp(value: str) -> str | None:
-    value = value.strip()
-    if not value:
-        return None
-    try:
-        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if timestamp.tzinfo is None:
-        return timestamp.replace(tzinfo=timezone.utc).isoformat()
-    return value
+    return normalize_iso8601_utc_string(value)
 
 
 def _is_parseable_iso8601(value: str) -> bool:

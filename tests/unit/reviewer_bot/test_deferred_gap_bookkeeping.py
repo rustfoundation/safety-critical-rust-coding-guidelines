@@ -160,13 +160,13 @@ def test_bookkeeping_owner_records_observer_watermark_event_and_empty_scan(monke
         runtime,
         review,
         "reviews_dismissed",
-        "2026-03-17T10:00:00Z",
+        "2026-03-17T12:30:00+02:30",
         "12",
     )
     deferred_gap_bookkeeping.record_observer_watermark_empty_scan(runtime, review, "review_comments")
 
     dismissed = review["sidecars"]["observer_discovery_watermarks"]["reviews_dismissed"]
-    assert dismissed["last_safe_event_time"] == "2026-03-17T10:00:00Z"
+    assert dismissed["last_safe_event_time"] == "2026-03-17T10:00:00+00:00"
     assert dismissed["last_safe_event_id"] == "12"
     assert dismissed["last_scan_completed_at"] == "2026-03-18T00:00:00+00:00"
     comments = review["sidecars"]["observer_discovery_watermarks"]["review_comments"]
@@ -298,7 +298,7 @@ def test_deferred_gap_diagnostic_retains_normalized_comment_source_evidence(monk
 
     assert changed is True
     gap = review["sidecars"]["deferred_gaps"]["issue_comment:210"]
-    assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
+    assert gap["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
     assert gap["source_actor_login"] == "alice"
     assert gap["source_actor_id"] == 7001
     assert gap["source_actor_user_type"] == "User"
@@ -322,7 +322,7 @@ def test_deferred_gap_diagnostic_retains_normalized_comment_source_evidence(monk
 
     gap = review["sidecars"]["deferred_gaps"]["issue_comment:210"]
     assert gap["source_actor_login"] == "alice"
-    assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
+    assert gap["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
 
 
 def test_update_deferred_gap_preserves_source_dismissed_at_diagnostics(monkeypatch):

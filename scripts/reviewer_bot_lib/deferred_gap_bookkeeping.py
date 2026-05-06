@@ -6,6 +6,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from .timestamps import normalize_iso8601_utc_string, parse_iso8601_utc
+
 
 @dataclass(frozen=True)
 class DeferredGap:
@@ -216,15 +218,7 @@ def _observer_now_iso(bot) -> str:
 
 
 def _parse_observer_timestamp(value: object) -> datetime | None:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if timestamp.tzinfo is None:
-        return timestamp.replace(tzinfo=timezone.utc)
-    return timestamp
+    return parse_iso8601_utc(value)
 
 
 def _configured_seconds(bot, name: str, default: int) -> int:
@@ -247,6 +241,8 @@ def begin_observer_surface_scan(
     scan_started_at = now or bot.clock.now()
     if scan_started_at.tzinfo is None:
         scan_started_at = scan_started_at.replace(tzinfo=timezone.utc)
+    else:
+        scan_started_at = scan_started_at.astimezone(timezone.utc)
     lookback_seconds = _configured_seconds(bot, "DEFERRED_DISCOVERY_OVERLAP_SECONDS", 3600)
     bootstrap_window_seconds = _configured_seconds(bot, "DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS", 604800)
     watermark.update(
@@ -266,11 +262,12 @@ def begin_observer_surface_scan(
 def record_observer_watermark_event(bot, review_data: dict, surface: str, event_time: str, event_id: str) -> None:
     current = _ensure_observer_discovery_watermark(review_data, surface)
     now = _observer_now_iso(bot)
+    safe_event_time = normalize_iso8601_utc_string(event_time) or event_time
     current.update(
         {
             "last_scan_started_at": current.get("last_scan_started_at") or now,
             "last_scan_completed_at": now,
-            "last_safe_event_time": event_time,
+            "last_safe_event_time": safe_event_time,
             "last_safe_event_id": event_id,
             "lookback_seconds": _configured_seconds(bot, "DEFERRED_DISCOVERY_OVERLAP_SECONDS", 3600),
             "bootstrap_window_seconds": _configured_seconds(bot, "DEFERRED_DISCOVERY_BOOTSTRAP_WINDOW_SECONDS", 604800),
@@ -304,7 +301,8 @@ def get_deferred_gap_reason(review_data: dict, source_event_key: str) -> str | N
 
 
 def _now_iso(bot) -> str:
-    return bot.clock.now().isoformat()
+    now = bot.clock.now()
+    return normalize_iso8601_utc_string(now) or now.isoformat()
 
 
 def _reconciled_at_now() -> str:
@@ -360,7 +358,7 @@ def mark_reconciled_source_event(
     reconciled_at: str | None = None,
 ) -> bool:
     reconciled = _reconciled_source_events(review_data)
-    timestamp = reconciled_at or _reconciled_at_now()
+    timestamp = normalize_iso8601_utc_string(reconciled_at) or reconciled_at or _reconciled_at_now()
     existing = reconciled.get(source_event_key)
     if isinstance(existing, dict):
         if not _is_valid_reconciled_source_event(existing, source_event_key):
@@ -424,7 +422,7 @@ def _copy_source_evidence(fields: dict, payload: dict, existing: dict) -> None:
 
 
 def _source_event_created_at(payload: dict, existing: dict):
-    return (
+    value = (
         payload.get("source_created_at")
         or payload.get("comment_created_at")
         or payload.get("source_submitted_at")
@@ -432,6 +430,7 @@ def _source_event_created_at(payload: dict, existing: dict):
         or payload.get("source_event_created_at")
         or existing.get("source_event_created_at")
     )
+    return normalize_iso8601_utc_string(value) or value
 
 
 def record_deferred_gap_diagnostic(
@@ -469,7 +468,7 @@ def record_deferred_gap_diagnostic(
     }
     source_dismissed_at = _payload_or_existing(payload, existing, "source_dismissed_at")
     if source_dismissed_at is not None:
-        fields["source_dismissed_at"] = source_dismissed_at
+        fields["source_dismissed_at"] = normalize_iso8601_utc_string(source_dismissed_at) or source_dismissed_at
     _copy_source_evidence(fields, payload, existing)
     existing.update(fields)
     changed = previous != existing

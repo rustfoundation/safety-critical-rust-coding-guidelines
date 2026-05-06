@@ -479,7 +479,7 @@ def test_handle_issue_or_pr_opened_adopts_existing_single_live_assignee(monkeypa
     review = review_state.ensure_review_entry(state, 42)
     assert review is not None
     assert review["current_reviewer"] == "alice"
-    assert review["assigned_at"] == "2026-03-17T10:00:00Z"
+    assert review["assigned_at"] == "2026-03-17T10:00:00+00:00"
 
 
 def test_handle_assigned_event_clears_reviewer_authority_on_multiple_live_assignees(monkeypatch):

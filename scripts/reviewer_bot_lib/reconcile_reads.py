@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+
+from .timestamps import normalize_iso8601_utc_string
 
 
 class ReconcileReadError(RuntimeError):
@@ -48,13 +49,7 @@ def _valid_exact_timestamp(value: object) -> str | None:
     timestamp = value.strip()
     if "T" not in timestamp:
         return None
-    try:
-        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc).isoformat()
-    return timestamp
+    return normalize_iso8601_utc_string(timestamp)
 
 
 def _dismissed_review_source_time(payload: dict | None) -> DismissalTimeResolution | None:

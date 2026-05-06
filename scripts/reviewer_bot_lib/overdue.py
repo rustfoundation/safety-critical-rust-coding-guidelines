@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from . import assignment_flow
 from .config import TRANSITION_NOTICE_MARKER_PREFIX, TRANSITION_WARNING_MARKER_PREFIX
 from .reminder_comments import ReminderCommentScan, scan_reviewer_reminder_comments
 from .repair_records import clear_repair_marker, store_repair_marker
+from .timestamps import parse_iso8601_utc
 
 _TRANSITION_NOTICE_AUTHORS = {"github-actions[bot]", "guidelines-bot"}
 
@@ -418,15 +419,7 @@ def build_reminder_delivery_persistence_result(
 
 
 def _parse_reminder_timestamp(value: object) -> datetime | None:
-    if isinstance(value, datetime):
-        return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return timestamp if timestamp.tzinfo is not None else timestamp.replace(tzinfo=timezone.utc)
+    return parse_iso8601_utc(value)
 
 
 def derive_reminder_cadence_decision(

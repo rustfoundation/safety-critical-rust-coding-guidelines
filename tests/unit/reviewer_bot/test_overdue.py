@@ -1,9 +1,10 @@
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 
 from scripts.reviewer_bot_core import approval_policy
-from scripts.reviewer_bot_lib import maintenance, review_state
+from scripts.reviewer_bot_lib import maintenance, overdue, review_state
 from scripts.reviewer_bot_lib.repair_records import load_repair_marker
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import (
@@ -37,6 +38,42 @@ def _approval_incomplete_result(*_args, **_kwargs):
         "write_approval": {"has_write_approval": False},
         "current_head_sha": "head-1",
     }
+
+
+def test_reminder_cadence_normalizes_timezone_less_anchor_to_utc():
+    decision = overdue.derive_reminder_cadence_decision(
+        SimpleNamespace(
+            scope=SimpleNamespace(issue_number=42, reviewer="alice"),
+            response_state="awaiting_reviewer_response",
+            anchor_timestamp="2026-03-01T00:00:00",
+        ),
+        receipt=None,
+        reminder_scan=None,
+        now="2026-03-08T00:00:00+00:00",
+        review_deadline_days=7,
+        transition_period_days=14,
+    )
+
+    assert decision.cadence_state == "warning_due"
+    assert decision.may_post_warning is True
+
+
+def test_reminder_cadence_normalizes_offset_anchor_to_canonical_utc():
+    decision = overdue.derive_reminder_cadence_decision(
+        SimpleNamespace(
+            scope=SimpleNamespace(issue_number=42, reviewer="alice"),
+            response_state="awaiting_reviewer_response",
+            anchor_timestamp="2026-03-01T02:30:00+02:30",
+        ),
+        receipt=None,
+        reminder_scan=None,
+        now="2026-03-08T00:00:00+00:00",
+        review_deadline_days=7,
+        transition_period_days=14,
+    )
+
+    assert decision.cadence_state == "warning_due"
+    assert decision.may_post_warning is True
 
 
 def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkeypatch):
