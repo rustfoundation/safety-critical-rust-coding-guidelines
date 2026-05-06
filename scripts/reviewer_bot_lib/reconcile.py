@@ -252,7 +252,28 @@ def build_command_replay_receipt(
     clear_gap_allowed: bool,
     diagnostic_reason: str | None = None,
 ) -> CommandReplayReceipt:
-    if not replay_attempted:
+    normalized_side_effects = tuple(
+        sorted(
+            {
+                str(item).strip()
+                for item in command_side_effects_attempted
+                if str(item).strip()
+            }
+        )
+    )
+    normalized_command_name = command_name.strip() if isinstance(command_name, str) and command_name.strip() else None
+    consistency_error = None
+    if replay_attempted and normalized_command_name is None:
+        consistency_error = "missing_command_name_for_replay"
+    elif not replay_attempted and normalized_side_effects:
+        consistency_error = "side_effects_without_replay"
+    elif not replay_attempted and state_save_required:
+        consistency_error = "state_save_required_without_replay"
+
+    if consistency_error is not None:
+        result = "blocked_inconsistent_replay_receipt"
+        diagnostic_reason = diagnostic_reason or consistency_error
+    elif not replay_attempted:
         result = "pass_diagnostic_only"
     elif not mark_reconciled_allowed or not clear_gap_allowed:
         result = "blocked_authority_missing"
@@ -263,9 +284,9 @@ def build_command_replay_receipt(
     return CommandReplayReceipt(
         source_event_key=source_event_key,
         issue_number=issue_number,
-        command_name=command_name,
+        command_name=normalized_command_name,
         replay_attempted=replay_attempted,
-        command_side_effects_attempted=command_side_effects_attempted,
+        command_side_effects_attempted=normalized_side_effects,
         state_save_required=state_save_required,
         state_save_succeeded=state_save_succeeded,
         mark_reconciled_allowed=mark_reconciled_allowed,

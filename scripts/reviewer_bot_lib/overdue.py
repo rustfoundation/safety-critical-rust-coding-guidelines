@@ -729,6 +729,70 @@ def _effective_response_with_cadence(bot, issue_number: int, review_data: dict, 
     return effective_response, cadence, reminder_scan
 
 
+def backfill_transition_warning_if_present(bot, state: dict, issue_number: int) -> bool:
+    active_reviews = state.get("active_reviews") if isinstance(state, dict) else None
+    review_data = active_reviews.get(str(issue_number)) if isinstance(active_reviews, dict) else None
+    if not isinstance(review_data, dict):
+        return False
+    if not isinstance(review_data.get("current_reviewer"), str) or not review_data["current_reviewer"].strip():
+        return False
+    existing_warning = review_data.get("transition_warning_sent")
+    if isinstance(existing_warning, str) and existing_warning.strip():
+        return False
+    try:
+        issue_snapshot_result = bot.github.get_issue_or_pr_snapshot_result(issue_number)
+    except (AssertionError, AttributeError, RuntimeError):
+        return False
+    issue_snapshot = issue_snapshot_result.payload if issue_snapshot_result.ok else None
+    if not isinstance(issue_snapshot, dict):
+        return False
+    if str(issue_snapshot.get("state", "")).lower() == "closed":
+        return False
+
+    response_state = bot.adapters.review_state.compute_reviewer_response_state(
+        issue_number,
+        review_data,
+        issue_snapshot=issue_snapshot,
+    )
+    _effective_response, cadence, _reminder_scan = _effective_response_with_cadence(
+        bot,
+        issue_number,
+        review_data,
+        response_state,
+    )
+    receipt = cadence.warning_receipt
+    if receipt is None or receipt.receipt_kind != "warning":
+        return False
+    if receipt.source not in {"comment_scan", "live_comment_scan"}:
+        return False
+    if not isinstance(receipt.created_at, str) or not receipt.created_at.strip():
+        return False
+
+    changed = False
+    if review_data.get("transition_warning_sent") != receipt.created_at:
+        review_data["transition_warning_sent"] = receipt.created_at
+        changed = True
+    delivery_result = build_reminder_delivery_persistence_result(
+        issue_number=issue_number,
+        reviewer=receipt.reviewer,
+        head_sha=receipt.head_sha,
+        cycle_key=receipt.cycle_key,
+        scope_key=receipt.scope_key,
+        receipt_kind="warning",
+        comment_posted=False,
+        comment_id=receipt.comment_id,
+        comment_created_at=receipt.created_at,
+        state_save_attempted=False,
+        state_save_succeeded=False,
+        recovered_receipt=receipt,
+        diagnostic_reason="live_warning_receipt_backfill",
+    )
+    changed = _store_reminder_delivery_result(review_data, delivery_result) or changed
+    if changed:
+        bot.collect_touched_item(issue_number)
+    return changed
+
+
 def _find_existing_warning_comment(
     bot,
     issue_number: int,
