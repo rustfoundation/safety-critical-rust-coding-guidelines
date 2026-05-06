@@ -74,6 +74,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/reviewer-bot-repair-output-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
           uv run --project "$BOT_SRC_ROOT" reviewer-bot
       - name: Upload repair artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'repair-review-status-labels' || github.event.inputs.action == 'repair-issue314-state-health') }}
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: reviewer-bot-repair-output-${{ github.run_id }}-attempt-${{ github.run_attempt }}

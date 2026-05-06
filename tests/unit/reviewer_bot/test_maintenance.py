@@ -235,6 +235,16 @@ def test_broad_status_label_repair_collection_is_explicit(monkeypatch):
     assert maintenance.collect_status_label_repair_targets(bot, make_state(), request) == (42, 264)
 
 
+def test_issue314_state_health_repair_policy_does_not_broaden_epoch_repair():
+    policy = maintenance.derive_manual_dispatch_projection_policy(
+        SimpleNamespace(action="repair-issue314-state-health", issue_number=314)
+    )
+
+    assert policy.allow_epoch_repair_expansion is False
+    assert policy.allow_status_label_sync is True
+    assert policy.reason == "issue314_state_health_repair"
+
+
 def test_status_label_repair_summary_writes_machine_readable_artifact(monkeypatch, tmp_path):
     summary = maintenance.StatusLabelRepairSummary(
         schema_version=1,

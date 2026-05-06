@@ -250,6 +250,8 @@ def derive_manual_dispatch_projection_policy(request) -> ManualDispatchProjectio
         return ManualDispatchProjectionPolicy(action, issue_number, False, True, "targeted_status_label_repair")
     if action == "repair-review-status-labels":
         return ManualDispatchProjectionPolicy(action, issue_number, True, True, "broad_status_label_repair")
+    if action == "repair-issue314-state-health":
+        return ManualDispatchProjectionPolicy(action, issue_number, False, True, "issue314_state_health_repair")
     if action in {"preview-check-overdue", "preview-status-label-projection", "preview-issue314-state-health"}:
         return ManualDispatchProjectionPolicy(action, issue_number, False, False, "read_only_preview")
     return ManualDispatchProjectionPolicy(action, issue_number, True, True, "normal_manual_mutation")

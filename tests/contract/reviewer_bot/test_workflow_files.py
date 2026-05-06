@@ -438,6 +438,12 @@ def test_sweeper_repair_workflow_exposes_nonce_identity_and_repair_artifacts():
     inputs = on_block["workflow_dispatch"]["inputs"]
 
     assert workflow["run-name"] == "repair ${{ github.event.inputs.action }} issue ${{ github.event.inputs.issue_number }} nonce ${{ github.event.inputs.validation_nonce }}"
+    upload_step = next(
+        step
+        for step in workflow["jobs"]["reviewer-bot-sweeper-repair"]["steps"]
+        if step["name"] == "Upload repair artifact"
+    )
+    assert upload_step["if"] == "${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.action == 'repair-review-status-labels' || github.event.inputs.action == 'repair-issue314-state-health') }}"
     assert inputs["action"]["options"] == [
         "sync-members",
         "show-state",

@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from scripts.reviewer_bot_lib import app
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import make_state, make_tracked_review_state
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
@@ -31,6 +32,7 @@ def test_execute_run_repair_issue314_state_health_removes_closed_rows_through_st
     monkeypatch.setenv("ISSUE314_STATE_HEALTH_REPAIR_SUMMARY_PATH", str(summary_path))
 
     state = make_state()
+    state["status_projection_epoch"] = "stale_projection_epoch"
     make_tracked_review_state(
         state,
         42,
@@ -59,6 +61,11 @@ def test_execute_run_repair_issue314_state_health_removes_closed_rows_through_st
     harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
     harness.stub_save_state(lambda current: saved.append(json.loads(json.dumps(current))) or True)
     harness.stub_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(AssertionError("issue314 repair should not broad-sync labels")))
+    monkeypatch.setattr(
+        app,
+        "collect_status_projection_repair_items",
+        lambda bot, state: (_ for _ in ()).throw(AssertionError("issue314 repair broadened through epoch repair")),
+    )
 
     result = harness.run_execute()
 
@@ -77,6 +84,7 @@ def test_execute_run_repair_issue314_state_health_removes_closed_rows_through_st
     assert payload["output_keys"] == sorted(payload.keys())
     assert saved
     assert "42" not in saved[-1]["active_reviews"]
+    assert saved[-1]["status_projection_epoch"] == "stale_projection_epoch"
 
 
 def test_execute_run_repair_issue314_state_health_emits_summary_only_after_state_save(
