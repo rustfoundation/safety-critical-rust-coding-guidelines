@@ -294,7 +294,7 @@ def test_deferred_review_dismissal_replay_uses_source_dismissal_time(monkeypatch
     harness.stub_head_repair(changed=False)
 
     assert harness.run(state) is True
-    assert review["review_dismissal"]["accepted"]["timestamp"] == "2026-03-17T10:10:00Z"
+    assert review["review_dismissal"]["accepted"]["timestamp"] == "2026-03-17T10:10:00+00:00"
     assert "pull_request_review_dismissed:12" in _reconciled_source_events(review)
     assert "pull_request_review_dismissed:12" not in _deferred_gaps(review)
     assert "issues/42/timeline?per_page=100&page=1" not in harness.github.requested_endpoints()
@@ -333,7 +333,7 @@ def test_deferred_review_dismissal_replay_uses_exact_timeline_dismissed_at(monke
     harness.stub_head_repair(changed=False)
 
     assert harness.run(state) is True
-    assert review["review_dismissal"]["accepted"]["timestamp"] == "2026-03-17T10:12:00Z"
+    assert review["review_dismissal"]["accepted"]["timestamp"] == "2026-03-17T10:12:00+00:00"
     assert "pull_request_review_dismissed:12" in _reconciled_source_events(review)
 
 
@@ -385,7 +385,7 @@ def test_deferred_review_dismissal_replay_finds_exact_time_on_paginated_timeline
 
     assert harness.run(state) is True
 
-    assert review["review_dismissal"]["accepted"]["timestamp"] == "2026-03-17T10:12:00Z"
+    assert review["review_dismissal"]["accepted"]["timestamp"] == "2026-03-17T10:12:00+00:00"
     assert "issues/42/timeline?per_page=100&page=1" in harness.github.requested_endpoints()
     assert "issues/42/timeline?per_page=100&page=2" in harness.github.requested_endpoints()
 
@@ -623,7 +623,7 @@ def test_deferred_comment_missing_live_object_preserves_source_time_freshness(mo
     assert state["active_reviews"]["42"]["reviewer_comment"]["accepted"] is None
     gap = state["active_reviews"]["42"]["sidecars"]["deferred_gaps"]["issue_comment:99"]
     assert gap["reason"] == "reconcile_failed_closed"
-    assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
+    assert gap["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
     assert gap["source_actor_login"] == "alice"
     assert gap["source_actor_id"] == 7001
     assert gap["source_actor_user_type"] == "User"
@@ -865,7 +865,7 @@ def test_deferred_review_comment_missing_live_object_preserves_source_time_fresh
     assert review["reviewer_comment"]["accepted"] is None
     gap = _deferred_gaps(review)["pull_request_review_comment:303"]
     assert gap["reason"] == "reconcile_failed_closed"
-    assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
+    assert gap["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
     assert gap["source_actor_login"] == "alice"
     assert gap["source_actor_id"] == 6
     assert gap["source_actor_user_type"] == "User"
@@ -1210,7 +1210,7 @@ def test_deferred_issue_comment_parse_failure_records_artifact_invalid_gap(monke
     gap = _deferred_gaps(review)["issue_comment:212"]
     assert gap["reason"] == "artifact_invalid"
     assert gap["source_comment_id"] == 212
-    assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
+    assert gap["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
 
 
 def test_deferred_issue_comment_parse_failure_rejects_mismatched_source_object_key(monkeypatch):
@@ -1259,7 +1259,7 @@ def test_deferred_review_submitted_parse_failure_records_artifact_invalid_gap(mo
     gap = _deferred_gaps(review)["pull_request_review:13"]
     assert gap["reason"] == "artifact_invalid"
     assert gap["source_review_id"] == 13
-    assert gap["source_event_created_at"] == "2026-03-17T10:00:00Z"
+    assert gap["source_event_created_at"] == "2026-03-17T10:00:00+00:00"
 
 
 def test_deferred_review_dismissed_parse_failure_records_artifact_invalid_gap(monkeypatch):
@@ -1283,7 +1283,7 @@ def test_deferred_review_dismissed_parse_failure_records_artifact_invalid_gap(mo
     gap = _deferred_gaps(review)["pull_request_review_dismissed:14"]
     assert gap["reason"] == "artifact_invalid"
     assert gap["source_review_id"] == 14
-    assert gap["source_event_created_at"] == "2026-03-17T10:10:00Z"
+    assert gap["source_event_created_at"] == "2026-03-17T10:10:00+00:00"
 
 
 def test_deferred_legacy_review_comment_hydrates_source_commit_id_from_live_comment(monkeypatch):

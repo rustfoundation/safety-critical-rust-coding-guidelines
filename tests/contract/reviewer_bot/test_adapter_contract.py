@@ -436,20 +436,20 @@ def test_event_inputs_build_issue_lifecycle_request_from_runtime_config(monkeypa
     assert request.previous_title == "Old title"
     assert request.previous_body == "old body"
     assert request.pr_head_sha == "head-2"
-    assert request.event_created_at == "2026-03-17T10:00:00Z"
+    assert request.event_created_at == "2026-03-17T10:00:00+00:00"
 
 
 @pytest.mark.parametrize(
     ("event_action", "expected_timestamp"),
     [
-        ("opened", "2026-03-17T09:00:00Z"),
-        ("edited", "2026-03-17T10:00:00Z"),
-        ("assigned", "2026-03-17T10:00:00Z"),
-        ("unassigned", "2026-03-17T10:00:00Z"),
-        ("labeled", "2026-03-17T10:00:00Z"),
-        ("unlabeled", "2026-03-17T10:00:00Z"),
-        ("reopened", "2026-03-17T10:00:00Z"),
-        ("closed", "2026-03-17T11:00:00Z"),
+        ("opened", "2026-03-17T09:00:00+00:00"),
+        ("edited", "2026-03-17T10:00:00+00:00"),
+        ("assigned", "2026-03-17T10:00:00+00:00"),
+        ("unassigned", "2026-03-17T10:00:00+00:00"),
+        ("labeled", "2026-03-17T10:00:00+00:00"),
+        ("unlabeled", "2026-03-17T10:00:00+00:00"),
+        ("reopened", "2026-03-17T10:00:00+00:00"),
+        ("closed", "2026-03-17T11:00:00+00:00"),
     ],
 )
 def test_event_inputs_derives_issue_lifecycle_timestamp_from_action_fields(
@@ -470,12 +470,12 @@ def test_event_inputs_derives_issue_lifecycle_timestamp_from_action_fields(
 @pytest.mark.parametrize(
     ("event_action", "expected_timestamp"),
     [
-        ("opened", "2026-03-17T09:30:00Z"),
-        ("labeled", "2026-03-17T10:30:00Z"),
-        ("unlabeled", "2026-03-17T10:30:00Z"),
-        ("reopened", "2026-03-17T10:30:00Z"),
-        ("synchronize", "2026-03-17T10:30:00Z"),
-        ("closed", "2026-03-17T11:30:00Z"),
+        ("opened", "2026-03-17T09:30:00+00:00"),
+        ("labeled", "2026-03-17T10:30:00+00:00"),
+        ("unlabeled", "2026-03-17T10:30:00+00:00"),
+        ("reopened", "2026-03-17T10:30:00+00:00"),
+        ("synchronize", "2026-03-17T10:30:00+00:00"),
+        ("closed", "2026-03-17T11:30:00+00:00"),
     ],
 )
 def test_event_inputs_derives_pr_lifecycle_timestamp_from_action_fields(
@@ -569,7 +569,7 @@ def test_event_inputs_build_label_and_sync_requests_from_runtime_config(monkeypa
     assert label_request.label_name == "sign-off: create pr"
     assert sync_request.issue_number == 42
     assert sync_request.head_sha == "head-2"
-    assert sync_request.event_created_at == "2026-03-17T10:05:00Z"
+    assert sync_request.event_created_at == "2026-03-17T10:05:00+00:00"
 
 
 def test_bootstrap_runtime_github_exposes_typed_reminder_helpers(monkeypatch):

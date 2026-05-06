@@ -46,3 +46,25 @@ def test_classify_stale_head_review_rejects_current_scope():
 
     assert result.classified_scope == "stale_head"
     assert result.is_current_head is False
+
+
+def test_classify_review_freshness_normalizes_timezone_less_submitted_at():
+    snapshot = build_review_snapshot_record(
+        {
+            "id": 3,
+            "state": "APPROVED",
+            "submitted_at": "2026-04-02T00:00:00",
+            "commit_id": "head-a",
+            "user": {"login": "iglesias"},
+        }
+    )
+
+    result = classify_review_freshness(
+        snapshot,
+        current_head_sha="head-a",
+        cycle_boundary="2026-04-01T00:00:00Z",
+        assigned_reviewer="iglesias",
+    )
+
+    assert result.classified_scope == "current_head_assigned_reviewer"
+    assert result.is_after_cycle_boundary is True

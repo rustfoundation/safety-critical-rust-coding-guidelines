@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from enum import StrEnum
+
+from .timestamps import normalize_iso8601_utc_string
 
 
 class DeferredPayloadKind(StrEnum):
@@ -520,13 +521,10 @@ def _first_string(payload: dict, field_names: tuple[str, ...], diagnostic_name: 
 
 def _recoverable_timestamp(payload: dict, field_names: tuple[str, ...]) -> str:
     timestamp = _first_string(payload, field_names, "source event timestamp")
-    try:
-        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise RuntimeError("Deferred context payload source event timestamp is not parseable ISO-8601") from exc
-    if parsed.tzinfo is None:
-        raise RuntimeError("Deferred context payload source event timestamp must include timezone")
-    return timestamp
+    normalized = normalize_iso8601_utc_string(timestamp)
+    if normalized is None:
+        raise RuntimeError("Deferred context payload source event timestamp is not parseable ISO-8601")
+    return normalized
 
 
 def _optional_nonempty_string(payload: dict, field_name: str) -> str | None:
@@ -534,6 +532,19 @@ def _optional_nonempty_string(payload: dict, field_name: str) -> str | None:
     if isinstance(value, str) and value.strip():
         return value.strip()
     return None
+
+
+def _timestamp_string(value: object, diagnostic_name: str) -> str:
+    normalized = normalize_iso8601_utc_string(value)
+    if normalized is None:
+        raise RuntimeError(f"Deferred context payload {diagnostic_name} is not parseable ISO-8601")
+    return normalized
+
+
+def _optional_timestamp_string(value: object) -> str | None:
+    if value is None:
+        return None
+    return normalize_iso8601_utc_string(value) or str(value)
 
 
 def _diagnostic_payload(payload: dict, contract: DeferredIdentityContract, *, source_run_id: int, source_run_attempt: int, pr_number: int, source_event_key: str, source_object_id: int, actor_login: str, source_event_created_at: str) -> dict:
@@ -556,6 +567,8 @@ def _diagnostic_payload(payload: dict, contract: DeferredIdentityContract, *, so
         "source_dismissed_at",
     ):
         value = _optional_nonempty_string(payload, field_name)
+        if value is not None and field_name == "source_dismissed_at":
+            value = normalize_iso8601_utc_string(value) or value
         if value is not None:
             diagnostic[field_name] = value
     actor_id = payload.get("source_actor_id", payload.get("comment_author_id", payload.get("actor_id")))
@@ -831,7 +844,7 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
                 identity=identity,
                 comment_id=comment_id,
                 comment_body="",
-                comment_created_at=str(payload["source_created_at"]),
+                comment_created_at=_timestamp_string(payload["source_created_at"], "source_created_at"),
                 comment_author=str(payload["actor_login"]),
                 comment_author_id=comment_author_id,
                 comment_user_type=str(payload.get("actor_user_type") or "User"),
@@ -853,7 +866,7 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
             identity=identity,
             comment_id=comment_id,
             comment_body=str(payload["comment_body"]),
-            comment_created_at=str(payload["comment_created_at"]),
+            comment_created_at=_timestamp_string(payload["comment_created_at"], "comment_created_at"),
             comment_author=str(payload["comment_author"]),
             comment_author_id=int(payload["comment_author_id"]),
             comment_user_type=str(payload["comment_user_type"]),
@@ -873,7 +886,7 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
         common = dict(
             identity=identity,
             review_id=review_id,
-            source_submitted_at=(str(payload["source_submitted_at"]) if payload.get("source_submitted_at") is not None else None),
+            source_submitted_at=_optional_timestamp_string(payload.get("source_submitted_at")),
             source_review_state=(str(payload["source_review_state"]) if payload.get("source_review_state") is not None else None),
             source_commit_id=(str(payload["source_commit_id"]) if payload.get("source_commit_id") is not None else None),
             actor_login=(str(payload["actor_login"]) if payload.get("actor_login") is not None else None),
@@ -883,7 +896,7 @@ def parse_deferred_context_payload(payload: dict) -> DeferredReviewPayload | Def
             return DeferredReviewSubmittedPayload(**common)
         return DeferredReviewDismissedPayload(
             **common,
-            source_dismissed_at=(str(payload["source_dismissed_at"]) if payload.get("source_dismissed_at") is not None else None),
+            source_dismissed_at=_optional_timestamp_string(payload.get("source_dismissed_at")),
         )
     raise RuntimeError("Unsupported deferred workflow_run payload")
 

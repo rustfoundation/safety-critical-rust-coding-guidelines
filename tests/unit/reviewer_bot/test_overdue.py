@@ -1,9 +1,10 @@
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 
 from scripts.reviewer_bot_core import approval_policy
-from scripts.reviewer_bot_lib import maintenance, review_state
+from scripts.reviewer_bot_lib import maintenance, overdue, review_state
 from scripts.reviewer_bot_lib.repair_records import load_repair_marker
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import (
@@ -39,6 +40,42 @@ def _approval_incomplete_result(*_args, **_kwargs):
     }
 
 
+def test_reminder_cadence_normalizes_timezone_less_anchor_to_utc():
+    decision = overdue.derive_reminder_cadence_decision(
+        SimpleNamespace(
+            scope=SimpleNamespace(issue_number=42, reviewer="alice"),
+            response_state="awaiting_reviewer_response",
+            anchor_timestamp="2026-03-01T00:00:00",
+        ),
+        receipt=None,
+        reminder_scan=None,
+        now="2026-03-08T00:00:00+00:00",
+        review_deadline_days=7,
+        transition_period_days=14,
+    )
+
+    assert decision.cadence_state == "warning_due"
+    assert decision.may_post_warning is True
+
+
+def test_reminder_cadence_normalizes_offset_anchor_to_canonical_utc():
+    decision = overdue.derive_reminder_cadence_decision(
+        SimpleNamespace(
+            scope=SimpleNamespace(issue_number=42, reviewer="alice"),
+            response_state="awaiting_reviewer_response",
+            anchor_timestamp="2026-03-01T02:30:00+02:30",
+        ),
+        receipt=None,
+        reminder_scan=None,
+        now="2026-03-08T00:00:00+00:00",
+        review_deadline_days=7,
+        transition_period_days=14,
+    )
+
+    assert decision.cadence_state == "warning_due"
+    assert decision.may_post_warning is True
+
+
 def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="alice", assigned_at="2026-03-01T00:00:00Z", active_cycle_started_at="2026-03-01T00:00:00Z")
@@ -53,7 +90,7 @@ def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkey
 def test_check_overdue_reviews_consumes_only_stable_reviewer_response_fields(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     now = runtime.datetime.now(runtime.timezone.utc)
-    anchor_timestamp = iso_z(now - timedelta(days=runtime.REVIEW_DEADLINE_DAYS + 1))
+    anchor_timestamp = (now - timedelta(days=runtime.REVIEW_DEADLINE_DAYS + 1)).replace(tzinfo=None).isoformat()
     state = make_state()
     make_tracked_review_state(state, 42, reviewer="alice", assigned_at=anchor_timestamp, active_cycle_started_at=anchor_timestamp)
     runtime.github.get_issue_or_pr_snapshot_result = lambda issue_number: runtime.GitHubApiResult(

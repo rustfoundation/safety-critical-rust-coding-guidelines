@@ -69,7 +69,7 @@ def test_deferred_review_dismissed_payload_keeps_canonical_dismissed_at():
         "source_event_key": "pull_request_review_dismissed:20",
         "pr_number": 264,
         "review_id": 20,
-        "source_dismissed_at": "2026-04-01T00:10:00Z",
+        "source_dismissed_at": "2026-04-01T02:40:00+02:30",
     }
     contract = deferred_workflow_source_contract_for_payload_kind("deferred_review_dismissed")
 
@@ -82,6 +82,6 @@ def test_deferred_review_dismissed_payload_keeps_canonical_dismissed_at():
     )
 
     assert isinstance(parsed, DeferredReviewDismissedPayload)
-    assert parsed.source_dismissed_at == "2026-04-01T00:10:00Z"
-    assert parsed.raw_payload["source_dismissed_at"] == "2026-04-01T00:10:00Z"
+    assert parsed.source_dismissed_at == "2026-04-01T00:10:00+00:00"
+    assert parsed.raw_payload["source_dismissed_at"] == "2026-04-01T02:40:00+02:30"
     assert authority.authority_status == "trusted_exact_identity"
