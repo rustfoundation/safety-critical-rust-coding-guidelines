@@ -605,10 +605,7 @@ def _find_existing_marker_comment(
 ) -> dict[str, object]:
     earliest = None
     if isinstance(not_before, str) and not_before:
-        try:
-            earliest = bot.datetime.fromisoformat(not_before.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
-            earliest = None
+        earliest = _parse_reminder_timestamp(not_before)
     page = 1
     while True:
         try:
@@ -634,9 +631,8 @@ def _find_existing_marker_comment(
                 continue
             if login not in authors:
                 continue
-            try:
-                created_dt = bot.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
+            created_dt = _parse_reminder_timestamp(created_at)
+            if created_dt is None:
                 continue
             if earliest is not None and created_dt < earliest:
                 continue
@@ -785,9 +781,8 @@ def _find_existing_warning_comment(
             if second_line.startswith(scope_prefix):
                 if scope_marker is None or second_line != scope_marker:
                     continue
-            try:
-                created_dt = bot.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-            except (ValueError, AttributeError):
+            created_dt = _parse_reminder_timestamp(created_at)
+            if created_dt is None:
                 continue
             if first_match is None or created_dt < first_match[0]:
                 first_match = (created_dt, created_at, comment.get("id"))
@@ -961,9 +956,8 @@ def check_overdue_reviews(bot, state: dict) -> list[dict]:
         if not last_activity:
             continue
 
-        try:
-            last_activity_dt = bot.datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
-        except (ValueError, AttributeError):
+        last_activity_dt = _parse_reminder_timestamp(last_activity)
+        if last_activity_dt is None:
             continue
 
         days_since_activity = (now - last_activity_dt).days

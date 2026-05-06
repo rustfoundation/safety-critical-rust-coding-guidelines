@@ -53,7 +53,7 @@ def test_check_overdue_reviews_skips_pr_with_current_head_reviewer_review(monkey
 def test_check_overdue_reviews_consumes_only_stable_reviewer_response_fields(monkeypatch):
     runtime = FakeReviewerBotRuntime(monkeypatch)
     now = runtime.datetime.now(runtime.timezone.utc)
-    anchor_timestamp = iso_z(now - timedelta(days=runtime.REVIEW_DEADLINE_DAYS + 1))
+    anchor_timestamp = (now - timedelta(days=runtime.REVIEW_DEADLINE_DAYS + 1)).replace(tzinfo=None).isoformat()
     state = make_state()
     make_tracked_review_state(state, 42, reviewer="alice", assigned_at=anchor_timestamp, active_cycle_started_at=anchor_timestamp)
     runtime.github.get_issue_or_pr_snapshot_result = lambda issue_number: runtime.GitHubApiResult(
