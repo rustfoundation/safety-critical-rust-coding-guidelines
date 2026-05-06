@@ -475,6 +475,13 @@ def _decorate_response(
     }
 
 
+def _write_approval_authority_payload(write_approval: object) -> dict[str, object] | None:
+    if not isinstance(write_approval, dict):
+        return None
+    authority = write_approval.get("authority_decision")
+    return dict(authority) if isinstance(authority, dict) else None
+
+
 def _record_for_current_reviewer(record: dict | None | object, current_reviewer: str) -> dict | None:
     if not isinstance(record, dict):
         return None
@@ -877,14 +884,19 @@ def derive_reviewer_response_state(
         )
 
     if not isinstance(approval_result, dict) or not approval_result.get("ok"):
+        write_approval_authority = _write_approval_authority_payload(
+            approval_result.get("write_approval") if isinstance(approval_result, dict) else None
+        )
         return _decorate_response(
             state="projection_failed",
             reason="live_review_state_unknown",
             scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
+            write_approval_authority=write_approval_authority,
         )
 
     completion = approval_result["completion"]
     write_approval = approval_result["write_approval"]
+    write_approval_authority = _write_approval_authority_payload(write_approval)
     if not completion.get("completed"):
         return _decorate_response(
             state="awaiting_contributor_response",
@@ -911,6 +923,7 @@ def derive_reviewer_response_state(
             current_cycle_reviewer_handoff=reviewer_handoff,
             contributor_comment=contributor_comment,
             contributor_handoff=contributor_handoff,
+            write_approval_authority=write_approval_authority,
         )
     if authority_response_state == "projection_failed":
         authority = write_approval.get("authority_decision")
@@ -921,6 +934,7 @@ def derive_reviewer_response_state(
             state="projection_failed",
             reason=reason,
             scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
+            write_approval_authority=write_approval_authority,
         )
     if not write_approval.get("has_write_approval"):
         return _decorate_response(
@@ -934,6 +948,7 @@ def derive_reviewer_response_state(
             current_cycle_reviewer_handoff=reviewer_handoff,
             contributor_comment=contributor_comment,
             contributor_handoff=contributor_handoff,
+            write_approval_authority=write_approval_authority,
         )
     return _decorate_response(
         state="done",
@@ -946,6 +961,7 @@ def derive_reviewer_response_state(
         current_cycle_reviewer_handoff=reviewer_handoff,
         contributor_comment=contributor_comment,
         contributor_handoff=contributor_handoff,
+        write_approval_authority=write_approval_authority,
     )
 
 

@@ -355,6 +355,51 @@ def test_status_projection_maps_reassignment_needed_and_exposes_decision_output(
     assert payload["output_keys"] == sorted(payload.keys())
 
 
+def test_status_projection_preserves_write_approval_authority_decision_output():
+    authority = {
+        "issue_number": 264,
+        "head_sha": "head-a",
+        "assigned_reviewer": "iglesias",
+        "assigned_review_id": 10,
+        "assigned_review_state": "APPROVED",
+        "assigned_round_complete": True,
+        "write_approval_state": "visibly_missing_write_approval",
+        "write_approval_source": "none_visible_after_trusted_reads",
+        "approving_reviewer": None,
+        "approving_review_id": None,
+        "permission_source": "github_permission_read",
+        "dismissal_supersession_status": "pass_not_dismissed_or_superseded",
+        "response_state": "awaiting_write_approval",
+        "diagnostic_reason": None,
+        "can_project_final_state": True,
+    }
+    decision = to_reviewer_response_decision(
+        {
+            "issue_number": 264,
+            "response_state": "awaiting_write_approval",
+            "current_scope_key": "scope-approval",
+            "current_scope_basis": "assigned_at",
+            "write_approval_authority": authority,
+        }
+    )
+
+    result = reviews_projection.derive_status_label_projection(
+        reviews_projection.StatusLabelProjectionInput(
+            issue_number=264,
+            issue_state="open",
+            actual_labels=(),
+            reviewer_response=decision,
+            reviewer_authority_outcome="tracked_reviewer_confirmed",
+            freshness_runtime_epoch="freshness_v15",
+            status_projection_epoch="status_projection_v2",
+        )
+    )
+
+    decision_output = result.projection_metadata["decision_output"]
+    assert decision_output["write_approval_authority"] == authority
+    assert result.delta.desired_status_labels == ("status: awaiting write approval",)
+
+
 @pytest.mark.parametrize("state_name", ["projection_failed", "live_read_unavailable", "unknown"])
 def test_status_projection_fail_closed_states_never_clear_existing_labels(state_name):
     decision = to_reviewer_response_decision({"response_state": state_name})

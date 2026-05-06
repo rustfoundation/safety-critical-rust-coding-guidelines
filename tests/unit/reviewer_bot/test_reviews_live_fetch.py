@@ -411,6 +411,23 @@ def test_compute_reviewer_response_state_reports_permission_unavailable(monkeypa
 
     assert response_state["state"] == "projection_failed"
     assert response_state["reason"] == "live_review_state_unknown"
+    assert response_state["write_approval_authority"] == {
+        "issue_number": 42,
+        "head_sha": "head-1",
+        "assigned_reviewer": "alice",
+        "assigned_review_id": 10,
+        "assigned_review_state": "APPROVED",
+        "assigned_round_complete": True,
+        "write_approval_state": "blocked_unavailable_authority",
+        "write_approval_source": "github_permission_read_unavailable",
+        "approving_reviewer": "alice",
+        "approving_review_id": 10,
+        "permission_source": "github_permission_read",
+        "dismissal_supersession_status": "blocked_untrusted",
+        "response_state": "projection_failed",
+        "diagnostic_reason": "permission_unavailable",
+        "can_project_final_state": False,
+    }
 
 
 def test_trigger_mandatory_approver_escalation_sets_required_label_and_ping(monkeypatch):
