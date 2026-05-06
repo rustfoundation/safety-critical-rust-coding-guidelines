@@ -793,7 +793,7 @@ def test_legacy_deferred_comment_identity_is_diagnostic_only(monkeypatch):
     assert result == reconcile.WorkflowRunHandlerResult(True, [42])
     gap = review["sidecars"]["deferred_gaps"]["issue_comment:210"]
     assert gap["reason"] == "artifact_invalid"
-    assert "diagnostic_legacy_identity" in gap["diagnostic_summary"]
+    assert "trusted_legacy_identity" in gap["diagnostic_summary"]
     assert review["sidecars"]["reconciled_source_events"] == {}
 
 
@@ -873,7 +873,7 @@ def test_non_success_missing_row_records_orphan_without_reconstruction(monkeypat
     assert result == reconcile.WorkflowRunHandlerResult(True, [42])
     assert "42" not in state["active_reviews"]
     orphan = state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]
-    assert orphan["recovery_status"] == "orphaned_deferred_event"
+    assert orphan["recovery_status"] == "diagnostic_open_item_orphaned_event"
     assert orphan["diagnostic_reason"] == "reconstruction_not_allowed_for_diagnostic_admission"
 
 

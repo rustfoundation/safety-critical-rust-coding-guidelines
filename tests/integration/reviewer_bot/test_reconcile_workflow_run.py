@@ -200,7 +200,7 @@ def test_late_workflow_run_reconcile_missing_row_is_diagnostic_safe_noop(monkeyp
     assert result == reconcile.WorkflowRunHandlerResult(True, [42])
     assert state["active_reviews"] == {}
     orphan = state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]
-    assert orphan["recovery_status"] == "orphaned_deferred_event"
+    assert orphan["recovery_status"] == "blocked_live_pr_unavailable"
 
 
 @pytest.mark.parametrize(
@@ -1315,7 +1315,7 @@ def test_deferred_legacy_review_comment_hydrates_source_commit_id_from_live_comm
     gap = _deferred_gaps(review)["pull_request_review_comment:305"]
     assert gap["reason"] == "artifact_invalid"
     assert gap["failure_kind"] == "blocked_untrusted_source"
-    assert "diagnostic_legacy_identity" in gap["diagnostic_summary"]
+    assert "trusted_legacy_identity" in gap["diagnostic_summary"]
     assert review["reviewer_comment"]["accepted"] is None
 
 
@@ -1346,7 +1346,7 @@ def test_deferred_legacy_review_comment_without_live_commit_id_records_artifact_
     gap = _deferred_gaps(review)["pull_request_review_comment:306"]
     assert gap["reason"] == "artifact_invalid"
     assert gap["failure_kind"] == "blocked_untrusted_source"
-    assert "diagnostic_legacy_identity" in gap["diagnostic_summary"]
+    assert "trusted_legacy_identity" in gap["diagnostic_summary"]
     assert "source_commit_id" not in gap
 
 

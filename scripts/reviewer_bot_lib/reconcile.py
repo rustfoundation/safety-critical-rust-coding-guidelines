@@ -503,7 +503,7 @@ def _recover_missing_active_review_entry(
             live_author=None,
             live_labels=(),
             recovered_current_reviewer=None,
-            recovery_status="orphaned_deferred_event",
+            recovery_status="blocked_live_pr_unavailable",
             diagnostic_reason=str(exc),
         )
         changed = _record_missing_row_orphan(state, context)
@@ -522,7 +522,7 @@ def _recover_missing_active_review_entry(
             source_event_action,
             live_pr,
             recovered_current_reviewer=None,
-            recovery_status="orphaned_deferred_event",
+            recovery_status="diagnostic_open_item_orphaned_event",
             diagnostic_reason="reconstruction_not_allowed_for_diagnostic_admission",
         )
         changed = _record_missing_row_orphan(state, context)
@@ -537,7 +537,7 @@ def _recover_missing_active_review_entry(
             source_event_action,
             live_pr,
             recovered_current_reviewer=None,
-            recovery_status="orphaned_deferred_event",
+            recovery_status="diagnostic_open_item_orphaned_event",
             diagnostic_reason="live_pr_state_not_open",
         )
         changed = _record_missing_row_orphan(state, context)
@@ -560,7 +560,7 @@ def _recover_missing_active_review_entry(
             source_event_action,
             live_pr,
             recovered_current_reviewer=None,
-            recovery_status="orphaned_deferred_event",
+            recovery_status="diagnostic_open_item_orphaned_event",
             diagnostic_reason="missing_row_recovery_requires_exactly_one_live_reviewer",
         )
         changed = _record_missing_row_orphan(state, context)

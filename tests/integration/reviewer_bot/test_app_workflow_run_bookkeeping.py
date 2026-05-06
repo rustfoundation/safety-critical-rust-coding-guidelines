@@ -323,7 +323,7 @@ def test_execute_run_workflow_run_missing_row_records_orphan_then_projects(
     assert result.exit_code == 0
     assert result.state_changed is True
     assert state["active_reviews"] == {}
-    assert state["sidecars"]["orphaned_deferred_reconcile_events"]["pull_request_review_dismissed:12"]["recovery_status"] == "orphaned_deferred_event"
+    assert state["sidecars"]["orphaned_deferred_reconcile_events"]["pull_request_review_dismissed:12"]["recovery_status"] == "blocked_live_pr_unavailable"
     assert save_snapshots
     assert projected_issue_numbers == [42]
 

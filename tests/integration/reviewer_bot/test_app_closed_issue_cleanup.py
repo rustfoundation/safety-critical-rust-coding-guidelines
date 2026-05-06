@@ -185,6 +185,6 @@ def test_execute_run_late_workflow_run_reconcile_missing_row_records_orphan(monk
 
     assert result.exit_code == 0
     assert state["active_reviews"] == {}
-    assert state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]["recovery_status"] == "orphaned_deferred_event"
+    assert state["sidecars"]["orphaned_deferred_reconcile_events"]["issue_comment:210"]["recovery_status"] == "blocked_live_pr_unavailable"
     assert save_called["value"] is True
     assert sync_calls == [[42]]

@@ -445,7 +445,7 @@ def derive_deferred_artifact_source_authority(
     status = "trusted_exact_identity"
     reason = None
     if identity is not None and identity.schema_version == 2:
-        status = "diagnostic_legacy_identity"
+        status = "trusted_legacy_identity"
         reason = "legacy_payload_missing_workflow_artifact_authority"
     elif identity is None or missing_identity:
         status = "blocked_missing_identity"

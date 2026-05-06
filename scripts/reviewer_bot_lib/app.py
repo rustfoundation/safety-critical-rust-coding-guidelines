@@ -507,7 +507,7 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             )
             _store_state_issue_write_receipt(state, success_receipt)
             if not bot.state_store.save_state(state):
-                record_state_issue_write_receipt(
+                failure_receipt = record_state_issue_write_receipt(
                     bot,
                     issue_number=_primary_issue_number(context, touched_items),
                     mutation_kind=f"{event_name}:{event_action or context.manual_action or 'none'}",
@@ -518,6 +518,12 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
                     state_save_succeeded=False,
                     failure_kind="state_save_failed",
                 )
+                _store_state_issue_write_receipt(state, failure_receipt)
+                if bot.state_store.save_state(state):
+                    raise RuntimeError(
+                        "State save initially failed after external side effects; "
+                        "a recovery receipt was persisted for the next run."
+                    )
                 raise RuntimeError(
                     "State updates were computed but could not be persisted. "
                     "Failing this run to avoid silent success."

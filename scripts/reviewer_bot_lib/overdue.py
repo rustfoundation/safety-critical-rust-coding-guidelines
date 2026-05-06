@@ -176,13 +176,13 @@ def _scoped_delivery_receipt(
         if scope_key is not None and row_scope != scope_key:
             continue
         row_reviewer = row.get("reviewer") if isinstance(row.get("reviewer"), str) else None
-        if reviewer and row_reviewer and row_reviewer.lower() != reviewer.lower():
+        if reviewer and (not row_reviewer or row_reviewer.lower() != reviewer.lower()):
             continue
         row_head = row.get("head_sha") if isinstance(row.get("head_sha"), str) else None
-        if head_sha and row_head and row_head != head_sha:
+        if head_sha and row_head != head_sha:
             continue
         row_cycle = row.get("cycle_key") if isinstance(row.get("cycle_key"), str) else None
-        if cycle_key and row_cycle and row_cycle != cycle_key:
+        if cycle_key and row_cycle != cycle_key:
             continue
         kind = row.get("receipt_kind")
         created_at = row.get("comment_created_at")
@@ -197,7 +197,7 @@ def _scoped_delivery_receipt(
             str(kind),
             row.get("comment_id"),
             created_at,
-            "state_delivery_receipt",
+            "state",
             "found",
             None,
         )
@@ -205,6 +205,97 @@ def _scoped_delivery_receipt(
     if not candidates:
         return None
     return sorted(candidates, key=lambda item: item[0])[-1][1]
+
+
+def _same_login(left: str | None, right: str | None) -> bool:
+    return isinstance(left, str) and isinstance(right, str) and left.strip() and left.lower() == right.lower()
+
+
+def _marker_field(first_line: str, field_name: str) -> str | None:
+    prefix = f"{field_name}="
+    for part in first_line.replace("-->", "").split():
+        if part.startswith(prefix):
+            value = part[len(prefix) :].strip()
+            return value or None
+    return None
+
+
+def _receipt_from_scanned_comments(
+    *,
+    issue_number: int,
+    reviewer: str | None,
+    head_sha: str | None,
+    cycle_key: str | None,
+    scope_key: str | None,
+    scanned_comments: tuple[object, ...],
+) -> ReminderScopeReceipt | None:
+    records = sorted(
+        scanned_comments,
+        key=lambda item: (getattr(item, "created_at", ""), str(getattr(item, "comment_id", "")), getattr(item, "matched_shape", "")),
+    )
+    legacy_records = []
+    for record in records:
+        shape = getattr(record, "matched_shape", "")
+        first_line = getattr(record, "body_first_line", "")
+        if shape in {"markerized_warning", "markerized_transition_notice"}:
+            marker_issue = _marker_field(first_line, "issue")
+            marker_reviewer = _marker_field(first_line, "reviewer")
+            if marker_issue != str(issue_number) or not _same_login(marker_reviewer, reviewer):
+                continue
+            receipt_kind = "transition" if shape == "markerized_transition_notice" else "warning"
+            return ReminderScopeReceipt(
+                issue_number,
+                reviewer,
+                head_sha,
+                cycle_key,
+                scope_key,
+                receipt_kind,
+                getattr(record, "comment_id", None),
+                getattr(record, "created_at", None),
+                "comment_scan",
+                "found",
+                None,
+            )
+        if shape in {
+            "legacy_unmarked_warning",
+            "legacy_unmarked_transition_notice",
+            "legacy_actions_warning_or_reminder",
+        }:
+            legacy_records.append(record)
+
+    if len(legacy_records) >= 2:
+        latest = legacy_records[-1]
+        shape = getattr(latest, "matched_shape", "")
+        receipt_kind = "legacy_transition" if "transition" in shape else "legacy_warning_or_reminder"
+        return ReminderScopeReceipt(
+            issue_number,
+            reviewer,
+            head_sha,
+            cycle_key,
+            scope_key,
+            receipt_kind,
+            getattr(latest, "comment_id", None),
+            getattr(latest, "created_at", None),
+            "legacy_duplicate_comment_scan",
+            "found",
+            None,
+        )
+    if legacy_records:
+        latest = legacy_records[-1]
+        return ReminderScopeReceipt(
+            issue_number,
+            reviewer,
+            head_sha,
+            cycle_key,
+            scope_key,
+            "none",
+            getattr(latest, "comment_id", None),
+            getattr(latest, "created_at", None),
+            "blocked",
+            "unavailable",
+            "ambiguous_legacy_reminder_scan",
+        )
+    return None
 
 
 def derive_reminder_scope_receipt(
@@ -227,29 +318,36 @@ def derive_reminder_scope_receipt(
     )
     if scoped_receipt is not None:
         return scoped_receipt
-    if scanned_comments:
-        record = sorted(scanned_comments, key=lambda item: getattr(item, "created_at", ""))[-1]
-        shape = getattr(record, "matched_shape", "")
-        kind = "legacy_transition" if "transition" in shape else "legacy_warning_or_reminder"
+    scanned_receipt = _receipt_from_scanned_comments(
+        issue_number=issue_number,
+        reviewer=reviewer,
+        head_sha=head_sha,
+        cycle_key=cycle_key,
+        scope_key=scope_key,
+        scanned_comments=scanned_comments,
+    )
+    if scanned_receipt is not None:
+        return scanned_receipt
+    warning = persisted_state.get("transition_warning_sent") if isinstance(persisted_state, dict) else None
+    notice = persisted_state.get("transition_notice_sent_at") if isinstance(persisted_state, dict) else None
+    if isinstance(warning, str) and warning.strip() and isinstance(notice, str) and notice.strip():
         return ReminderScopeReceipt(
             issue_number,
             reviewer,
             head_sha,
             cycle_key,
             scope_key,
-            kind,
-            getattr(record, "comment_id", None),
-            getattr(record, "created_at", None),
-            "comment_scan",
-            "found",
+            "legacy_transition",
             None,
+            notice,
+            "state",
+            "found",
+            "legacy_duplicate_exhausted",
         )
-    warning = persisted_state.get("transition_warning_sent") if isinstance(persisted_state, dict) else None
-    notice = persisted_state.get("transition_notice_sent_at") if isinstance(persisted_state, dict) else None
     if isinstance(notice, str) and notice.strip():
-        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "transition", None, notice, "legacy_state_field", "found", "scope_unbound_legacy_field")
+        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "none", None, notice, "blocked", "unavailable", "scope_unbound_legacy_field")
     if isinstance(warning, str) and warning.strip():
-        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "warning", None, warning, "legacy_state_field", "found", "scope_unbound_legacy_field")
+        return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "none", None, warning, "blocked", "unavailable", "scope_unbound_legacy_field")
     return ReminderScopeReceipt(issue_number, reviewer, head_sha, cycle_key, scope_key, "none", None, None, "derived_absent", "missing", None)
 
 
@@ -292,7 +390,8 @@ def build_reminder_delivery_persistence_result(
     if comment_posted and state_save_attempted and not state_save_succeeded:
         result = "posted_save_failed_recoverable" if recovered_receipt is not None else "posted_save_failed_unrecoverable"
     elif comment_posted and not state_save_attempted:
-        result = "pending_state_save_with_receipt" if recovered_receipt is not None else "pending_state_save_missing_receipt"
+        result = "blocked"
+        diagnostic_reason = diagnostic_reason or "state_save_not_attempted_after_comment_post"
     elif recovered_receipt is not None and not comment_posted:
         result = "not_posted_existing_receipt"
     elif state_save_succeeded or not state_save_attempted:
@@ -341,6 +440,20 @@ def derive_reminder_cadence_decision(
 ) -> ReminderCadenceDecision:
     issue_number = int(getattr(response, "scope", None).issue_number or 0) if getattr(response, "scope", None) else 0
     reviewer = getattr(getattr(response, "scope", None), "reviewer", None)
+    if receipt is not None and (receipt.source == "blocked" or receipt.status in {"unavailable", "malformed"}):
+        return ReminderCadenceDecision(
+            issue_number=int(getattr(response, "scope", None).issue_number or 0) if getattr(response, "scope", None) else 0,
+            reviewer=getattr(getattr(response, "scope", None), "reviewer", None),
+            scope=getattr(response, "scope", None),
+            cadence_state="blocked",
+            exhaustion_reason="blocked",
+            warning_receipt=None,
+            transition_receipt=None,
+            legacy_duplicate_count=reminder_scan.baseline_count if reminder_scan is not None else 0,
+            may_post_warning=False,
+            may_post_transition=False,
+            must_project_reassignment_needed=False,
+        )
     effective_receipt = receipt if receipt is not None and receipt.receipt_kind != "none" else None
     legacy_duplicate_count = reminder_scan.baseline_count if reminder_scan is not None else 0
     exhausted = (effective_receipt is not None and effective_receipt.receipt_kind in {"transition", "legacy_transition"}) or legacy_duplicate_count >= 2

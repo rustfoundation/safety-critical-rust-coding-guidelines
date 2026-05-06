@@ -366,6 +366,29 @@ def test_execute_run_returns_failure_when_save_state_fails(monkeypatch):
     assert receipt_logs[-1]["fields"]["next_recovery_action"] == "recover_from_live_github_receipt"
 
 
+def test_execute_run_persists_recovery_receipt_after_initial_save_failure(monkeypatch):
+    harness = AppHarness(monkeypatch)
+    harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")
+    harness.stub_lock(acquire=lambda: None, release=lambda: True)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_pass_until(lambda state: (state, []))
+    harness.stub_sync_members(lambda state: (state, []))
+    harness.stub_handler("handle_comment_event", lambda state: True)
+    save_results = iter([False, True])
+    harness.stub_save_state(lambda state: next(save_results))
+
+    result = harness.run_execute()
+
+    assert result.exit_code == 1
+    assert len(harness.state_store.save_calls) == 2
+    receipts = harness.state_store.save_calls[-1]["state_issue_write_receipts"]
+    assert any(
+        receipt["write_status"] == "failed_after_external_side_effect"
+        and receipt["next_recovery_action"] == "recover_from_live_github_receipt"
+        for receipt in receipts.values()
+    )
+
+
 def test_execute_run_releases_lock_after_save_failure(monkeypatch):
     harness = AppHarness(monkeypatch)
     harness.set_event(EVENT_NAME="issue_comment", EVENT_ACTION="created")
