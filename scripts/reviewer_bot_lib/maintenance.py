@@ -25,6 +25,7 @@ from .reviews_projection import status_label_projection_output
 
 ScheduleHandlerResult = maintenance_schedule.ScheduleHandlerResult
 SCHEDULE_LIKE_MANUAL_ACTIONS = frozenset({"check-overdue"})
+_PENDING_ISSUE314_REPAIR_SUMMARY_ATTR = "_reviewer_bot_pending_issue314_state_health_repair_summary"
 _now_iso = maintenance_privileged._now_iso
 _finalize_schedule_result = maintenance_schedule._finalize_schedule_result
 _record_maintenance_repair_marker = maintenance_schedule._record_maintenance_repair_marker
@@ -234,6 +235,14 @@ def _issue314_request(bot, request) -> issue314_state_health.Issue314StateHealth
     )
 
 
+def emit_pending_issue314_state_health_repair_summary(bot) -> None:
+    summary = getattr(bot, _PENDING_ISSUE314_REPAIR_SUMMARY_ATTR, None)
+    if summary is None:
+        return
+    issue314_state_health.emit_issue314_state_health_repair_summary(summary)
+    setattr(bot, _PENDING_ISSUE314_REPAIR_SUMMARY_ATTR, None)
+
+
 def derive_manual_dispatch_projection_policy(request) -> ManualDispatchProjectionPolicy:
     action = request.action or ""
     issue_number = request.issue_number if isinstance(request.issue_number, int) else None
@@ -296,49 +305,34 @@ def run_status_label_repair(bot, state: dict, request: StatusLabelRepairRequest)
     after: list[StatusLabelRepairItemResult] = []
     labels_added: set[str] = set()
     labels_removed: set[str] = set()
-    blocked = False
     for issue_number in targets:
-        try:
-            projection = reviews.project_status_label_projection_for_item(bot, issue_number, state)
-            delta = projection.delta
-            sync_result = reviews.apply_status_label_delta(bot, issue_number, delta)
-            item_result = "changed" if sync_result.changed else "already_aligned"
-            before.append(
-                StatusLabelRepairItemResult(
-                    issue_number=issue_number,
-                    before_status_labels=delta.actual_status_labels,
-                    desired_status_labels=delta.desired_status_labels,
-                    labels_added=delta.labels_to_add,
-                    labels_removed=delta.labels_to_remove,
-                    result=item_result,
-                )
+        projection = reviews.project_status_label_projection_for_item(bot, issue_number, state)
+        delta = projection.delta
+        sync_result = reviews.apply_status_label_delta(bot, issue_number, delta)
+        item_result = "changed" if sync_result.changed else "already_aligned"
+        before.append(
+            StatusLabelRepairItemResult(
+                issue_number=issue_number,
+                before_status_labels=delta.actual_status_labels,
+                desired_status_labels=delta.desired_status_labels,
+                labels_added=delta.labels_to_add,
+                labels_removed=delta.labels_to_remove,
+                result=item_result,
             )
-            after.append(
-                StatusLabelRepairItemResult(
-                    issue_number=issue_number,
-                    before_status_labels=delta.desired_status_labels,
-                    desired_status_labels=delta.desired_status_labels,
-                    labels_added=sync_result.labels_added,
-                    labels_removed=sync_result.labels_removed,
-                    result=item_result,
-                )
+        )
+        after.append(
+            StatusLabelRepairItemResult(
+                issue_number=issue_number,
+                before_status_labels=delta.desired_status_labels,
+                desired_status_labels=delta.desired_status_labels,
+                labels_added=sync_result.labels_added,
+                labels_removed=sync_result.labels_removed,
+                result=item_result,
             )
-            labels_added.update(sync_result.labels_added)
-            labels_removed.update(sync_result.labels_removed)
-        except RuntimeError:
-            blocked = True
-            before.append(
-                StatusLabelRepairItemResult(
-                    issue_number=issue_number,
-                    before_status_labels=(),
-                    desired_status_labels=(),
-                    labels_added=(),
-                    labels_removed=(),
-                    result="blocked",
-                )
-            )
-            after.append(before[-1])
-    result = "blocked" if blocked else "changed" if labels_added or labels_removed else "already_aligned"
+        )
+        labels_added.update(sync_result.labels_added)
+        labels_removed.update(sync_result.labels_removed)
+    result = "changed" if labels_added or labels_removed else "already_aligned"
     artifact = _repair_artifact_fields(request)
     payload = StatusLabelRepairSummary(
         schema_version=1,
@@ -499,7 +493,7 @@ def _handle_manual_dispatch_request(bot, state: dict, request) -> bool:
             state,
             _issue314_request(bot, request),
         )
-        issue314_state_health.emit_issue314_state_health_repair_summary(summary)
+        setattr(bot, _PENDING_ISSUE314_REPAIR_SUMMARY_ATTR, summary)
         return bool(summary.rows_removed_closed)
     if action == "execute-pending-privileged-command":
         source_event_key = request.privileged_source_event_key

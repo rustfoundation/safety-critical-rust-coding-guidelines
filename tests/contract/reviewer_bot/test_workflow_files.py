@@ -446,6 +446,7 @@ def test_sweeper_repair_workflow_exposes_nonce_identity_and_repair_artifacts():
         "repair-issue314-state-health",
     ]
     assert inputs["validation_nonce"]["type"] == "string"
+    assert inputs["validation_nonce"]["required"] is True
     assert "VALIDATION_NONCE: ${{ github.event.inputs.validation_nonce }}" in text
     assert "EVALUATED_REPO: ${{ github.repository }}" in text
     assert "HEAD_SHA: ${{ github.sha }}" in text

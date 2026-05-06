@@ -107,7 +107,7 @@ def test_execute_run_preview_status_label_projection_is_read_only_pr264_contract
     assert payload["response_state"] == "reviewer_reassignment_needed"
     assert payload["reviewer_authority_outcome"] == "tracked_reviewer_confirmed"
     assert payload["suppression_reason"] == "legacy_duplicate_reminders_exhausted"
-    assert payload["current_scope_basis"] == "active_cycle_started_at"
+    assert payload["current_scope_basis"] == "reminder_cadence_exhausted"
     assert payload["actual_status_labels"] == ["status: awaiting reviewer response"]
     assert payload["desired_status_labels"] == ["status: reviewer reassignment needed"]
     assert payload["labels_to_add"] == ["status: reviewer reassignment needed"]

@@ -19,6 +19,66 @@ from .reviews_projection import (
     actual_status_labels_from_snapshot,
 )
 
+_REQUIRED_IDENTITY_FIELDS = (
+    "validation_nonce",
+    "evaluated_repo",
+    "head_sha",
+    "evaluated_ref",
+    "workflow_path",
+    "run_id",
+    "run_attempt",
+)
+_SUPPORTED_ACTION_WORKFLOWS = {
+    "preview-issue314-state-health": ".github/workflows/reviewer-bot-preview.yml",
+    "repair-issue314-state-health": ".github/workflows/reviewer-bot-sweeper-repair.yml",
+}
+_SUPPORTED_REPAIR_RESULTS = frozenset({"already_healthy", "changed", "blocked"})
+
+
+def _missing_identity_fields(values: dict[str, object]) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            name
+            for name in _REQUIRED_IDENTITY_FIELDS
+            if not isinstance(values.get(name), str) or not str(values.get(name)).strip()
+        )
+    )
+
+
+def _require_identity(values: dict[str, object], *, reason: str) -> None:
+    missing = _missing_identity_fields(values)
+    if missing:
+        raise RuntimeError(f"issue314_state_health_identity_blocked:{reason}:" + ",".join(missing))
+
+
+def _require_request_identity(request: "Issue314StateHealthRepairRequest") -> None:
+    expected_workflow = _SUPPORTED_ACTION_WORKFLOWS.get(request.repair_action)
+    if expected_workflow is None:
+        raise RuntimeError("issue314_state_health_request_blocked:unsupported_action")
+    _require_identity(request.__dict__, reason="missing")
+    if request.workflow_path != expected_workflow:
+        raise RuntimeError("issue314_state_health_request_blocked:workflow_path")
+
+
+def _require_repair_summary_contract(summary: "Issue314StateHealthRepairSummary") -> None:
+    _require_identity(summary.__dict__, reason="missing")
+    if summary.target_collection_mode != "global_issue314_state_health":
+        raise RuntimeError("issue314_state_health_repair_summary_blocked:target_collection_mode")
+    if summary.result not in _SUPPORTED_REPAIR_RESULTS:
+        raise RuntimeError("issue314_state_health_repair_summary_blocked:result")
+    if summary.reviewer_facing_reminder_posts_attempted != 0:
+        raise RuntimeError("issue314_state_health_repair_summary_blocked:reviewer_reminder_attempt")
+    if summary.manual_issue314_edit_status != "not_attempted":
+        raise RuntimeError("issue314_state_health_repair_summary_blocked:manual_issue314_edit")
+    if summary.rows_blocked and summary.result != "blocked":
+        raise RuntimeError("issue314_state_health_repair_summary_blocked:blocked_rows_success")
+    if set(summary.status_labels_changed) - set(summary.rows_repaired):
+        raise RuntimeError("issue314_state_health_repair_summary_blocked:final_label_only_status")
+    if summary.result == "already_healthy" and (
+        summary.rows_repaired or summary.rows_removed_closed or summary.status_labels_changed
+    ):
+        raise RuntimeError("issue314_state_health_repair_summary_blocked:changed_rows_marked_healthy")
+
 
 @dataclass(frozen=True)
 class Issue314StateHealthClassificationInput:
@@ -121,6 +181,7 @@ class Issue314StateHealthSummary:
     output_keys: tuple[str, ...]
 
     def to_output(self) -> dict[str, object]:
+        _require_identity(self.__dict__, reason="preview_output")
         payload: dict[str, object] = {
             "schema_version": self.schema_version,
             "preview_action": self.preview_action,
@@ -186,6 +247,7 @@ class Issue314StateHealthRepairSummary:
     result: str
 
     def to_output(self) -> dict[str, object]:
+        _require_repair_summary_contract(self)
         payload: dict[str, object] = {
             "schema_version": self.schema_version,
             "repair_action": self.repair_action,
@@ -285,6 +347,7 @@ def collect_issue314_state_health_input(
     request: Issue314StateHealthRepairRequest | None = None,
 ) -> Issue314StateHealthClassificationInput:
     request = request or _default_request(bot)
+    _require_request_identity(request)
     rows = _active_rows(state)
     snapshots: dict[int, dict[str, object]] = {}
     reviewer_responses: dict[int, ReviewerResponseDecision] = {}
@@ -293,8 +356,17 @@ def collect_issue314_state_health_input(
     for row in rows:
         issue_number = int(row["issue_number"])
         review_data = row["review_data"]
-        snapshot_result = bot.github.get_issue_or_pr_snapshot_result(issue_number)
-        snapshot = snapshot_result.payload if snapshot_result.ok and isinstance(snapshot_result.payload, dict) else None
+        try:
+            snapshot_result = bot.github.get_issue_or_pr_snapshot_result(issue_number)
+        except (AssertionError, AttributeError, RuntimeError):
+            snapshot_result = None
+        snapshot = (
+            snapshot_result.payload
+            if snapshot_result is not None
+            and snapshot_result.ok
+            and isinstance(snapshot_result.payload, dict)
+            else None
+        )
         if snapshot is not None:
             snapshots[issue_number] = snapshot
         scans[issue_number] = _comment_scan(bot, issue_number)
@@ -444,6 +516,7 @@ def _row_from_input(input: Issue314StateHealthClassificationInput, row: dict[str
 
 
 def classify_issue314_state_health(input: Issue314StateHealthClassificationInput) -> Issue314StateHealthSummary:
+    _require_identity(input.__dict__, reason="classification_input")
     inventory = tuple(_row_from_input(input, row) for row in input.active_review_rows)
     counts: dict[str, int] = {}
     for row in inventory:
@@ -520,6 +593,8 @@ def run_issue314_state_health_repair(
     state: dict,
     request: Issue314StateHealthRepairRequest,
 ) -> Issue314StateHealthRepairSummary:
+    _require_request_identity(request)
+    bot.assert_lock_held("run_issue314_state_health_repair")
     classification_input = collect_issue314_state_health_input(bot, state, request)
     summary = classify_issue314_state_health(classification_input)
     active_reviews = state.get("active_reviews") if isinstance(state, dict) else None

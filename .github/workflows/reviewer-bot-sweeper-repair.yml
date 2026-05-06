@@ -19,7 +19,7 @@ on:
         type: string
       validation_nonce:
         description: Validation nonce used to correlate this repair run
-        required: false
+        required: true
         type: string
 
 permissions:

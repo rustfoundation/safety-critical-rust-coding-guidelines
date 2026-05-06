@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from scripts.reviewer_bot_lib import app
+from scripts.reviewer_bot_lib import app, maintenance
 from tests.fixtures.app_harness import AppHarness
 from tests.fixtures.reviewer_bot import (
     make_state,
@@ -140,3 +140,38 @@ def test_execute_run_targeted_status_label_repair_does_not_broaden_epoch_repair(
     assert payload["artifact_file"] == "repair-summary.json"
     assert payload["output_keys"] == sorted(payload.keys())
     assert state["status_projection_epoch"] == "stale_projection_epoch"
+
+
+def test_execute_run_targeted_status_label_repair_fails_closed_without_summary(
+    monkeypatch,
+    tmp_path,
+):
+    harness = AppHarness(monkeypatch)
+    repair_summary_path = tmp_path / "repair" / "repair-summary.json"
+    harness.set_event(
+        EVENT_NAME="workflow_dispatch",
+        EVENT_ACTION="",
+        MANUAL_ACTION="repair-review-status-labels",
+        ISSUE_NUMBER=264,
+        VALIDATION_NONCE="nonce-pr264-repair",
+        GITHUB_SHA="workflow-head",
+        GITHUB_REPOSITORY="rustfoundation/safety-critical-rust-coding-guidelines",
+        GITHUB_RUN_ID="889",
+        GITHUB_RUN_ATTEMPT="1",
+    )
+    harness.stub_lock()
+    monkeypatch.setenv("REPAIR_SUMMARY_PATH", str(repair_summary_path))
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: make_state())
+    harness.stub_save_state(lambda current: (_ for _ in ()).throw(AssertionError("blocked repair should not save state")))
+    monkeypatch.setattr(
+        maintenance.reviews,
+        "project_status_label_projection_for_item",
+        lambda bot, issue_number, state: (_ for _ in ()).throw(
+            RuntimeError("status_label_projection_blocked:projection_failed")
+        ),
+    )
+
+    result = harness.run_execute()
+
+    assert result.exit_code == 1
+    assert not repair_summary_path.exists()

@@ -114,7 +114,7 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
     assert payload["reviewer_authority_outcome"] == "tracked_reviewer_confirmed"
     assert payload["suppression_reason"] == "legacy_duplicate_reminders_exhausted"
     assert payload["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z"
-    assert payload["current_scope_basis"] == "active_cycle_started_at"
+    assert payload["current_scope_basis"] == "reminder_cadence_exhausted"
     assert payload["would_post_warning"] is False
     assert payload["would_post_transition"] is False
     assert payload["lock_attempted"] is False

@@ -122,3 +122,58 @@ def test_execute_run_preview_issue314_state_health_is_read_only_and_inspects_act
     assert payload["artifact_name"] == "reviewer-bot-preview-output-999-attempt-4"
     assert payload["artifact_file"] == "preview-output.json"
     assert payload["output_keys"] == sorted(payload.keys())
+
+
+def test_execute_run_preview_issue314_state_health_blocks_unavailable_live_rows(
+    monkeypatch,
+    capsys,
+):
+    harness = AppHarness(monkeypatch)
+    harness.set_event(
+        EVENT_NAME="workflow_dispatch",
+        EVENT_ACTION="",
+        MANUAL_ACTION="preview-issue314-state-health",
+        ISSUE_NUMBER=314,
+        VALIDATION_NONCE="nonce-issue314-preview",
+        GITHUB_SHA="workflow-head",
+        GITHUB_REPOSITORY="rustfoundation/safety-critical-rust-coding-guidelines",
+        GITHUB_RUN_ID="1000",
+        GITHUB_RUN_ATTEMPT="1",
+        STATE_ISSUE_NUMBER=314,
+    )
+    state = make_state()
+    make_tracked_review_state(
+        state,
+        264,
+        reviewer="iglesias",
+        assigned_at="2026-02-10T17:20:07Z",
+        active_cycle_started_at="2026-02-10T17:20:07Z",
+    )
+    routes = RouteGitHubApi().add_request(
+        "GET",
+        "issues/264",
+        status_code=502,
+        payload={"message": "bad gateway"},
+    ).add_request(
+        "GET",
+        "issues/264/comments?per_page=100&page=1",
+        status_code=200,
+        payload=[],
+    )
+    harness.runtime.github.stub(routes)
+    harness.stub_load_state(lambda *, fail_on_unavailable=False: state)
+    harness.stub_lock(acquire=lambda: (_ for _ in ()).throw(AssertionError("preview should not acquire lock")))
+    harness.stub_save_state(lambda current: (_ for _ in ()).throw(AssertionError("preview should not save state")))
+    harness.stub_sync_status_labels(lambda current, issue_numbers: (_ for _ in ()).throw(AssertionError("preview should not sync labels")))
+
+    result = harness.run_execute()
+
+    assert result.exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["active_rows_inspected"] == [264]
+    assert payload["rows_blocked"] == [264]
+    assert payload["row_inventory"][0]["blockers"] == [
+        "live_snapshot_unavailable",
+        "reviewer_response_unavailable",
+        "status_projection_unavailable",
+    ]

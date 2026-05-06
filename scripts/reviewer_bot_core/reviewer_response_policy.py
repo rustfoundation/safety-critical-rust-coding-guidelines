@@ -14,7 +14,7 @@ Old module no longer preferred for these reviewer-response decision changes:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 
 from . import live_review_support, reviewer_review_helpers
@@ -173,11 +173,16 @@ def apply_reminder_cadence_overlay(response: ReviewerResponseDecision, cadence) 
     if response.response_state != "awaiting_reviewer_response":
         return response
     reason = getattr(cadence, "exhaustion_reason", None) or "legacy_duplicate_reminders_exhausted"
+    scope = (
+        replace(response.scope, scope_basis="reminder_cadence_exhausted")
+        if response.scope is not None
+        else None
+    )
     return ReviewerResponseDecision(
         response_state="reviewer_reassignment_needed",
         reason=reason,
         suppression_reason=reason,
-        scope=response.scope,
+        scope=scope,
         current_head_sha=response.current_head_sha,
         anchor_timestamp=response.anchor_timestamp,
         reviewer_authority_outcome=response.reviewer_authority_outcome,

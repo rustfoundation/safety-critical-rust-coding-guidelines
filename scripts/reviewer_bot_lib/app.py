@@ -558,6 +558,8 @@ def execute_run(bot: AppExecutionRuntime, context: EventContext) -> ExecutionRes
             if touched_items:
                 state = bot.state_store.load_state(fail_on_unavailable=True)
 
+        maintenance.emit_pending_issue314_state_health_repair_summary(bot)
+
         if touched_items:
             if not lock_acquired:
                 raise RuntimeError(

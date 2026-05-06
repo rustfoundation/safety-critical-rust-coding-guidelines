@@ -35,6 +35,38 @@ def _projection(issue_number: int, actual_labels: tuple[str, ...], state: str):
     )
 
 
+def _repair_summary(**overrides):
+    values = {
+        "schema_version": 1,
+        "repair_action": "repair-issue314-state-health",
+        "state_issue_number": 314,
+        "issue_number": 314,
+        "validation_nonce": "nonce",
+        "target_collection_mode": "global_issue314_state_health",
+        "active_rows_inspected": (42,),
+        "rows_repaired": (),
+        "rows_removed_closed": (),
+        "rows_operator_action_required": (),
+        "rows_blocked": (),
+        "status_labels_changed": (),
+        "reviewer_facing_reminder_posts_attempted": 0,
+        "manual_issue314_edit_status": "not_attempted",
+        "state_store_mutation_mode": "not_required",
+        "evaluated_repo": "rustfoundation/safety-critical-rust-coding-guidelines",
+        "head_sha": "head",
+        "evaluated_ref": "head",
+        "workflow_path": ".github/workflows/reviewer-bot-sweeper-repair.yml",
+        "run_id": "1",
+        "run_attempt": "1",
+        "artifact_name": "reviewer-bot-repair-output-1-attempt-1",
+        "artifact_file": "issue314-state-health-repair-summary.json",
+        "output_keys": (),
+        "result": "already_healthy",
+    }
+    values.update(overrides)
+    return issue314_state_health.Issue314StateHealthRepairSummary(**values)
+
+
 def test_issue314_classifier_marks_pr264_stale_label_as_operator_action_without_ping_risk():
     decision, projection = _projection(
         264,
@@ -160,6 +192,29 @@ def test_issue314_repair_summary_writer_requires_artifact_path(monkeypatch):
 
     with pytest.raises(RuntimeError, match="issue314_state_health_repair_summary_path_missing"):
         issue314_state_health.emit_issue314_state_health_repair_summary(summary)
+
+
+def test_issue314_summary_requires_identity_fields():
+    summary = _repair_summary(validation_nonce="")
+
+    with pytest.raises(RuntimeError, match="issue314_state_health_identity_blocked:missing:validation_nonce"):
+        summary.to_output()
+
+
+def test_issue314_summary_rejects_broad_or_manual_repair_as_success():
+    with pytest.raises(RuntimeError, match="target_collection_mode"):
+        _repair_summary(target_collection_mode="broad").to_output()
+
+    with pytest.raises(RuntimeError, match="manual_issue314_edit"):
+        _repair_summary(manual_issue314_edit_status="attempted").to_output()
+
+
+def test_issue314_summary_rejects_blocked_or_final_label_only_success():
+    with pytest.raises(RuntimeError, match="blocked_rows_success"):
+        _repair_summary(rows_blocked=(42,), result="changed").to_output()
+
+    with pytest.raises(RuntimeError, match="final_label_only_status"):
+        _repair_summary(status_labels_changed=(42,), rows_repaired=(), result="changed").to_output()
 
 
 def test_issue314_repair_summary_writer_emits_identity_fields(monkeypatch, tmp_path):
