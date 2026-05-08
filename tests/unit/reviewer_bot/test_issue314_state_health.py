@@ -9,19 +9,26 @@ from scripts.reviewer_bot_lib import issue314_state_health, reviews_projection
 from scripts.reviewer_bot_lib.reminder_comments import scan_reviewer_reminder_comments
 
 
-def _projection(issue_number: int, actual_labels: tuple[str, ...], state: str):
-    decision = to_reviewer_response_decision(
-        {
-            "issue_number": issue_number,
-            "current_reviewer": "iglesias",
-            "response_state": state,
-            "suppression_reason": "legacy_duplicate_reminders_exhausted"
-            if state == "reviewer_reassignment_needed"
-            else None,
-            "current_scope_key": "scope",
-            "current_scope_basis": "reminder_cadence_exhausted",
-        }
-    )
+def _projection(
+    issue_number: int,
+    actual_labels: tuple[str, ...],
+    state: str,
+    *,
+    suppresses_overdue_reminder: bool | None = None,
+):
+    decision_payload = {
+        "issue_number": issue_number,
+        "current_reviewer": "iglesias",
+        "response_state": state,
+        "suppression_reason": "legacy_duplicate_reminders_exhausted"
+        if state == "reviewer_reassignment_needed"
+        else None,
+        "current_scope_key": "scope",
+        "current_scope_basis": "reminder_cadence_exhausted",
+    }
+    if suppresses_overdue_reminder is not None:
+        decision_payload["suppresses_overdue_reminder"] = suppresses_overdue_reminder
+    decision = to_reviewer_response_decision(decision_payload)
     return decision, reviews_projection.derive_status_label_projection(
         reviews_projection.StatusLabelProjectionInput(
             issue_number=issue_number,
@@ -135,13 +142,105 @@ def test_issue314_classifier_marks_pr264_stale_label_as_operator_action_without_
     assert payload["output_keys"] == sorted(payload.keys())
 
 
-def test_issue314_classifier_blocks_rows_with_automated_reminder_risk():
-    decision, projection = _projection(42, (), "awaiting_reviewer_response")
+def test_issue314_classifier_keeps_aligned_awaiting_reviewer_response_healthy():
+    decision, projection = _projection(
+        42,
+        ("status: awaiting reviewer response",),
+        "awaiting_reviewer_response",
+    )
     input = issue314_state_health.Issue314StateHealthClassificationInput(
         state_issue_number=314,
         validation_nonce="nonce",
         active_review_rows=({"issue_number": 42, "review_data": {"current_reviewer": "alice"}},),
-        live_snapshots={42: {"number": 42, "state": "open", "pull_request": {}, "labels": []}},
+        live_snapshots={
+            42: {
+                "number": 42,
+                "state": "open",
+                "pull_request": {},
+                "labels": [{"name": "status: awaiting reviewer response"}],
+            }
+        },
+        reviewer_responses={42: decision},
+        status_projections={42: projection},
+        reminder_scans={42: scan_reviewer_reminder_comments([])},
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="1",
+        run_attempt="1",
+    )
+
+    summary = issue314_state_health.classify_issue314_state_health(input)
+
+    assert summary.rows_blocked == ()
+    assert summary.rows_repairable == ()
+    row = summary.row_inventory[0]
+    assert row.health_classification == "healthy"
+    assert row.automated_reminder_risk is False
+    assert row.status_label_risk == "aligned"
+
+
+def test_issue314_classifier_marks_awaiting_reviewer_response_label_drift_repairable():
+    decision, projection = _projection(
+        360,
+        ("status: awaiting reviewer response", "status: draft"),
+        "awaiting_reviewer_response",
+    )
+    input = issue314_state_health.Issue314StateHealthClassificationInput(
+        state_issue_number=314,
+        validation_nonce="nonce",
+        active_review_rows=({"issue_number": 360, "review_data": {"current_reviewer": "alice"}},),
+        live_snapshots={
+            360: {
+                "number": 360,
+                "state": "open",
+                "labels": [
+                    {"name": "status: awaiting reviewer response"},
+                    {"name": "status: draft"},
+                ],
+            }
+        },
+        reviewer_responses={360: decision},
+        status_projections={360: projection},
+        reminder_scans={360: scan_reviewer_reminder_comments([])},
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="1",
+        run_attempt="1",
+    )
+
+    summary = issue314_state_health.classify_issue314_state_health(input)
+
+    assert summary.rows_blocked == ()
+    assert summary.rows_repairable == (360,)
+    row = summary.row_inventory[0]
+    assert row.health_classification == "repairable"
+    assert row.automated_reminder_risk is False
+    assert row.status_label_risk == "repairable_drift"
+
+
+def test_issue314_classifier_blocks_contradictory_non_remindable_response():
+    decision, projection = _projection(
+        42,
+        ("status: reviewer reassignment needed",),
+        "reviewer_reassignment_needed",
+        suppresses_overdue_reminder=False,
+    )
+    input = issue314_state_health.Issue314StateHealthClassificationInput(
+        state_issue_number=314,
+        validation_nonce="nonce",
+        active_review_rows=({"issue_number": 42, "review_data": {"current_reviewer": "alice"}},),
+        live_snapshots={
+            42: {
+                "number": 42,
+                "state": "open",
+                "pull_request": {},
+                "labels": [{"name": "status: reviewer reassignment needed"}],
+            }
+        },
         reviewer_responses={42: decision},
         status_projections={42: projection},
         reminder_scans={42: scan_reviewer_reminder_comments([])},
