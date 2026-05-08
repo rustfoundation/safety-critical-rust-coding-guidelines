@@ -12,7 +12,11 @@ from tests.fixtures.reviewer_bot import (
     pull_request_payload,
     review_payload,
 )
-from tests.fixtures.reviewer_bot_builders import accept_reviewer_review
+from tests.fixtures.reviewer_bot_builders import (
+    accept_contributor_revision,
+    accept_reviewer_comment,
+    accept_reviewer_review,
+)
 from tests.fixtures.reviewer_bot_fakes import RouteGitHubApi
 
 pytestmark = pytest.mark.integration
@@ -37,8 +41,8 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
         state,
         264,
         reviewer="iglesias",
-        assigned_at="2026-02-10T17:20:07Z",
-        active_cycle_started_at="2026-02-10T17:20:07Z",
+        assigned_at="2026-02-26T04:58:03.401345+00:00",
+        active_cycle_started_at="2026-02-26T04:58:03.401345+00:00",
     )
     accept_reviewer_review(
         review,
@@ -46,6 +50,19 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
         timestamp="2026-03-18T01:09:05Z",
         actor="iglesias",
         reviewed_head_sha="head-old",
+    )
+    accept_contributor_revision(
+        review,
+        semantic_key="pull_request_sync:264:head-live",
+        timestamp="2026-03-18T12:09:36.450502+00:00",
+        actor="manhatsu",
+        head_sha="head-live",
+    )
+    accept_reviewer_comment(
+        review,
+        semantic_key="issue_comment:4240237244",
+        timestamp="2026-04-13T23:23:25Z",
+        actor="iglesias",
     )
 
     routes = RouteGitHubApi().add_request(
@@ -71,16 +88,26 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
         status_code=200,
         payload=[
             {
-                "id": 9001,
-                "user": {"login": "github-actions[bot]"},
-                "created_at": "2026-04-13T00:44:23Z",
-                "body": "⚠️ **Review Reminder**\n\ntransition period",
+                "id": 4240237244,
+                "user": {"login": "iglesias"},
+                "created_at": "2026-04-13T23:23:25Z",
+                "body": "LGTM",
             },
             {
-                "id": 9002,
+                "id": 4240517367,
                 "user": {"login": "github-actions[bot]"},
                 "created_at": "2026-04-14T00:44:23Z",
-                "body": "⚠️ **Review Reminder**\n\ntransition period",
+                "body": "⚠️ **Review Reminder**\n\n"
+                "Hey @iglesias, it's been more than 14 days since you were assigned to review this.\n\n"
+                "If no action is taken within 14 days, you may be transitioned from Producer to Observer status.",
+            },
+            {
+                "id": 4240520000,
+                "user": {"login": "github-actions[bot]"},
+                "created_at": "2026-04-14T00:52:09Z",
+                "body": "⚠️ **Review Reminder**\n\n"
+                "Hey @iglesias, this review has already received its final transition notice.\n\n"
+                "If no action is taken, the reviewer may be transitioned from Producer to Observer status.",
             },
         ],
     )
@@ -113,7 +140,7 @@ def test_execute_run_preview_check_overdue_uses_frozen_pr264_operational_project
     assert payload["response_state"] == "reviewer_reassignment_needed"
     assert payload["reviewer_authority_outcome"] == "tracked_reviewer_confirmed"
     assert payload["suppression_reason"] == "legacy_duplicate_reminders_exhausted"
-    assert payload["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-10T17:20:07Z|anchor=2026-02-10T17:20:07Z"
+    assert payload["current_scope_key"] == "reviewer=iglesias|head=head-live|cycle=2026-02-26T04:58:03.401345+00:00|anchor=2026-03-18T12:09:36.450502+00:00"
     assert payload["current_scope_basis"] == "reminder_cadence_exhausted"
     assert payload["would_post_warning"] is False
     assert payload["would_post_transition"] is False

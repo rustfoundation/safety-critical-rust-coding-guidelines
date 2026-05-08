@@ -742,6 +742,9 @@ def derive_reviewer_response_state(
             reason="pull_request_head_unavailable",
             scope_fields={"current_scope_key": None, "current_scope_basis": None},
         )
+    # Plain PR issue/review comments are diagnostic-only in v65. Explicit
+    # command handoff is represented separately by current_cycle_reviewer_handoff.
+    reviewer_comment = None
 
     reviewer_handoff = _current_cycle_reviewer_handoff_record(
         review_data,
@@ -824,7 +827,7 @@ def derive_reviewer_response_state(
     if reviewer_handoff is not None and latest_reviewer_response is reviewer_handoff:
         return _decorate_response(
             state="awaiting_contributor_response",
-            reason="accepted_same_scope_reviewer_activity",
+            reason="reviewer_feedback_handoff",
             scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
             anchor_timestamp=reviewer_handoff.get("timestamp"),
             current_head_sha=current_head,
@@ -860,7 +863,7 @@ def derive_reviewer_response_state(
             response_anchor = reviewer_comment if isinstance(reviewer_comment, dict) else reviewer_handoff
             return _decorate_response(
                 state="awaiting_contributor_response",
-                reason="accepted_same_scope_reviewer_activity",
+                reason="reviewer_feedback_handoff",
                 scope_fields=_current_scope_fields(review_data, current_reviewer, current_head, contributor_handoff),
                 anchor_timestamp=response_anchor.get("timestamp") if isinstance(response_anchor.get("timestamp"), str) else None,
                 current_head_sha=current_head,
@@ -989,6 +992,10 @@ def compute_reviewer_response_state(
     stored_reviewer_review = reviewer_review
     contributor_comment = review_data.get("contributor_comment", {}).get("accepted")
     had_reviewer_review = isinstance(reviewer_review, dict)
+    if is_pr:
+        # Plain PR issue/review comments are diagnostic-only in v65. Explicit
+        # command handoff is represented separately by current_cycle_reviewer_handoff.
+        reviewer_comment = None
 
     if not is_pr:
         return derive_reviewer_response_state(

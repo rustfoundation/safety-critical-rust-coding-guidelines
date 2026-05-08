@@ -585,7 +585,7 @@ def test_pr_feedback_handoff_requires_current_tracked_head():
     )
 
     assert current_head_result["state"] == "awaiting_contributor_response"
-    assert current_head_result["reason"] == "accepted_same_scope_reviewer_activity"
+    assert current_head_result["reason"] == "reviewer_feedback_handoff"
     assert stale_head_result["state"] == "awaiting_reviewer_response"
     assert stale_head_result["reason"] == "no_reviewer_activity"
 
@@ -663,7 +663,7 @@ def test_pr_feedback_handoff_overrides_existing_approval_completion_without_clea
     )
 
     assert result["state"] == "awaiting_contributor_response"
-    assert result["reason"] == "accepted_same_scope_reviewer_activity"
+    assert result["reason"] == "reviewer_feedback_handoff"
     assert review["review_completed_at"] == "2026-03-17T09:30:00Z"
     assert review["current_cycle_write_approval"] == {"has_write_approval": True}
 

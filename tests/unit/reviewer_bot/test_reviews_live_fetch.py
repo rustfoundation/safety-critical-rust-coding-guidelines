@@ -4,6 +4,7 @@ from scripts.reviewer_bot_core import approval_policy
 from scripts.reviewer_bot_lib import review_state, reviews
 from scripts.reviewer_bot_lib.config import (
     STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL,
+    STATUS_AWAITING_REVIEWER_RESPONSE_LABEL,
 )
 from tests.fixtures.fake_runtime import FakeReviewerBotRuntime
 from tests.fixtures.reviewer_bot import (
@@ -199,7 +200,7 @@ def test_repair_missing_reviewer_review_state_backfills_live_review_payload_when
     assert review.get("transition_notice_sent_at") == before["transition_notice_sent_at"]
 
 
-def test_project_status_labels_uses_commit_id_and_comment_freshness(monkeypatch):
+def test_project_status_labels_ignores_pr_reviewer_comment_when_review_head_stale(monkeypatch):
     state = make_state()
     review = make_tracked_review_state(state, 42, reviewer="alice", active_cycle_started_at="2026-03-17T09:00:00Z")
     accept_reviewer_comment(review, semantic_key="issue_comment:1", timestamp="2026-03-17T10:00:00Z", actor="alice")
@@ -209,8 +210,65 @@ def test_project_status_labels_uses_commit_id_and_comment_freshness(monkeypatch)
 
     desired_labels, metadata = reviews.project_status_labels_for_item(runtime, 42, state)
 
-    assert desired_labels == {STATUS_AWAITING_CONTRIBUTOR_RESPONSE_LABEL}
-    assert metadata["reason"] == "accepted_same_scope_reviewer_activity"
+    assert desired_labels == {STATUS_AWAITING_REVIEWER_RESPONSE_LABEL}
+    assert metadata["reason"] == "review_head_stale"
+
+
+def test_compute_reviewer_response_state_ignores_persisted_pr264_plain_comment_poison(monkeypatch):
+    state = make_state()
+    review = make_tracked_review_state(
+        state,
+        264,
+        reviewer="iglesias",
+        assigned_at="2026-02-26T04:58:03.401345+00:00",
+        active_cycle_started_at="2026-02-26T04:58:03.401345+00:00",
+    )
+    accept_reviewer_review(
+        review,
+        semantic_key="pull_request_review:77",
+        timestamp="2026-03-18T01:09:05Z",
+        actor="iglesias",
+        reviewed_head_sha="head-old",
+        source_precedence=1,
+    )
+    accept_contributor_revision(
+        review,
+        semantic_key="pull_request_sync:264:7d8864fa0c00b5bf9da20dd66047f039a049fd8b",
+        timestamp="2026-03-18T12:09:36.450502+00:00",
+        actor="manhatsu",
+        head_sha="7d8864fa0c00b5bf9da20dd66047f039a049fd8b",
+    )
+    accept_reviewer_comment(
+        review,
+        semantic_key="issue_comment:4240237244",
+        timestamp="2026-04-13T23:23:25Z",
+        actor="iglesias",
+    )
+    routes = RouteGitHubApi().add_pull_request_snapshot(
+        264,
+        pull_request_payload(264, head_sha="7d8864fa0c00b5bf9da20dd66047f039a049fd8b", author="manhatsu"),
+    ).add_pull_request_reviews(
+        264,
+        [
+            review_payload(77, state="COMMENTED", submitted_at="2026-03-18T01:09:05Z", commit_id="head-old", author="iglesias"),
+            review_payload(
+                501,
+                state="APPROVED",
+                submitted_at="2026-03-18T12:10:42Z",
+                commit_id="7d8864fa0c00b5bf9da20dd66047f039a049fd8b",
+                author="plaindocs",
+            ),
+        ],
+    )
+    runtime = _runtime(monkeypatch, routes)
+
+    response_state = reviews.compute_reviewer_response_state(runtime, 264, review)
+
+    assert response_state["state"] == "awaiting_reviewer_response"
+    assert response_state["reason"] == "contributor_revision_newer"
+    assert response_state["reviewer_comment"] is None
+    assert response_state["anchor_timestamp"] == "2026-03-18T12:09:36.450502+00:00"
+    assert response_state["current_scope_basis"] == "contributor_revision"
 
 
 def test_compute_reviewer_response_state_reports_review_head_stale_when_current_head_has_no_matching_review(monkeypatch):
@@ -358,7 +416,10 @@ def test_project_status_labels_emits_awaiting_write_approval_only_after_completi
     accept_reviewer_review(review, semantic_key="pull_request_review:10", timestamp="2026-03-17T10:01:00Z", actor="alice", reviewed_head_sha="head-1", source_precedence=1)
     routes = RouteGitHubApi().add_pull_request_snapshot(42, pull_request_payload(42, head_sha="head-1")).add_pull_request_reviews(
         42,
-        [review_payload(10, state="APPROVED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="bob")],
+        [
+            review_payload(10, state="COMMENTED", submitted_at="2026-03-17T10:01:00Z", commit_id="head-1", author="alice"),
+            review_payload(11, state="APPROVED", submitted_at="2026-03-17T10:05:00Z", commit_id="head-1", author="bob"),
+        ],
     )
     runtime = _runtime(monkeypatch, routes)
     runtime.github.get_user_permission_status = lambda username, required_permission="triage": "denied"

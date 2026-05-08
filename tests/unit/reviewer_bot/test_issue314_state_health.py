@@ -83,15 +83,19 @@ def test_issue314_classifier_marks_pr264_stale_label_as_operator_action_without_
     scan = scan_reviewer_reminder_comments(
         [
             {
-                "id": 1,
-                "created_at": "2026-04-13T00:44:23Z",
-                "body": "⚠️ **Review Reminder**\n\ntransition period",
+                "id": 4240517367,
+                "created_at": "2026-04-14T00:44:23Z",
+                "body": "⚠️ **Review Reminder**\n\n"
+                "Hey @iglesias, it's been more than 14 days since you were assigned to review this.\n\n"
+                "If no action is taken within 14 days, you may be transitioned from Producer to Observer status.",
                 "user": {"login": "github-actions[bot]"},
             },
             {
-                "id": 2,
-                "created_at": "2026-04-14T00:44:23Z",
-                "body": "⚠️ **Review Reminder**\n\ntransition period",
+                "id": 4240520000,
+                "created_at": "2026-04-14T00:52:09Z",
+                "body": "⚠️ **Review Reminder**\n\n"
+                "Hey @iglesias, this review has already received its final transition notice.\n\n"
+                "If no action is taken, the reviewer may be transitioned from Producer to Observer status.",
                 "user": {"login": "github-actions[bot]"},
             },
         ]
@@ -140,6 +144,54 @@ def test_issue314_classifier_marks_pr264_stale_label_as_operator_action_without_
     assert row["status_label_risk"] == "operator_visible_stale"
     assert row["automated_reminder_risk"] is False
     assert payload["output_keys"] == sorted(payload.keys())
+
+
+def test_issue314_classifier_blocks_pr264_handoff_when_projection_truth_is_incompatible():
+    decision, projection = _projection(
+        264,
+        ("status: awaiting reviewer response",),
+        "awaiting_contributor_response",
+    )
+    input = issue314_state_health.Issue314StateHealthClassificationInput(
+        state_issue_number=314,
+        validation_nonce="nonce",
+        active_review_rows=(
+            {
+                "issue_number": 264,
+                "review_data": {
+                    "current_reviewer": "iglesias",
+                    "active_head_sha": "7d8864fa0c00b5bf9da20dd66047f039a049fd8b",
+                },
+            },
+        ),
+        live_snapshots={
+            264: {
+                "number": 264,
+                "state": "open",
+                "pull_request": {},
+                "labels": [{"name": "status: awaiting reviewer response"}],
+            }
+        },
+        reviewer_responses={264: decision},
+        status_projections={264: projection},
+        reminder_scans={264: scan_reviewer_reminder_comments([])},
+        evaluated_repo="rustfoundation/safety-critical-rust-coding-guidelines",
+        head_sha="head",
+        evaluated_ref="head",
+        workflow_path=".github/workflows/reviewer-bot-preview.yml",
+        run_id="1",
+        run_attempt="1",
+    )
+
+    summary = issue314_state_health.classify_issue314_state_health(input)
+    payload = summary.to_output()
+
+    assert payload["rows_operator_action_required"] == []
+    assert payload["rows_blocked"] == [264]
+    row = payload["row_inventory"][0]
+    assert row["health_classification"] == "blocked"
+    assert row["classification_reason"] == "pr264_projection_handoff_response_state_mismatch"
+    assert row["blockers"] == ["pr264_projection_handoff_response_state_mismatch"]
 
 
 def test_issue314_classifier_keeps_aligned_awaiting_reviewer_response_healthy():

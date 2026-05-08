@@ -77,7 +77,11 @@ def _matched_shape(first_line: str, body: str) -> str | None:
     if first_line.startswith(f"<!-- {TRANSITION_NOTICE_MARKER_PREFIX} "):
         return "markerized_transition_notice"
     normalized = body.lower()
-    if "**review reminder**" in normalized and "transition period" in normalized:
+    if "**review reminder**" in normalized and (
+        "transition period" in normalized
+        or "transitioned from producer to observer" in normalized
+        or "if no action is taken" in normalized
+    ):
         return "legacy_unmarked_warning"
     if "**transition period ended**" in normalized:
         return "legacy_unmarked_transition_notice"
