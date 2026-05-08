@@ -435,6 +435,12 @@ def _live_head_sha(snapshot: dict[str, object], projection: StatusLabelProjectio
     return None
 
 
+def _has_unsafe_automated_reminder_risk(decision: ReviewerResponseDecision) -> bool:
+    if decision.response_state == "awaiting_reviewer_response":
+        return False
+    return not decision.suppresses_overdue_reminder
+
+
 def _row_from_input(input: Issue314StateHealthClassificationInput, row: dict[str, object]) -> Issue314StateHealthRow:
     issue_number = int(row["issue_number"])
     review_data = row.get("review_data") if isinstance(row.get("review_data"), dict) else {}
@@ -469,9 +475,10 @@ def _row_from_input(input: Issue314StateHealthClassificationInput, row: dict[str
             reason = "closed_live_item_has_active_issue314_row"
         else:
             assert projection is not None
+            assert decision is not None
             delta = projection.delta
             has_drift = bool(delta.labels_to_add or delta.labels_to_remove)
-            automated_risk = projection.response_state == "awaiting_reviewer_response"
+            automated_risk = _has_unsafe_automated_reminder_risk(decision)
             if automated_risk:
                 health = "blocked"
                 repair = "blocked"
