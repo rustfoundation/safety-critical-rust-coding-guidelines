@@ -486,10 +486,17 @@ def _row_from_input(input: Issue314StateHealthClassificationInput, row: dict[str
                 reason = "row_can_still_trigger_reviewer_reminder"
                 blockers.append(reason)
             elif has_drift and issue_number == 264:
-                health = "operator_action_required"
-                repair = "not_attempted"
-                status_risk = "operator_visible_stale"
-                reason = "pr264_status_label_repair_deferred_to_issue_scoped_live_repair"
+                if projection.response_state != "reviewer_reassignment_needed":
+                    health = "blocked"
+                    repair = "blocked"
+                    status_risk = "blocked_unknown"
+                    reason = "pr264_projection_handoff_response_state_mismatch"
+                    blockers.append(reason)
+                else:
+                    health = "operator_action_required"
+                    repair = "not_attempted"
+                    status_risk = "operator_visible_stale"
+                    reason = "pr264_status_label_repair_deferred_to_issue_scoped_live_repair"
             elif has_drift:
                 health = "repairable"
                 repair = "not_attempted"
