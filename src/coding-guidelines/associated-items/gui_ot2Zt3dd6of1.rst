@@ -7,7 +7,7 @@ Recursive function are not allowed
 ==================================
 
 .. guideline:: Recursive function are not allowed
-    :id: gui_ot2Zt3dd6of1 
+    :id: gui_ot2Zt3dd6of1
     :category: required
     :status: draft
     :release: 1.3.0-latest
@@ -15,17 +15,18 @@ Recursive function are not allowed
     :decidability: undecidable
     :scope: system
     :tags: stack-overflow
+    :misra: test
 
     Any function shall not call itself directly or indirectly
 
-    .. rationale:: 
-        :id: rat_gvoKeVSKK8fD 
+    .. rationale::
+        :id: rat_gvoKeVSKK8fD
         :status: draft
 
         Recursive functions can easily cause stack overflows, which may result in exceptions or, in some cases, undefined behavior (typically some embedded systems). Although the Rust compiler supports tail call optimization :cite:`gui_ot2Zt3dd6of1:WIKI-TAIL-CALL`, this optimization is not guaranteed and depends on the specific implementation and function structure. There is an open RFC to guarantee tail call optimization in the Rust compiler :cite:`gui_ot2Zt3dd6of1:PROPOSED-RFC-EXPLICIT-TAIL-CALLS`, but this feature has not yet been stabilized. Until tail call optimization is guaranteed and stabilized, developers should avoid using recursive functions to prevent potential stack overflows and ensure program reliability.
 
     .. non_compliant_example::
-        :id: non_compl_ex_MxqhjfkStJJy 
+        :id: non_compl_ex_MxqhjfkStJJy
         :status: draft
 
         The below function ``concat_strings`` is not complaint because it call itself and depending on depth of data provided as input it could generate an stack overflow exception or undefine behavior.
@@ -55,7 +56,7 @@ Recursive function are not allowed
             # fn main() {}
 
     .. compliant_example::
-        :id: compl_ex_9pK3h65rfceO 
+        :id: compl_ex_9pK3h65rfceO
         :status: draft
 
         The following code implements the same functionality using iteration instead of recursion. The ``stack`` variable is used to maintain the processing context at each step of the loop. This approach provides explicit control over memory usage. If the stack grows beyond a predefined limit due to the structure or size of the input, the function returns an error rather than risking a stack overflow or out-of-memory exception. This ensures more predictable and robust behavior in resource-constrained environments.
