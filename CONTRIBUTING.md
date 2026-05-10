@@ -102,6 +102,41 @@ As the contributor of the coding guideline and opener of the issue, you'll respo
 
 Once the coding guideline contents have passed review, a subcommittee member with `write` access will approve the pull request, and put it on the merge queue.
 
+### Writing a guideline locally (less typical, not recommended)
+
+We recommend the issue-based workflow above. If you need to work locally, expand the section below.
+
+<details>
+<summary>Local authoring steps</summary>
+
+While it is possible to create guidelines locally, we encourage contributors to make use of the process described above since it handles some of the fiddly details for you as a guideline writer.
+
+### Guideline template
+
+Use `./generate_guideline_templates.py` to generate a guideline template with properly randomized IDs. You'll need to `uv` to install the dependencies.
+
+To see all available options, run:
+
+```bash
+./generate_guideline_templates.py --help
+```
+
+Here are a few examples of how to generate templates:
+
+- Generate a standard template (1 compliant and 1 non-compliant example):
+  ```bash
+  ./generate_guideline_templates.py
+  ```
+
+- Generate a template with multiple examples and a bibliography:
+  ```bash
+  ./generate_guideline_templates.py --non-compliant 2 --compliant 3 --bibliography --bib-entries 2
+  ```
+
+You can then copy and paste this guideline from the command line into the correct chapter.
+
+</details>
+
 ### Licenses
 
 There is no Contributor License Agreement to sign to contribute this project.
