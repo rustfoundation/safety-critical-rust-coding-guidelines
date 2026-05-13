@@ -19,8 +19,10 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
    * - Guideline
      - Category
      - Safety critical Rust rule
+     - Category
      - Comment
    * - **Directives**
+     -
      -
      -
      -
@@ -28,67 +30,84 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      - Required
      - 
      -
+     -
    * - D.1.2
      - Advisory
+     -
      -
      - intended to apply to experimental and unstable features, forcing full documentation
    * - D.2.1
      - Required
      -
      -
+     -
    * - D.3.1
      - Required
+     -
      -
      -
    * - D.4.1
      - Required
      -
+     -
      - often in the form of panics
    * - D.4.4
      - Advisory
+     -
      -
      - conditional compilation is provided by the cfg attribute
    * - D.4.5
      - Advisory
      -
+     -
      - "ambiguity" is determined by the project
    * - D.4.7
      - Required
+     -
      -
      - prefer Option, Result, etc. over in-band error values
    * - D.4.9
      - Advisory
      -
      -
+     -
    * - D.4.11
      - Required
+     -
      -
      -
    * - D.4.12
      - Required
      -
      -
+     -
    * - D.4.13
      - Advisory
+     -
      -
      - many Rust APIs use the type system to enforce ordering
    * - D.4.14
      - Required
      -
      -
+     -
    * - D.4.15
      - Required
+     -
      -
      - Rust implements IEEE-754
    * - D.5.2
      - Required
      -
      -
+     -
    * - D.5.3
      - Required
      -
      -
+     -
    * - **Rules**
+     -
      -
      -
      -
@@ -96,180 +115,225 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
      - Required
      -
      -
+     -
    * - R.1.5
      - Required
+     -
      -
      - this applies to deprecated APIs
    * - R.2.1
      - Required
      -
      -
+     -
    * - R.2.2
      - Required
+     -
      -
      -
    * - R.2.3
      - Advisory
      -
      -
+     -
    * - R.2.5
      - Advisory
+     -
      -
      -
    * - R.2.6
      - Advisory
      -
      -
+     -
    * - R.2.7
      - Advisory
+     -
      -
      -
    * - R.2.8
      - Advisory
      -
      -
+     -
    * - R.3.1
      - Required
+     -
      -
      - nested comments are fully supported
    * - R.5.2
      - Required
      -
+     -
      - no character limit, but one can be applied; has name spaces
    * - R.5.3
      - Required
      - :need:`gui_SJMrWDYZ0dN4`
+     -
      - this also applies to macro names
    * - R.5.6
      - Required
      -
+     -
      - the proper module system makes surprise name conflicts much less likely
    * - R.5.8
      - Required
+     -
      -
      - the proper module system makes surprise name conflicts much less likely
    * - R.5.9
      - Advisory
      -
      -
+     -
    * - R.7.1
      - Required
+     -
      -
      - Rust octals have a distinct prefix from decimals
    * - R.7.2
      - Required
      -
+     -
      - this is an error by default but can be enabled. Note that suffixes also make the size explicit
    * - R.8.7
      - Advisory
+     -
      -
      - items should not be declared pub if referenced in only one module
    * - R.8.9
      - Advisory
      -
      -
+     -
    * - R.8.13
      - Advisory
+     -
      -
      - ``mut`` should be avoided unless necessary
    * - R.9.1
      - Mandatory
      -
+     -
      - enforced by rustc but can be bypassed by unsafe
    * - R.9.4
      - Required
+     -
      -
      - enforced by rustc
    * - R.11.3
      - Required
      -
      -
+     -
    * - R.11.4
      - Advisory
      - :need:`gui_PM8Vpf7lZ51U`
      -
+     -
    * - R.11.11
      - Advisory
+     -
      -
      - enforced by rustc
    * - R.12.1
      - Advisory
      -
      -
+     -
    * - R.13.1
      - Required
+     -
      -
      - order of evaluation is strict in Rust
    * - R.13.5
      - Required
      -
      -
+     -
    * - R.14.3
      - Required
      -
      -
+     -
    * - R.14.4
      - Required
+     -
      -
      - enforced by rustc
    * - R.15.4
      - Advisory
      -
      -
+     -
    * - R.15.5
      - Advisory
+     -
      -
      -
    * - R.15.7
      - Required
      -
      -
+     -
    * - R.17.2
      - Required
      - :need:`gui_ot2Zt3dd6of1`
      -
+     -
    * - R.17.7
      - Required
+     -
      -
      - ``must_use`` can help indicate where this is important, but does not affect applicability
    * - R.17.8
      - Advisory
      -
+     -
      - this cannot be done accidentally without declaring parameters ``mut``
    * - R.17.11
      - Advisory
+     -
      -
      - a non-returning function can be declared to return a value type
    * - R.18.3
      - Required
      -
      -
+     -
    * - R.18.5
      - Advisory
+     -
      -
      -
    * - R.19.2
      - Advisory
      - :need:`gui_0cuTYG8RVYjg`
      -
+     -
    * - R.19.3
      - Required
+     -
      -
      -
    * - R.21.25
      - Required
      -
      -
+     -
    * - R.22.13
      - Required
+     -
      -
      -
    * - R.22.18
      - Required
      -
      -
+     -
    * - R.22.19
      - Required
+     -
      -
      -
 
@@ -286,8 +350,10 @@ In addition to the rules from Table 1, these are the additional guidelines that 
    * - Guideline
      - Category
      - Safety critical Rust rule
+     - Category
      - Comment
    * - **Directives**
+     -
      -
      -
      -
@@ -295,15 +361,19 @@ In addition to the rules from Table 1, these are the additional guidelines that 
      - Advisory
      -
      -
+     -
    * - D.4.3
      - Required
+     -
      -
      -
    * - D.5.1
      - Required
      -
+     -
      - not all safe Rust types are race-free
    * - **Rules**
+     -
      -
      -
      -
@@ -311,260 +381,325 @@ In addition to the rules from Table 1, these are the additional guidelines that 
      - Required
      -
      -
+     -
    * - R.5.1
      - Required
+     -
      -
      - no character limit, except in extern "C", but one can be set by project
    * - R.5.5
      - Required
      -
+     -
      - macros and functions use different syntax
    * - R.5.10
      - Required
+     -
      -
      - only possible in some cases. Previously Rule 21.2
    * - R.8.3
      - Required
      -
+     -
      - an extern declaration shall have a type compatible with the C declaration
    * - R.8.5
      - Required
+     -
      -
      - may affect extern "C" declarations
    * - R.8.6
      - Required
      -
+     -
      - may affect extern "C" declarations
    * - R.8.15
      - Required
      -
+     -
      - may affect extern "C" declarations
    * - R.8.17
      - Advisory
+     -
      -
      - alignment applies to types, not objects
    * - R.9.7
      - Mandatory
      -
      -
+     -
    * - R.10.5
      - Advisory
      - :need:`gui_ADHABsmK9FXz`
+     -
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.10.8
      - Required
      - :need:`gui_HDnAZ7EZ4z6G`
+     -
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.11.1
      - Required
+     -
      -
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.11.2
      - Required
      -
      -
+     -
    * - R.11.5
      - Advisory
+     -
      -
      -
    * - R.11.6
      - Required
      - :need:`gui_PM8Vpf7lZ51U`
      -
+     -
    * - R.11.8
      - Required
+     -
      -
      -
    * - R.12.2
      - Required
      - :need:`gui_LvmzGKdsAgI5`, :need:`gui_RHvQj8BHlz9b`
      -
+     -
    * - R.12.4
      - Advisory
+     -
      -
      - this is either well-defined or will not occur
    * - R.14.1
      - Required
      -
+     -
      - applies to while loops only
    * - R.17.9
      - Mandatory
+     -
      -
      - this is expressed with the ``!`` (Never) type, and enforced by rustc
    * - R.18.1
      - Required
      -
+     -
      - by unsafe API
    * - R.18.2
      - Required
      -
+     -
      - by unsafe API
    * - R.18.4
      - Advisory
+     -
      -
      - applies to use of the unsafe API
    * - R.18.6
      - Required
      -
      -
+     -
    * - R.19.1
      - Mandatory
+     -
      -
      -
    * - R.20.4
      - Required
      -
+     -
      - possible with raw identifiers but the compiler prevents visual conflicts
    * - R.20.7
      - Required
+     -
      -
      - possible to express with procedural macros only, not ``macro_rules``
    * - R.21.3
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.4
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.5
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.6
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.7
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.8
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.9
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.10
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.12
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.13
      - Mandatory
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.14
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.15
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.16
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.17
      - Mandatory
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.18
      - Mandatory
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.19
      - Mandatory
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.20
      - Mandatory
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.21
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.21.24
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.21.26
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.22.1
      - Required
      -
+     -
      - applies to resources acquired through FFI only
    * - R.22.2
      - Mandatory
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.22.3
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.22.4
      - Mandatory
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.22.5
      - Mandatory
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.22.6
      - Mandatory
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.22.7
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.22.8
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.22.9
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.22.10
      - Required
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.22.11
      - Required
      -
      -
+     -
    * - R.22.12
      - Mandatory
+     -
      -
      - only accessible through unsafe extern "C"
    * - R.22.14
      - Mandatory
      -
+     -
      - applies to creating synchronization objects before threads that use them
    * - R.22.15
      - Required
+     -
      -
      - applies to releasing synchronization objects after threads that use them
    * - R.22.16
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.22.17
      - Required
      -
+     -
      - only accessible through unsafe extern "C"
    * - R.22.20
      - Mandatory
+     -
      -
      -
 
