@@ -169,7 +169,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
    * - R.5.3
      - Required
      - :need:`gui_SJMrWDYZ0dN4`
-     -
+     - Required
      - this also applies to macro names
    * - R.5.6
      - Required
@@ -229,7 +229,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
    * - R.11.4
      - Advisory
      - :need:`gui_PM8Vpf7lZ51U`
-     -
+     - <TODO>
      -
    * - R.11.11
      - Advisory
@@ -279,7 +279,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
    * - R.17.2
      - Required
      - :need:`gui_ot2Zt3dd6of1`
-     -
+     - Required
      -
    * - R.17.7
      - Required
@@ -309,7 +309,7 @@ Table 1 – Guidelines applicable to Rust in general (safe Rust, no unsafe code 
    * - R.19.2
      - Advisory
      - :need:`gui_0cuTYG8RVYjg`
-     -
+     - Required
      -
    * - R.19.3
      - Required
@@ -430,12 +430,12 @@ In addition to the rules from Table 1, these are the additional guidelines that 
    * - R.10.5
      - Advisory
      - :need:`gui_ADHABsmK9FXz`
-     -
+     - Advisory
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.10.8
      - Required
      - :need:`gui_HDnAZ7EZ4z6G`
-     -
+     - Required
      - includes both safe ``as`` and unsafe ``transmute`` operations
    * - R.11.1
      - Required
@@ -455,7 +455,7 @@ In addition to the rules from Table 1, these are the additional guidelines that 
    * - R.11.6
      - Required
      - :need:`gui_PM8Vpf7lZ51U`
-     -
+     - <TODO>
      -
    * - R.11.8
      - Required
@@ -465,7 +465,7 @@ In addition to the rules from Table 1, these are the additional guidelines that 
    * - R.12.2
      - Required
      - :need:`gui_LvmzGKdsAgI5`, :need:`gui_RHvQj8BHlz9b`
-     -
+     - Mandatory, Advisory
      -
    * - R.12.4
      - Advisory
